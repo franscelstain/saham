@@ -13,7 +13,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->app->bind(
+            \App\Repositories\Contracts\TickerOhlcRepositoryInterface::class,
+            \App\Repositories\TickerOhlcRepository::class
+        );
     }
 
     /**

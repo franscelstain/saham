@@ -29,5 +29,10 @@ return [
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
+    
+    'yahoo' => [
+        'base_uri' => env('YAHOO_BASE_URI', 'https://query1.finance.yahoo.com'),
+        'timeout'  => env('YAHOO_TIMEOUT', 20),
+    ],
 
 ];

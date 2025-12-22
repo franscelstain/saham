@@ -1,0 +1,89 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateTickerIndicatorsDailyTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::create('ticker_indicators_daily', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+
+            $table->bigIncrements('indicator_daily_id');
+            $table->unsignedBigInteger('ticker_id');
+            $table->date('trade_date');
+
+            // snapshot EOD (optional tapi membantu debug)
+            $table->decimal('open', 18, 4)->nullable();
+            $table->decimal('high', 18, 4)->nullable();
+            $table->decimal('low', 18, 4)->nullable();
+            $table->decimal('close', 18, 4)->nullable();
+            $table->unsignedBigInteger('volume')->nullable();
+
+            // moving averages
+            $table->decimal('ma20', 18, 4)->nullable();
+            $table->decimal('ma50', 18, 4)->nullable();
+            $table->decimal('ma200', 18, 4)->nullable();
+
+            // volume metrics
+            $table->decimal('vol_sma20', 20, 4)->nullable();
+            $table->decimal('vol_ratio', 12, 4)->nullable(); // volume / vol_sma20
+
+            // momentum / volatility
+            $table->decimal('rsi14', 6, 2)->nullable();
+            $table->decimal('atr14', 18, 4)->nullable();
+
+            // support & resistance (rolling)
+            $table->decimal('support_20d', 18, 4)->nullable();
+            $table->decimal('resistance_20d', 18, 4)->nullable();
+
+            // hasil klasifikasi (yang kamu mau)
+            $table->tinyInteger('signal_code')->unsigned()->default(4); // 1..5
+            $table->tinyInteger('volume_label_code')->unsigned()->nullable(); // 1..10
+
+            // scoring
+            $table->smallInteger('score_total')->default(0);
+            $table->smallInteger('score_trend')->default(0);
+            $table->smallInteger('score_momentum')->default(0);
+            $table->smallInteger('score_volume')->default(0);
+            $table->smallInteger('score_breakout')->default(0);
+            $table->smallInteger('score_risk')->default(0);
+
+            // meta
+            $table->string('source', 30)->nullable();
+            $table->boolean('is_deleted')->default(0);
+            $table->timestamps();
+
+            $table->unique(['ticker_id', 'trade_date'], 'uq_ind_daily_ticker_date');
+
+            // index untuk screener “hari ini”
+            $table->index(['trade_date', 'signal_code'], 'idx_ind_date_signal');
+            $table->index(['trade_date', 'volume_label_code'], 'idx_ind_date_vlabel');
+            $table->index(['trade_date', 'vol_ratio'], 'idx_ind_date_volratio');
+            $table->index(['trade_date', 'score_total'], 'idx_ind_date_score');
+
+            $table->foreign('ticker_id', 'fk_ind_daily_ticker')
+                ->references('ticker_id')->on('tickers')
+                ->onUpdate('cascade')
+                ->onDelete('restrict');
+        });
+
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('ticker_indicators_daily');
+    }
+}
