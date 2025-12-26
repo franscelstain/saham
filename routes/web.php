@@ -2,27 +2,31 @@
 
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
-|
-*/
+use App\Http\Controllers\ScreenerController;
+use App\Http\Controllers\YahooFinanceController;
+use App\Http\Controllers\IntradayController;
 
-Route::get('/', function () {
-    return view('welcome');
+// Landing -> langsung ke screener
+Route::get('/', fn () => redirect()->route('screener.index'));
+
+// Yahoo
+Route::prefix('yahoo')->group(function () {
+    Route::get('/history', [YahooFinanceController::class, 'history'])->name('yahoo.history');
+    Route::get('/names', [YahooFinanceController::class, 'names'])->name('yahoo.names');
 });
 
-Route::get('ohlc', 'TickerController@historicalOhlc');
-Route::get('yahoo/history', 'YahooFinanceController@history');
-Route::get('yahoo/names', 'YahooFinanceController@names');
-Route::get('screener', 'ScreenerController@screenerPage');
-Route::get('screener/candidates', 'ScreenerController@candidates');
-Route::get('screener/buylist-today', 'ScreenerController@buylistToday');
-Route::get('intraday/capture', 'IntradayController@capture');
+// Screener
+Route::prefix('screener')->group(function () {
+    Route::get('/', [ScreenerController::class, 'screenerPage'])->name('screener.index');
+    Route::get('/candidates', [ScreenerController::class, 'candidates'])->name('screener.candidates');
+    Route::get('/buylist-today', [ScreenerController::class, 'buylistToday'])->name('screener.buylistToday');
+
+    // capital (POST)
+    Route::post('/buylist-today/capital', [ScreenerController::class, 'setCapital'])->name('screener.setCapital');
+});
+
+// Intraday capture (kalau memang controller kamu punya endpoint ini)
+// Kalau IntradayController belum punya method capture, hapus blok ini.
+Route::post('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');
 
 // php artisan screener:compute-daily --date=2025-12-15

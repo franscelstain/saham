@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ScreenerService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ScreenerController extends Controller
@@ -16,34 +17,11 @@ class ScreenerController extends Controller
     }
 
     /**
-     * /screener/candidates?date=YYYY-MM-DD (optional)
+     * GET /screener
      */
-    public function candidates(Request $request)
-    {
-        $date = $request->query('date'); // optional: force tanggal EOD tertentu
-
-        $data = $this->svc->getCandidatesPageData($date);
-
-        return view('screener.candidates', $data);
-    }
-
-    public function buylistToday(Request $r)
-    {
-        $today = $r->get('today');           // optional
-        $capital = $r->get('capital');       // contoh: 5000000
-
-        $data = $this->svc->getTodayBuylistData(
-            $today,
-            $capital !== null ? (float) $capital : null
-        );
-
-        return view('screener.buylist_today', $data);
-    }
-
-
     public function screenerPage()
     {
-        $latestDate = DB::table('ticker_indicators_daily')->max('trade_date');
+        $latestDate = DB::table('ticker_indicators_daily')->where('is_deleted', 0)->max('trade_date');
 
         $rows = collect();
         if ($latestDate) {
@@ -56,42 +34,154 @@ class ScreenerController extends Controller
                     't.ticker_code',
                     't.company_name',
                     'd.trade_date',
+                    'd.open',
+                    'd.high',
+                    'd.low',
+                    'd.close',
+                    'd.volume',
                     'd.ma20',
                     'd.ma50',
                     'd.ma200',
-                    'd.close',
                     'd.rsi14',
                     'd.vol_ratio',
                     'd.score_total',
-                    DB::raw("CASE d.signal_code
-                        WHEN 1 THEN 'False Breakout / Batal'
-                        WHEN 2 THEN 'Hati - Hati'
-                        WHEN 3 THEN 'Hindari'
-                        WHEN 4 THEN 'Perlu Konfirmasi'
-                        WHEN 5 THEN 'Layak Beli'
-                        ELSE 'Unknown' END AS signal_name"),
-                    DB::raw("CASE d.volume_label_code
-                        WHEN 1 THEN 'Climax / Euphoria – hati-hati'
-                        WHEN 2 THEN 'Quiet/Normal – Volume lemah'
-                        WHEN 3 THEN 'Ultra Dry'
-                        WHEN 4 THEN 'Dormant'
-                        WHEN 5 THEN 'Quiet'
-                        WHEN 6 THEN 'Normal'
-                        WHEN 7 THEN 'Early Interest'
-                        WHEN 8 THEN 'Volume Burst / Accumulation'
-                        WHEN 9 THEN 'Strong Burst / Breakout'
-                        WHEN 10 THEN 'Climax / Euphoria'
-                        ELSE '-' END AS volume_label_name"),
+                    'd.signal_code',
+                    'd.volume_label_code',
                 ])
                 ->orderByDesc('d.signal_code')
                 ->orderByDesc('d.volume_label_code')
                 ->orderByDesc('d.score_total')
-                ->get();
+                ->get()
+                ->map(function ($r) {
+                    $r->signal_name = $this->signalName((int) $r->signal_code);
+                    $r->volume_label_name = $this->volumeLabelName($r->volume_label_code !== null ? (int) $r->volume_label_code : null);
+                    return $r;
+                });
         }
 
         return view('screener.index', [
             'trade_date' => $latestDate,
             'rows' => $rows,
         ]);
+    }
+
+    /**
+     * GET /screener/candidates?date=YYYY-MM-DD (optional)
+     */
+    public function candidates(Request $request)
+    {
+        $date = $request->query('date');
+
+        // validasi ringan date
+        if ($date !== null && !$this->isValidYmd($date)) {
+            return response()->view('screener.candidates', [
+                'trade_date' => null,
+                'rows' => collect(),
+                'error' => 'Parameter date harus format YYYY-MM-DD',
+            ], 422);
+        }
+
+        $data = $this->svc->getCandidatesPageData($date);
+
+        return view('screener.candidates', $data);
+    }
+
+    /**
+     * GET /screener/buylist-today?today=YYYY-MM-DD&capital=9000000
+     */
+    public function buylistToday(Request $request)
+    {
+        $today = $request->query('today');
+        if ($today !== null && !$this->isValidYmd($today)) {
+            $today = null;
+        }
+
+        // capital: query > session > null
+        $capital = $request->query('capital');
+        $capital = $capital !== null ? $this->toPositiveNumber($capital) : null;
+
+        if ($capital === null) {
+            $capital = session('trade_capital');
+            $capital = $capital !== null ? (float) $capital : null;
+            if ($capital !== null && $capital <= 0) $capital = null;
+        }
+
+        $data = $this->svc->getTodayBuylistData($today, $capital);
+        $reco = $this->svc->getTodayRecommendations($today, $capital);
+
+        return view('screener.buylist_today', [
+            'today'     => $data['today'] ?? ($today ?: date('Y-m-d')),
+            'eod_date'  => $data['eod_date'] ?? null,
+            'capital'   => $data['capital'] ?? $capital,
+            'rows'      => $data['rows'] ?? collect(),
+
+            'picks'     => $reco['picks'] ?? collect(),
+            'note'      => $reco['note'] ?? null,
+        ]);
+    }
+
+    /**
+     * POST /screener/buylist-today/capital
+     */
+    public function setCapital(Request $request)
+    {
+        $cap = $this->toPositiveNumber($request->input('capital'));
+
+        if ($cap !== null) {
+            session(['trade_capital' => $cap]);
+        } else {
+            session()->forget('trade_capital');
+        }
+
+        // redirect balik ke halaman + bawa capital biar terlihat jelas (opsional)
+        return redirect('/screener/buylist-today');
+    }
+
+    private function isValidYmd(string $s): bool
+    {
+        $dt = Carbon::createFromFormat('Y-m-d', $s);
+        return $dt && $dt->format('Y-m-d') === $s;
+    }
+
+    private function toPositiveNumber($raw): ?float
+    {
+        if ($raw === null) return null;
+        $raw = (string) $raw;
+        // input bisa "9.000.000" atau "9000000" atau "9 000 000"
+        $raw = str_replace(['.', ',', ' '], '', $raw);
+        if ($raw === '' || !is_numeric($raw)) return null;
+
+        $v = (float) $raw;
+        return $v > 0 ? $v : null;
+    }
+
+    private function signalName(int $code): string
+    {
+        switch ($code) {
+            case 1: return 'False Breakout / Batal';
+            case 2: return 'Hati - Hati';
+            case 3: return 'Hindari';
+            case 4: return 'Perlu Konfirmasi';
+            case 5: return 'Layak Beli';
+            default: return 'Unknown';
+        }
+    }
+
+    private function volumeLabelName(?int $code): string
+    {
+        if ($code === null) return '-';
+        switch ($code) {
+            case 1:  return 'Climax / Euphoria – hati-hati';
+            case 2:  return 'Quiet/Normal – Volume lemah';
+            case 3:  return 'Ultra Dry';
+            case 4:  return 'Dormant';
+            case 5:  return 'Quiet';
+            case 6:  return 'Normal';
+            case 7:  return 'Early Interest';
+            case 8:  return 'Volume Burst / Accumulation';
+            case 9:  return 'Strong Burst / Breakout';
+            case 10: return 'Climax / Euphoria';
+            default: return '-';
+        }
     }
 }

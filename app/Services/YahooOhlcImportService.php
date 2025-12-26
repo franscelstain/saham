@@ -2,36 +2,44 @@
 
 namespace App\Services;
 
-use App\Repositories\Contracts\TickerOhlcRepositoryInterface;
-use App\Services\YahooFinanceService;
-use Carbon\Carbon;
+use App\Repositories\TickerOhlcRepository;
+use Illuminate\Support\Carbon;
 
 class YahooOhlcImportService
 {
-    private $repo;
     private $yahoo;
+    private $repo;
 
-    public function __construct(TickerOhlcRepositoryInterface $repo, YahooFinanceService $yahoo)
+    public function __construct(YahooFinanceService $yahoo, TickerOhlcRepository $repo)
     {
-        $this->repo  = $repo;
         $this->yahoo = $yahoo;
+        $this->repo  = $repo;
     }
 
-    public function import(Carbon $start, Carbon $end, string $interval = '1d', ?string $tickerCode = null): array
+    /**
+     * Import OHLC daily untuk semua ticker aktif / atau 1 ticker.
+     * $start/$end default: 1 tahun terakhir s/d hari ini.
+     */
+    public function import(?string $tickerCode = null, ?string $start = null, ?string $end = null): array
     {
+        $tz = 'Asia/Jakarta';
+        $endDate   = $end   ? Carbon::parse($end, $tz)   : Carbon::now($tz);
+        $startDate = $start ? Carbon::parse($start, $tz) : Carbon::now($tz)->subYear();
+
         $tickers = $this->repo->getActiveTickers($tickerCode);
-        $now = now();
 
         $stats = [
-            'start' => $start->toDateString(),
-            'end' => $end->toDateString(),
-            'interval' => $interval,
+            'ticker_param' => $tickerCode,
+            'start' => $startDate->toDateString(),
+            'end'   => $endDate->toDateString(),
             'processed' => 0,
-            'success' => 0,
+            'bars_saved' => 0,
             'no_data' => 0,
             'failed' => 0,
             'failed_items' => [],
         ];
+
+        $buffer = [];
 
         foreach ($tickers as $t) {
             $stats['processed']++;
@@ -40,40 +48,34 @@ class YahooOhlcImportService
             $symbol = (substr($code, -3) === '.JK') ? $code : ($code . '.JK');
 
             try {
-                $rows = $this->yahoo->historical($symbol, $start, $end, $interval);
+                $rows = $this->yahoo->historical($symbol, $startDate, $endDate, '1d');
 
                 if (empty($rows)) {
                     $stats['no_data']++;
                     continue;
                 }
 
-                $payload = [];
                 foreach ($rows as $r) {
-                    if (empty($r['trade_date']) || $r['close'] === null) continue;
-
-                    $payload[] = [
-                        'ticker_id'   => (int) $t->ticker_id,
-                        'trade_date'  => $r['trade_date'],
-                        'open'        => $r['open'],
-                        'high'        => $r['high'],
-                        'low'         => $r['low'],
-                        'close'       => $r['close'],
-                        'adj_close'   => $r['adj_close'],
-                        'volume'      => $r['volume'],
-                        'source'      => 'yahoo',
-                        'is_deleted'  => 0,
-                        'created_at'  => $now,
-                        'updated_at'  => $now,
+                    $buffer[] = [
+                        'ticker_id'  => (int)$t->ticker_id,
+                        'trade_date' => $r['date'],
+                        'open'       => $r['open'],
+                        'high'       => $r['high'],
+                        'low'        => $r['low'],
+                        'close'      => $r['close'],
+                        'adj_close'  => $r['adj_close'],
+                        'volume'     => $r['volume'],
+                        'source'     => 'yahoo',
+                        'is_deleted' => 0,
+                        'updated_at' => Carbon::now($tz)->toDateTimeString(),
                     ];
                 }
 
-                if (empty($payload)) {
-                    $stats['no_data']++;
-                    continue;
-                }
+                // flush per ticker (aman, nggak bengkak memory)
+                $this->repo->upsertDailyBars($buffer);
+                $stats['bars_saved'] += count($buffer);
+                $buffer = [];
 
-                $this->repo->upsertOhlcDaily($payload);
-                $stats['success']++;
             } catch (\Throwable $e) {
                 $stats['failed']++;
                 $stats['failed_items'][] = [
@@ -81,7 +83,6 @@ class YahooOhlcImportService
                     'symbol' => $symbol,
                     'error' => $e->getMessage(),
                 ];
-                continue;
             }
         }
 

@@ -14,7 +14,7 @@ class YahooFinanceService
     public function __construct()
     {
         $this->http = new Client([
-            'base_uri' => config('services.yahoo.base_uri'),
+            'base_uri' => config('services.yahoo.base_uri', 'https://query1.finance.yahoo.com'),
             'timeout'  => (int) config('services.yahoo.timeout', 20),
         ]);
     }
@@ -24,88 +24,60 @@ class YahooFinanceService
      */
     public function historical(string $symbol, Carbon $start, Carbon $end, string $interval = '1d'): array
     {
-        // Yahoo pakai unix seconds UTC.
-        // period2 disarankan exclusive -> tambah 1 hari biar inclusive.
-        $startUtc = Carbon::createFromFormat('Y-m-d', $start->toDateString(), 'UTC')->startOfDay();
-        $endUtc   = Carbon::createFromFormat('Y-m-d', $end->toDateString(), 'UTC')->startOfDay()->addDay();
-
-        $period1 = $startUtc->timestamp;
-        $period2 = $endUtc->timestamp;
+        // Yahoo pakai unix seconds UTC. period2 disarankan exclusive => +1 hari biar inclusive.
+        $period1 = $start->copy()->startOfDay()->timestamp;
+        $period2 = $end->copy()->addDay()->startOfDay()->timestamp;
 
         try {
-            // Pakai http_errors=false supaya 4xx tidak jadi exception.
             $res = $this->http->get("/v8/finance/chart/{$symbol}", [
                 'http_errors' => false,
                 'query' => [
+                    'period1' => $period1,
+                    'period2' => $period2,
                     'interval' => $interval,
-                    'period1'  => $period1,
-                    'period2'  => $period2,
+                    'events' => 'history',
+                    'includeAdjustedClose' => 'true',
                 ],
             ]);
         } catch (GuzzleException $e) {
-            // Network/timeout/dns -> ini fatal
-            throw new RuntimeException("Yahoo request failed: {$e->getMessage()}", 0, $e);
+            throw new \RuntimeException("Yahoo historical request failed: ".$e->getMessage(), 0, $e);
         }
 
-        $status = $res->getStatusCode();
-        $body   = (string) $res->getBody();
-        $json   = json_decode($body, true);
-
-        // Jika response bukan JSON valid
-        if (!is_array($json)) {
-            throw new RuntimeException("Yahoo returned non-JSON response (HTTP {$status}).");
+        if ($res->getStatusCode() !== 200) {
+            return [];
         }
 
-        // Yahoo kadang kirim error di chart.error
-        $desc = $json['chart']['error']['description'] ?? null;
-
-        // Handle status non-200
-        if ($status !== 200) {
-            // Kasus kamu: 400 "Data doesn't exist for startDate..."
-            if ($status === 400 && is_string($desc) && stripos($desc, "Data doesn't exist for startDate") !== false) {
-                return [];
-            }
-
-            // 404/invalid symbol kadang juga no data (tergantung Yahoo)
-            if (in_array($status, [404], true)) {
-                return [];
-            }
-
-            // selain itu anggap fatal
-            $msg = $desc ?: ("Yahoo error HTTP {$status}");
-            throw new RuntimeException($msg);
-        }
-
-        // Jika status 200 tapi chart.error ada
-        if (is_string($desc) && $desc !== '') {
-            if (stripos($desc, "Data doesn't exist for startDate") !== false) {
-                return [];
-            }
-            throw new RuntimeException("Yahoo error: {$desc}");
-        }
-
+        $json = json_decode((string) $res->getBody(), true);
         $result = $json['chart']['result'][0] ?? null;
         if (!$result) return [];
 
-        $timestamps = $result['timestamp'] ?? [];
-        $quote      = $result['indicators']['quote'][0] ?? null;
-        $adjClose   = $result['indicators']['adjclose'][0]['adjclose'] ?? null;
+        $ts    = $result['timestamp'] ?? [];
+        $quote = $result['indicators']['quote'][0] ?? null;
+        $adj   = $result['indicators']['adjclose'][0]['adjclose'] ?? null;
 
-        if (empty($timestamps) || !is_array($quote)) return [];
+        if (empty($ts) || !is_array($quote)) return [];
+
+        $opens  = $quote['open'] ?? [];
+        $highs  = $quote['high'] ?? [];
+        $lows   = $quote['low'] ?? [];
+        $closes = $quote['close'] ?? [];
+        $vols   = $quote['volume'] ?? [];
 
         $rows = [];
-        foreach ($timestamps as $i => $ts) {
-            $close = $quote['close'][$i] ?? null;
-            if ($close === null) continue; // skip bar bolong
+        for ($i = 0; $i < count($ts); $i++) {
+            // skip bar null
+            if (!isset($closes[$i]) || $closes[$i] === null) continue;
+
+            $date = Carbon::createFromTimestampUTC((int)$ts[$i])->toDateString();
 
             $rows[] = [
-                'trade_date' => Carbon::createFromTimestampUTC((int) $ts)->toDateString(),
-                'open'       => $quote['open'][$i] ?? null,
-                'high'       => $quote['high'][$i] ?? null,
-                'low'        => $quote['low'][$i] ?? null,
-                'close'      => $close,
-                'adj_close'  => is_array($adjClose) ? ($adjClose[$i] ?? null) : null,
-                'volume'     => $quote['volume'][$i] ?? null,
+                'date'      => $date,
+                'open'      => isset($opens[$i])  && $opens[$i]  !== null ? (float)$opens[$i]  : null,
+                'high'      => isset($highs[$i])  && $highs[$i]  !== null ? (float)$highs[$i]  : null,
+                'low'       => isset($lows[$i])   && $lows[$i]   !== null ? (float)$lows[$i]   : null,
+                'close'     => (float)$closes[$i],
+                'adj_close' => (is_array($adj) && isset($adj[$i]) && $adj[$i] !== null) ? (float)$adj[$i] : null,
+                'volume'    => isset($vols[$i])   && $vols[$i]   !== null ? (int)$vols[$i]   : null,
             ];
         }
 

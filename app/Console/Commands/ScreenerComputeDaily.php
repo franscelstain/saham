@@ -9,10 +9,11 @@ use Illuminate\Support\Facades\DB;
 class ScreenerComputeDaily extends Command
 {
     protected $signature = 'screener:compute-daily
-        {--date= : Tanggal EOD (YYYY-MM-DD). Default ambil MAX(trade_date) dari ticker_ohlc_daily}
+        {--date= : Tanggal target (YYYY-MM-DD). Jika tanggal tsb tidak ada EOD, fallback ke last trade_date <= date}
         {--ticker= : Proses 1 ticker_code saja (contoh: BBCA)}
         {--source=yahoo : Isi field source (default: yahoo)}
-        {--chunk=200 : Chunk tickers per batch}';
+        {--chunk=200 : Chunk tickers per batch}
+        {--lookback=420 : Lookback days untuk ambil OHLC (default 420)}';
 
     protected $description = 'Compute daily indicators + signals + scores and upsert into ticker_indicators_daily';
 
@@ -25,10 +26,16 @@ class ScreenerComputeDaily extends Command
         }
 
         $tickerCode = $this->option('ticker');
-        $source = (string) $this->option('source');
-        $chunk = (int) $this->option('chunk');
+        $source     = (string) $this->option('source');
+        $chunk      = max(1, (int) $this->option('chunk'));
+        $lookback   = max(220, (int) $this->option('lookback')); // default aman untuk MA200 + buffer
 
-        $this->info('Compute screener for date: ' . $date->toDateString());
+        $now = Carbon::now(config('app.timezone', 'Asia/Jakarta'));
+
+        $this->info('Compute screener for EOD date: ' . $date->toDateString());
+        if ($tickerCode) {
+            $this->info('Only ticker: ' . strtoupper(trim($tickerCode)));
+        }
 
         $tickersQuery = DB::table('tickers')
             ->select('ticker_id', 'ticker_code')
@@ -38,45 +45,107 @@ class ScreenerComputeDaily extends Command
             $tickersQuery->where('ticker_code', strtoupper(trim($tickerCode)));
         }
 
-        $tickersQuery->orderBy('ticker_id')
-            ->chunkById($chunk, function ($tickers) use ($date, $source) {
-                $rows = [];
-                $now = now();
+        $processed = 0;
+        $saved = 0;
+        $skippedNoEod = 0;
 
-                foreach ($tickers as $t) {
-                    $row = $this->computeForTicker((int)$t->ticker_id, $date, $source, $now);
-                    if ($row) {
-                        $rows[] = $row;
-                    }
+        $fromDate = $date->copy()->subDays($lookback)->toDateString();
+        $toDate   = $date->toDateString();
+
+        $tickersQuery->orderBy('ticker_id')->chunkById($chunk, function ($tickers) use (
+            $date, $source, $now, $fromDate, $toDate,
+            &$processed, &$saved, &$skippedNoEod
+        ) {
+            $tickerIds = $tickers->pluck('ticker_id')->map(function ($v) {
+                return (int) $v;
+            })->values()->all();
+
+            if (empty($tickerIds)) return;
+
+            // 1 query OHLC untuk 1 batch ticker
+            $ohlcRows = DB::table('ticker_ohlc_daily')
+                ->select('ticker_id','trade_date','open','high','low','close','volume')
+                ->whereIn('ticker_id', $tickerIds)
+                ->where('is_deleted', 0)
+                ->whereBetween('trade_date', [$fromDate, $toDate])
+                ->orderBy('ticker_id', 'asc')
+                ->orderBy('trade_date', 'asc')
+                ->get();
+
+            // group per ticker_id
+            $grouped = [];
+            foreach ($ohlcRows as $r) {
+                $tid = (int) $r->ticker_id;
+                if (!isset($grouped[$tid])) $grouped[$tid] = [];
+                $grouped[$tid][] = $r;
+            }
+
+            $rowsToUpsert = [];
+
+            foreach ($tickers as $t) {
+                $processed++;
+                $tid = (int) $t->ticker_id;
+
+                $rows = $grouped[$tid] ?? [];
+                if (empty($rows)) {
+                    $skippedNoEod++;
+                    continue;
                 }
 
-                if (!empty($rows)) {
-                    DB::table('ticker_indicators_daily')->upsert(
-                        $rows,
-                        ['ticker_id', 'trade_date'],
-                        [
-                            'open','high','low','close','volume',
-                            'ma20','ma50','ma200',
-                            'vol_sma20','vol_ratio',
-                            'rsi14','atr14',
-                            'support_20d','resistance_20d',
-                            'signal_code','volume_label_code',
-                            'score_total','score_trend','score_momentum','score_volume','score_breakout','score_risk',
-                            'source','is_deleted','updated_at'
-                        ]
-                    );
+                $row = $this->computeFromRows($tid, $rows, $date, $source, $now);
+                if ($row) {
+                    $rowsToUpsert[] = $row;
+                    $saved++;
+                } else {
+                    $skippedNoEod++;
                 }
-            }, 'ticker_id');
+            }
 
-        $this->info('Done.');
+            if (!empty($rowsToUpsert)) {
+                DB::table('ticker_indicators_daily')->upsert(
+                    $rowsToUpsert,
+                    ['ticker_id', 'trade_date'],
+                    [
+                        'open','high','low','close','volume',
+                        'ma20','ma50','ma200',
+                        'vol_sma20','vol_ratio',
+                        'rsi14','atr14',
+                        'support_20d','resistance_20d',
+                        'signal_code','volume_label_code',
+                        'score_total','score_trend','score_momentum','score_volume','score_breakout','score_risk',
+                        'source','is_deleted','updated_at'
+                    ]
+                );
+            }
+        }, 'ticker_id');
+
+        $this->info("Done. processed={$processed}, saved={$saved}, skipped(no_eod/insufficient)={$skippedNoEod}");
         return 0;
     }
 
     private function resolveDate(): ?Carbon
     {
         $opt = $this->option('date');
+
         if ($opt) {
-            return Carbon::createFromFormat('Y-m-d', $opt)->startOfDay();
+            try {
+                $target = Carbon::createFromFormat('Y-m-d', $opt)->startOfDay()->toDateString();
+            } catch (\Throwable $e) {
+                $this->error("Format --date invalid, harus YYYY-MM-DD. Dapat: {$opt}");
+                return null;
+            }
+
+            $maxLe = DB::table('ticker_ohlc_daily')
+                ->where('trade_date', '<=', $target)
+                ->max('trade_date');
+
+            if (!$maxLe) return null;
+
+            if ($maxLe !== $target) {
+                $this->warn("Tanggal {$target} tidak ada EOD. Fallback ke last trading date: {$maxLe}");
+            }
+
+            return Carbon::parse($maxLe)->startOfDay();
         }
 
         $max = DB::table('ticker_ohlc_daily')->max('trade_date');
@@ -85,76 +154,88 @@ class ScreenerComputeDaily extends Command
         return Carbon::parse($max)->startOfDay();
     }
 
-    private function computeForTicker(int $tickerId, Carbon $date, string $source, $now): ?array
+    /**
+     * Compute 1 ticker dari rows OHLC (sudah ASC).
+     */
+    private function computeFromRows(int $tickerId, array $rows, Carbon $date, string $source, Carbon $now): ?array
     {
-        // Ambil window cukup buat MA200 + buffer hari libur
-        $from = $date->copy()->subDays(420)->toDateString();
         $to = $date->toDateString();
 
-        $ohlc = DB::table('ticker_ohlc_daily')
-            ->select('trade_date','open','high','low','close','volume')
-            ->where('ticker_id', $tickerId)
-            ->where('is_deleted', 0)
-            ->whereBetween('trade_date', [$from, $to])
-            ->orderBy('trade_date', 'asc')
-            ->get();
+        $last = end($rows);
+        if (!$last || (string)$last->trade_date !== $to) {
+            return null; // ticker tidak punya EOD pada tanggal target
+        }
 
-        if ($ohlc->isEmpty()) return null;
-
-        // Pastikan ada baris untuk tanggal target
-        $last = $ohlc->last();
-        if ((string)$last->trade_date !== $to) {
-            // belum ada EOD untuk tanggal tersebut
+        // Guard EOD hari ini: jangan paksa null jadi 0
+        if ($last->high === null || $last->low === null || $last->close === null) {
             return null;
         }
+
+        $openToday  = ($last->open !== null) ? (float)$last->open : null;
+        $highToday  = (float) $last->high;
+        $lowToday   = (float) $last->low;
+        $closeToday = (float) $last->close;
+        $volToday   = (int)   ($last->volume ?? 0);
 
         $closes = [];
         $highs  = [];
         $lows   = [];
         $vols   = [];
 
-        foreach ($ohlc as $r) {
+        foreach ($rows as $r) {
+            if ($r->close === null || $r->high === null || $r->low === null) continue;
             $closes[] = (float) $r->close;
             $highs[]  = (float) $r->high;
             $lows[]   = (float) $r->low;
-            $vols[]   = (float) $r->volume;
+            $vols[]   = (int)   ($r->volume ?? 0);
         }
 
-        $openToday  = (float) $last->open;
-        $highToday  = (float) $last->high;
-        $lowToday   = (float) $last->low;
-        $closeToday = (float) $last->close;
-        $volToday   = (int) $last->volume;
+        // Minimal untuk RSI/ATR stabil
+        if (count($closes) < 30) return null;
 
         $ma20  = $this->sma($closes, 20);
         $ma50  = $this->sma($closes, 50);
         $ma200 = $this->sma($closes, 200);
 
-        $volSma20 = $this->sma($vols, 20);
-        $volRatio = ($volSma20 && $volSma20 > 0) ? ($volToday / $volSma20) : null;
+        // Vol SMA 20 exclude today (lebih fair)
+        $volSma20Prev = $this->smaExcludeToday($vols, 20);
+        $volRatio = ($volSma20Prev !== null && $volSma20Prev > 0) ? round($volToday / $volSma20Prev, 4) : null;
 
-        // support/resistance: pakai 20 hari sebelum hari ini (exclude hari ini)
         $support20 = $this->rollingMinExcludeToday($lows, 20);
         $resist20  = $this->rollingMaxExcludeToday($highs, 20);
 
         $rsi14 = $this->rsiWilder($closes, 14);
         $atr14 = $this->atrWilder($highs, $lows, $closes, 14);
 
-        // volume label (baseline; nanti kamu bisa tuning rule-nya)
         $volumeLabel = $this->mapVolumeLabel($volRatio);
 
-        // signal + score (baseline default)
+        // ===== Breakout detection =====
         $falseBreakout = ($resist20 !== null) && ($highToday > $resist20) && ($closeToday <= $resist20);
+        $isBreakout    = ($resist20 !== null) && ($closeToday > $resist20);
 
+        // ===== Rule wajib screener (kandidat operasional) =====
+        $trendOk = ($ma20 !== null && $ma50 !== null && $ma200 !== null)
+            && ($closeToday > $ma20)
+            && ($ma20 > $ma50)
+            && ($ma50 > $ma200);
+
+        $rsiOk = ($rsi14 !== null) && ($rsi14 <= 75.0);
+
+        // Untuk signal 4/5 wajib volume burst minimal
+        $volOk = ($volRatio !== null && $volRatio >= 1.5);
+
+        // ===== Scoring (simple + konsisten) =====
         $scoreTrend = 0;
         if ($ma20 !== null && $closeToday > $ma20) $scoreTrend += 10;
         if ($ma20 !== null && $ma50 !== null && $ma20 > $ma50) $scoreTrend += 10;
         if ($ma50 !== null && $ma200 !== null && $ma50 > $ma200) $scoreTrend += 10;
+        if ($trendOk) $scoreTrend += 10;
 
         $scoreMomentum = 0;
         if ($rsi14 !== null) {
             if ($rsi14 >= 50 && $rsi14 <= 70) $scoreMomentum += 10;
-            elseif ($rsi14 > 70) $scoreMomentum -= 5;
+            elseif ($rsi14 > 70 && $rsi14 <= 75) $scoreMomentum += 3;
+            elseif ($rsi14 > 75) $scoreMomentum -= 15;
             elseif ($rsi14 < 40) $scoreMomentum -= 5;
         }
 
@@ -162,14 +243,15 @@ class ScreenerComputeDaily extends Command
         if ($volRatio !== null) {
             if ($volRatio >= 1.5) $scoreVolume += 10;
             if ($volRatio >= 2.0) $scoreVolume += 10;
+            if ($volRatio >= 3.0) $scoreVolume -= 5; // euphoria rawan fake move
+            if ($volRatio < 1.0)  $scoreVolume -= 5; // volume lemah
         }
 
         $scoreBreakout = 0;
         if ($falseBreakout) $scoreBreakout -= 20;
-        elseif ($resist20 !== null && $closeToday > $resist20) $scoreBreakout += 15;
+        elseif ($isBreakout) $scoreBreakout += 15;
 
         $scoreRisk = 0;
-        // contoh risk sederhana: makin dekat ke support (dibanding ATR) makin ok
         if ($support20 !== null && $atr14 !== null && $atr14 > 0) {
             $dist = $closeToday - $support20;
             if ($dist <= 1.0 * $atr14) $scoreRisk += 5;
@@ -178,33 +260,31 @@ class ScreenerComputeDaily extends Command
 
         $scoreTotal = $scoreTrend + $scoreMomentum + $scoreVolume + $scoreBreakout + $scoreRisk;
 
-        // signal_code baseline:
-        // 1 False Breakout/Batal
-        // 2 Hati-hati
-        // 3 Hindari
-        // 4 Perlu Konfirmasi
-        // 5 Layak Beli
-        $signalCode = 4;
+        // ===== Signal final (disinkronkan dengan operasional buylist) =====
+        // 1 False Breakout / Batal
+        // 2 Hati-hati (tunggu volume / overheat)
+        // 3 Hindari (trend chain tidak terpenuhi / data tidak cukup)
+        // 4 Perlu Konfirmasi (trend+rsi+volume ok, belum breakout confirm)
+        // 5 Layak Beli (trend+rsi+volume ok + breakout)
+        $signalCode = 3;
+
         if ($falseBreakout) {
             $signalCode = 1;
         } else {
-            // hindari/hati-hati berdasarkan overheat sederhana
-            if (($rsi14 !== null && $rsi14 >= 78) || $volumeLabel === 1) {
-                $signalCode = 2; // hati-hati (climax/euphoria)
-            }
-            if ($ma20 !== null && $closeToday < $ma20) {
-                $signalCode = 3; // hindari (trend lemah)
-            }
-
-            // layak beli
-            $layak =
-                ($ma20 !== null && $closeToday > $ma20) &&
-                ($ma20 !== null && $ma50 !== null && $ma20 > $ma50) &&
-                ($volRatio !== null && $volRatio >= 1.5) &&
-                ($rsi14 !== null && $rsi14 >= 50 && $rsi14 <= 70);
-
-            if ($layak) {
-                $signalCode = 5;
+            // Jika MA chain belum kebentuk, jangan bikin seolah “jelek” tapi kita tetap set aman = Hindari
+            if (!$trendOk) {
+                $signalCode = 3;
+            } else {
+                if (!$rsiOk) {
+                    $signalCode = 2;
+                } else {
+                    // di sini trend+rsi ok
+                    if (!$volOk) {
+                        $signalCode = 2; // tunggu volume (biar gak muncul “Perlu Konfirmasi” tapi vol normal/lemah)
+                    } else {
+                        $signalCode = $isBreakout ? 5 : 4;
+                    }
+                }
             }
         }
 
@@ -222,7 +302,7 @@ class ScreenerComputeDaily extends Command
             'ma50'              => $ma50,
             'ma200'             => $ma200,
 
-            'vol_sma20'         => $volSma20,
+            'vol_sma20'         => $volSma20Prev !== null ? round($volSma20Prev, 4) : null,
             'vol_ratio'         => $volRatio,
 
             'rsi14'             => $rsi14,
@@ -234,12 +314,12 @@ class ScreenerComputeDaily extends Command
             'signal_code'       => $signalCode,
             'volume_label_code' => $volumeLabel,
 
-            'score_total'       => $scoreTotal,
-            'score_trend'       => $scoreTrend,
-            'score_momentum'    => $scoreMomentum,
-            'score_volume'      => $scoreVolume,
-            'score_breakout'    => $scoreBreakout,
-            'score_risk'        => $scoreRisk,
+            'score_total'       => (int) $scoreTotal,
+            'score_trend'       => (int) $scoreTrend,
+            'score_momentum'    => (int) $scoreMomentum,
+            'score_volume'      => (int) $scoreVolume,
+            'score_breakout'    => (int) $scoreBreakout,
+            'score_risk'        => (int) $scoreRisk,
 
             'source'            => $source,
             'is_deleted'        => 0,
@@ -252,27 +332,44 @@ class ScreenerComputeDaily extends Command
     {
         $count = count($values);
         if ($count < $n) return null;
-        $slice = array_slice($values, $count - $n, $n);
-        return array_sum($slice) / $n;
+        $sum = 0.0;
+        for ($i = $count - $n; $i < $count; $i++) $sum += $values[$i];
+        return round($sum / $n, 4);
+    }
+
+    private function smaExcludeToday(array $values, int $n): ?float
+    {
+        $count = count($values);
+        if ($count < ($n + 1)) return null;
+        $sum = 0.0;
+        for ($i = $count - 1 - $n; $i < $count - 1; $i++) $sum += $values[$i];
+        return $sum / $n;
     }
 
     private function rollingMinExcludeToday(array $values, int $n): ?float
     {
         $count = count($values);
-        if ($count < ($n + 1)) return null; // butuh n hari sebelum hari ini
-        $slice = array_slice($values, $count - 1 - $n, $n);
-        return min($slice);
+        if ($count < ($n + 1)) return null;
+        $min = null;
+        for ($i = $count - 1 - $n; $i < $count - 1; $i++) {
+            $v = (float)$values[$i];
+            $min = ($min === null) ? $v : min($min, $v);
+        }
+        return round($min, 4);
     }
 
     private function rollingMaxExcludeToday(array $values, int $n): ?float
     {
         $count = count($values);
         if ($count < ($n + 1)) return null;
-        $slice = array_slice($values, $count - 1 - $n, $n);
-        return max($slice);
+        $max = null;
+        for ($i = $count - 1 - $n; $i < $count - 1; $i++) {
+            $v = (float)$values[$i];
+            $max = ($max === null) ? $v : max($max, $v);
+        }
+        return round($max, 4);
     }
 
-    // RSI Wilder smoothing (lebih standar daripada RSI SMA)
     private function rsiWilder(array $closes, int $period): ?float
     {
         $n = count($closes);
@@ -281,7 +378,6 @@ class ScreenerComputeDaily extends Command
         $gains = 0.0;
         $losses = 0.0;
 
-        // initial avg gain/loss
         for ($i = 1; $i <= $period; $i++) {
             $diff = $closes[$i] - $closes[$i - 1];
             if ($diff >= 0) $gains += $diff;
@@ -291,7 +387,6 @@ class ScreenerComputeDaily extends Command
         $avgGain = $gains / $period;
         $avgLoss = $losses / $period;
 
-        // smooth sampai akhir (kita butuh last RSI)
         for ($i = $period + 1; $i < $n; $i++) {
             $diff = $closes[$i] - $closes[$i - 1];
             $gain = $diff > 0 ? $diff : 0.0;
@@ -302,19 +397,18 @@ class ScreenerComputeDaily extends Command
         }
 
         if ($avgLoss == 0.0) return 100.0;
-        $rs = $avgGain / $avgLoss;
+
+        $rs  = $avgGain / $avgLoss;
         $rsi = 100.0 - (100.0 / (1.0 + $rs));
         return round($rsi, 2);
     }
 
-    // ATR Wilder smoothing
     private function atrWilder(array $highs, array $lows, array $closes, int $period): ?float
     {
         $n = count($closes);
         if ($n < ($period + 1)) return null;
 
         $trs = [];
-
         for ($i = 1; $i < $n; $i++) {
             $tr = max(
                 $highs[$i] - $lows[$i],
@@ -326,10 +420,8 @@ class ScreenerComputeDaily extends Command
 
         if (count($trs) < $period) return null;
 
-        // initial ATR = SMA TR
         $atr = array_sum(array_slice($trs, 0, $period)) / $period;
 
-        // smooth
         for ($i = $period; $i < count($trs); $i++) {
             $atr = (($atr * ($period - 1)) + $trs[$i]) / $period;
         }
@@ -337,20 +429,20 @@ class ScreenerComputeDaily extends Command
         return round($atr, 4);
     }
 
+    /**
+     * Map volRatio ke 10 label (lebih nyambung dengan list kamu).
+     * Fokus operasional tetap: kandidat hanya label 8/9 (burst).
+     */
     private function mapVolumeLabel(?float $volRatio): ?int
     {
         if ($volRatio === null) return null;
 
-        // baseline sederhana:
-        // 1 = Climax/Euphoria (warning)
-        // 9 = Strong Burst
-        // 8 = Volume Burst
-        // 6 = Normal
-        // 2 = Quiet/weak
-        if ($volRatio >= 3.0) return 1;
-        if ($volRatio >= 2.0) return 9;
-        if ($volRatio >= 1.5) return 8;
-        if ($volRatio >= 1.0) return 6;
-        return 2;
+        if ($volRatio >= 3.0) return 10; // Climax / Euphoria
+        if ($volRatio >= 2.0) return 9;  // Strong Burst / Breakout
+        if ($volRatio >= 1.5) return 8;  // Volume Burst / Accumulation
+        if ($volRatio >= 1.0) return 6;  // Normal
+        if ($volRatio >= 0.7) return 5;  // Quiet
+        if ($volRatio >= 0.4) return 2;  // Quiet/Normal – Volume lemah
+        return 4; // Dormant (sangat sepi)
     }
 }

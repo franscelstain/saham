@@ -2,32 +2,34 @@
 
 namespace App\Repositories;
 
-use App\Repositories\Contracts\TickerOhlcRepositoryInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class TickerOhlcRepository implements TickerOhlcRepositoryInterface
+class TickerOhlcRepository
 {
+    /**
+     * Ambil ticker aktif (is_deleted = 0).
+     * Kalau $tickerCode diisi, hanya 1 ticker itu.
+     */
     public function getActiveTickers(?string $tickerCode = null): Collection
     {
         $q = DB::table('tickers')
-            ->select('ticker_id', 'ticker_code')
-            ->where('is_deleted', 0)
-            ->orderBy('ticker_id');
+            ->select(['ticker_id', 'ticker_code'])
+            ->where('is_deleted', 0);
 
-        if ($tickerCode) {
-            $q->where('ticker_code', strtoupper(trim($tickerCode)));
+        if ($tickerCode !== null && trim($tickerCode) !== '') {
+            $code = strtoupper(trim($tickerCode));
+            $q->where('ticker_code', $code);
         }
 
-        return $q->get();
+        return $q->orderBy('ticker_id')->get();
     }
 
-    public function getLatestOhlcDate(): ?string
-    {
-        return DB::table('ticker_ohlc_daily')->max('trade_date');
-    }
-
-    public function upsertOhlcDaily(array $rows): void
+    /**
+     * Upsert OHLC daily.
+     * Unique key di tabel: (ticker_id, trade_date)
+     */
+    public function upsertDailyBars(array $rows): void
     {
         if (empty($rows)) return;
 
@@ -36,5 +38,20 @@ class TickerOhlcRepository implements TickerOhlcRepositoryInterface
             ['ticker_id', 'trade_date'],
             ['open','high','low','close','adj_close','volume','source','is_deleted','updated_at']
         );
+    }
+
+    public function getLatestTradeDate(): ?string
+    {
+        return DB::table('ticker_ohlc_daily')
+            ->where('is_deleted', 0)
+            ->max('trade_date');
+    }
+
+    public function getLatestTradeDateByTicker(int $tickerId): ?string
+    {
+        return DB::table('ticker_ohlc_daily')
+            ->where('is_deleted', 0)
+            ->where('ticker_id', $tickerId)
+            ->max('trade_date');
     }
 }

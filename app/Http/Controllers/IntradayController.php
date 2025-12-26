@@ -15,13 +15,19 @@ class IntradayController extends Controller
     }
 
     /**
-     * GET /intraday/capture?ticker=ANTM&interval=1m
+     * GET/POST /intraday/capture?ticker=ANTM&interval=1m
      * Kalau ticker kosong -> capture semua ticker aktif.
      */
     public function capture(Request $request)
     {
-        $ticker   = $request->query('ticker');   // optional
-        $interval = $request->query('interval', '1m');
+        $ticker   = $request->query('ticker') ?? $request->input('ticker');
+        $interval = $request->query('interval', $request->input('interval', '1m'));
+
+        // whitelist interval biar gak aneh-aneh
+        $allowed = ['1m','2m','5m','15m','30m','60m','90m','1h'];
+        if (!in_array($interval, $allowed, true)) {
+            return response()->json(['message' => 'interval tidak valid'], 422);
+        }
 
         $stats = $this->svc->capture($ticker, $interval);
 
