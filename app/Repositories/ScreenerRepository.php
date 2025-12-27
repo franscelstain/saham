@@ -205,4 +205,18 @@ class ScreenerRepository
             ->whereDate('x.trade_date', $eodDate)
             ->get(['x.ticker_id', 'x.avg_vol20']);
     }
+
+    public function getNthTradingDateAfter(string $from, int $n): ?string
+    {
+        $dates = DB::table('ticker_indicators_daily')
+            ->where('is_deleted', 0)
+            ->where('trade_date', '>', $from)
+            ->select('trade_date')
+            ->distinct()
+            ->orderBy('trade_date', 'asc')
+            ->limit($n)
+            ->pluck('trade_date');
+
+        return $dates->isEmpty() ? null : $dates->last();
+    }
 }

@@ -22,9 +22,30 @@ class YahooOhlcImportService
      */
     public function import(?string $tickerCode = null, ?string $start = null, ?string $end = null): array
     {
-        $tz = 'Asia/Jakarta';
-        $endDate   = $end   ? Carbon::parse($end, $tz)   : Carbon::now($tz);
-        $startDate = $start ? Carbon::parse($start, $tz) : Carbon::now($tz)->subYear();
+        $tz        = 'Asia/Jakarta';
+        $now       = Carbon::now($tz);
+
+        // Cutoff aman setelah market close + data settle (pilih sesuai kebutuhan)
+        $cutoffStr = (string) config('screener.eod_cutoff', '16:30');
+
+        if (!preg_match('/^(\d{1,2}):(\d{2})$/', $cutoffStr, $m)) {
+            $cutoffStr = '16:30';
+            preg_match('/^(\d{1,2}):(\d{2})$/', $cutoffStr, $m);
+        }
+
+        $hh = (int) $m[1];
+        $mm = (int) $m[2];
+
+        $cutoff   = $now->copy()->setTime($hh, $mm, 0);
+        $todayWib = $now->toDateString();
+
+        $endDate   = $end   ? Carbon::parse($end, $tz)->startOfDay()   : $now->copy()->subDay()->startOfDay();
+        $startDate = $start ? Carbon::parse($start, $tz)->startOfDay() : $now->copy()->subYear()->startOfDay();
+        
+        // Safety: kalau endDate > (hari ini) => clamp ke hari ini
+        if ($endDate->gt($now)) {
+            $endDate = $now->copy()->startOfDay();
+        }
 
         $tickers = $this->repo->getActiveTickers($tickerCode);
 
@@ -33,10 +54,11 @@ class YahooOhlcImportService
             'start' => $startDate->toDateString(),
             'end'   => $endDate->toDateString(),
             'processed' => 0,
-            'bars_saved' => 0,
+            'bars_attempted' => 0,
             'no_data' => 0,
             'failed' => 0,
             'failed_items' => [],
+            'skipped_today_partial' => 0,
         ];
 
         $buffer = [];
@@ -56,6 +78,12 @@ class YahooOhlcImportService
                 }
 
                 foreach ($rows as $r) {
+                    // Skip bar today kalau belum lewat cutoff (hindari partial EOD)
+                    if (($r['date'] ?? null) === $todayWib && $now->lt($cutoff)) {
+                        $stats['skipped_today_partial']++;
+                        continue;
+                    }
+
                     $buffer[] = [
                         'ticker_id'  => (int)$t->ticker_id,
                         'trade_date' => $r['date'],
@@ -67,15 +95,16 @@ class YahooOhlcImportService
                         'volume'     => $r['volume'],
                         'source'     => 'yahoo',
                         'is_deleted' => 0,
-                        'updated_at' => Carbon::now($tz)->toDateTimeString(),
+                        'updated_at' => $now->toDateTimeString(),
                     ];
                 }
 
-                // flush per ticker (aman, nggak bengkak memory)
-                $this->repo->upsertDailyBars($buffer);
-                $stats['bars_saved'] += count($buffer);
-                $buffer = [];
-
+                if (!empty($buffer)) {
+                    // flush per ticker (aman, nggak bengkak memory)
+                    $this->repo->upsertDailyBars($buffer);
+                    $stats['bars_attempted'] += count($buffer);
+                    $buffer = [];
+                }
             } catch (\Throwable $e) {
                 $stats['failed']++;
                 $stats['failed_items'][] = [
@@ -83,6 +112,9 @@ class YahooOhlcImportService
                     'symbol' => $symbol,
                     'error' => $e->getMessage(),
                 ];
+
+                // pastikan buffer bersih kalau error di tengah ticker
+                $buffer = [];
             }
         }
 

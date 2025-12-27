@@ -45,8 +45,8 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->decimal('resistance_20d', 18, 4)->nullable();
 
             // hasil klasifikasi (yang kamu mau)
-            $table->tinyInteger('signal_code')->unsigned()->default(4); // 1..5
-            $table->tinyInteger('volume_label_code')->unsigned()->nullable(); // 1..10
+            $table->unsignedTinyInteger('signal_code')->default(4); // 1..5
+            $table->unsignedTinyInteger('volume_label_code')->nullable(); // 1..10
 
             // scoring
             $table->smallInteger('score_total')->default(0);
@@ -56,23 +56,23 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->smallInteger('score_breakout')->default(0);
             $table->smallInteger('score_risk')->default(0);
 
-            // meta
             $table->string('source', 30)->nullable();
-            $table->boolean('is_deleted')->default(0);
-            $table->timestamps();
+
+            $table->boolean('is_deleted')->default(false);
+
+            // match DDL: timestamp NULL DEFAULT NULL
+            $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->useCurrent();
 
             $table->unique(['ticker_id', 'trade_date'], 'uq_ind_daily_ticker_date');
 
-            // index untuk screener “hari ini”
-            $table->index(['trade_date', 'signal_code'], 'idx_ind_date_signal');
-            $table->index(['trade_date', 'volume_label_code'], 'idx_ind_date_vlabel');
             $table->index(['trade_date', 'vol_ratio'], 'idx_ind_date_volratio');
-            $table->index(['trade_date', 'score_total'], 'idx_ind_date_score');
+            $table->index(['trade_date', 'signal_code', 'volume_label_code', 'score_total'], 'idx_ind_candidates');
+            $table->index(['trade_date', 'rsi14', 'ma20', 'ma50', 'ma200'], 'idx_ind_trend_filter');
 
             $table->foreign('ticker_id', 'fk_ind_daily_ticker')
                 ->references('ticker_id')->on('tickers')
-                ->onUpdate('cascade')
-                ->onDelete('restrict');
+                ->onUpdate('cascade');
         });
 
     }

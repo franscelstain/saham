@@ -95,9 +95,9 @@ class ScreenerService
      */
     public function getTodayBuylistData(?string $today = null, ?float $capital = null): array
     {
-        $today = $today ?: date('Y-m-d');
+        $today = $today ?: Carbon::now('Asia/Jakarta')->toDateString();
 
-        $eodDate = $this->repo->getLatestEodDate();
+        $eodDate = $this->repo->getEodReferenceForToday($today);
         if (!$eodDate) {
             return [
                 'today' => $today,
@@ -107,9 +107,15 @@ class ScreenerService
             ];
         }
 
-        $td     = Carbon::parse($today);
-        $eod    = Carbon::parse($eodDate);
-        $expiry = $this->addTradingDays($eod, self::CANDIDATE_WINDOW_TRADING_DAYS);
+        $td  = Carbon::parse($today, 'Asia/Jakarta');
+        $eod = Carbon::parse($eodDate, 'Asia/Jakarta');
+
+        $expiryDateStr = $this->repo->getNthTradingDateAfter($eodDate, self::CANDIDATE_WINDOW_TRADING_DAYS);
+        if (!$expiryDateStr) {
+            $expiryDateStr = $this->addTradingDays($eod, self::CANDIDATE_WINDOW_TRADING_DAYS)->toDateString();
+        }
+
+        $expiry = Carbon::parse($expiryDateStr, 'Asia/Jakarta');
 
         // “now” WIB buat rule jam entry (operasional real time)
         $nowWib  = Carbon::now('Asia/Jakarta');
@@ -183,8 +189,8 @@ class ScreenerService
             // ===== relvol =====
             $avg20 = $av->avg_vol20 ?? null;
             $relvol = null;
-            if ($volSoFar !== null && $avg20 !== null && (float)$avg20 > 0) {
-                $relvol = (float)$volSoFar / (float)$avg20;
+            if ($volSoFar !== null && $avg20 !== null) {
+                $relvol = $this->computeTimedRelVol((float)$volSoFar, (float)$avg20, $nowWib);
             }
 
             // =========================
@@ -312,7 +318,8 @@ class ScreenerService
             $c->low_price     = $lowToday;
             $c->eod_low       = $eodLow;
 
-            $c->price_ok      = ($priceOk === true) ? 1 : 0;
+            $c->price_ok      = ($priceOk === null) ? null : (($priceOk === true) ? 1 : 0);
+
             $c->pos_in_range  = $posInRange !== null ? round($posInRange * 100, 2) : null;
 
             // ===== Trade plan + risk filters =====
@@ -322,32 +329,39 @@ class ScreenerService
                     $c->{$k} = $v;
                 }
 
-                // Risk lebar? (entry-SL)/entry
-                if (isset($c->entry_ideal, $c->stop_loss) && (float)$c->entry_ideal > 0) {
-                    $riskPctFromEntry = (((float)$c->entry_ideal - (float)$c->stop_loss) / (float)$c->entry_ideal);
-                    if ($riskPctFromEntry > self::MAX_RISK_PCT_FROM_ENTRY) {
-                        $status = 'RISK_TOO_WIDE';
-                        $reason = 'Risk terlalu lebar (> '.(self::MAX_RISK_PCT_FROM_ENTRY * 100).'%)';
-                    }
+                if (($c->lots ?? 0) < 1) {
+                    $status = 'CAPITAL_TOO_SMALL';
+                    $reason = $c->plan_blocked_reason ?? 'Modal tidak cukup untuk 1 lot sesuai risk rule';
                 }
-
-                // RR minimal ke TP2
-                if ($status === 'BUY_OK' && isset($c->entry_ideal, $c->stop_loss, $c->tp2)) {
-                    $risk   = max(0.0000001, (float)$c->entry_ideal - (float)$c->stop_loss);
-                    $reward = max(0.0, (float)$c->tp2 - (float)$c->entry_ideal);
-                    $rr = $reward / $risk;
-
-                    if ($rr < self::MIN_RR_TO_TP2) {
-                        $status = 'RR_TOO_LOW';
-                        $reason = 'RR ke TP2 terlalu kecil (< '.self::MIN_RR_TO_TP2.')';
-                    }
-                }
-
-                // BUY_PULLBACK variant (zona entry ideal)
+            
                 if ($status === 'BUY_OK') {
-                    if ($posInRange !== null && $posInRange >= 0.60 && $posInRange <= 0.75) {
-                        $status = 'BUY_PULLBACK';
-                        $reason = 'Valid intraday (zona pullback ideal)';
+                    // Risk lebar? (entry-SL)/entry
+                    if (isset($c->entry_ideal, $c->stop_loss) && (float)$c->entry_ideal > 0) {
+                        $riskPctFromEntry = (((float)$c->entry_ideal - (float)$c->stop_loss) / (float)$c->entry_ideal);
+                        if ($riskPctFromEntry > self::MAX_RISK_PCT_FROM_ENTRY) {
+                            $status = 'RISK_TOO_WIDE';
+                            $reason = 'Risk terlalu lebar (> '.(self::MAX_RISK_PCT_FROM_ENTRY * 100).'%)';
+                        }
+                    }
+
+                    // RR minimal ke TP2
+                    if ($status === 'BUY_OK' && isset($c->entry_ideal, $c->stop_loss, $c->tp2)) {
+                        $risk   = max(0.0000001, (float)$c->entry_ideal - (float)$c->stop_loss);
+                        $reward = max(0.0, (float)$c->tp2 - (float)$c->entry_ideal);
+                        $rr = $reward / $risk;
+
+                        if ($rr < self::MIN_RR_TO_TP2) {
+                            $status = 'RR_TOO_LOW';
+                            $reason = 'RR ke TP2 terlalu kecil (< '.self::MIN_RR_TO_TP2.')';
+                        }
+                    }
+
+                    // BUY_PULLBACK variant (zona entry ideal)
+                    if ($status === 'BUY_OK') {
+                        if ($posInRange !== null && $posInRange >= 0.60 && $posInRange <= 0.75) {
+                            $status = 'BUY_PULLBACK';
+                            $reason = 'Valid intraday (zona pullback ideal)';
+                        }
                     }
                 }
             }
@@ -611,8 +625,34 @@ class ScreenerService
 
         if ($sl >= $entry) $sl = $entry * 0.98;
 
+        $res20 = isset($c->resistance_20d) && $c->resistance_20d !== null ? (float)$c->resistance_20d : null;
+
         $tp1 = $entry * 1.03;
-        $tp2 = $entry * 1.05;
+        
+        // === TP2 adaptif: pakai resistance_20d dan ATR ===
+        $tp2Candidates = [];
+
+        // baseline weekly target
+        $tp2Candidates[] = $entry * 1.05;
+
+        // ATR-based target (contoh 2x ATR)
+        if ($atr !== null && $atr > 0) {
+            $tp2Candidates[] = $entry + (2.0 * $atr);
+        }
+
+        // resistance 20d sebagai target realistis (kalau di atas entry)
+        if ($res20 !== null && $res20 > $entry) {
+            $tp2Candidates[] = $res20;
+        }
+
+        // pilih yang paling realistis (paling dekat) supaya sering kena dalam minggu yang sama
+        $tp2 = min($tp2Candidates);
+        $tp2 = max($tp2, $entry * 1.05); // jaga TP2 minimal 5%
+
+        // guard: jangan sampai tp2 < tp1
+        if ($tp2 < $tp1) {
+            $tp2 = $tp1;
+        }
 
         // ===== sizing =====
         $riskPct = self::DEFAULT_RISK_PCT;
@@ -623,6 +663,7 @@ class ScreenerService
         $estRisk = null;
         $estCost = null;
         $riskPctReal = null;
+        $planBlockedReason = null;
 
         if ($capital !== null && $capital > 0 && $riskPerShare > 0) {
             $riskBudget = $capital * $riskPct;
@@ -633,14 +674,24 @@ class ScreenerService
             $shares = min($maxSharesByRisk, $maxSharesByCash);
             $lots = (int) floor($shares / self::LOT_SIZE);
 
-            if ($lots < 1) $lots = 1;
-
-            $estCost = $lots * self::LOT_SIZE * $entry;
-            $estRisk = $lots * self::LOT_SIZE * $riskPerShare;
-            $riskPctReal = $estRisk / $capital;
+            if ($lots < 1) {
+                // Tidak cukup untuk entry sesuai risk/cash -> blok
+                $lots = 0;
+                $estCost = null;
+                $estRisk = null;
+                $riskPctReal = null;
+                $planBlockedReason = 'Modal/risk budget tidak cukup untuk 1 lot sesuai aturan risk';
+            } else {
+                $estCost = $lots * self::LOT_SIZE * $entry;
+                $estRisk = $lots * self::LOT_SIZE * $riskPerShare;
+                $riskPctReal = $estRisk / $capital;
+                $planBlockedReason = null;
+            }
         }
 
-        // ===== buy steps =====
+        $hasLots = is_int($lots) && $lots > 0;
+
+        // ===== buy steps =====        
         $buyType  = 'Sekali';
         $buySteps = '100% di '.round($entry, 4);
 
@@ -654,30 +705,53 @@ class ScreenerService
 
             if ($eodLow !== null) $e2 = max($e2, $eodLow);
 
-            if ($lots !== null) {
-                $lot1 = (int) floor($lots * 0.60);
-                $lot2 = $lots - $lot1;
-                if ($lot1 < 1) { $lot1 = 1; $lot2 = max(0, $lots - 1); }
+            if ($lots === 0) {
+                // plan blocked -> jangan tampilkan lot
+                $buySteps = "60% di ".round($e1, 4)." | 40% di ".round($e2, 4);
+            } elseif ($hasLots) {                
+                // pastikan pembagian valid
+                if ($lots === 1) {
+                    $buyType  = 'Sekali';
+                    $buySteps = "1 lot di ".round($e1, 4);
+                } else {
+                    $lot1 = (int) floor($lots * 0.60);
+                    $lot2 = $lots - $lot1;
 
-                $buySteps = "{$lot1} lot di ".round($e1, 4)." | {$lot2} lot di ".round($e2, 4);
+                    if ($lot1 < 1) { $lot1 = 1; $lot2 = $lots - 1; }
+                    if ($lot2 < 1) { $lot2 = 1; $lot1 = $lots - 1; }
+                
+                    $buySteps = "{$lot1} lot di ".round($e1, 4)." | {$lot2} lot di ".round($e2, 4);
+                }
             } else {
                 $buySteps = "60% di ".round($e1, 4)." | 40% di ".round($e2, 4);
             }
         } else {
-            if ($lots !== null) {
+            // non-burst
+            if ($lots === 0) {
+                $buySteps = "100% di ".round($entry, 4); // plan blocked -> persen saja
+            } elseif ($hasLots) {
                 $buySteps = "{$lots} lot di ".round($entry, 4);
+            } else {
+                $buySteps = "100% di ".round($entry, 4);
             }
         }
 
         // ===== sell steps =====
         $sellType = 'Bertahap (2x)';
-        if ($lots !== null) {
-            $s1 = (int) max(1, floor($lots * 0.50));
-            $s2 = $lots - $s1;
+        if ($hasLots) {
+            if ($lots === 1) {
+                $sellType  = 'Sekali';
+                $sellSteps = "Jual 1 lot di ".round($tp2, 4)
+                    ." | Setelah TP1: SL naik ke Entry | Time stop: T+2 belum +2% → keluar";
+            } else {
+                $s1 = (int) floor($lots * 0.50);
+                $s1 = max(1, min($lots - 1, $s1)); // pastikan s2 minimal 1
+                $s2 = $lots - $s1;
 
-            $sellSteps = "Jual {$s1} lot di ".round($tp1, 4)
-                ." | Jual {$s2} lot di ".round($tp2, 4)
-                ." | Setelah TP1: SL naik ke Entry | Time stop: T+2 belum +2% → keluar";
+                $sellSteps = "Jual {$s1} lot di ".round($tp1, 4)
+                    ." | Jual {$s2} lot di ".round($tp2, 4)
+                    ." | Setelah TP1: SL naik ke Entry | Time stop: T+2 belum +2% → keluar";
+            } 
         } else {
             $sellSteps = "Jual 50% di ".round($tp1, 4)
                 ." | Jual 50% di ".round($tp2, 4)
@@ -702,6 +776,28 @@ class ScreenerService
             'risk_pct_real' => $riskPctReal !== null ? round($riskPctReal, 4) : null,
             'risk_per_share'=> round($riskPerShare, 4),
             'risk_budget'   => $riskBudget !== null ? round($riskBudget, 2) : null,
+            'plan_blocked_reason' => $planBlockedReason,
         ];
+    }
+
+    private function computeTimedRelVol(float $volSoFar, float $avgVol20, Carbon $nowWib): ?float
+    {
+        if ($avgVol20 <= 0) return null;
+
+        // Session IDX kira-kira 09:00 - 15:00 (360 menit). Sesuaikan kalau kamu punya jam yg lebih presisi.
+        $start = $nowWib->copy()->setTime(9, 0, 0);
+        $end   = $nowWib->copy()->setTime(15, 0, 0);
+
+        if ($nowWib->lt($start)) return 0.0;
+        if ($nowWib->gt($end))   return $volSoFar / $avgVol20; // sudah lewat, pakai normal
+
+        $elapsed = max(1, $start->diffInMinutes($nowWib));
+        $total   = max(1, $start->diffInMinutes($end));
+
+        $ratioTime = $elapsed / $total;               // 0..1
+        $expected  = $avgVol20 * $ratioTime;          // expected vol sampai saat ini
+
+        if ($expected <= 0) return null;
+        return $volSoFar / $expected;
     }
 }

@@ -137,6 +137,7 @@ class ScreenerComputeDaily extends Command
 
             $maxLe = DB::table('ticker_ohlc_daily')
                 ->where('trade_date', '<=', $target)
+                ->where('is_deleted', 0)
                 ->max('trade_date');
 
             if (!$maxLe) return null;
@@ -148,7 +149,9 @@ class ScreenerComputeDaily extends Command
             return Carbon::parse($maxLe)->startOfDay();
         }
 
-        $max = DB::table('ticker_ohlc_daily')->max('trade_date');
+        $max = DB::table('ticker_ohlc_daily')
+            ->where('is_deleted', 0)
+            ->max('trade_date');
         if (!$max) return null;
 
         return Carbon::parse($max)->startOfDay();

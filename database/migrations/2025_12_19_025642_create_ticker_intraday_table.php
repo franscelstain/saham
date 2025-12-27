@@ -14,6 +14,8 @@ class CreateTickerIntradayTable extends Migration
     public function up()
     {
         Schema::create('ticker_intraday', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+
             $table->bigIncrements('snapshot_id');
             $table->unsignedBigInteger('ticker_id');
             $table->date('trade_date');                 // tanggal bursa lokal
@@ -26,10 +28,19 @@ class CreateTickerIntradayTable extends Migration
             $table->decimal('high_price', 18, 4)->nullable();
             $table->decimal('low_price', 18, 4)->nullable();
 
-            $table->tinyInteger('is_deleted')->default(0);
-            $table->timestamps();
+            $table->string('source', 30)->nullable();
 
-            $table->index(['trade_date']);
+            $table->tinyInteger('is_deleted')->default(0);
+
+            $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->useCurrent();
+
+            $table->unique(['ticker_id', 'trade_date'], 'ticker_intraday_ticker_date_unique');
+            $table->index('trade_date', 'ticker_intraday_trade_date_idx');
+
+            $table->foreign('ticker_id', 'ticker_intraday_ticker_id_foreign')
+                ->references('ticker_id')->on('tickers')
+                ->onUpdate('cascade');
         });
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Carbon;
 use RuntimeException;
 
@@ -25,12 +26,16 @@ class YahooFinanceService
     public function historical(string $symbol, Carbon $start, Carbon $end, string $interval = '1d'): array
     {
         // Yahoo pakai unix seconds UTC. period2 disarankan exclusive => +1 hari biar inclusive.
-        $period1 = $start->copy()->startOfDay()->timestamp;
-        $period2 = $end->copy()->addDay()->startOfDay()->timestamp;
+        $period1 = Carbon::createFromFormat('Y-m-d', $start->toDateString(), 'UTC')->timestamp;
+        $period2 = Carbon::createFromFormat('Y-m-d', $end->toDateString(), 'UTC')->addDay()->timestamp;
 
         try {
             $res = $this->http->get("/v8/finance/chart/{$symbol}", [
                 'http_errors' => false,
+                'headers' => [
+                    'User-Agent' => 'Mozilla/5.0',
+                    'Accept'     => 'application/json',
+                ],
                 'query' => [
                     'period1' => $period1,
                     'period2' => $period2,
@@ -48,14 +53,19 @@ class YahooFinanceService
         }
 
         $json = json_decode((string) $res->getBody(), true);
+        if (!is_array($json)) return [];
+
+        if (!empty($json['chart']['error'])) return []; // optional tapi bagus
+
         $result = $json['chart']['result'][0] ?? null;
-        if (!$result) return [];
+        if (!is_array($result)) return [];
 
+        $tz    = 'Asia/Jakarta';
         $ts    = $result['timestamp'] ?? [];
-        $quote = $result['indicators']['quote'][0] ?? null;
-        $adj   = $result['indicators']['adjclose'][0]['adjclose'] ?? null;
+        $quote = $result['indicators']['quote'][0] ?? [];
+        $adj   = $result['indicators']['adjclose'][0]['adjclose'] ?? [];
 
-        if (empty($ts) || !is_array($quote)) return [];
+        if (!is_array($ts) || empty($ts) || !is_array($quote)) return [];
 
         $opens  = $quote['open'] ?? [];
         $highs  = $quote['high'] ?? [];
@@ -64,20 +74,26 @@ class YahooFinanceService
         $vols   = $quote['volume'] ?? [];
 
         $rows = [];
-        for ($i = 0; $i < count($ts); $i++) {
-            // skip bar null
-            if (!isset($closes[$i]) || $closes[$i] === null) continue;
+        $n = count($ts);
+        for ($i = 0; $i < $n; $i++) {
+            // pastikan semua index ada
+            if (!isset($closes[$i], $opens[$i], $highs[$i], $lows[$i])) continue;
 
-            $date = Carbon::createFromTimestampUTC((int)$ts[$i])->toDateString();
+            // skip null candle
+            if ($closes[$i] === null || $opens[$i] === null || $highs[$i] === null || $lows[$i] === null) continue;
+
+            $date = Carbon::createFromTimestampUTC((int)$ts[$i])
+                    ->setTimezone($tz)
+                    ->toDateString();
 
             $rows[] = [
                 'date'      => $date,
-                'open'      => isset($opens[$i])  && $opens[$i]  !== null ? (float)$opens[$i]  : null,
-                'high'      => isset($highs[$i])  && $highs[$i]  !== null ? (float)$highs[$i]  : null,
-                'low'       => isset($lows[$i])   && $lows[$i]   !== null ? (float)$lows[$i]   : null,
+                'open'      => (float)$opens[$i],
+                'high'      => (float)$highs[$i],
+                'low'       => (float)$lows[$i],
                 'close'     => (float)$closes[$i],
                 'adj_close' => (is_array($adj) && isset($adj[$i]) && $adj[$i] !== null) ? (float)$adj[$i] : null,
-                'volume'    => isset($vols[$i])   && $vols[$i]   !== null ? (int)$vols[$i]   : null,
+                'volume'    => (isset($vols[$i]) && $vols[$i] !== null) ? (int)$vols[$i] : null,
             ];
         }
 
