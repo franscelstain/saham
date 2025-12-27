@@ -53,8 +53,8 @@ class ScreenerController extends Controller
                 ->orderByDesc('d.score_total')
                 ->get()
                 ->map(function ($r) {
-                    $r->signal_name = $this->signalName((int) $r->signal_code);
-                    $r->volume_label_name = $this->volumeLabelName($r->volume_label_code !== null ? (int) $r->volume_label_code : null);
+                    $r->signal_name = $this->svc->signalName((int) $r->signal_code);
+                    $r->volume_label_name = $this->svc->volumeLabelName($r->volume_label_code !== null ? (int) $r->volume_label_code : null);
                     return $r;
                 });
         }
@@ -153,35 +153,5 @@ class ScreenerController extends Controller
 
         $v = (float) $raw;
         return $v > 0 ? $v : null;
-    }
-
-    private function signalName(int $code): string
-    {
-        switch ($code) {
-            case 1: return 'False Breakout / Batal';
-            case 2: return 'Hati - Hati';
-            case 3: return 'Hindari';
-            case 4: return 'Perlu Konfirmasi';
-            case 5: return 'Layak Beli';
-            default: return 'Unknown';
-        }
-    }
-
-    private function volumeLabelName(?int $code): string
-    {
-        if ($code === null) return '-';
-        switch ($code) {
-            case 1:  return 'Climax / Euphoria – hati-hati';
-            case 2:  return 'Quiet/Normal – Volume lemah';
-            case 3:  return 'Ultra Dry';
-            case 4:  return 'Dormant';
-            case 5:  return 'Quiet';
-            case 6:  return 'Normal';
-            case 7:  return 'Early Interest';
-            case 8:  return 'Volume Burst / Accumulation';
-            case 9:  return 'Strong Burst / Breakout';
-            case 10: return 'Climax / Euphoria';
-            default: return '-';
-        }
     }
 }

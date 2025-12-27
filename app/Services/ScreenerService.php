@@ -78,6 +78,8 @@ class ScreenerService
             $c->eod_guard_ok = $ok ? 1 : 0;
             $c->eod_guard_reason = $why;
             $c->eod_guard_severity = $sev;
+            $c->signal_name = $this->signalName((int) $c->signal_code);
+            $c->volume_label_name = $this->volumeLabelName($c->volume_label_code !== null ? (int) $c->volume_label_code : null);
             return $c;
         });
 
@@ -799,5 +801,35 @@ class ScreenerService
 
         if ($expected <= 0) return null;
         return $volSoFar / $expected;
+    }    
+
+    public function signalName(int $code): string
+    {
+        switch ($code) {
+            case 1: return 'False Breakout / Batal';
+            case 2: return 'Hati - Hati';
+            case 3: return 'Hindari';
+            case 4: return 'Perlu Konfirmasi';
+            case 5: return 'Layak Beli';
+            default: return 'Unknown';
+        }
+    }
+
+    public function volumeLabelName(?int $code): string
+    {
+        if ($code === null) return '-';
+        switch ($code) {
+            case 1:  return 'Climax / Euphoria – hati-hati';
+            case 2:  return 'Quiet/Normal – Volume lemah';
+            case 3:  return 'Ultra Dry';
+            case 4:  return 'Dormant';
+            case 5:  return 'Quiet';
+            case 6:  return 'Normal';
+            case 7:  return 'Early Interest';
+            case 8:  return 'Volume Burst / Accumulation';
+            case 9:  return 'Strong Burst / Breakout';
+            case 10: return 'Climax / Euphoria';
+            default: return '-';
+        }
     }
 }

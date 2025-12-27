@@ -24,14 +24,16 @@
 <table class="tbl">
   <thead>
     <tr>
-      <th>Ticker</th><th>Company</th><th>Date</th>
+      <th>No</th><th>Ticker</th><th>Company</th><th>Date</th>
       <th>Close</th><th>MA20</th><th>MA50</th><th>MA200</th>
       <th>Signal</th><th>Volume Label</th><th>VolRatio</th><th>RSI</th><th>Score</th>
     </tr>
   </thead>
   <tbody>
+    @php $no = 1; @endphp
     @foreach($rows as $r)
       <tr>
+        <td>{{ $no++ }}</td>
         <td>{{ $r->ticker_code }}</td>
         <td>{{ $r->company_name }}</td>
         <td>{{ $r->trade_date }}</td>
