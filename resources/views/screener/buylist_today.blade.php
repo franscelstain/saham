@@ -7,6 +7,11 @@
   .ok{font-weight:bold}
   .muted{color:#666}
   .pill{display:inline-block;padding:2px 6px;border:1px solid #333;border-radius:4px;font-size:12px;white-space:nowrap}
+  .pill-buy{background:#e9fbe9;border-color:#2e7d32;color:#1b5e20}
+  .pill-wait{background:#e8f0fe;border-color:#1a73e8;color:#174ea6}
+  .pill-warn{background:#fff4e5;border-color:#f29900;color:#8a5a00}
+  .pill-bad{background:#fde8e8;border-color:#d93025;color:#a50e0e}
+  .pill-muted{background:#f1f3f4;border-color:#9aa0a6;color:#5f6368}
   .right{text-align:right}
   .center{text-align:center}
   .nowrap{white-space:nowrap}
@@ -72,6 +77,23 @@
         $alias = $r->status_alias ?? $r->status ?? '-';
         $risk  = $r->risk_pct ?? '-';
         $rr    = $r->rr_tp2 ?? '-';
+        $statusKey = (string) ($r->status ?? $alias ?? '');
+        $pillClass = 'pill pill-muted';
+
+        if (in_array($statusKey, ['BUY_OK','BUY_PULLBACK'], true)) {
+            $pillClass = 'pill pill-buy';
+        } elseif ($statusKey === 'EXPIRED') {
+            $pillClass = 'pill pill-muted';
+        } elseif (strpos($statusKey, 'WAIT_') === 0) {
+            // WAIT_* (umumnya nunggu kondisi)
+            $pillClass = in_array($statusKey, ['WAIT_PULLBACK'], true) ? 'pill pill-warn' : 'pill pill-wait';
+        } elseif (in_array($statusKey, ['LUNCH_WINDOW'], true)) {
+            $pillClass = 'pill pill-warn';
+        } elseif (strpos($statusKey, 'SKIP_') === 0 || in_array($statusKey, ['RR_TOO_LOW','RISK_TOO_WIDE','CAPITAL_TOO_SMALL','STALE_INTRADAY','NO_INTRADAY','LATE_ENTRY','SKIP_EOD_GUARD'], true)) {
+            $pillClass = 'pill pill-bad';
+        } else {
+            $pillClass = 'pill pill-warn';
+        }
       @endphp
       <tr>
         <td class="center">{{ $i+1 }}</td>
@@ -83,7 +105,7 @@
         <td class="right">{{ $r->relvol_today !== null ? number_format($r->relvol_today, 4) : '-' }}</td>
         <td class="right">{{ $r->pos_in_range !== null ? number_format($r->pos_in_range, 2) . '%' : '-' }}</td>
 
-        <td class="ok"><span class="pill">{{ $alias }}</span></td>
+        <td class="ok"><span class="{{ $pillClass }}">{{ $alias }}</span></td>
         <td>{{ $r->reason ?? '-' }}</td>
 
         <td class="right">{{ $r->entry_ideal ?? '-' }}</td>
@@ -150,6 +172,23 @@
         $alias = $r->status_alias ?? $r->status ?? '-';
         $risk  = $r->risk_pct ?? '-';
         $rr    = $r->rr_tp2 ?? '-';
+        $statusKey = (string) ($r->status ?? $alias ?? '');
+        $pillClass = 'pill pill-muted';
+
+        if (in_array($statusKey, ['BUY_OK','BUY_PULLBACK'], true)) {
+            $pillClass = 'pill pill-buy';
+        } elseif ($statusKey === 'EXPIRED') {
+            $pillClass = 'pill pill-muted';
+        } elseif (strpos($statusKey, 'WAIT_') === 0) {
+            // WAIT_* (umumnya nunggu kondisi)
+            $pillClass = in_array($statusKey, ['WAIT_PULLBACK'], true) ? 'pill pill-warn' : 'pill pill-wait';
+        } elseif (in_array($statusKey, ['LUNCH_WINDOW'], true)) {
+            $pillClass = 'pill pill-warn';
+        } elseif (strpos($statusKey, 'SKIP_') === 0 || in_array($statusKey, ['RR_TOO_LOW','RISK_TOO_WIDE','CAPITAL_TOO_SMALL','STALE_INTRADAY','NO_INTRADAY','LATE_ENTRY','SKIP_EOD_GUARD'], true)) {
+            $pillClass = 'pill pill-bad';
+        } else {
+            $pillClass = 'pill pill-warn';
+        }
       @endphp
       <tr>
         <td class="center">{{ $i+1 }}</td>
@@ -169,7 +208,7 @@
 
         <td class="center">{{ !empty($r->price_ok) ? 'YES' : 'NO' }}</td>
 
-        <td class="ok"><span class="pill">{{ $alias }}</span></td>
+        <td class="ok"><span class="{{ $pillClass }}">{{ $alias }}</span></td>
         <td>{{ $r->reason ?? '-' }}</td>
         <td class="nowrap">{{ $r->snapshot_at ?? '-' }}</td>
 
