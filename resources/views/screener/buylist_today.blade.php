@@ -64,6 +64,11 @@
       <th class="right">TP1</th>
       <th class="right">TP2</th>
 
+      <th class="right">BE</th>
+      <th class="right">Out (Buy+Fee)</th>
+      <th class="right">Profit TP2 (Net)</th>
+      <th class="right">RR TP2 (Net)</th>
+
       <th class="right">Risk%</th>
       <th class="right">RR(TP2)</th>
 
@@ -75,7 +80,8 @@
     @forelse($picks as $i => $r)
       @php
         $alias = $r->status_alias ?? $r->status ?? '-';
-        $risk  = $r->risk_pct ?? '-';
+        $riskVal = $r->risk_pct_real ?? $r->risk_pct ?? null;
+        $risk = $riskVal !== null ? number_format($riskVal * 100, 2) . '%' : '-';
         $rr    = $r->rr_tp2 ?? '-';
         $statusKey = (string) ($r->status ?? $alias ?? '');
         $pillClass = 'pill pill-muted';
@@ -114,6 +120,11 @@
         <td class="right">{{ $r->tp1 ?? '-' }}</td>
         <td class="right">{{ $r->tp2 ?? '-' }}</td>
 
+        <td class="right">{{ $r->break_even ?? '-' }}</td>
+        <td class="right">{{ isset($r->est_out_total) && $r->est_out_total !== null ? number_format($r->est_out_total, 0, '.', ',') : '-' }}</td>
+        <td class="right">{{ isset($r->est_profit_tp2) && $r->est_profit_tp2 !== null ? number_format($r->est_profit_tp2, 0, '.', ',') : '-' }}</td>
+        <td class="right">{{ $r->rr_net_tp2 ?? '-' }}</td>
+
         <td class="right">{{ $risk }}</td>
         <td class="right">{{ $rr }}</td>
 
@@ -123,7 +134,7 @@
         </td>
       </tr>
     @empty
-      <tr><td colspan="18">Tidak ada rekomendasi BUY_OK / BUY_PULLBACK saat ini.</td></tr>
+      <tr><td colspan="22">Tidak ada rekomendasi BUY_OK / BUY_PULLBACK saat ini.</td></tr>
     @endforelse
   </tbody>
 </table>
@@ -170,7 +181,8 @@
     @forelse($rows as $i => $r)
       @php
         $alias = $r->status_alias ?? $r->status ?? '-';
-        $risk  = $r->risk_pct ?? '-';
+        $riskVal = $r->risk_pct_real ?? $r->risk_pct ?? null;
+        $risk = $riskVal !== null ? number_format($riskVal * 100, 2) . '%' : '-';
         $rr    = $r->rr_tp2 ?? '-';
         $statusKey = (string) ($r->status ?? $alias ?? '');
         $pillClass = 'pill pill-muted';

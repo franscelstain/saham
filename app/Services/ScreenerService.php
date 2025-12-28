@@ -564,7 +564,14 @@ class ScreenerService
         $statusWeight = 0.0;
         if (in_array($status, ['BUY_OK','BUY_PULLBACK'], true)) {
             $statusWeight = 1000.0;
-        } elseif (in_array($status, ['WAIT_PULLBACK','WAIT_STRENGTH','WAIT_REL_VOL','WAIT_ENTRY_WINDOW','LUNCH_WINDOW'], true)) {
+        } elseif (in_array($status, [
+            'WAIT_PULLBACK',
+            'WAIT_STRENGTH',
+            'WAIT_REL_VOL',
+            'WAIT_ENTRY_WINDOW',
+            'WAIT_EOD_GUARD',
+            'LUNCH_WINDOW'
+        ], true)) {
             $statusWeight = 200.0;
         } elseif (in_array($status, ['NO_INTRADAY','STALE_INTRADAY'], true)) {
             $statusWeight = 50.0;
@@ -574,12 +581,24 @@ class ScreenerService
 
         $relvol     = (float)($r->relvol_today ?? 0);
         $scoreTotal = (float)($r->score_total ?? 0);
-        $rr         = (float)($r->rr_tp2 ?? 0);
+
+        // pakai NET kalau ada, fallback ke gross
+        $rrNet   = (float)($r->rr_net_tp2 ?? 0);
+        $rrGross = (float)($r->rr_tp2 ?? 0);
+        $rrUse   = $rrNet > 0 ? $rrNet : $rrGross;
+
+        $profitPctNet = (float)($r->est_profit_pct_tp2 ?? 0);
 
         $rank = $statusWeight
-            + (200.0 * $rr)
-            + (50.0 * min($relvol, 5))
-            + (1.0 * $scoreTotal);
+            + (220.0 * $rrUse)
+            + (80.0  * $profitPctNet)
+            + (50.0  * min($relvol, 5))
+            + (1.0   * $scoreTotal);
+
+        // plan diblok -> buang jauh
+        if (!empty($r->plan_blocked_reason)) {
+            $rank -= 5000.0;
+        }
 
         $riskPctReal = isset($r->risk_pct_real) ? (float)$r->risk_pct_real : null;
         if ($riskPctReal !== null) {
@@ -620,6 +639,11 @@ class ScreenerService
             $entry = $open;
         }
 
+         // ===== APPLY TICK (IDX) =====
+        // Entry: round down biar realistis (nggak overpay)
+        $entry = $this->roundDownToTick($entry);
+        $entry = $this->clampMinTick($entry);
+
         // SL swing-safe: struktur kemarin
         if ($eodLow !== null) $sl = $eodLow;
         elseif ($low !== null) $sl = $low;
@@ -627,14 +651,24 @@ class ScreenerService
 
         if ($sl >= $entry) $sl = $entry * 0.98;
 
+        // SL: round down (lebih longgar, sesuai struktur support)
+        $sl = $this->roundDownToTick($sl);
+        $sl = $this->clampMinTick($sl);
+
+        // guard ulang setelah tick: SL harus < entry
+        if ($sl >= $entry) {
+            $sl = $this->prevTickDown($entry);
+            $sl = $this->clampMinTick($sl);
+        }
+
         $res20 = isset($c->resistance_20d) && $c->resistance_20d !== null ? (float)$c->resistance_20d : null;
 
         $tp1 = $entry * 1.03;
-        
-        // === TP2 adaptif: pakai resistance_20d dan ATR ===
+
+        // === TP2 adaptif: pakai baseline + resistance_20d + ATR ===
         $tp2Candidates = [];
 
-        // baseline weekly target
+        // baseline weekly target (wajib supaya array tidak kosong)
         $tp2Candidates[] = $entry * 1.05;
 
         // ATR-based target (contoh 2x ATR)
@@ -649,9 +683,24 @@ class ScreenerService
 
         // pilih yang paling realistis (paling dekat) supaya sering kena dalam minggu yang sama
         $tp2 = min($tp2Candidates);
-        $tp2 = max($tp2, $entry * 1.05); // jaga TP2 minimal 5%
 
-        // guard: jangan sampai tp2 < tp1
+        // TP: round down supaya target lebih realistis sering kena
+        $tp1 = $this->roundDownToTick($tp1);
+        $tp2 = $this->roundDownToTick($tp2);
+
+        $tp1 = $this->clampMinTick($tp1);
+        $tp2 = $this->clampMinTick($tp2);
+
+        // guard setelah tick
+        if ($tp1 <= $entry) {
+            $tp1 = $this->nextTickUp($entry);
+        }
+
+        $minTp2 = $this->nextTickUp($entry * 1.05);
+        if ($tp2 < $minTp2) {
+            $tp2 = $minTp2;
+        }
+        
         if ($tp2 < $tp1) {
             $tp2 = $tp1;
         }
@@ -693,9 +742,86 @@ class ScreenerService
 
         $hasLots = is_int($lots) && $lots > 0;
 
+        // ===== fees + break-even (NET) =====
+        $feeBuyRate  = null;
+        $feeSellRate = null;     // keep untuk backward compat (isi = TP2)
+
+        $feeSellRateTp1 = null;
+        $feeSellRateTp2 = null;
+        $feeSellRateBe  = null;
+
+        $breakEven = null;
+
+        $estFeeBuy = null;
+        $estOutTotal = null;
+
+        $estFeeSellTp1 = null;
+        $estFeeSellTp2 = null;
+
+        $estProfitTp1 = null;
+        $estProfitTp2 = null;
+
+        // NET metrics (buat ranking & UI)
+        $estProfitPctTp2 = null; // profit TP2 / total out (buy+fee)
+        $rrNetTp2 = null;        // net reward TP2 / gross risk
+
+        if ($hasLots) {
+            $shares = $lots * self::LOT_SIZE;
+            $notionalBuy = $shares * $entry;
+
+            // BUY rate harus based on notional BUY (entry)
+            [$feeBuyRate, $feeSellRateBe] = $this->resolveFeeRates($notionalBuy);
+
+            // Break-even: sell rate bisa berubah tergantung tier notional SELL.
+            // Iterasi 1–2x biar tier-nya akurat di boundary.
+            $breakEven = $this->breakEvenSellPrice($entry, $feeBuyRate, $feeSellRateBe);
+            for ($iter = 0; $iter < 2; $iter++) {
+                $notionalBeSell = $shares * $breakEven;
+                [, $sellRateNew] = $this->resolveFeeRates($notionalBeSell);
+
+                if (abs($sellRateNew - $feeSellRateBe) < 1e-12) {
+                    break;
+                }
+
+                $feeSellRateBe = $sellRateNew;
+                $breakEven = $this->breakEvenSellPrice($entry, $feeBuyRate, $feeSellRateBe);
+            }
+
+            // SELL rate harus based on notional SELL (TP1 / TP2)
+            [, $feeSellRateTp1] = $this->resolveFeeRates($shares * $tp1);
+            [, $feeSellRateTp2] = $this->resolveFeeRates($shares * $tp2);
+
+            // Keep key lama: fee_sell_rate = rate yang dipakai TP2 (paling relevan)
+            $feeSellRate = $feeSellRateTp2;
+
+            // BUY side (fee buy tetap berdasarkan notional BUY)
+            $estFeeBuy   = $notionalBuy * $feeBuyRate;
+            $estOutTotal = $notionalBuy + $estFeeBuy;
+
+            // TP1 / TP2 net profit (pakai sellRate masing-masing)
+            [$estFeeSellTp1, $estProfitTp1] = $this->estimateSellFeeAndNetProfit(
+                $shares, $entry, $tp1, $feeBuyRate, $feeSellRateTp1
+            );
+
+            [$estFeeSellTp2, $estProfitTp2] = $this->estimateSellFeeAndNetProfit(
+                $shares, $entry, $tp2, $feeBuyRate, $feeSellRateTp2
+            );
+
+            // ==== NET metrics (untuk ranking & transparansi UI) ====
+            if ($estOutTotal !== null && $estOutTotal > 0 && $estProfitTp2 !== null) {
+                $estProfitPctTp2 = $estProfitTp2 / $estOutTotal; // contoh 0.05 = 5% net
+            }
+
+            // RR NET: reward(net TP2) / risk(gross entry->SL)
+            if ($estProfitTp2 !== null) {
+                $riskGross = max(0.0000001, ($entry - $sl) * $shares);
+                $rrNetTp2 = $estProfitTp2 / $riskGross;
+            }
+        }
+
         // ===== buy steps =====        
         $buyType  = 'Sekali';
-        $buySteps = '100% di '.round($entry, 4);
+        $buySteps = '100% di '.(int)$entry;
 
         if ($volLabel === 8) {
             $buyType = 'Bertahap (2x)';
@@ -707,14 +833,24 @@ class ScreenerService
 
             if ($eodLow !== null) $e2 = max($e2, $eodLow);
 
+            // apply tick untuk step entry
+            $e1 = $this->roundDownToTick($e1);
+            $e2 = $this->roundDownToTick($e2);
+
+            $e1 = $this->clampMinTick($e1);
+            $e2 = $this->clampMinTick($e2);
+
+            // jaga jangan sampai e2 > e1 setelah rounding
+            if ($e2 > $e1) $e2 = $e1;
+
             if ($lots === 0) {
                 // plan blocked -> jangan tampilkan lot
-                $buySteps = "60% di ".round($e1, 4)." | 40% di ".round($e2, 4);
+                $buySteps = "60% di ".(int)$e1." | 40% di ".(int)$e2;
             } elseif ($hasLots) {                
                 // pastikan pembagian valid
                 if ($lots === 1) {
                     $buyType  = 'Sekali';
-                    $buySteps = "1 lot di ".round($e1, 4);
+                    $buySteps = "1 lot di ".(int)$e1;
                 } else {
                     $lot1 = (int) floor($lots * 0.60);
                     $lot2 = $lots - $lot1;
@@ -722,19 +858,19 @@ class ScreenerService
                     if ($lot1 < 1) { $lot1 = 1; $lot2 = $lots - 1; }
                     if ($lot2 < 1) { $lot2 = 1; $lot1 = $lots - 1; }
                 
-                    $buySteps = "{$lot1} lot di ".round($e1, 4)." | {$lot2} lot di ".round($e2, 4);
+                    $buySteps = "{$lot1} lot di ".(int)$e1." | {$lot2} lot di ".(int)$e2;
                 }
             } else {
-                $buySteps = "60% di ".round($e1, 4)." | 40% di ".round($e2, 4);
+                $buySteps = "60% di ".(int)$e1." | 40% di ".(int)$e2;
             }
         } else {
             // non-burst
             if ($lots === 0) {
-                $buySteps = "100% di ".round($entry, 4); // plan blocked -> persen saja
+                $buySteps = "100% di ".(int)$entry; // plan blocked -> persen saja
             } elseif ($hasLots) {
-                $buySteps = "{$lots} lot di ".round($entry, 4);
+                $buySteps = "{$lots} lot di ".(int)$entry;
             } else {
-                $buySteps = "100% di ".round($entry, 4);
+                $buySteps = "100% di ".(int)$entry;
             }
         }
 
@@ -743,28 +879,28 @@ class ScreenerService
         if ($hasLots) {
             if ($lots === 1) {
                 $sellType  = 'Sekali';
-                $sellSteps = "Jual 1 lot di ".round($tp2, 4)
+                $sellSteps = "Jual 1 lot di ".(int)$tp2
                     ." | Setelah TP1: SL naik ke Entry | Time stop: T+2 belum +2% → keluar";
             } else {
                 $s1 = (int) floor($lots * 0.50);
                 $s1 = max(1, min($lots - 1, $s1)); // pastikan s2 minimal 1
                 $s2 = $lots - $s1;
 
-                $sellSteps = "Jual {$s1} lot di ".round($tp1, 4)
-                    ." | Jual {$s2} lot di ".round($tp2, 4)
+                $sellSteps = "Jual {$s1} lot di ".(int)$tp1
+                    ." | Jual {$s2} lot di ".(int)$tp2
                     ." | Setelah TP1: SL naik ke Entry | Time stop: T+2 belum +2% → keluar";
             } 
         } else {
-            $sellSteps = "Jual 50% di ".round($tp1, 4)
-                ." | Jual 50% di ".round($tp2, 4)
+            $sellSteps = "Jual 50% di ".(int)$tp1
+                ." | Jual 50% di ".(int)$tp2
                 ." | Setelah TP1: SL naik ke Entry | Time stop: T+2 belum +2% → keluar";
         }
 
         return [
-            'entry_ideal'   => round($entry, 4),
-            'stop_loss'     => round($sl, 4),
-            'tp1'           => round($tp1, 4),
-            'tp2'           => round($tp2, 4),
+            'entry_ideal' => (int)$entry,
+            'stop_loss'   => (int)$sl,
+            'tp1'         => (int)$tp1,
+            'tp2'         => (int)$tp2,
 
             'buy_type'      => $buyType,
             'buy_steps'     => $buySteps,
@@ -779,6 +915,26 @@ class ScreenerService
             'risk_per_share'=> round($riskPerShare, 4),
             'risk_budget'   => $riskBudget !== null ? round($riskBudget, 2) : null,
             'plan_blocked_reason' => $planBlockedReason,
+
+            'fee_buy_rate'       => $feeBuyRate,
+            'fee_sell_rate'      => $feeSellRate,      // tetap ada (TP2)
+            'fee_sell_rate_tp1'  => $feeSellRateTp1,
+            'fee_sell_rate_tp2'  => $feeSellRateTp2,
+            'fee_sell_rate_be'   => $feeSellRateBe,
+            'break_even'         => $breakEven !== null ? (int)$breakEven : null,
+
+            'est_fee_buy'       => $estFeeBuy !== null ? round($estFeeBuy, 2) : null,
+            'est_out_total'     => $estOutTotal !== null ? round($estOutTotal, 2) : null,
+
+            'est_fee_sell_tp1'  => $estFeeSellTp1 !== null ? round($estFeeSellTp1, 2) : null,
+            'est_fee_sell_tp2'  => $estFeeSellTp2 !== null ? round($estFeeSellTp2, 2) : null,
+
+            'est_profit_tp1'    => $estProfitTp1 !== null ? round($estProfitTp1, 2) : null,
+            'est_profit_tp2'    => $estProfitTp2 !== null ? round($estProfitTp2, 2) : null,
+
+            // NET metrics
+            'est_profit_pct_tp2' => $estProfitPctTp2 !== null ? round($estProfitPctTp2, 6) : null,
+            'rr_net_tp2'         => $rrNetTp2 !== null ? round($rrNetTp2, 4) : null,
         ];
     }
 
@@ -786,22 +942,83 @@ class ScreenerService
     {
         if ($avgVol20 <= 0) return null;
 
-        // Session IDX kira-kira 09:00 - 15:00 (360 menit). Sesuaikan kalau kamu punya jam yg lebih presisi.
-        $start = $nowWib->copy()->setTime(9, 0, 0);
-        $end   = $nowWib->copy()->setTime(15, 0, 0);
+        $minRatio = (float) config('screener.relvol_min_time_ratio', 0.05);
 
-        if ($nowWib->lt($start)) return 0.0;
-        if ($nowWib->gt($end))   return $volSoFar / $avgVol20; // sudah lewat, pakai normal
+        $sessions = config('screener.market_sessions', [
+            ['start' => '09:00', 'end' => '11:30'],
+            ['start' => '13:00', 'end' => '15:00'],
+        ]);
 
-        $elapsed = max(1, $start->diffInMinutes($nowWib));
-        $total   = max(1, $start->diffInMinutes($end));
+        if (!is_array($sessions) || empty($sessions)) return null;
 
-        $ratioTime = $elapsed / $total;               // 0..1
-        $expected  = $avgVol20 * $ratioTime;          // expected vol sampai saat ini
+        // Build session boundaries for "today" in WIB
+        $bounds = [];
+        foreach ($sessions as $s) {
+            if (!is_array($s) || empty($s['start']) || empty($s['end'])) continue;
 
+            $st = $nowWib->copy()->setTimeFromTimeString($s['start']);
+            $en = $nowWib->copy()->setTimeFromTimeString($s['end']);
+
+            if ($en->lte($st)) continue;
+
+            $bounds[] = [$st, $en, $st->diffInMinutes($en)];
+        }
+
+        if (empty($bounds)) return null;
+
+        // If before first session start
+        $firstStart = $bounds[0][0];
+        if ($nowWib->lt($firstStart)) return 0.0;
+
+        // Total active minutes
+        $totalActive = 0;
+        foreach ($bounds as $b) $totalActive += $b[2];
+        $totalActive = max(1, $totalActive);
+
+        // If after last session end -> full day relvol
+        $lastEnd = $bounds[count($bounds) - 1][1];
+        if ($nowWib->gte($lastEnd)) {
+            return $volSoFar / $avgVol20;
+        }
+
+        // Elapsed active minutes (exclude gaps automatically)
+        $elapsedActive = 0;
+
+        foreach ($bounds as [$st, $en, $mins]) {
+            if ($nowWib->lt($st)) {
+                // haven't started this session
+                break;
+            }
+
+            if ($nowWib->gte($en)) {
+                // finished this session
+                $elapsedActive += $mins;
+                continue;
+            }
+
+            // within this session
+            $elapsedActive += max(1, $st->diffInMinutes($nowWib));
+            break;
+        }
+
+        $elapsedActive = max(1, $elapsedActive);
+
+        $ratioTime = $elapsedActive / $totalActive;       // 0..1
+        $ratioTime = min(1.0, max($minRatio, $ratioTime));
+
+        $expected  = $avgVol20 * $ratioTime;
         if ($expected <= 0) return null;
-        return $volSoFar / $expected;
-    }    
+
+        $relvol = $volSoFar / $expected;
+
+        // Optional clamp max
+        $maxRel = config('screener.relvol_max', null);
+        if ($maxRel !== null && is_numeric($maxRel)) {
+            $relvol = min((float)$maxRel, $relvol);
+        }
+
+        return $relvol;
+    }
 
     public function signalName(int $code): string
     {
@@ -831,5 +1048,133 @@ class ScreenerService
             case 10: return 'Climax / Euphoria';
             default: return '-';
         }
+    }
+
+    private function idxTickSize(float $price): float
+    {
+        // hardening: kalau input aneh, jangan bikin tick 0/negatif
+        if (!is_finite($price) || $price <= 0) return 1;
+
+        if ($price < 200)  return 1;
+        if ($price < 500)  return 2;
+        if ($price < 2000) return 5;
+        if ($price < 5000) return 10;
+        return 25;
+    }
+
+    private function roundDownToTick(float $price): float
+    {
+        if (!is_finite($price) || $price <= 0) return 0.0;
+
+        $tick = $this->idxTickSize($price);
+        if ($tick <= 0) return $price;
+
+        return floor($price / $tick) * $tick;
+    }
+
+    private function roundUpToTick(float $price): float
+    {
+        if (!is_finite($price) || $price <= 0) return 0.0;
+
+        $tick = $this->idxTickSize($price);
+        if ($tick <= 0) return $price;
+
+        return ceil($price / $tick) * $tick;
+    }
+
+    private function nextTickUp(float $price): float
+    {
+        if (!is_finite($price) || $price <= 0) return 1.0;
+        // +1 supaya boundary tick dihitung ulang dengan benar
+        return $this->roundUpToTick($price + 1);
+    }
+
+    private function prevTickDown(float $price): float
+    {
+        if (!is_finite($price) || $price <= 0) return 0.0;
+        // -1 supaya boundary tick dihitung ulang dengan benar
+        return $this->roundDownToTick($price - 1);
+    }
+
+    private function clampMinTick(float $price): float
+    {
+        if (!is_finite($price) || $price <= 0) return 0.0;
+        return max($price, $this->idxTickSize($price));
+    }
+
+    private function resolveFeeRates(?float $notionalBuy = null): array
+    {
+        // fallback kalau config belum ada
+        $defaultBuy  = (float) config('screener.fee_buy_rate', 0.001513);
+        $defaultSell = (float) config('screener.fee_sell_rate', 0.002513);
+
+        $broker = (string) config('screener.broker', 'ajaib');
+        $tiers  = config("screener.fees.{$broker}", null);
+
+        if (!is_array($tiers)) {
+            return [$defaultBuy, $defaultSell];
+        }
+
+        // ambil tier list (yang punya max/buy/sell)
+        $tierList = [];
+        foreach ($tiers as $k => $v) {
+            if (is_array($v) && isset($v['max'], $v['buy'], $v['sell'])) {
+                $tierList[] = $v;
+            }
+        }
+
+        if (empty($tierList)) {
+            return [$defaultBuy, $defaultSell];
+        }
+
+        usort($tierList, fn($a,$b) => (float)$a['max'] <=> (float)$b['max']);
+
+        // kalau notional belum ada (mis. lots null), pakai tier pertama
+        if ($notionalBuy === null || $notionalBuy <= 0) {
+            $t = $tierList[0];
+            return [(float)$t['buy'], (float)$t['sell']];
+        }
+
+        // pilih tier berdasar notional
+        foreach ($tierList as $t) {
+            if ($notionalBuy <= (float)$t['max']) {
+                return [(float)$t['buy'], (float)$t['sell']];
+            }
+        }
+
+        // fallback tier terakhir
+        $t = end($tierList);
+        return [(float)$t['buy'], (float)$t['sell']];
+    }
+
+    private function breakEvenSellPrice(float $entry, float $feeBuyRate, float $feeSellRate): float
+    {
+        $den = max(0.0000001, 1.0 - $feeSellRate);
+        $be  = $entry * (1.0 + $feeBuyRate) / $den;
+
+        // BE harus valid tick & aman (round up)
+        $be = $this->roundUpToTick($be);
+        $be = $this->clampMinTick($be);
+        return $be;
+    }
+
+    private function estimateSellFeeAndNetProfit(
+        int $shares,
+        float $entry,
+        float $sellPrice,
+        float $feeBuyRate,
+        float $feeSellRate
+    ): array {
+        $buyNotional  = $shares * $entry;
+        $buyFee       = $buyNotional * $feeBuyRate;
+        $outTotal     = $buyNotional + $buyFee;
+
+        $sellNotional = $shares * $sellPrice;
+        $sellFee      = $sellNotional * $feeSellRate;
+        $inNet        = $sellNotional - $sellFee;
+
+        $profit = $inNet - $outTotal;
+
+        return [$sellFee, $profit];
     }
 }
