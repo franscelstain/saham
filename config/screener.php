@@ -4,6 +4,17 @@ return [
     'eod_cutoff'     => env('SCREENER_EOD_CUTOFF', '16:30'),
     'session_start'  => env('SCREENER_SESSION_START', '09:00'),
     'session_end'    => env('SCREENER_SESSION_END', '15:00'),
+    'sessions' => [
+        // IDX regular market (umum)
+        'session1' => ['start' => '09:00', 'end' => '11:30'],
+        'session2' => ['start' => '13:30', 'end' => '15:50'],
+    ],
+    // batas entry by day (biar nggak kebawa weekend / minggu depan)
+    'entry_end' => [
+        'mon_wed' => '14:30',
+        'thu'     => '14:00',
+        'fri'     => '11:00',
+    ],
     'broker' => env('SCREENER_BROKER', 'ajaib'),
     'fees' => [
         'ajaib' => [
@@ -23,11 +34,6 @@ return [
         'market_order_extra_broker' => 0.001,
         'forced_sell_extra_broker'  => 0.0025,
         ],
-    ],
-    // Jam bursa WIB (default IDX reguler)
-    'market_sessions' => [
-        ['start' => '09:00', 'end' => '11:30'],
-        ['start' => '13:00', 'end' => '15:00'],
     ],
 
     // Floor minimal time ratio untuk timed relvol (biar menit awal gak "meledak")

@@ -19,14 +19,9 @@ class ScreenerService
     private const CANDIDATE_WINDOW_TRADING_DAYS = 2;
 
     // Jam entry (WIB)
-    private const ENTRY_START            = '09:20';
     private const ENTRY_END_MON_WED      = '14:30';
     private const ENTRY_END_THURSDAY     = '12:00';
     private const ENTRY_END_FRIDAY       = '10:30'; // setelah ini: SKIP_DAY_FRIDAY (entry baru stop)
-
-    // Window rawan (WIB)
-    private const LUNCH_START = '11:30';
-    private const LUNCH_END   = '13:00';
 
     // Filter intraday
     private const MIN_REL_VOL = 0.30; // wajib
@@ -220,28 +215,64 @@ class ScreenerService
                     }
                 }
 
-                // 2) aturan hari & jam (disiplin swing mingguan)
+                // 2) aturan hari & jam (2 sesi, configurable)
                 if ($status === 'WAIT' || $status === 'WAIT_EOD_GUARD') {
-                    $entryEnd = self::ENTRY_END_MON_WED;
-                    if ($nowWib->isThursday()) $entryEnd = self::ENTRY_END_THURSDAY;
-                    if ($nowWib->isFriday())   $entryEnd = self::ENTRY_END_FRIDAY;
 
-                    if ($timeNow < self::ENTRY_START) {
+                    $sessions = $this->getSessionTimes();
+
+                    // entry end by day (configurable)
+                    $entryEndRaw = (string) config('screener.entry_end.mon_wed', self::ENTRY_END_MON_WED);
+                    if ($nowWib->isThursday()) $entryEndRaw = (string) config('screener.entry_end.thu', self::ENTRY_END_THURSDAY);
+                    if ($nowWib->isFriday())   $entryEndRaw = (string) config('screener.entry_end.fri', self::ENTRY_END_FRIDAY);
+
+                    $entryEnd = $this->normalizeTimeHHMM($entryEndRaw) ?? $this->normalizeTimeHHMM(self::ENTRY_END_MON_WED) ?? '14:30';
+
+                    // LOCK: entryEnd tidak boleh melewati sesi 2 end (biar tidak entry setelah market tutup)
+                    $s2End = $this->normalizeTimeHHMM($sessions[1]['end'] ?? null);
+                    if ($s2End !== null && $entryEnd > $s2End) {
+                        $entryEnd = $s2End;
+                    }
+                    
+                    // sebelum sesi 1 mulai => tunggu market buka
+                    $s1Start = $sessions[0]['start'] ?? '09:00';
+                    if ($timeNow < $s1Start) {
                         $status = 'WAIT_ENTRY_WINDOW';
-                        $reason = 'Belum masuk jam entry (mulai '.self::ENTRY_START.' WIB)';
-                    } elseif ($this->isTimeBetween($timeNow, self::LUNCH_START, self::LUNCH_END)) {
-                        $status = 'LUNCH_WINDOW';
-                        $reason = 'Jam rawan ('.self::LUNCH_START.'-'.self::LUNCH_END.' WIB), tunggu selesai';
-                    } elseif ($timeNow > $entryEnd) {
+                        $reason = 'Belum masuk jam bursa (mulai '.$s1Start.' WIB)';
+                    }
+                    // lewat batas entry harian => skip/late
+                    elseif ($timeNow > $entryEnd) {
                         if ($nowWib->isFriday()) {
                             $status = 'SKIP_DAY_FRIDAY';
-                            $reason = 'Jumat: entry lewat batas (maks '.self::ENTRY_END_FRIDAY.' WIB) (hindari gap weekend)';
+                            $reason = 'Jumat: entry lewat batas (maks '.$entryEnd.' WIB) (hindari gap weekend)';
                         } elseif ($nowWib->isThursday()) {
                             $status = 'SKIP_DAY_THURSDAY_LATE';
-                            $reason = 'Kamis: entry lewat batas (maks '.self::ENTRY_END_THURSDAY.' WIB) biar tidak kebawa minggu depan';
+                            $reason = 'Kamis: entry lewat batas (maks '.$entryEnd.' WIB) biar tidak kebawa minggu depan';
                         } else {
                             $status = 'LATE_ENTRY';
                             $reason = 'Sudah lewat batas entry (maks '.$entryEnd.' WIB)';
+                        }
+                    }
+                    // di luar sesi 1/2 => dianggap lunch / jeda antar sesi
+                    elseif (!$this->isWithinAnySession($timeNow, $sessions)) {
+                        $s1Start = $sessions[0]['start'] ?? '09:00';
+                        $s1End   = $sessions[0]['end']   ?? '11:30';
+                        $s2Start = $sessions[1]['start'] ?? '13:30';
+                        $s2End   = $sessions[1]['end']   ?? '15:50';
+
+                        // antara sesi 1 dan sesi 2 => break antar sesi
+                        if ($timeNow > $s1End && $timeNow < $s2Start) {
+                            $status = 'LUNCH_WINDOW';
+                            $reason = "Break antar sesi (Sesi 2 mulai {$s2Start} WIB)";
+                        }
+                        // setelah sesi 2 tutup (walau masih <= entryEnd) => market udah ga liquid, tunggu besok
+                        elseif ($timeNow > $s2End) {
+                            $status = 'LATE_ENTRY';
+                            $reason = "Market sudah tutup (Sesi 2 berakhir {$s2End} WIB)";
+                        }
+                        // sebelum sesi 1 start (sebenernya sudah di-handle sebelumnya, tapi aman)
+                        else {
+                            $status = 'WAIT_ENTRY_WINDOW';
+                            $reason = "Belum masuk jam bursa (mulai {$s1Start} WIB)";
                         }
                     }
                 }
@@ -944,12 +975,9 @@ class ScreenerService
 
         $minRatio = (float) config('screener.relvol_min_time_ratio', 0.05);
 
-        $sessions = config('screener.market_sessions', [
-            ['start' => '09:00', 'end' => '11:30'],
-            ['start' => '13:00', 'end' => '15:00'],
-        ]);
+        $sessions = $this->getSessionTimes();
 
-        if (!is_array($sessions) || empty($sessions)) return null;
+        if (empty($sessions)) return null;
 
         // Build session boundaries for "today" in WIB
         $bounds = [];
@@ -1176,5 +1204,59 @@ class ScreenerService
         $profit = $inNet - $outTotal;
 
         return [$sellFee, $profit];
+    }
+
+    private function getSessionTimes(): array
+    {
+        $s = (array) config('screener.sessions', []);
+
+        $s1 = $s['session1'] ?? ['start' => '09:00', 'end' => '11:30'];
+        $s2 = $s['session2'] ?? ['start' => '13:30', 'end' => '15:50'];
+
+        // fallback kalau config rusak
+        $s1Start = $this->normalizeTimeHHMM($s1['start'] ?? null) ?? '09:00';
+        $s1End   = $this->normalizeTimeHHMM($s1['end'] ?? null)   ?? '11:30';
+        $s2Start = $this->normalizeTimeHHMM($s2['start'] ?? null) ?? '13:30';
+        $s2End   = $this->normalizeTimeHHMM($s2['end'] ?? null)   ?? '15:50';
+
+        return [
+            ['start' => $s1Start, 'end' => $s1End],
+            ['start' => $s2Start, 'end' => $s2End],
+        ];
+    }
+
+    private function isWithinAnySession(string $timeNow, array $sessions): bool
+    {
+        foreach ($sessions as $s) {
+            $start = $s['start'] ?? null;
+            $end   = $s['end'] ?? null;
+            if (!$start || !$end) continue;
+
+            if ($this->isTimeBetween($timeNow, $start, $end)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function normalizeTimeHHMM($t): ?string
+    {
+        if (!is_string($t)) return null;
+
+        // trim + toleransi format "9:00" / "09:00"
+        $t = trim($t);
+
+        if (!preg_match('/^(\d{1,2}):(\d{2})$/', $t, $m)) {
+            return null;
+        }
+
+        $h = (int) $m[1];
+        $i = (int) $m[2];
+
+        if ($h < 0 || $h > 23 || $i < 0 || $i > 59) {
+            return null;
+        }
+
+        return sprintf('%02d:%02d', $h, $i);
     }
 }
