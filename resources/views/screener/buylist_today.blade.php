@@ -22,8 +22,17 @@
 <div class="muted" style="margin-bottom:8px">
   Today: <b>{{ $today }}</b> |
   EOD Reference: <b>{{ $eod_date ?? '-' }}</b> |
-  Capital: <b>{{ $capital !== null ? number_format($capital, 0, '.', ',') : '-' }}</b>
+  Expiry (2 Hari Bursa): <b>{{ $expiry_date ?? '-' }}</b> |
+  Capital: <b>{{ $capital !== null ? number_format($capital, 0, '.', ',') : '-' }}</b> |
+  Calendar: <span class="pill {{ (!empty($calendar_ok)) ? 'pill-buy' : 'pill-warn' }}">{{ (!empty($calendar_ok)) ? 'OK' : 'WAIT' }}</span>
 </div>
+
+@if(isset($calendar_ok) && !$calendar_ok)
+  <p class="muted" style="margin:6px 0 10px 0">
+    <span class="pill pill-warn">WAIT_CALENDAR</span>
+    Market Calendar belum lengkap untuk hitung expiry kandidat. Lengkapi range kalender / overlay libur bursa dulu.
+  </p>
+@endif
 
 <form method="GET" action="" style="margin:8px 0 14px 0">
   <label class="nowrap">Today (YYYY-mm-dd):</label>

@@ -99,6 +99,8 @@ class ScreenerService
             return [
                 'today' => $today,
                 'eod_date' => null,
+                'expiry_date' => null,
+                'calendar_ok' => false,
                 'capital' => $capital,
                 'rows' => collect(),
             ];
@@ -108,11 +110,14 @@ class ScreenerService
         $eod = Carbon::parse($eodDate, 'Asia/Jakarta');
 
         $expiryDateStr = $this->repo->getNthTradingDateAfter($eodDate, self::CANDIDATE_WINDOW_TRADING_DAYS);
-        if (!$expiryDateStr) {
-            $expiryDateStr = $this->addTradingDays($eod, self::CANDIDATE_WINDOW_TRADING_DAYS)->toDateString();
-        }
+        $calendarOk = true;
 
-        $expiry = Carbon::parse($expiryDateStr, 'Asia/Jakarta');
+        if (!$expiryDateStr) {
+            $calendarOk = false;
+            $expiry = null; // penting: jangan parse null
+        } else {
+            $expiry = Carbon::parse($expiryDateStr, 'Asia/Jakarta');
+        }
 
         // “now” WIB buat rule jam entry (operasional real time)
         $nowWib  = Carbon::now('Asia/Jakarta');
@@ -132,7 +137,7 @@ class ScreenerService
 
         $rows = $candidates->map(function ($c) use (
             $intraday, $levels, $avgVol20,
-            $td, $expiry, $nowWib, $timeNow, $capital
+            $td, $expiry, $calendarOk, $nowWib, $timeNow, $capital
         ) {
             $tid = (int) $c->ticker_id;
 
@@ -147,8 +152,16 @@ class ScreenerService
             $priceOk = null;
             $posInRange = null;
 
+            if (!$calendarOk) {
+                $c->status = 'WAIT_CALENDAR';
+                $c->reason = 'market_calendar belum lengkap untuk hitung expiry kandidat';
+                $c->rr_tp2 = null;
+                $c->rank_score = null;
+                return $c; // STOP: jangan evaluasi rules lain
+            }
+
             // ===== expiry kandidat (berdasarkan hari bursa, bukan ISO week) =====
-            if ($td->gt($expiry)) {
+            if ($expiry && $td->gt($expiry)) {
                 $status = 'EXPIRED';
                 $reason = 'Lewat window kandidat ('.self::CANDIDATE_WINDOW_TRADING_DAYS.' hari bursa)';
             }
@@ -438,11 +451,17 @@ class ScreenerService
         });
 
         // Sorting: rank_score tertinggi
-        $rows = $rows->sortByDesc('rank_score')->values();
+        if ($calendarOk) {
+            $rows = $rows->sortByDesc('rank_score')->values();
+        } else {
+            $rows = $rows->values();
+        }
 
         return [
             'today' => $today,
             'eod_date' => $eodDate,
+            'expiry_date' => $expiryDateStr,
+            'calendar_ok' => $calendarOk,
             'capital' => $capital,
             'rows' => $rows,
         ];
@@ -456,6 +475,16 @@ class ScreenerService
     {
         $data = $this->getTodayBuylistData($today, $capital);
         $rows = $data['rows'] ?? collect();
+
+        if (empty($data['calendar_ok'])) {
+            return [
+                'today'   => $data['today'] ?? ($today ?: date('Y-m-d')),
+                'eod_date'=> $data['eod_date'] ?? null,
+                'capital' => $capital,
+                'picks'   => collect(),
+                'note'    => 'Kalender bursa (market_calendar) belum lengkap, jadi rekomendasi BUY dinonaktifkan.',
+            ];
+        }
 
         $cands = $rows->filter(function ($r) {
             return in_array(($r->status ?? ''), ['BUY_OK','BUY_PULLBACK'], true);
@@ -530,20 +559,6 @@ class ScreenerService
     // ==============================
     // Helpers
     // ==============================
-
-    /**
-     * Tambah N hari bursa (skip Sabtu/Minggu).
-     * NOTE: tidak mempertimbangkan libur bursa nasional.
-     */
-    private function addTradingDays(Carbon $d, int $n): Carbon
-    {
-        $x = $d->copy();
-        while ($n > 0) {
-            $x->addDay();
-            if (!$x->isWeekend()) $n--;
-        }
-        return $x;
-    }
 
     /**
      * Compare time "H:i" (string). Inclusive.

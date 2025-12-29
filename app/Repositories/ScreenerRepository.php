@@ -77,6 +77,23 @@ class ScreenerRepository
      */
     public function getEodReferenceForToday(string $today): ?string
     {
+        // trading day terakhir sebelum "today"
+        $expected = DB::table('market_calendar')
+            ->where('is_trading_day', 1)
+            ->where('cal_date', '<', $today)
+            ->max('cal_date');
+
+        if ($expected) {
+            // pastikan indikator EOD untuk tanggal itu memang sudah ada
+            $has = DB::table('ticker_indicators_daily')
+                ->where('is_deleted', 0)
+                ->whereDate('trade_date', (string) $expected)
+                ->exists();
+
+            if ($has) return (string) $expected;
+        }
+
+        // fallback: kalau indikator belum siap, balik ke behavior lama (max trade_date < today)
         return $this->getLatestEodDate($today, true);
     }
 
@@ -208,15 +225,14 @@ class ScreenerRepository
 
     public function getNthTradingDateAfter(string $from, int $n): ?string
     {
-        $dates = DB::table('ticker_indicators_daily')
-            ->where('is_deleted', 0)
-            ->where('trade_date', '>', $from)
-            ->select('trade_date')
-            ->distinct()
-            ->orderBy('trade_date', 'asc')
+        $dates = DB::table('market_calendar')
+            ->where('is_trading_day', 1)
+            ->where('cal_date', '>', $from)
+            ->select('cal_date')
+            ->orderBy('cal_date', 'asc')
             ->limit($n)
-            ->pluck('trade_date');
+            ->pluck('cal_date');
 
-        return $dates->isEmpty() ? null : $dates->last();
+        return $dates->isEmpty() ? null : (string) $dates->last();
     }
 }

@@ -110,13 +110,15 @@ class ScreenerController extends Controller
         $reco = $this->svc->getTodayRecommendations($today, $capital);
 
         return view('screener.buylist_today', [
-            'today'     => $data['today'] ?? ($today ?: date('Y-m-d')),
-            'eod_date'  => $data['eod_date'] ?? null,
-            'capital'   => $data['capital'] ?? $capital,
-            'rows'      => $data['rows'] ?? collect(),
+            'today'       => $data['today'] ?? ($today ?: date('Y-m-d')),
+            'eod_date'    => $data['eod_date'] ?? null,
+            'expiry_date' => $data['expiry_date'] ?? null,
+            'calendar_ok' => $data['calendar_ok'] ?? null,
+            'capital'     => $data['capital'] ?? $capital,
+            'rows'        => $data['rows'] ?? collect(),
 
-            'picks'     => $reco['picks'] ?? collect(),
-            'note'      => $reco['note'] ?? null,
+            'picks'       => $reco['picks'] ?? collect(),
+            'note'        => $reco['note'] ?? null,
         ]);
     }
 

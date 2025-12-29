@@ -193,6 +193,7 @@ class YahooIntradayService
                     'trade_date'    => $today,
 
                     // snapshot_at = waktu CAPTURE (WIB)
+                    'last_bar_at'   => $snap['last_bar_at_wib'],
                     'snapshot_at'   => $now->toDateTimeString(),
 
                     'last_price'    => $snap['last_price'],

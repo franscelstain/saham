@@ -20,6 +20,7 @@ class CreateTickerIntradayTable extends Migration
             $table->unsignedBigInteger('ticker_id');
             $table->date('trade_date');                 // tanggal bursa lokal
             $table->dateTime('snapshot_at');            // waktu ambil data
+            $table->dateTime('data_at')->nullable();
             $table->decimal('last_price', 18, 4)->nullable();
             $table->bigInteger('volume_so_far')->nullable();
 
