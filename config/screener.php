@@ -18,21 +18,15 @@ return [
     'broker' => env('SCREENER_BROKER', 'ajaib'),
     'fees' => [
         'ajaib' => [
-        // tier berdasarkan nilai transaksi (notional)
-        ['max' => 150_000_000,  'buy' => 0.001513, 'sell' => 0.002513],
-        ['max' => 1_500_000_000,'buy' => 0.001412, 'sell' => 0.002412],
-        ['max' => PHP_INT_MAX,  'buy' => 0.001311, 'sell' => 0.002311],
-
-        // tambahan kondisi khusus
-        'market_order_extra_broker' => 0.001,   // +0.1% (Market Order) :contentReference[oaicite:1]{index=1}
-        'forced_sell_extra_broker'  => 0.0025,  // +0.25% (forced sell) :contentReference[oaicite:2]{index=2}
-        ],
+            // tier berdasarkan nilai transaksi (notional)
+            ['max' => 150_000_000,  'buy' => 0.001513, 'sell' => 0.002513],
+            ['max' => 1_500_000_000,'buy' => 0.001412, 'sell' => 0.002412],
+            ['max' => PHP_INT_MAX,  'buy' => 0.001311, 'sell' => 0.002311],
+    ],
 
         // fallback "umum" (kalau mau)
         'generic' => [
-        ['max' => PHP_INT_MAX, 'buy' => 0.0015, 'sell' => 0.0025],
-        'market_order_extra_broker' => 0.001,
-        'forced_sell_extra_broker'  => 0.0025,
+            ['max' => PHP_INT_MAX, 'buy' => 0.0015, 'sell' => 0.0025],
         ],
     ],
 

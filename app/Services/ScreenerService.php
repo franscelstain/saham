@@ -366,7 +366,28 @@ class ScreenerService
                     $status = 'CAPITAL_TOO_SMALL';
                     $reason = $c->plan_blocked_reason ?? 'Modal tidak cukup untuk 1 lot sesuai risk rule';
                 }
-            
+
+                // ===== HARD GUARD: net profit harus masuk akal setelah fee + tick =====
+                if ($status === 'BUY_OK') {
+                    $netTp2 = isset($c->est_profit_tp2) && $c->est_profit_tp2 !== null ? (float) $c->est_profit_tp2 : null;
+                    $netPctTp2 = isset($c->est_profit_pct_tp2) && $c->est_profit_pct_tp2 !== null ? (float) $c->est_profit_pct_tp2 : null;
+
+                    // 1) reject keras kalau TP2 net <= 0 (fee drag)
+                    if ($netTp2 !== null && $netTp2 <= 0) {
+                        $status = 'SKIP_FEE_DRAG';
+                        $reason = 'Net profit TP2 <= 0 setelah fee + tick (fee drag)';
+                    }
+
+                    // 2) optional: net % terlalu kecil (kalau kamu mau lebih kejam)
+                    // Pastikan const MIN_NET_PROFIT_PCT_TP2 ada kalau ini diaktifkan
+                    /*
+                    if ($status === 'BUY_OK' && $netPctTp2 !== null && $netPctTp2 < self::MIN_NET_PROFIT_PCT_TP2) {
+                        $status = 'SKIP_LOW_NET';
+                        $reason = 'Net profit TP2 terlalu kecil (< '.(self::MIN_NET_PROFIT_PCT_TP2 * 100).'%) setelah fee';
+                    }
+                    */
+                }
+
                 if ($status === 'BUY_OK') {
                     // Risk lebar? (entry-SL)/entry
                     if (isset($c->entry_ideal, $c->stop_loss) && (float)$c->entry_ideal > 0) {
@@ -817,6 +838,10 @@ class ScreenerService
                 $feeSellRateBe = $sellRateNew;
                 $breakEven = $this->breakEvenSellPrice($entry, $feeBuyRate, $feeSellRateBe);
             }
+
+            // Break-even harus tick-safe: round UP biar benar-benar BE (nggak minus karena rounding)
+            $breakEven = $this->roundUpToTick($breakEven);
+            $breakEven = $this->clampMinTick($breakEven);
 
             // SELL rate harus based on notional SELL (TP1 / TP2)
             [, $feeSellRateTp1] = $this->resolveFeeRates($shares * $tp1);

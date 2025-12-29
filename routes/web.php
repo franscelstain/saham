@@ -27,6 +27,6 @@ Route::prefix('screener')->group(function () {
 
 // Intraday capture (kalau memang controller kamu punya endpoint ini)
 // Kalau IntradayController belum punya method capture, hapus blok ini.
-Route::post('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');
+Route::get('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');
 
 // php artisan screener:compute-daily --date=2025-12-15
