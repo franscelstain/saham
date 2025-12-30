@@ -35,4 +35,7 @@ return [
 
     // Optional: clamp maksimal (kalau kamu mau batasi outlier)
     // 'relvol_max' => 10.0,
+
+    // Guard: maksimal selisih menit antara waktu data (data_at) vs sekarang, agar tidak pakai data ngaret
+    'intraday_max_lag_min' => (int) env('SCREENER_INTRADAY_MAX_LAG_MIN', 10),
 ];

@@ -106,9 +106,9 @@ class ScreenerRepository
             ->join('tickers as t', 't.ticker_id', '=', 'ind.ticker_id')
             ->where('ind.is_deleted', 0)
             ->where('t.is_deleted', 0)
-            ->whereDate('ind.trade_date', $tradeDate)
-            ->whereIn('ind.signal_code', $signalCodes)
-            ->whereIn('ind.volume_label_code', $volumeLabelCodes);
+            ->whereDate('ind.trade_date', $tradeDate);
+            // ->whereIn('ind.signal_code', $signalCodes)
+            // ->whereIn('ind.volume_label_code', $volumeLabelCodes);
 
         // Trend filter: close > ma20 > ma50 > ma200
         $q->whereNotNull('ind.close')
@@ -175,6 +175,7 @@ class ScreenerRepository
                 'i.ticker_id',
                 'i.trade_date',
                 'i.snapshot_at',
+                'i.last_bar_at',
                 'i.last_price',
                 'i.volume_so_far',
                 'i.open_price',

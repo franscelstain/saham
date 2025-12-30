@@ -187,6 +187,14 @@ class ScreenerService
 
             // ===== ambil intraday =====
             $snapshotAt = $in->snapshot_at ?? null;
+            $lastBarAt  = $in->last_bar_at ?? null; // waktu bar terakhir dari source (WIB)
+            $asOfWib    = null;
+            if ($lastBarAt) {
+                $asOfWib = Carbon::parse($lastBarAt, 'Asia/Jakarta');
+            } elseif ($snapshotAt) {
+                // fallback: kalau belum punya data_at, pakai waktu capture
+                $asOfWib = Carbon::parse($snapshotAt, 'Asia/Jakarta');
+            }
             $lastPrice  = $in->last_price ?? null;
             $volSoFar   = $in->volume_so_far ?? null;
             $openToday  = $in->open_price ?? null;
@@ -200,33 +208,13 @@ class ScreenerService
             $avg20 = $av->avg_vol20 ?? null;
             $relvol = null;
             if ($volSoFar !== null && $avg20 !== null) {
-                $relvol = $this->computeTimedRelVol((float)$volSoFar, (float)$avg20, $nowWib);
+                $relvol = $this->computeTimedRelVol((float)$volSoFar, (float)$avg20, ($asOfWib ?? $nowWib));
             }
 
             // =========================
             // Pipeline status (urut dari paling gating)
             // =========================
             if (!in_array($status, ['EXPIRED','SKIP_EOD_GUARD'], true)) {
-
-                // 0) snapshot hari ini harus bener (hindari libur tapi data “kemarin” ke-upsert sebagai hari ini)
-                if ($snapshotAt === null) {
-                    $status = 'NO_INTRADAY';
-                    $reason = 'Snapshot intraday belum ada';
-                } else {
-                    $snapDate = Carbon::parse($snapshotAt, 'Asia/Jakarta')->toDateString();
-                    if ($snapDate !== $td->toDateString()) {
-                        $status = 'STALE_INTRADAY';
-                        $reason = 'Snapshot bukan tanggal hari ini (WIB), kemungkinan libur / belum capture';
-                    }
-                }
-
-                // 1) data intraday harus lengkap
-                if ($status === 'WAIT' || $status === 'WAIT_EOD_GUARD') {
-                    if ($lastPrice === null || $volSoFar === null || $openToday === null || $highToday === null || $lowToday === null) {
-                        $status = 'NO_INTRADAY';
-                        $reason = 'Snapshot intraday belum lengkap';
-                    }
-                }
 
                 // 2) aturan hari & jam (2 sesi, configurable)
                 if ($status === 'WAIT' || $status === 'WAIT_EOD_GUARD') {
@@ -286,6 +274,69 @@ class ScreenerService
                         else {
                             $status = 'WAIT_ENTRY_WINDOW';
                             $reason = "Belum masuk jam bursa (mulai {$s1Start} WIB)";
+                        }
+                    }
+                }
+
+                // 2b) Validasi tanggal & freshness intraday
+                if ($status === 'WAIT' || $status === 'WAIT_EOD_GUARD') {
+                    if ($asOfWib === null) {
+                        $status = 'NO_INTRADAY';
+                        $reason = 'Snapshot intraday belum ada';
+                    } else {
+                        if ($asOfWib->toDateString() !== $td->toDateString()) {
+                            $status = 'STALE_INTRADAY';
+                            $reason = 'Data intraday bukan tanggal hari ini (WIB), kemungkinan libur / Yahoo delay / belum capture';
+                        }
+                    }
+                }
+
+                // 2c) Guard lag: kalau source telat update (pakai last_bar_at, bukan snapshot_at)
+                // NOTE: step waktu (pre-market / lunch / lewat entryEnd) dievaluasi dulu, jadi guard ini hanya berlaku saat market sedang aktif.
+                if (($status === 'WAIT' || $status === 'WAIT_EOD_GUARD') && $lastBarAt && $asOfWib) {
+                    $lagMin = $asOfWib->diffInMinutes($nowWib);
+                    $maxLag = (int) config('screener.intraday_max_lag_min', 10);
+                    if ($lagMin > $maxLag) {
+                        $status = 'STALE_INTRADAY';
+                        $reason = "Data intraday terlambat {$lagMin} menit (maks {$maxLag}m). Yahoo delay / capture jarang";
+                    }
+                }
+
+                // 2d) data intraday harus lengkap
+                if ($status === 'WAIT' || $status === 'WAIT_EOD_GUARD') {
+                    if ($lastPrice === null || $volSoFar === null || $openToday === null || $highToday === null || $lowToday === null) {
+                        $status = 'NO_INTRADAY';
+                        $reason = 'Snapshot intraday belum lengkap';
+                    }
+                }
+
+                // 2e) Quality guard intraday: hardening terhadap feed glitch / data aneh
+                if ($status === 'WAIT' || $status === 'WAIT_EOD_GUARD') {
+                    $o   = (float) $openToday;
+                    $h   = (float) $highToday;
+                    $l   = (float) $lowToday;
+                    $cpx = (float) $lastPrice;
+
+                    if (!is_finite($o) || !is_finite($h) || !is_finite($l) || !is_finite($cpx) || $o <= 0 || $h <= 0 || $l <= 0 || $cpx <= 0) {
+                        $status = 'SKIP_BAD_INTRADAY';
+                        $reason = 'Intraday invalid (non-finite/<=0)';
+                    } else {
+                        // toleransi 1 tick untuk rounding/feed
+                        $tick = $this->idxTickSize($cpx);
+                        $tol  = $tick;
+
+                        if ($h + 1e-9 < $l) {
+                            $status = 'SKIP_BAD_INTRADAY';
+                            $reason = 'Intraday invalid (high < low)';
+                        } elseif ($o < ($l - $tol) || $o > ($h + $tol)) {
+                            $status = 'SKIP_BAD_INTRADAY';
+                            $reason = 'Intraday invalid (open di luar range hari ini)';
+                        } elseif ($cpx < ($l - $tol) || $cpx > ($h + $tol)) {
+                            $status = 'SKIP_BAD_INTRADAY';
+                            $reason = 'Intraday invalid (last di luar range hari ini)';
+                        } elseif ($volSoFar !== null && ((int) $volSoFar) < 0) {
+                            $status = 'SKIP_BAD_INTRADAY';
+                            $reason = 'Intraday invalid (volume negatif)';
                         }
                     }
                 }
@@ -352,7 +403,9 @@ class ScreenerService
             }
 
             // ===== Isi field untuk UI (selalu isi, biar transparan) =====
-            $c->snapshot_at   = $snapshotAt;
+            $c->snapshot_at      = $snapshotAt;
+            $c->last_bar_at      = $lastBarAt;
+            $c->intraday_lag_min = ($asOfWib !== null) ? $asOfWib->diffInMinutes($nowWib) : null;
 
             $c->last_price    = $lastPrice;
             $c->vol_so_far    = $volSoFar;

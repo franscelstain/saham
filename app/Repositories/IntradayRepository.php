@@ -23,6 +23,27 @@ class IntradayRepository
         return $q->orderBy('ticker_code')->get();
     }
 
+    public function countActiveTickers(): int
+    {
+        return (int) DB::table('tickers')
+            ->where('is_deleted', 0)
+            ->count();
+    }
+
+    /**
+     * Ambil slice ticker aktif (round-robin).
+     */
+    public function getActiveTickersSlice(int $offset, int $limit): Collection
+    {
+        return DB::table('tickers')
+            ->select(['ticker_id','ticker_code'])
+            ->where('is_deleted', 0)
+            ->orderBy('ticker_code')
+            ->offset(max(0, $offset))
+            ->limit(max(1, $limit))
+            ->get();
+    }
+
     /**
      * Upsert snapshot:
      * - key: (ticker_id, trade_date)
@@ -37,6 +58,7 @@ class IntradayRepository
             ['ticker_id', 'trade_date'],
             [
                 'snapshot_at',
+                'last_bar_at',
                 'last_price',
                 'volume_so_far',
                 'open_price',
@@ -59,6 +81,7 @@ class IntradayRepository
                 'ticker_id',
                 'trade_date',
                 'snapshot_at',
+                'last_bar_at',
                 'last_price',
                 'volume_so_far',
                 'open_price',

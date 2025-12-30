@@ -174,6 +174,7 @@
       <th>Status</th>
       <th>Reason</th>
       <th class="nowrap">Snapshot At</th>
+      <th class="nowrap">Last Bar At</th>
 
       <th class="right">Entry</th>
       <th class="right">SL</th>
@@ -232,6 +233,7 @@
         <td class="ok"><span class="{{ $pillClass }}">{{ $alias }}</span></td>
         <td>{{ $r->reason ?? '-' }}</td>
         <td class="nowrap">{{ $r->snapshot_at ?? '-' }}</td>
+        <td class="nowrap">{{ $r->last_bar_at ?? '-' }}</td>
 
         <td class="right">{{ $r->entry_ideal ?? '-' }}</td>
         <td class="right">{{ $r->stop_loss ?? '-' }}</td>
@@ -245,7 +247,7 @@
         <td class="right">{{ $r->rank_score ?? '-' }}</td>
       </tr>
     @empty
-      <tr><td colspan="24">No data.</td></tr>
+      <tr><td colspan="25">No data.</td></tr>
     @endforelse
   </tbody>
 </table>

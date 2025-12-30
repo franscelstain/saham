@@ -25,8 +25,6 @@ Route::prefix('screener')->group(function () {
     Route::post('/buylist-today/capital', [ScreenerController::class, 'setCapital'])->name('screener.setCapital');
 });
 
-// Intraday capture (kalau memang controller kamu punya endpoint ini)
-// Kalau IntradayController belum punya method capture, hapus blok ini.
 Route::get('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');
 
 // php artisan screener:compute-daily --date=2025-12-15

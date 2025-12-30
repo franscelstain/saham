@@ -21,6 +21,13 @@ class IntradayController extends Controller
     public function capture(Request $request)
     {
         $ticker   = $request->query('ticker') ?? $request->input('ticker');
+        
+        if (empty($ticker)) {
+            return response()->json([
+                'message' => 'Capture massal dilarang via web (rawan max_execution_time). Jalankan: php artisan intraday:capture'
+            ], 422);
+        }
+        
         $interval = $request->query('interval', $request->input('interval', '1m'));
 
         // whitelist interval biar gak aneh-aneh
