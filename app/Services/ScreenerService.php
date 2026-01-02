@@ -524,9 +524,9 @@ class ScreenerService
      * (Opsional) Rekomendasi picks dari BUY_OK / BUY_PULLBACK berdasarkan modal.
      * Tidak mengubah fungsi existing, cuma tambahan biar controller bisa tampilkan “yang direkomendasikan”.
      */
-    public function getTodayRecommendations(?string $today = null, ?float $capital = null, ?int $maxPositions = null): array
+    public function getTodayRecommendations(?string $today = null, ?float $capital = null, ?int $maxPositions = null, ?array $buylistData = null): array
     {
-        $data = $this->getTodayBuylistData($today, $capital);
+        $data = $buylistData ?? $this->getTodayBuylistData($today, $capital);
         $rows = $data['rows'] ?? collect();
 
         if (empty($data['calendar_ok'])) {

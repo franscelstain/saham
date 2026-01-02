@@ -28,3 +28,9 @@ Route::prefix('screener')->group(function () {
 Route::get('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');
 
 // php artisan screener:compute-daily --date=2025-12-15
+
+// halaman UI
+Route::get('/screener/buylist', [ScreenerController::class, 'buylistUi']);
+
+// data JSON (1 endpoint)
+Route::get('/screener/buylist/data', [ScreenerController::class, 'buylistData']);

@@ -2,18 +2,27 @@
     "private": true,
     "scripts": {
         "dev": "npm run development",
-        "development": "cross-env NODE_ENV=development node_modules/webpack/bin/webpack.js --progress --hide-modules --config=node_modules/laravel-mix/setup/webpack.config.js",
-        "watch": "npm run development -- --watch",
-        "watch-poll": "npm run watch -- --watch-poll",
-        "hot": "cross-env NODE_ENV=development node_modules/webpack-dev-server/bin/webpack-dev-server.js --inline --hot --disable-host-check --config=node_modules/laravel-mix/setup/webpack.config.js",
+        "development": "node node_modules/laravel-mix/bin/cli.js",
+        "watch": "node node_modules/laravel-mix/bin/cli.js watch",
+        "watch-poll": "node node_modules/laravel-mix/bin/cli.js watch -- --watch-options-poll=1000",
+        "hot": "node node_modules/laravel-mix/bin/cli.js watch --hot",
         "prod": "npm run production",
-        "production": "cross-env NODE_ENV=production node_modules/webpack/bin/webpack.js --no-progress --hide-modules --config=node_modules/laravel-mix/setup/webpack.config.js"
+        "production": "node node_modules/laravel-mix/bin/cli.js --production"
     },
     "devDependencies": {
+        "@tailwindcss/aspect-ratio": "^0.4.2",
+        "@tailwindcss/forms": "^0.5.11",
+        "@tailwindcss/line-clamp": "^0.4.4",
+        "@tailwindcss/typography": "^0.5.19",
+        "autoprefixer": "^10.4.23",
         "axios": "^0.19",
         "cross-env": "^7.0",
-        "laravel-mix": "^5.0.1",
+        "daisyui": "^1.25.4",
+        "laravel-mix": "^6.0.0",
         "lodash": "^4.17.19",
-        "resolve-url-loader": "^3.1.0"
+        "postcss": "^8.5.6",
+        "resolve-url-loader": "^3.1.0",
+        "tailwindcss": "^3.4.19",
+        "vue-template-compiler": "^2.7.16"
     }
 }

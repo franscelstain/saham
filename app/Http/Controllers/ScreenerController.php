@@ -107,7 +107,7 @@ class ScreenerController extends Controller
         }
 
         $data = $this->svc->getTodayBuylistData($today, $capital);
-        $reco = $this->svc->getTodayRecommendations($today, $capital);
+        $reco = $this->svc->getTodayRecommendations($today, $capital, null, $data);
 
         return view('screener.buylist_today', [
             'today'       => $data['today'] ?? ($today ?: date('Y-m-d')),
@@ -155,5 +155,60 @@ class ScreenerController extends Controller
 
         $v = (float) $raw;
         return $v > 0 ? $v : null;
+    }
+
+    public function buylistUi(Request $request)
+    {
+        $today = $request->query('today');
+        if ($today !== null && !$this->isValidYmd($today)) {
+            $today = null;
+        }
+
+        $capital = $request->query('capital');
+        $capital = $capital !== null ? $this->toPositiveNumber($capital) : null;
+
+        if ($capital === null) {
+            $capital = session('trade_capital');
+            $capital = $capital !== null ? (float) $capital : null;
+            if ($capital !== null && $capital <= 0) $capital = null;
+        }
+
+        // metadata ringan (optional)
+        $data = $this->svc->getTodayBuylistData($today, $capital);
+
+        return view('screener.pages.buylist', [
+            'today'   => $data['today'] ?? ($today ?: date('Y-m-d')),
+            'eodDate' => $data['eod_date'] ?? null,
+            'capital' => $data['capital'] ?? $capital,
+        ]);
+    }
+
+    public function buylistData(Request $request)
+    {
+        $today = $request->query('today');
+        if ($today !== null && !$this->isValidYmd($today)) {
+            $today = null;
+        }
+
+        $capital = $request->query('capital');
+        $capital = $capital !== null ? $this->toPositiveNumber($capital) : null;
+
+        if ($capital === null) {
+            $capital = session('trade_capital');
+            $capital = $capital !== null ? (float) $capital : null;
+            if ($capital !== null && $capital <= 0) $capital = null;
+        }
+
+        // HITUNG SEKALI
+        $data = $this->svc->getTodayBuylistData($today, $capital);
+        $reco = $this->svc->getTodayRecommendations($today, $capital, null, $data);
+
+        return response()->json([
+            'today'   => $data['today'] ?? ($today ?: date('Y-m-d')),
+            'eodDate' => $data['eod_date'] ?? null,
+            'capital' => $data['capital'] ?? $capital,
+            'rows'    => $data['rows'] ?? [],
+            'reco'    => $reco,
+        ]);
     }
 }

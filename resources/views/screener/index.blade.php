@@ -1,23 +1,6 @@
-<style>
-  .tbl {
-    width: 100%;
-    border-collapse: collapse; /* ini yang bikin border rapi */
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-  }
-  .tbl th, .tbl td {
-    border: 1px solid #333;
-    padding: 6px 8px;
-    vertical-align: top;
-  }
-  .tbl th {
-    background: #f2f2f2;
-    text-align: left;
-  }
-  .tbl tbody tr:nth-child(even) {
-    background: #fafafa;
-  }
-</style>
+@extends('layouts.screener')
+
+@section('content')
 
 <h3>Screener ({{ $trade_date ?? '-' }})</h3>
 
@@ -50,3 +33,4 @@
     @endforeach
   </tbody>
 </table>
+@endsection
