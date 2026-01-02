@@ -2,202 +2,146 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tabulator basic polish (daisyUI friendly) */
+/* -------------------------------------------------------------------------- */
+/* App-level polish (Tailwind v3 + daisyUI)                                   */
+/* Goal: remove "pucat" look by using deeper surfaces, better contrast, and   */
+/* consistent shadows/rings in the chosen theme.                               */
+/* -------------------------------------------------------------------------- */
+
+@layer base {
+  html, body {
+    height: 100%;
+  }
+
+  /* nicer selection on dark surfaces */
+  ::selection {
+    background: color-mix(in oklab, hsl(var(--p)) 30%, transparent);
+  }
+}
+
+@layer components {
+  /* Unified "surface" look for cards/panels (works with daisyUI colors). */
+  .ui-surface {
+    @apply bg-base-100/90 backdrop-blur border border-base-300/70 rounded-2xl shadow-md;
+  }
+  .ui-surface:hover {
+    @apply border-base-300/90 shadow-lg;
+  }
+
+  /* Subtle elevated header strip */
+  .ui-header {
+    @apply bg-gradient-to-r from-sky-600 to-blue-700 text-white border-b border-sky-700/30;
+  }
+
+  /* KPI card treatment */
+  .kpi-card {
+    @apply ui-surface transition-transform duration-150;
+  }
+  .kpi-card:hover {
+    @apply -translate-y-0.5 shadow-lg;
+  }
+  /* KPI color cues (light theme) */
+  .kpi-card[data-kpi="BUY"]    { @apply border-emerald-400/70 bg-emerald-200/70; }
+  .kpi-card[data-kpi="WAIT"]   { @apply border-sky-400/70     bg-sky-200/70; }
+  .kpi-card[data-kpi="SKIP"]   { @apply border-amber-400/70   bg-amber-200/70; }
+  .kpi-card[data-kpi="STALE"]  { @apply border-rose-400/70    bg-rose-200/70; }
+  .kpi-card[data-kpi="ALL"]    { @apply border-indigo-400/70  bg-indigo-200/60; }
+
+  .kpi-card[data-kpi] .kpi-ico { @apply ring-1 ring-base-300/70; }
+  .kpi-card[data-kpi="BUY"]  .kpi-ico { @apply bg-emerald-100/70 text-emerald-700; }
+  .kpi-card[data-kpi="WAIT"] .kpi-ico { @apply bg-sky-100/70 text-sky-700; }
+  .kpi-card[data-kpi="SKIP"] .kpi-ico { @apply bg-amber-100/70 text-amber-700; }
+  .kpi-card[data-kpi="STALE"] .kpi-ico { @apply bg-rose-100/70 text-rose-700; }
+  .kpi-card[data-kpi="ALL"]  .kpi-ico { @apply bg-indigo-100/70 text-indigo-700; }
+  .kpi-top {
+    @apply flex items-start justify-between gap-3;
+  }
+  .kpi-ico {
+    @apply w-9 h-9 rounded-2xl grid place-items-center;
+    background: color-mix(in oklab, hsl(var(--p)) 18%, hsl(var(--b1)));
+    border: 1px solid color-mix(in oklab, hsl(var(--p)) 22%, transparent);
+  }
+
+  /* CTA button pop on dark theme */
+  .btn-cta {
+    @apply shadow-sm;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tabulator (keep minimal, theme-aware; avoid hard-coded whites)             */
+/* -------------------------------------------------------------------------- */
+
 .tabulator {
   border: 0 !important;
   background: transparent !important;
   font-size: 14px;
 }
 
+/* Header */
 .tabulator .tabulator-header {
-  background: #f5f7fb !important;          /* base-200 feel */
-  border: 1px solid rgba(17,24,39,.08) !important;
+  background: color-mix(in oklab, hsl(var(--b2)) 75%, hsl(var(--b1))) !important;
+  border: 1px solid color-mix(in oklab, hsl(var(--bc)) 12%, transparent) !important;
   border-bottom: 0 !important;
   border-radius: 14px 14px 0 0;
   overflow: hidden;
 }
-
 .tabulator .tabulator-header .tabulator-col {
   background: transparent !important;
-  border-right: 1px solid rgba(17,24,39,.06) !important;
-  font-weight: 600;
-  color: rgba(17,24,39,.75);
+  border-right: 1px solid color-mix(in oklab, hsl(var(--bc)) 10%, transparent) !important;
+  font-weight: 650;
+  color: color-mix(in oklab, hsl(var(--bc)) 78%, transparent);
+}
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+  padding: 10px 10px !important;
 }
 
+/* Body */
 .tabulator .tabulator-tableholder {
-  border: 1px solid rgba(17,24,39,.08) !important;
+  border: 1px solid color-mix(in oklab, hsl(var(--bc)) 12%, transparent) !important;
   border-top: 0 !important;
   border-radius: 0 0 14px 14px;
-  overflow: hidden;
-  background: #ffffff;
+  background: color-mix(in oklab, hsl(var(--b1)) 92%, transparent) !important;
 }
-
-.tabulator-row {
-  border-bottom: 1px solid rgba(17,24,39,.06) !important;
-}
-
-.tabulator-row:hover {
-  background: rgba(37,99,235,.06) !important;
-}
-
-.tabulator-row.tabulator-selected {
-  background: rgba(37,99,235,.10) !important;
-}
-
-.tabulator-cell {
-  border-right: 0 !important;
-}
-
-/* ===== Tabulator header spacing (biar nggak dempet) ===== */
-.tabulator .tabulator-header .tabulator-col .tabulator-col-content{
-  padding:10px 10px !important;
-}
-.tabulator .tabulator-cell{
-  padding:10px 10px !important;
-}
-
-.tabulator .tabulator-footer {
+.tabulator .tabulator-row {
   background: transparent !important;
-  border: 0 !important;
 }
-/* keep header crisp on scroll */
-.sticky {
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+.tabulator .tabulator-row .tabulator-cell {
+  border-right: 1px solid color-mix(in oklab, hsl(var(--bc)) 7%, transparent) !important;
+  border-bottom: 1px solid color-mix(in oklab, hsl(var(--bc)) 7%, transparent) !important;
+  padding: 10px 10px !important;
+  color: color-mix(in oklab, hsl(var(--bc)) 88%, transparent);
 }
-.kpi-card {
-  border-radius: 18px;
+.tabulator .tabulator-row:nth-child(2n) {
+  background: color-mix(in oklab, hsl(var(--b2)) 22%, transparent) !important;
 }
-.kpi-card:hover {
-  transform: translateY(-1px);
+.tabulator .tabulator-row.tabulator-selected {
+  background: color-mix(in oklab, hsl(var(--p)) 16%, transparent) !important;
 }
-.kpi-card.ring-2 {
-  box-shadow: 0 0 0 2px rgba(37,99,235,.25), 0 8px 18px rgba(17,24,39,.06);
-}
-.meta-chip{
-  display:inline-flex;
-  align-items:center;
-  gap:.5rem;
-  padding:.45rem .75rem;
-  border-radius:999px;
-  background:#fff;
-  border:1px solid rgba(17,24,39,.10);
-  box-shadow:0 1px 2px rgba(17,24,39,.06);
-  font-weight:600;
-}
-.meta-chip .dot{
-  width:.55rem;height:.55rem;border-radius:999px;background:rgba(37,99,235,.85);
-}
-.meta-chip.eod .dot{ background:rgba(14,165,233,.9); }
-.meta-chip.cap .dot{ background:rgba(34,197,94,.9); }
-
-/* ===== KPI cards: icon + depth ===== */
-.kpi-card{
-  border-radius:18px;
-  box-shadow:0 1px 2px rgba(17,24,39,.06);
-  transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-}
-.kpi-card:hover{
-  transform:translateY(-1px);
-  box-shadow:0 10px 22px rgba(17,24,39,.08);
-}
-.kpi-card.ring-2{
-  box-shadow:0 0 0 2px rgba(37,99,235,.20), 0 14px 28px rgba(17,24,39,.10);
-}
-.kpi-top{
-  display:flex;align-items:center;justify-content:space-between;
-}
-.kpi-ico{
-  width:40px;height:40px;border-radius:14px;
-  display:grid;place-items:center;
-  background:rgba(37,99,235,.10);
-  color:rgba(37,99,235,.95);
+.tabulator .tabulator-row:hover {
+  background: color-mix(in oklab, hsl(var(--b2)) 32%, transparent) !important;
 }
 
-.kpi-ico.wait{ background:rgba(245,158,11,.12); color:rgba(245,158,11,.95); }
-.kpi-ico.skip{ background:rgba(107,114,128,.12); color:rgba(107,114,128,.95); }
-.kpi-ico.stale{ background:rgba(239,68,68,.12); color:rgba(239,68,68,.95); }
-.kpi-ico.all{ background:rgba(14,165,233,.12); color:rgba(14,165,233,.95); }
-
-/* KPI accent color per type */
-.kpi-accent-buy { box-shadow: 0 0 0 1px rgba(37,99,235,.18), 0 8px 18px rgba(17,24,39,.06); }
-.kpi-accent-wait{ box-shadow: 0 0 0 1px rgba(245,158,11,.18), 0 8px 18px rgba(17,24,39,.06); }
-.kpi-accent-skip{ box-shadow: 0 0 0 1px rgba(107,114,128,.18), 0 8px 18px rgba(17,24,39,.06); }
-.kpi-accent-stale{box-shadow: 0 0 0 1px rgba(239,68,68,.18), 0 8px 18px rgba(17,24,39,.06); }
-.kpi-accent-all { box-shadow: 0 0 0 1px rgba(14,165,233,.18), 0 8px 18px rgba(17,24,39,.06); }
-
-.kpi-accent-buy .kpi-ico { background: rgba(37,99,235,.12); color: rgba(37,99,235,.95); }
-.kpi-accent-wait .kpi-ico{ background: rgba(245,158,11,.12); color: rgba(245,158,11,.95); }
-.kpi-accent-skip .kpi-ico{ background: rgba(107,114,128,.12); color: rgba(107,114,128,.95); }
-.kpi-accent-stale .kpi-ico{background: rgba(239,68,68,.12); color: rgba(239,68,68,.95); }
-.kpi-accent-all .kpi-ico { background: rgba(14,165,233,.12); color: rgba(14,165,233,.95); }
-
-/* ===== Badge: kecil, tidak hitam, teks putih kalau perlu ===== */
-.badge{
-  border-radius:999px !important;
-  font-weight:700;
-  letter-spacing:.2px;
+/* Sort arrows */
+.tabulator .tabulator-col.tabulator-sortable:hover {
+  background: color-mix(in oklab, hsl(var(--b2)) 40%, transparent) !important;
 }
-.badge-mini{
-  font-size:11px !important;
-  padding:.45rem .6rem !important;
-  height:auto !important;
-  border:0 !important;
-}
-.badge-status-ok{ background:rgba(22,163,74,.95)!important; color:#fff!important; }
-.badge-status-wait{ background:rgba(245,158,11,.95)!important; color:#fff!important; }
-.badge-status-skip{ background:rgba(107,114,128,.95)!important; color:#fff!important; }
-.badge-status-bad{ background:rgba(239,68,68,.95)!important; color:#fff!important; }
-.badge-soft{ background:rgba(37,99,235,.10)!important; color:rgba(37,99,235,.95)!important; border:0!important; }
-
-/* ===== Buttons: biar kelihatan "klik-able" (hover nggak hilang) ===== */
-.btn-cta{
-  border-radius: 14px !important;
-  box-shadow: 0 8px 18px rgba(37,99,235,.18);
-}
-.btn-cta:hover{
-  box-shadow: 0 10px 22px rgba(37,99,235,.22);
-  filter: brightness(.98);
-}
-.btn-cta:active{
-  transform: translateY(1px);
+.tabulator .tabulator-col .tabulator-arrow {
+  border-bottom-color: color-mix(in oklab, hsl(var(--bc)) 55%, transparent) !important;
 }
 
-/* ===== Input focus: matikan garis biru nyolok, ganti ring halus ===== */
-.input:focus-within{
-  outline: none !important;
-  box-shadow: 0 0 0 3px rgba(37,99,235,.18) !important;
-  border-color: rgba(37,99,235,.45) !important;
-}
-#global-search:focus{
-  outline: none !important;
-  box-shadow: none !important;
-}
+/* -------------------------------------------------------------------------- */
+/* Detail drawer and misc                                                     */
+/* -------------------------------------------------------------------------- */
 
-/* ===== Panel detail: bikin “carded” dan tidak polos ===== */
-.detail-hero{
-  border-radius:16px;
-  padding:12px 12px;
-  background:linear-gradient(135deg, rgba(37,99,235,.10), rgba(14,165,233,.06));
-  border:1px solid rgba(17,24,39,.10);
-}
-.detail-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px 14px;
-}
 .detail-kv{
   padding:10px 10px;
   border-radius:14px;
-  background:#fff;
-  border:1px solid rgba(17,24,39,.08);
+  background: color-mix(in oklab, hsl(var(--b1)) 88%, transparent);
+  border:1px solid color-mix(in oklab, hsl(var(--bc)) 12%, transparent);
 }
-.detail-kv .k{ font-size:12px; opacity:.65; }
+.detail-kv .k{ font-size:12px; opacity:.70; }
 .detail-kv .v{ font-size:14px; font-weight:700; margin-top:2px; }
-.btn.btn-primary:hover{
-  filter: brightness(0.97);
-}
-.btn:focus{
-  outline: none !important;
-}
+
+.btn:focus{ outline: none !important; }
 .input:focus, input:focus{ box-shadow:none !important; }

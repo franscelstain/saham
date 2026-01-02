@@ -35,6 +35,27 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
   var $ = function $(q) {
     return document.querySelector(q);
   };
+
+  // --- SAFE DOM helpers (tahan banting) ---
+  function el(q) {
+    try {
+      return document.querySelector(q);
+    } catch (_) {
+      return null;
+    }
+  }
+  function setText(q, v) {
+    var n = el(q);
+    if (!n) return false;
+    n.textContent = v === null || v === undefined ? '' : String(v);
+    return true;
+  }
+  function setHtml(q, v) {
+    var n = el(q);
+    if (!n) return false;
+    n.innerHTML = v === null || v === undefined ? '' : String(v);
+    return true;
+  }
   var state = {
     rows: [],
     recoRows: [],
@@ -46,6 +67,11 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
   function fmt(v) {
     if (v === null || v === undefined || v === '') return '—';
     return String(v);
+  }
+  function pretty(v) {
+    if (v === null || v === undefined) return '—';
+    var s = String(v);
+    return s.replaceAll('_', ' ');
   }
   function badge(cls, text, title) {
     var t = title ? " title=\"".concat(String(title).replace(/"/g, '&quot;'), "\"") : '';
@@ -218,11 +244,11 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
     var stale = allRows.filter(function (r) {
       return isStale(r.status);
     }).length;
-    $('#kpi-buy').textContent = String(buy);
-    $('#kpi-wait').textContent = String(wait);
-    $('#kpi-skip').textContent = String(skip);
-    $('#kpi-stale').textContent = String(stale);
-    $('#kpi-all').textContent = String(allRows.length);
+    setText('#kpi-buy', String(buy));
+    setText('#kpi-wait', String(wait));
+    setText('#kpi-skip', String(skip));
+    setText('#kpi-stale', String(stale));
+    setText('#kpi-all', String(allRows.length));
   }
   function paintKpiActive() {
     document.querySelectorAll('.kpi').forEach(function (btn) {
@@ -233,19 +259,49 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
   }
   function renderPanel(row) {
     state.selected = row || null;
-    $('#kpi-selected').textContent = row !== null && row !== void 0 && row.ticker ? row.ticker : '—';
-    $('#p-ticker').textContent = fmt(row === null || row === void 0 ? void 0 : row.ticker);
-    $('#p-badges').innerHTML = badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status, row === null || row === void 0 ? void 0 : row.status) + badge(clsSignal(row === null || row === void 0 ? void 0 : row.signalName), row === null || row === void 0 ? void 0 : row.signalName, row === null || row === void 0 ? void 0 : row.signalName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName, row === null || row === void 0 ? void 0 : row.volumeLabelName);
-    $('#p-last').textContent = fmt(row === null || row === void 0 ? void 0 : row.last);
-    $('#p-rank').textContent = fmt(row === null || row === void 0 ? void 0 : row.rank);
-    $('#p-entry').textContent = fmt(row === null || row === void 0 ? void 0 : row.entry);
-    $('#p-rr').textContent = fmt(row === null || row === void 0 ? void 0 : row.rr);
-    $('#p-sl').textContent = fmt(row === null || row === void 0 ? void 0 : row.sl);
-    $('#p-tp').textContent = fmt(row === null || row === void 0 ? void 0 : row.tp);
-    $('#p-reason').textContent = fmt(row === null || row === void 0 ? void 0 : row.reason);
-    $('#p-snapshot').textContent = fmt(row === null || row === void 0 ? void 0 : row.snapshot_at);
-    $('#p-lastbar').textContent = fmt(row === null || row === void 0 ? void 0 : row.last_bar_at);
-    $('#p-json').textContent = row ? JSON.stringify(row, null, 2) : '—';
+    setText('#kpi-selected', row !== null && row !== void 0 && row.ticker ? row.ticker : '—');
+    setText('#p-ticker', fmt(row === null || row === void 0 ? void 0 : row.ticker));
+    var logo = $('#p-logo');
+    if (logo) {
+      var url = (row === null || row === void 0 ? void 0 : row.logoUrl) || (row === null || row === void 0 ? void 0 : row.logo_url) || (row === null || row === void 0 ? void 0 : row.logo) || (row === null || row === void 0 ? void 0 : row.company_logo) || null;
+      if (url) {
+        logo.src = url;
+        logo.classList.remove('hidden');
+      } else {
+        logo.classList.add('hidden');
+      }
+    }
+    setHtml('#p-badges', badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), pretty(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status) + badge(clsSignal(row === null || row === void 0 ? void 0 : row.signalName), pretty(row === null || row === void 0 ? void 0 : row.signalName), row === null || row === void 0 ? void 0 : row.signalName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), pretty(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName));
+    setText('#p-last', fmt(row === null || row === void 0 ? void 0 : row.last));
+    setText('#p-rank', fmt(row === null || row === void 0 ? void 0 : row.rank));
+    setText('#p-entry', fmt(row === null || row === void 0 ? void 0 : row.entry));
+    setText('#p-rr', fmt(row === null || row === void 0 ? void 0 : row.rr));
+    setText('#p-sl', fmt(row === null || row === void 0 ? void 0 : row.sl));
+    setText('#p-tp', fmt(row === null || row === void 0 ? void 0 : row.tp));
+    setText('#p-reason', fmt(row === null || row === void 0 ? void 0 : row.reason));
+    setText('#p-snapshot', fmt(row === null || row === void 0 ? void 0 : row.snapshot_at));
+    setText('#p-lastbar', fmt(row === null || row === void 0 ? void 0 : row.last_bar_at));
+    setText('#p-json', row ? JSON.stringify(row, null, 2) : '—');
+    renderDrawer(row);
+  }
+  function renderDrawer(row) {
+    var _row$reason;
+    // Mobile drawer uses d-* ids; kalau drawer markup tidak ada / tidak lengkap, jangan crash
+    var required = ['#d-ticker', '#d-badges', '#d-last', '#d-rank', '#d-entry', '#d-rr', '#d-sl', '#d-tp', '#d-reason', '#d-json'];
+    for (var _i = 0, _required = required; _i < _required.length; _i++) {
+      var q = _required[_i];
+      if (!el(q)) return;
+    }
+    setText('#d-ticker', fmt(row === null || row === void 0 ? void 0 : row.ticker));
+    setHtml('#d-badges', badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), pretty(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status) + badge(clsSignal(row === null || row === void 0 ? void 0 : row.signalName), pretty(row === null || row === void 0 ? void 0 : row.signalName), row === null || row === void 0 ? void 0 : row.signalName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), pretty(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName));
+    setText('#d-last', fmt(row === null || row === void 0 ? void 0 : row.last));
+    setText('#d-rank', fmt(row === null || row === void 0 ? void 0 : row.rank));
+    setText('#d-entry', fmt(row === null || row === void 0 ? void 0 : row.entry));
+    setText('#d-rr', fmt(row === null || row === void 0 ? void 0 : row.rr));
+    setText('#d-sl', fmt(row === null || row === void 0 ? void 0 : row.sl));
+    setText('#d-tp', fmt(row === null || row === void 0 ? void 0 : row.tp));
+    setText('#d-reason', ((_row$reason = row === null || row === void 0 ? void 0 : row.reason) !== null && _row$reason !== void 0 ? _row$reason : '—').toString());
+    setText('#d-json', JSON.stringify(row !== null && row !== void 0 ? row : {}, null, 2));
   }
   function openDrawer() {
     var d = $('#drawer');
@@ -325,21 +381,41 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
           return ((_c$getValue2 = c.getValue()) !== null && _c$getValue2 !== void 0 ? _c$getValue2 : '').toString().slice(0, 90);
         }
       }],
+      // Fallback: kalau rowClick/cellClick tidak kepanggil karena overlay/formatter,
+      // update panel lewat event selection (pasti kepanggil saat row ter-select).
+      rowSelected: function rowSelected(row) {
+        try {
+          renderPanel(row.getData());
+        } catch (e) {}
+      },
+      rowSelectionChanged: function rowSelectionChanged(data, rows) {
+        if (!rows || !rows.length) return;
+        try {
+          renderPanel(rows[0].getData());
+        } catch (e) {}
+      },
       rowClick: function rowClick(_, row) {
-        row.select();
+        // Tabulator can throw if selectable is not enabled. Don't let it block panel render.
+        try {
+          row.select();
+        } catch (e) {}
         renderPanel(row.getData());
         if (window.innerWidth < 1024) openDrawer();
       },
       rowTap: function rowTap(_, row) {
-        // buat touch / klik yang kadang miss
-        row.select();
+        // touch / klik yang kadang miss
+        try {
+          row.select();
+        } catch (e) {}
         renderPanel(row.getData());
         if (window.innerWidth < 1024) openDrawer();
       },
       cellClick: function cellClick(_, cell) {
         // klik badge/sel tetap kebaca
         var row = cell.getRow();
-        row.select();
+        try {
+          row.select();
+        } catch (e) {}
         renderPanel(row.getData());
         if (window.innerWidth < 1024) openDrawer();
       }
@@ -356,8 +432,8 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
     var allFiltered = applyClientFilter(state.rows);
     tblBuy.replaceData(buyFiltered);
     tblAll.replaceData(allFiltered);
-    $('#meta-buy').textContent = "".concat(buyFiltered.length, " rows");
-    $('#meta-all').textContent = "".concat(allFiltered.length, " rows");
+    setText('#meta-buy', "".concat(buyFiltered.length, " rows"));
+    setText('#meta-all', "".concat(allFiltered.length, " rows"));
   }
   function fmtTicker(cell) {
     var t = cell.getValue() || '';
@@ -370,19 +446,30 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
   function _refresh() {
     _refresh = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3() {
       var _meta$today, _meta$eodDate;
-      var _yield$fetchData, meta, rows, recoRows, note, noteEl;
+      var metaEl, meta, rows, recoRows, note, _yield$fetchData, noteEl, _t2;
       return _regenerator().w(function (_context3) {
-        while (1) switch (_context3.n) {
+        while (1) switch (_context3.p = _context3.n) {
           case 0:
-            $('#meta-server').textContent = 'Loading…';
-            _context3.n = 1;
+            metaEl = el('#meta-server');
+            if (metaEl) metaEl.textContent = 'Loading…';
+            _context3.p = 1;
+            _context3.n = 2;
             return fetchData();
-          case 1:
+          case 2:
             _yield$fetchData = _context3.v;
             meta = _yield$fetchData.meta;
             rows = _yield$fetchData.rows;
             recoRows = _yield$fetchData.recoRows;
             note = _yield$fetchData.note;
+            _context3.n = 4;
+            break;
+          case 3:
+            _context3.p = 3;
+            _t2 = _context3.v;
+            console.error(_t2);
+            if (metaEl) metaEl.textContent = 'Server: error (lihat console)';
+            return _context3.a(2);
+          case 4:
             state.rows = rows;
             state.recoRows = recoRows;
             setKpiCounts(rows);
@@ -397,17 +484,18 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
             }
             applyTables();
             selectFirstIfNeeded();
-            $('#meta-server').textContent = "Server: ".concat((_meta$today = meta.today) !== null && _meta$today !== void 0 ? _meta$today : '-', " \u2022 EOD: ").concat((_meta$eodDate = meta.eodDate) !== null && _meta$eodDate !== void 0 ? _meta$eodDate : '-');
-          case 2:
+            setText('#meta-server', "Server: ".concat((_meta$today = meta.today) !== null && _meta$today !== void 0 ? _meta$today : '-', " \u2022 EOD: ").concat((_meta$eodDate = meta.eodDate) !== null && _meta$eodDate !== void 0 ? _meta$eodDate : '-'));
+          case 5:
             return _context3.a(2);
         }
-      }, _callee3);
+      }, _callee3, null, [[1, 3]]);
     }));
     return _refresh.apply(this, arguments);
   }
   function startAuto() {
     stopAuto();
-    var sec = parseInt($('#auto-interval').value || '60', 10);
+    var ai = el('#auto-interval');
+    var sec = parseInt((ai ? ai.value : '60') || '60', 10);
     state.timer = setInterval(function () {
       return refresh()["catch"](console.error);
     }, sec * 1000);
@@ -422,28 +510,31 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
     tblAll = makeTable(document.getElementById('tbl-all'), '560px');
 
     // refresh
-    $('#btn-refresh').addEventListener('click', function () {
+    var btnRefresh = el('#btn-refresh');
+    if (btnRefresh) btnRefresh.addEventListener('click', function () {
       return refresh()["catch"](console.error);
     });
 
     // auto refresh
-    $('#auto-refresh').addEventListener('change', function (e) {
+    var autoRefresh = el('#auto-refresh');
+    if (autoRefresh) autoRefresh.addEventListener('change', function (e) {
       return e.target.checked ? startAuto() : stopAuto();
     });
-    $('#auto-interval').addEventListener('change', function () {
-      return $('#auto-refresh').checked ? startAuto() : null;
+    var autoInterval = el('#auto-interval');
+    if (autoInterval) autoInterval.addEventListener('change', function () {
+      return el('#auto-refresh') && el('#auto-refresh').checked ? startAuto() : null;
     });
 
     // search
-    var search = $('#global-search');
-    search.addEventListener('input', function () {
+    var search = el('#global-search');
+    if (search) search.addEventListener('input', function () {
       state.search = search.value || '';
       applyTables();
     });
     document.addEventListener('keydown', function (e) {
       if (e.key === '/') {
         e.preventDefault();
-        search.focus();
+        if (search) search.focus();
       }
       if (e.key === 'Escape') closeDrawer();
     });

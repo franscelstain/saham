@@ -176,7 +176,7 @@ class ScreenerController extends Controller
         // metadata ringan (optional)
         $data = $this->svc->getTodayBuylistData($today, $capital);
 
-        return view('screener.pages.buylist', [
+        return view('screener.buylist.index', [
             'today'   => $data['today'] ?? ($today ?: date('Y-m-d')),
             'eodDate' => $data['eod_date'] ?? null,
             'capital' => $data['capital'] ?? $capital,

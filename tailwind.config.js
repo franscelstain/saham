@@ -4,33 +4,41 @@ module.exports = {
     './resources/**/*.blade.php',
     './resources/**/*.js',
   ],
+  // Keep this small and intentional. Only safelist classes that are applied dynamically from JS.
   safelist: [
-    "badge","badge-outline","badge-success","badge-warning","badge-error","badge-info","badge-neutral","badge-ghost",
-    "btn","btn-primary","btn-outline","btn-sm","btn-xs",
-    "card","card-body","divider",
-    "bg-base-100","bg-base-200","bg-base-300","text-base-content","border-base-300",
-    "ring-2","ring-primary"
+    // badges are applied by Tabulator formatters in JS
+    'badge','badge-outline','badge-success','badge-warning','badge-error','badge-info','badge-neutral','badge-ghost',
   ],
   theme: { extend: {} },
-  plugins: [require("daisyui")],
+  plugins: [require('daisyui')],
   daisyui: {
     themes: [
       {
+        // Soft-light theme: not "pure white", avoids washed-out UI but stays light.
         ajaib: {
-          "primary": "#2563eb",
-          "primary-content": "#ffffff",
-          "secondary": "#0ea5e9",
-          "accent": "#22c55e",
-          "neutral": "#111827",
-          "base-100": "#ffffff",
-          "base-200": "#f5f7fb",
-          "base-300": "#e5e7eb",
-          "info": "#0ea5e9",
-          "success": "#16a34a",
-          "warning": "#f59e0b",
-          "error": "#ef4444",
-        }
-      }
+          primary: '#2563eb',
+          'primary-content': '#ffffff',
+
+          secondary: '#0ea5e9',
+          'secondary-content': '#02131f',
+
+          accent: '#16a34a',
+          'accent-content': '#04120a',
+
+          neutral: '#111827',
+          'neutral-content': '#f9fafb',
+
+          'base-100': '#f7f8fb',
+          'base-200': '#eef1f6',
+          'base-300': '#e2e8f0',
+          'base-content': '#111827',
+
+          info: '#0284c7',
+          success: '#16a34a',
+          warning: '#d97706',
+          error: '#dc2626',
+        },
+      },
     ],
-  }
-}
+  },
+};

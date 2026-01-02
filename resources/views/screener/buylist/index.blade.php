@@ -6,33 +6,31 @@
 
 @section('content')
 <div class="min-h-screen bg-base-200">
-  @include('screener.partials.topbar_buylist', ['title' => 'Buylist Today'])
+  @include('screener.buylist.partials.topbar', ['title' => 'Buylist Today'])
 
   <div class="px-4 py-4 space-y-4">
-    @include('screener.partials.buylist.meta', [
+    @include('screener.buylist.partials.meta', [
       'today' => $today ?? null,
       'eodDate' => $eodDate ?? null,
       'capital' => $capital ?? null,
     ])
 
-    @include('screener.partials.buylist.kpi_row')
+    @include('screener.buylist.partials.kpi_row')
 
-    <div class="grid grid-cols-12 gap-4">
-      {{-- LEFT: tables --}}
-      <div class="col-span-12 lg:col-span-8 xl:col-span-9 space-y-4">
-        @include('screener.partials.buylist.table_recommended')
-        @include('screener.partials.buylist.table_all')
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div class="lg:col-span-8 space-y-4">
+        @include('screener.buylist.partials.table_recommended')
+        @include('screener.buylist.partials.table_all')
       </div>
 
-      {{-- RIGHT: detail panel (desktop) --}}
-      <div class="col-span-12 lg:col-span-4 xl:col-span-3">
-        @include('screener.partials.buylist.right_panel')
+      <div class="lg:col-span-4">
+        @include('screener.buylist.partials.right_panel')
       </div>
     </div>
   </div>
 
-  {{-- Mobile drawer (optional) --}}
-  @include('screener.partials.buylist.drawer_detail')
+  {{-- Mobile drawer --}}
+  @include('screener.buylist.partials.drawer_detail')
 </div>
 @endsection
 

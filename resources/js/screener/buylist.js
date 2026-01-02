@@ -2,6 +2,21 @@
   const endpoint = window.__SCREENER__?.endpoints?.buylist;
   const $ = (q) => document.querySelector(q);
 
+// --- SAFE DOM helpers (tahan banting) ---
+function el(q){ try { return document.querySelector(q); } catch(_) { return null; } }
+function setText(q, v){
+  const n = el(q);
+  if (!n) return false;
+  n.textContent = (v === null || v === undefined) ? '' : String(v);
+  return true;
+}
+function setHtml(q, v){
+  const n = el(q);
+  if (!n) return false;
+  n.innerHTML = (v === null || v === undefined) ? '' : String(v);
+  return true;
+}
+
   const state = {
     rows: [],
     recoRows: [],
@@ -15,6 +30,13 @@
     if (v === null || v === undefined || v === '') return '—';
     return String(v);
   }
+
+  function pretty(v) {
+    if (v === null || v === undefined) return '—';
+    const s = String(v);
+    return s.replaceAll('_', ' ');
+  }
+
 
   function badge(cls, text, title) {
     const t = title ? ` title="${String(title).replace(/"/g, '&quot;')}"` : '';
@@ -153,11 +175,11 @@
     const skip = allRows.filter(r => isSkip(r.status)).length;
     const stale = allRows.filter(r => isStale(r.status)).length;
 
-    $('#kpi-buy').textContent = String(buy);
-    $('#kpi-wait').textContent = String(wait);
-    $('#kpi-skip').textContent = String(skip);
-    $('#kpi-stale').textContent = String(stale);
-    $('#kpi-all').textContent = String(allRows.length);
+    setText('#kpi-buy', String(buy));
+    setText('#kpi-wait', String(wait));
+    setText('#kpi-skip', String(skip));
+    setText('#kpi-stale', String(stale));
+    setText('#kpi-all', String(allRows.length));
   }
 
   function paintKpiActive() {
@@ -170,29 +192,59 @@
 
   function renderPanel(row) {
     state.selected = row || null;
-    $('#kpi-selected').textContent = row?.ticker ? row.ticker : '—';
+    setText('#kpi-selected', row?.ticker ? row.ticker : '—');
 
-    $('#p-ticker').textContent = fmt(row?.ticker);
-    $('#p-badges').innerHTML =
-      badge(clsStatus(row?.status), row?.status, row?.status) +
-      badge(clsSignal(row?.signalName), row?.signalName, row?.signalName) +
-      badge(clsVol(row?.volumeLabelName), row?.volumeLabelName, row?.volumeLabelName);
+    setText('#p-ticker', fmt(row?.ticker));
+    const logo = $('#p-logo');
+    if (logo) {
+      const url = row?.logoUrl || row?.logo_url || row?.logo || row?.company_logo || null;
+      if (url) { logo.src = url; logo.classList.remove('hidden'); }
+      else { logo.classList.add('hidden'); }
+    }
+    setHtml('#p-badges',
+      badge(clsStatus(row?.status), pretty(row?.status), row?.status) +
+      badge(clsSignal(row?.signalName), pretty(row?.signalName), row?.signalName) +
+      badge(clsVol(row?.volumeLabelName), pretty(row?.volumeLabelName), row?.volumeLabelName) 
+    );
 
-    $('#p-last').textContent = fmt(row?.last);
-    $('#p-rank').textContent = fmt(row?.rank);
-    $('#p-entry').textContent = fmt(row?.entry);
-    $('#p-rr').textContent = fmt(row?.rr);
-    $('#p-sl').textContent = fmt(row?.sl);
-    $('#p-tp').textContent = fmt(row?.tp);
+    setText('#p-last', fmt(row?.last));
+    setText('#p-rank', fmt(row?.rank));
+    setText('#p-entry', fmt(row?.entry));
+    setText('#p-rr', fmt(row?.rr));
+    setText('#p-sl', fmt(row?.sl));
+    setText('#p-tp', fmt(row?.tp));
 
-    $('#p-reason').textContent = fmt(row?.reason);
-    $('#p-snapshot').textContent = fmt(row?.snapshot_at);
-    $('#p-lastbar').textContent = fmt(row?.last_bar_at);
+    setText('#p-reason', fmt(row?.reason));
+    setText('#p-snapshot', fmt(row?.snapshot_at));
+    setText('#p-lastbar', fmt(row?.last_bar_at));
 
-    $('#p-json').textContent = row ? JSON.stringify(row, null, 2) : '—';
+    setText('#p-json', row ? JSON.stringify(row, null, 2) : '—');
+    renderDrawer(row);
   }
 
-  function openDrawer() {
+  
+  function renderDrawer(row) {
+    // Mobile drawer uses d-* ids; kalau drawer markup tidak ada / tidak lengkap, jangan crash
+    const required = ['#d-ticker','#d-badges','#d-last','#d-rank','#d-entry','#d-rr','#d-sl','#d-tp','#d-reason','#d-json'];
+    for (const q of required) { if (!el(q)) return; }
+
+    setText('#d-ticker', fmt(row?.ticker));
+    setHtml('#d-badges',
+      badge(clsStatus(row?.status), pretty(row?.status), row?.status) +
+      badge(clsSignal(row?.signalName), pretty(row?.signalName), row?.signalName) +
+      badge(clsVol(row?.volumeLabelName), pretty(row?.volumeLabelName), row?.volumeLabelName) 
+    );
+
+    setText('#d-last', fmt(row?.last));
+    setText('#d-rank', fmt(row?.rank));
+    setText('#d-entry', fmt(row?.entry));
+    setText('#d-rr', fmt(row?.rr));
+    setText('#d-sl', fmt(row?.sl));
+    setText('#d-tp', fmt(row?.tp));
+    setText('#d-reason', (row?.reason ?? '—').toString());
+    setText('#d-json', JSON.stringify(row ?? {}, null, 2));
+  }
+function openDrawer() {
     const d = $('#drawer');
     if (d) d.classList.remove('hidden');
   }
@@ -245,19 +297,28 @@
           formatter: (c) => (c.getValue() ?? '').toString().slice(0, 90),
         },
       ],
+      // Fallback: kalau rowClick/cellClick tidak kepanggil karena overlay/formatter,
+      // update panel lewat event selection (pasti kepanggil saat row ter-select).
+      rowSelected: (row) => { try { renderPanel(row.getData()); } catch (e) {} },
+      rowSelectionChanged: (data, rows) => {
+        if (!rows || !rows.length) return;
+        try { renderPanel(rows[0].getData()); } catch (e) {}
+      },
+
       rowClick: (_, row) => {
-        row.select();
+        // Tabulator can throw if selectable is not enabled. Don't let it block panel render.
+        try { row.select(); } catch (e) {}
         renderPanel(row.getData());
         if (window.innerWidth < 1024) openDrawer();
       },
-      rowTap: (_, row) => { // buat touch / klik yang kadang miss
-        row.select();
+      rowTap: (_, row) => { // touch / klik yang kadang miss
+        try { row.select(); } catch (e) {}
         renderPanel(row.getData());
         if (window.innerWidth < 1024) openDrawer();
       },
       cellClick: (_, cell) => { // klik badge/sel tetap kebaca
         const row = cell.getRow();
-        row.select();
+        try { row.select(); } catch (e) {}
         renderPanel(row.getData());
         if (window.innerWidth < 1024) openDrawer();
       },
@@ -277,8 +338,8 @@
     tblBuy.replaceData(buyFiltered);
     tblAll.replaceData(allFiltered);
 
-    $('#meta-buy').textContent = `${buyFiltered.length} rows`;
-    $('#meta-all').textContent = `${allFiltered.length} rows`;
+    setText('#meta-buy', `${buyFiltered.length} rows`);
+    setText('#meta-all', `${allFiltered.length} rows`);
   }
 
   function fmtTicker(cell){
@@ -295,9 +356,17 @@
   }
 
   async function refresh() {
-    $('#meta-server').textContent = 'Loading…';
+    const metaEl = el('#meta-server');
+    if (metaEl) metaEl.textContent = 'Loading…';
 
-    const { meta, rows, recoRows, note } = await fetchData();
+    let meta, rows, recoRows, note;
+    try {
+      ({ meta, rows, recoRows, note } = await fetchData());
+    } catch (e) {
+      console.error(e);
+      if (metaEl) metaEl.textContent = 'Server: error (lihat console)';
+      return;
+    }
 
     state.rows = rows;
     state.recoRows = recoRows;
@@ -317,12 +386,13 @@
     applyTables();
     selectFirstIfNeeded();
 
-    $('#meta-server').textContent = `Server: ${meta.today ?? '-'} • EOD: ${meta.eodDate ?? '-'}`;
+    setText('#meta-server', `Server: ${meta.today ?? '-'} • EOD: ${meta.eodDate ?? '-'}`);
   }
 
   function startAuto() {
     stopAuto();
-    const sec = parseInt($('#auto-interval').value || '60', 10);
+    const ai = el('#auto-interval');
+    const sec = parseInt((ai ? ai.value : '60') || '60', 10);
     state.timer = setInterval(() => refresh().catch(console.error), sec * 1000);
   }
   function stopAuto() {
@@ -336,21 +406,24 @@
     tblAll = makeTable(document.getElementById('tbl-all'), '560px');
 
     // refresh
-    $('#btn-refresh').addEventListener('click', () => refresh().catch(console.error));
+    const btnRefresh = el('#btn-refresh');
+    if (btnRefresh) btnRefresh.addEventListener('click', () => refresh().catch(console.error));
 
     // auto refresh
-    $('#auto-refresh').addEventListener('change', (e) => e.target.checked ? startAuto() : stopAuto());
-    $('#auto-interval').addEventListener('change', () => $('#auto-refresh').checked ? startAuto() : null);
+    const autoRefresh = el('#auto-refresh');
+    if (autoRefresh) autoRefresh.addEventListener('change', (e) => e.target.checked ? startAuto() : stopAuto());
+    const autoInterval = el('#auto-interval');
+    if (autoInterval) autoInterval.addEventListener('change', () => (el('#auto-refresh') && el('#auto-refresh').checked) ? startAuto() : null);
 
     // search
-    const search = $('#global-search');
-    search.addEventListener('input', () => {
+    const search = el('#global-search');
+    if (search) search.addEventListener('input', () => {
       state.search = search.value || '';
       applyTables();
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === '/') { e.preventDefault(); search.focus(); }
+      if (e.key === '/') { e.preventDefault(); if (search) search.focus(); }
       if (e.key === 'Escape') closeDrawer();
     });
 
