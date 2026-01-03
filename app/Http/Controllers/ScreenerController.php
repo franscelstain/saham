@@ -65,98 +65,6 @@ class ScreenerController extends Controller
         ]);
     }
 
-    /**
-     * GET /screener/candidates?date=YYYY-MM-DD (optional)
-     */
-    public function candidates(Request $request)
-    {
-        $date = $request->query('date');
-
-        // validasi ringan date
-        if ($date !== null && !$this->isValidYmd($date)) {
-            return response()->view('screener.candidates', [
-                'trade_date' => null,
-                'rows' => collect(),
-                'error' => 'Parameter date harus format YYYY-MM-DD',
-            ], 422);
-        }
-
-        $data = $this->svc->getCandidatesPageData($date);
-
-        return view('screener.candidates', $data);
-    }
-
-    /**
-     * GET /screener/buylist-today?today=YYYY-MM-DD&capital=9000000
-     */
-    public function buylistToday(Request $request)
-    {
-        $today = $request->query('today');
-        if ($today !== null && !$this->isValidYmd($today)) {
-            $today = null;
-        }
-
-        // capital: query > session > null
-        $capital = $request->query('capital');
-        $capital = $capital !== null ? $this->toPositiveNumber($capital) : null;
-
-        if ($capital === null) {
-            $capital = session('trade_capital');
-            $capital = $capital !== null ? (float) $capital : null;
-            if ($capital !== null && $capital <= 0) $capital = null;
-        }
-
-        $data = $this->svc->getTodayBuylistData($today, $capital);
-        $reco = $this->svc->getTodayRecommendations($today, $capital, null, $data);
-
-        return view('screener.buylist_today', [
-            'today'       => $data['today'] ?? ($today ?: date('Y-m-d')),
-            'eod_date'    => $data['eod_date'] ?? null,
-            'expiry_date' => $data['expiry_date'] ?? null,
-            'calendar_ok' => $data['calendar_ok'] ?? null,
-            'capital'     => $data['capital'] ?? $capital,
-            'rows'        => $data['rows'] ?? collect(),
-
-            'picks'       => $reco['picks'] ?? collect(),
-            'note'        => $reco['note'] ?? null,
-        ]);
-    }
-
-    /**
-     * POST /screener/buylist-today/capital
-     */
-    public function setCapital(Request $request)
-    {
-        $cap = $this->toPositiveNumber($request->input('capital'));
-
-        if ($cap !== null) {
-            session(['trade_capital' => $cap]);
-        } else {
-            session()->forget('trade_capital');
-        }
-
-        // redirect balik ke halaman + bawa capital biar terlihat jelas (opsional)
-        return redirect('/screener/buylist-today');
-    }
-
-    private function isValidYmd(string $s): bool
-    {
-        $dt = Carbon::createFromFormat('Y-m-d', $s);
-        return $dt && $dt->format('Y-m-d') === $s;
-    }
-
-    private function toPositiveNumber($raw): ?float
-    {
-        if ($raw === null) return null;
-        $raw = (string) $raw;
-        // input bisa "9.000.000" atau "9000000" atau "9 000 000"
-        $raw = str_replace(['.', ',', ' '], '', $raw);
-        if ($raw === '' || !is_numeric($raw)) return null;
-
-        $v = (float) $raw;
-        return $v > 0 ? $v : null;
-    }
-
     public function buylistUi(Request $request)
     {
         $today = $request->query('today');
@@ -210,5 +118,23 @@ class ScreenerController extends Controller
             'rows'    => $data['rows'] ?? [],
             'reco'    => $reco,
         ]);
+    }
+
+    private function isValidYmd(string $s): bool
+    {
+        $dt = Carbon::createFromFormat('Y-m-d', $s);
+        return $dt && $dt->format('Y-m-d') === $s;
+    }
+
+    private function toPositiveNumber($raw): ?float
+    {
+        if ($raw === null) return null;
+        $raw = (string) $raw;
+        // input bisa "9.000.000" atau "9000000" atau "9 000 000"
+        $raw = str_replace(['.', ',', ' '], '', $raw);
+        if ($raw === '' || !is_numeric($raw)) return null;
+
+        $v = (float) $raw;
+        return $v > 0 ? $v : null;
     }
 }

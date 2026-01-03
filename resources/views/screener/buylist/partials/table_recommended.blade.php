@@ -1,6 +1,6 @@
 <div class="ui-surface">
   <div class="px-4 py-3 border-b border-base-300/60 flex items-center justify-between">
-    <div class="font-semibold">Recommended (picks)</div>
+    <div class="font-semibold">Recommended (Picks)</div>
     <div class="text-xs opacity-70" id="meta-buy">—</div>
   </div>
 

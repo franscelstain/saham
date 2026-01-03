@@ -49,8 +49,13 @@
     <div class="text-3xl font-extrabold mt-1" id="kpi-all">0</div>
   </button>
 
-  <div class="ui-surface p-3">
-    <div class="text-xs opacity-70 font-semibold">Selected</div>
+  <div class="ui-surface p-3 border border-violet-300/70 bg-violet-200/40">
+    <div class="kpi-top">
+      <div class="text-xs opacity-70 font-semibold">Selected</div>
+      <div class="w-9 h-9 rounded-xl grid place-items-center ring-1 ring-violet-300/70 bg-violet-100/70 text-violet-700">
+        <x-icon.grid class="w-5 h-5" />
+      </div>
+    </div>
     <div class="text-sm font-semibold truncate mt-1" id="kpi-selected">—</div>
   </div>
 </div>

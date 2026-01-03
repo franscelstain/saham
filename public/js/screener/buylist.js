@@ -30,6 +30,13 @@ function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present,
 function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
 function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
 function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
+function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
+function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
+function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t["return"] || t["return"](); } finally { if (u) throw o; } } }; }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 (function (_window$__SCREENER__) {
   var endpoint = (_window$__SCREENER__ = window.__SCREENER__) === null || _window$__SCREENER__ === void 0 || (_window$__SCREENER__ = _window$__SCREENER__.endpoints) === null || _window$__SCREENER__ === void 0 ? void 0 : _window$__SCREENER__.buylist;
   var $ = function $(q) {
@@ -73,62 +80,227 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
     var s = String(v);
     return s.replaceAll('_', ' ');
   }
-  function badge(cls, text, title) {
-    var t = title ? " title=\"".concat(String(title).replace(/"/g, '&quot;'), "\"") : '';
-    return "<span class=\"badge ".concat(cls, "\"").concat(t, ">").concat(fmt(text), "</span>");
+  function badge(cls, text) {
+    var title = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+    var raw = (text !== null && text !== void 0 ? text : '—').toString();
+    var disp = raw.replaceAll('_', ' ');
+    var tt = title === null || title === undefined || title === '' ? '' : " title=\"".concat(escapeHtml((title !== null && title !== void 0 ? title : raw).toString().replaceAll('_', ' ')), "\"");
+    return "\n      <span class=\"inline-flex items-center justify-center whitespace-nowrap\n                   px-2.5 py-1 text-xs font-semibold leading-none\n                   rounded-md align-middle ".concat(cls, "\"").concat(tt, ">\n        ").concat(escapeHtml(disp), "\n      </span>\n    ");
+  }
+  function escapeHtml(s) {
+    return (s !== null && s !== void 0 ? s : '').toString().replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", "&#039;");
   }
   function clsStatus(st) {
     var map = {
-      BUY_OK: 'badge-success',
-      BUY_PULLBACK: 'badge-success',
-      WAIT: 'badge-warning',
-      WAIT_ENTRY_WINDOW: 'badge-warning',
-      WAIT_PULLBACK: 'badge-warning',
-      WAIT_REL_VOL: 'badge-warning',
-      WAIT_STRENGTH: 'badge-warning',
-      WAIT_EOD_GUARD: 'badge-warning',
-      WAIT_CALENDAR: 'badge-warning',
-      CAPITAL_TOO_SMALL: 'badge-error',
-      RR_TOO_LOW: 'badge-error',
-      RISK_TOO_WIDE: 'badge-error',
-      NO_INTRADAY: 'badge-error',
-      STALE_INTRADAY: 'badge-error',
-      SKIP_BAD_INTRADAY: 'badge-neutral',
-      SKIP_BREAKDOWN: 'badge-neutral',
-      SKIP_EOD_GUARD: 'badge-neutral',
-      SKIP_FEE_DRAG: 'badge-neutral',
-      SKIP_DAY_FRIDAY: 'badge-neutral',
-      SKIP_DAY_THURSDAY_LATE: 'badge-neutral',
-      LATE_ENTRY: 'badge-ghost',
-      LUNCH_WINDOW: 'badge-ghost',
-      EXPIRED: 'badge-ghost'
+      // BUY = paling yakin (hijau tua)
+      BUY_OK: 'bg-emerald-700 text-white',
+      BUY_PULLBACK: 'bg-emerald-700 text-white',
+      // WAIT = butuh syarat (amber)
+      WAIT: 'bg-amber-500 text-white',
+      WAIT_ENTRY_WINDOW: 'bg-amber-500 text-white',
+      WAIT_PULLBACK: 'bg-amber-500 text-white',
+      WAIT_REL_VOL: 'bg-amber-500 text-white',
+      WAIT_STRENGTH: 'bg-amber-500 text-white',
+      WAIT_EOD_GUARD: 'bg-amber-500 text-white',
+      WAIT_CALENDAR: 'bg-amber-500 text-white',
+      // ERROR / tidak layak (merah)
+      CAPITAL_TOO_SMALL: 'bg-rose-600 text-white',
+      RR_TOO_LOW: 'bg-rose-600 text-white',
+      RISK_TOO_WIDE: 'bg-rose-600 text-white',
+      NO_INTRADAY: 'bg-rose-600 text-white',
+      STALE_INTRADAY: 'bg-rose-600 text-white',
+      // SKIP / neutral (slate)
+      SKIP_BAD_INTRADAY: 'bg-slate-700 text-white',
+      SKIP_BREAKDOWN: 'bg-slate-700 text-white',
+      SKIP_EOD_GUARD: 'bg-slate-700 text-white',
+      SKIP_FEE_DRAG: 'bg-slate-700 text-white',
+      SKIP_DAY_FRIDAY: 'bg-slate-700 text-white',
+      SKIP_DAY_THURSDAY_LATE: 'bg-slate-700 text-white',
+      // ghost/info (abu)
+      LATE_ENTRY: 'bg-gray-600 text-white',
+      LUNCH_WINDOW: 'bg-gray-600 text-white',
+      EXPIRED: 'bg-gray-600 text-white'
     };
-    return map[st] || 'badge-outline';
+    return map[st] || 'bg-slate-500 text-white';
+  }
+  function fmtPrice(v) {
+    var n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString('id-ID', {
+      maximumFractionDigits: 2
+    });
+  }
+
+  // Harga saham IDX: default tanpa desimal, tapi kalau data punya pecahan, tampilkan max 4.
+  function fmtPx(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    var s = String(v);
+    var n = Number(s);
+    if (!Number.isFinite(n)) return '—';
+    var hasFrac = s.includes('.') && !/^\d+\.0+$/.test(s);
+    var maxFrac = hasFrac ? 4 : 0;
+    return n.toLocaleString('id-ID', {
+      maximumFractionDigits: maxFrac
+    });
+  }
+  function fmtInt(v) {
+    var n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    var i = Math.round(n);
+    return i.toLocaleString('id-ID', {
+      maximumFractionDigits: 0
+    });
+  }
+  function fmt2(v) {
+    var n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString('id-ID', {
+      maximumFractionDigits: 2
+    });
+  }
+  function fmtPct(v) {
+    var n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return "".concat(n.toLocaleString('id-ID', {
+      maximumFractionDigits: 2
+    }), "%");
+  }
+  function firstVal(obj, keys) {
+    var _iterator = _createForOfIteratorHelper(keys),
+      _step;
+    try {
+      for (_iterator.s(); !(_step = _iterator.n()).done;) {
+        var k = _step.value;
+        var v = obj === null || obj === void 0 ? void 0 : obj[k];
+        if (v !== null && v !== undefined && v !== '') return v;
+      }
+    } catch (err) {
+      _iterator.e(err);
+    } finally {
+      _iterator.f();
+    }
+    return null;
+  }
+  function resolveOHLC(row) {
+    // Intraday candidates (kalau sudah ada)
+    var o_i = firstVal(row, ['open_price', 'i_open', 'intraday_open']);
+    var h_i = firstVal(row, ['high_price', 'i_high', 'intraday_high']);
+    var l_i = firstVal(row, ['low_price', 'i_low', 'intraday_low']);
+    var c_i = firstVal(row, ['last_price', 'intraday_close', 'i_close']);
+    var intradayOk = (o_i !== null || h_i !== null || l_i !== null) && c_i !== null;
+    if (intradayOk) {
+      return {
+        src: 'Intraday',
+        o: o_i,
+        h: h_i,
+        l: l_i,
+        c: c_i
+      };
+    }
+
+    // Fallback ke EOD
+    var o = firstVal(row, ['open']);
+    var h = firstVal(row, ['high']);
+    var l = firstVal(row, ['low']);
+    var c = firstVal(row, ['close']);
+    return {
+      src: 'EOD',
+      o: o,
+      h: h,
+      l: l,
+      c: c
+    };
+  }
+  function setPanelLogo(logoUrl, ticker) {
+    var img = el('#p-logo-img');
+    var fb = el('#p-logo-fallback');
+    var t = (ticker !== null && ticker !== void 0 ? ticker : '').toString().trim().toUpperCase();
+    if (fb) fb.textContent = t[0] || '?';
+    if (!img || !fb) return;
+    var url = (logoUrl !== null && logoUrl !== void 0 ? logoUrl : '').toString().trim();
+    if (!url) {
+      img.classList.add('hidden');
+      fb.classList.remove('hidden');
+      return;
+    }
+    img.onload = function () {
+      img.classList.remove('hidden');
+      fb.classList.add('hidden');
+    };
+    img.onerror = function () {
+      img.classList.add('hidden');
+      fb.classList.remove('hidden');
+    };
+    img.src = url;
   }
   function clsSignal(s) {
     var map = {
-      'Layak Beli': 'badge-outline badge-success',
-      'Perlu Konfirmasi': 'badge-outline badge-warning',
-      'Hati - Hati': 'badge-outline badge-warning',
-      'Hindari': 'badge-outline badge-error',
-      'False Breakout / Batal': 'badge-outline badge-neutral'
+      // urutan kualitas sinyal (paling kuat -> paling lemah)
+      'Layak Beli': 'bg-emerald-600 text-white',
+      'Perlu Konfirmasi': 'bg-sky-600 text-white',
+      'Hati - Hati': 'bg-amber-500 text-white',
+      'Hindari': 'bg-rose-600 text-white',
+      'False Breakout / Batal': 'bg-slate-600 text-white',
+      'Unknown': 'bg-slate-500 text-white'
     };
-    return map[s] || 'badge-outline';
+    return map[s] || 'bg-slate-500 text-white';
   }
+  ;
   function clsVol(v) {
     var map = {
-      'Strong Burst / Breakout': 'badge-success',
-      'Volume Burst / Accumulation': 'badge-success',
-      'Early Interest': 'badge-info',
-      'Normal': 'badge-neutral',
-      'Quiet': 'badge-neutral',
-      'Quiet/Normal – Volume lemah': 'badge-neutral',
-      'Dormant': 'badge-outline',
-      'Ultra Dry': 'badge-outline',
-      'Climax / Euphoria': 'badge-warning',
-      'Climax / Euphoria – hati-hati': 'badge-warning'
+      // volume momentum: beda tingkat
+      'Strong Burst / Breakout': 'bg-emerald-700 text-white',
+      'Volume Burst / Accumulation': 'bg-emerald-600 text-white',
+      'Early Interest': 'bg-sky-600 text-white',
+      // normal -> lemah
+      'Normal': 'bg-slate-600 text-white',
+      'Quiet': 'bg-slate-500 text-white',
+      'Quiet/Normal – Volume lemah': 'bg-slate-500 text-white',
+      'Dormant': 'bg-slate-400 text-white',
+      'Ultra Dry': 'bg-slate-300 text-slate-900',
+      // euforia
+      'Climax / Euphoria': 'bg-orange-600 text-white',
+      'Climax / Euphoria – hati-hati': 'bg-orange-500 text-white'
     };
-    return map[v] || 'badge-outline';
+    return map[v] || 'bg-slate-500 text-white';
+  }
+  ;
+  function renderNoteWithStatusBadges(note) {
+    var s = (note !== null && note !== void 0 ? note : '').toString();
+    if (!s.trim()) return '';
+    var re = /\b[A-Z][A-Z0-9_]{2,}\b/g;
+    var out = '';
+    var last = 0;
+    var matches = _toConsumableArray(s.matchAll(re));
+    var _iterator2 = _createForOfIteratorHelper(matches),
+      _step2;
+    try {
+      for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
+        var _m$index;
+        var m = _step2.value;
+        var token = m[0];
+        var idx = (_m$index = m.index) !== null && _m$index !== void 0 ? _m$index : 0;
+
+        // teks sebelum token (escape)
+        out += escapeHtml(s.slice(last, idx));
+
+        // token jadi badge (JANGAN di-escape)
+        var cls = clsStatus(token);
+        // kalau token tidak dikenal, tampilkan teks biasa
+        if (cls && cls !== 'badge-outline' && cls !== 'bg-slate-500 text-white') {
+          out += badge(cls, token.replaceAll('_', ' ')); // text display sudah spasi
+        } else {
+          out += escapeHtml(token.replaceAll('_', ' '));
+        }
+        last = idx + token.length;
+      }
+    } catch (err) {
+      _iterator2.e(err);
+    } finally {
+      _iterator2.f();
+    }
+    out += escapeHtml(s.slice(last));
+    return out;
   }
   function isBuy(st) {
     return st === 'BUY_OK' || st === 'BUY_PULLBACK';
@@ -189,14 +361,16 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
           case 3:
             json = _context2.v;
             rows = (json.rows || []).map(function (r) {
-              var _ref2, _ref3, _r$last, _ref4, _r$reason, _r$snapshot_at, _r$last_bar_at, _ref5, _r$rank;
+              var _ref6, _ref7, _r$last, _ref8, _r$reason, _r$snapshot_at, _r$last_bar_at, _ref9, _r$rank, _ref0, _r$signalName, _ref1, _r$volumeLabelName;
               return _objectSpread(_objectSpread({}, r), {}, {
                 ticker: r.ticker || r.ticker_code || r.symbol,
-                last: (_ref2 = (_ref3 = (_r$last = r.last) !== null && _r$last !== void 0 ? _r$last : r.last_price) !== null && _ref3 !== void 0 ? _ref3 : r.close) !== null && _ref2 !== void 0 ? _ref2 : r.price,
-                reason: (_ref4 = (_r$reason = r.reason) !== null && _r$reason !== void 0 ? _r$reason : r.reason_text) !== null && _ref4 !== void 0 ? _ref4 : r.notes,
+                last: (_ref6 = (_ref7 = (_r$last = r.last) !== null && _r$last !== void 0 ? _r$last : r.last_price) !== null && _ref7 !== void 0 ? _ref7 : r.close) !== null && _ref6 !== void 0 ? _ref6 : r.price,
+                reason: (_ref8 = (_r$reason = r.reason) !== null && _r$reason !== void 0 ? _r$reason : r.reason_text) !== null && _ref8 !== void 0 ? _ref8 : r.notes,
                 snapshot_at: (_r$snapshot_at = r.snapshot_at) !== null && _r$snapshot_at !== void 0 ? _r$snapshot_at : r.snapshotAt,
                 last_bar_at: (_r$last_bar_at = r.last_bar_at) !== null && _r$last_bar_at !== void 0 ? _r$last_bar_at : r.lastBarAt,
-                rank: (_ref5 = (_r$rank = r.rank) !== null && _r$rank !== void 0 ? _r$rank : r.rank_score) !== null && _ref5 !== void 0 ? _ref5 : r.rankScore
+                rank: (_ref9 = (_r$rank = r.rank) !== null && _r$rank !== void 0 ? _r$rank : r.rank_score) !== null && _ref9 !== void 0 ? _ref9 : r.rankScore,
+                signalName: (_ref0 = (_r$signalName = r.signalName) !== null && _r$signalName !== void 0 ? _r$signalName : r.signal_name) !== null && _ref0 !== void 0 ? _ref0 : r.signal,
+                volumeLabelName: (_ref1 = (_r$volumeLabelName = r.volumeLabelName) !== null && _r$volumeLabelName !== void 0 ? _r$volumeLabelName : r.volume_label_name) !== null && _ref1 !== void 0 ? _ref1 : r.volume_label
               });
             });
             picks = json.reco && (json.reco.picks || json.reco.rows || json.reco) || [];
@@ -204,14 +378,16 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
             recoRows = [];
             if (Array.isArray(picks) && picks.length && _typeof(picks[0]) === 'object') {
               recoRows = picks.map(function (r) {
-                var _ref6, _ref7, _r$last2, _ref8, _r$reason2, _r$snapshot_at2, _r$last_bar_at2, _ref9, _r$rank2;
+                var _ref10, _ref11, _r$last2, _ref12, _r$reason2, _r$snapshot_at2, _r$last_bar_at2, _ref13, _r$rank2, _ref14, _r$signalName2, _ref15, _r$volumeLabelName2;
                 return _objectSpread(_objectSpread({}, r), {}, {
                   ticker: r.ticker || r.ticker_code || r.symbol,
-                  last: (_ref6 = (_ref7 = (_r$last2 = r.last) !== null && _r$last2 !== void 0 ? _r$last2 : r.last_price) !== null && _ref7 !== void 0 ? _ref7 : r.close) !== null && _ref6 !== void 0 ? _ref6 : r.price,
-                  reason: (_ref8 = (_r$reason2 = r.reason) !== null && _r$reason2 !== void 0 ? _r$reason2 : r.reason_text) !== null && _ref8 !== void 0 ? _ref8 : r.notes,
+                  last: (_ref10 = (_ref11 = (_r$last2 = r.last) !== null && _r$last2 !== void 0 ? _r$last2 : r.last_price) !== null && _ref11 !== void 0 ? _ref11 : r.close) !== null && _ref10 !== void 0 ? _ref10 : r.price,
+                  reason: (_ref12 = (_r$reason2 = r.reason) !== null && _r$reason2 !== void 0 ? _r$reason2 : r.reason_text) !== null && _ref12 !== void 0 ? _ref12 : r.notes,
                   snapshot_at: (_r$snapshot_at2 = r.snapshot_at) !== null && _r$snapshot_at2 !== void 0 ? _r$snapshot_at2 : r.snapshotAt,
                   last_bar_at: (_r$last_bar_at2 = r.last_bar_at) !== null && _r$last_bar_at2 !== void 0 ? _r$last_bar_at2 : r.lastBarAt,
-                  rank: (_ref9 = (_r$rank2 = r.rank) !== null && _r$rank2 !== void 0 ? _r$rank2 : r.rank_score) !== null && _ref9 !== void 0 ? _ref9 : r.rankScore
+                  rank: (_ref13 = (_r$rank2 = r.rank) !== null && _r$rank2 !== void 0 ? _r$rank2 : r.rank_score) !== null && _ref13 !== void 0 ? _ref13 : r.rankScore,
+                  signalName: (_ref14 = (_r$signalName2 = r.signalName) !== null && _r$signalName2 !== void 0 ? _r$signalName2 : r.signal_name) !== null && _ref14 !== void 0 ? _ref14 : r.signal,
+                  volumeLabelName: (_ref15 = (_r$volumeLabelName2 = r.volumeLabelName) !== null && _r$volumeLabelName2 !== void 0 ? _r$volumeLabelName2 : r.volume_label_name) !== null && _ref15 !== void 0 ? _ref15 : r.volume_label
                 });
               });
             } else {
@@ -258,21 +434,26 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
     });
   }
   function renderPanel(row) {
+    var _ref, _row$ticker, _ref2, _row$company_name, _ref3, _ref4, _row$last_price, _firstVal, _firstVal2, _firstVal3;
     state.selected = row || null;
     setText('#kpi-selected', row !== null && row !== void 0 && row.ticker ? row.ticker : '—');
-    setText('#p-ticker', fmt(row === null || row === void 0 ? void 0 : row.ticker));
-    var logo = $('#p-logo');
-    if (logo) {
-      var url = (row === null || row === void 0 ? void 0 : row.logoUrl) || (row === null || row === void 0 ? void 0 : row.logo_url) || (row === null || row === void 0 ? void 0 : row.logo) || (row === null || row === void 0 ? void 0 : row.company_logo) || null;
-      if (url) {
-        logo.src = url;
-        logo.classList.remove('hidden');
-      } else {
-        logo.classList.add('hidden');
-      }
-    }
+    var ticker = (_ref = (_row$ticker = row === null || row === void 0 ? void 0 : row.ticker) !== null && _row$ticker !== void 0 ? _row$ticker : row === null || row === void 0 ? void 0 : row.ticker_code) !== null && _ref !== void 0 ? _ref : '—';
+    var name = (_ref2 = (_row$company_name = row === null || row === void 0 ? void 0 : row.company_name) !== null && _row$company_name !== void 0 ? _row$company_name : row === null || row === void 0 ? void 0 : row.companyName) !== null && _ref2 !== void 0 ? _ref2 : '—';
+
+    // harga saat ini: prioritas intraday last_price, fallback ke last, lalu close (EOD)
+    var priceRaw = (_ref3 = (_ref4 = (_row$last_price = row === null || row === void 0 ? void 0 : row.last_price) !== null && _row$last_price !== void 0 ? _row$last_price : row === null || row === void 0 ? void 0 : row.last) !== null && _ref4 !== void 0 ? _ref4 : row === null || row === void 0 ? void 0 : row.close) !== null && _ref3 !== void 0 ? _ref3 : null;
+    setText('#p-ticker', fmt(ticker));
+    setText('#p-name', fmt(name));
+    setText('#p-price', fmtPx(priceRaw));
+    var url = (row === null || row === void 0 ? void 0 : row.logoUrl) || (row === null || row === void 0 ? void 0 : row.logo_url) || (row === null || row === void 0 ? void 0 : row.logo) || (row === null || row === void 0 ? void 0 : row.company_logo) || null;
+    setPanelLogo(url, ticker);
+    var ohlc = resolveOHLC(row);
+    setText('#p-ohlc-src', ohlc.src ? "(".concat(ohlc.src, ")") : '—');
+    setText('#p-o', fmtPx(ohlc.o));
+    setText('#p-h', fmtPx(ohlc.h));
+    setText('#p-l', fmtPx(ohlc.l));
+    setText('#p-c', fmtPx(ohlc.c));
     setHtml('#p-badges', badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), pretty(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status) + badge(clsSignal(row === null || row === void 0 ? void 0 : row.signalName), pretty(row === null || row === void 0 ? void 0 : row.signalName), row === null || row === void 0 ? void 0 : row.signalName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), pretty(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName));
-    setText('#p-last', fmt(row === null || row === void 0 ? void 0 : row.last));
     setText('#p-rank', fmt(row === null || row === void 0 ? void 0 : row.rank));
     setText('#p-entry', fmt(row === null || row === void 0 ? void 0 : row.entry));
     setText('#p-rr', fmt(row === null || row === void 0 ? void 0 : row.rr));
@@ -282,12 +463,36 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
     setText('#p-snapshot', fmt(row === null || row === void 0 ? void 0 : row.snapshot_at));
     setText('#p-lastbar', fmt(row === null || row === void 0 ? void 0 : row.last_bar_at));
     setText('#p-json', row ? JSON.stringify(row, null, 2) : '—');
+
+    // Market
+    setText('#p-relvol', fmt2(firstVal(row, ['relvol_today', 'relvol', 'vol_ratio'])));
+    setText('#p-pos', fmtPct(firstVal(row, ['pos_in_range', 'pos_pct', 'pos'])));
+    setText('#p-eodlow', fmtInt(firstVal(row, ['eod_low'])));
+    setText('#p-priceok', String((_firstVal = firstVal(row, ['price_ok'])) !== null && _firstVal !== void 0 ? _firstVal : '—').replaceAll('_', ' '));
+
+    // Plan
+    setText('#p-entry', fmtInt(firstVal(row, ['entry'])));
+    setText('#p-steps', String((_firstVal2 = firstVal(row, ['buy_steps', 'steps', 'buySteps'])) !== null && _firstVal2 !== void 0 ? _firstVal2 : '—'));
+    setText('#p-sl', fmtInt(firstVal(row, ['sl'])));
+    setText('#p-tp1', fmtInt(firstVal(row, ['tp1', 'tp_1'])));
+    setText('#p-tp2', fmtInt(firstVal(row, ['tp2', 'tp_2', 'tp2_price'])));
+    setText('#p-be', fmtInt(firstVal(row, ['be', 'break_even', 'breakEven'])));
+    setText('#p-out', fmtInt(firstVal(row, ['out', 'out_buy_fee', 'out_buyfee'])));
+    setText('#p-lots', String((_firstVal3 = firstVal(row, ['lots'])) !== null && _firstVal3 !== void 0 ? _firstVal3 : '—'));
+    setText('#p-cost', fmtInt(firstVal(row, ['est_cost', 'estCost', 'cost_est'])));
+
+    // Risk/Result
+    setText('#p-rr', fmt2(firstVal(row, ['rr'])));
+    setText('#p-risk', fmtPct(firstVal(row, ['risk_pct', 'risk_percent', 'risk'])));
+    setText('#p-profit2', fmtInt(firstVal(row, ['profit_tp2_net', 'profit2_net', 'profit_tp2'])));
+    setText('#p-rr2net', fmt2(firstVal(row, ['rr_tp2_net', 'rr2_net'])));
+    setText('#p-rr2', fmt2(firstVal(row, ['rr_tp2', 'rr2'])));
     renderDrawer(row);
   }
   function renderDrawer(row) {
     var _row$reason;
     // Mobile drawer uses d-* ids; kalau drawer markup tidak ada / tidak lengkap, jangan crash
-    var required = ['#d-ticker', '#d-badges', '#d-last', '#d-rank', '#d-entry', '#d-rr', '#d-sl', '#d-tp', '#d-reason', '#d-json'];
+    var required = ['#d-ticker', '#d-badges', '#d-rank', '#d-entry', '#d-rr', '#d-sl', '#d-tp', '#d-reason', '#d-json'];
     for (var _i = 0, _required = required; _i < _required.length; _i++) {
       var q = _required[_i];
       if (!el(q)) return;
@@ -314,112 +519,86 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
   var tblBuy = null;
   var tblAll = null;
   function makeTable(el, height) {
-    return new Tabulator(el, {
+    var t = new Tabulator(el, {
       layout: 'fitColumns',
       height: height,
-      selectable: 1,
+      selectableRows: false,
       rowHeight: 44,
       placeholder: 'No data',
+      columnDefaults: {
+        headerSort: false,
+        resizable: false
+      },
       columns: [{
         title: 'Ticker',
         field: 'ticker',
-        width: 150,
+        width: 160,
         formatter: function formatter(c) {
           var _c$getValue, _c$getRow$getData$log, _c$getRow$getData;
           var t = ((_c$getValue = c.getValue()) !== null && _c$getValue !== void 0 ? _c$getValue : '').toString();
-          var logo = ((_c$getRow$getData$log = (_c$getRow$getData = c.getRow().getData()) === null || _c$getRow$getData === void 0 ? void 0 : _c$getRow$getData.logoUrl) !== null && _c$getRow$getData$log !== void 0 ? _c$getRow$getData$log : '').toString(); // siap kalau nanti ada
+          var logo = ((_c$getRow$getData$log = (_c$getRow$getData = c.getRow().getData()) === null || _c$getRow$getData === void 0 ? void 0 : _c$getRow$getData.logoUrl) !== null && _c$getRow$getData$log !== void 0 ? _c$getRow$getData$log : '').toString();
           var img = logo ? "<img src=\"".concat(logo, "\" class=\"w-6 h-6 rounded-full\" onerror=\"this.style.display='none'\">") : "<div class=\"w-6 h-6 rounded-full bg-primary/10 text-primary grid place-items-center text-xs font-bold\">".concat(t.slice(0, 1) || '?', "</div>");
           return "<div class=\"flex items-center gap-2\">".concat(img, "<span class=\"font-semibold\">").concat(t, "</span></div>");
         }
       }, {
         title: 'Status',
         field: 'status',
-        width: 150,
+        width: 190,
         formatter: function formatter(c) {
           return badge(clsStatus(c.getValue()), c.getValue(), c.getValue());
         }
       }, {
         title: 'Signal',
         field: 'signalName',
-        width: 170,
+        minWidth: 170,
         formatter: function formatter(c) {
           return badge(clsSignal(c.getValue()), c.getValue(), c.getValue());
         }
-      }, {
+      },
+      // Vol yang menyerap sisa lebar, jadi nggak ada “kolom kosong”
+      {
         title: 'Vol',
         field: 'volumeLabelName',
-        width: 150,
+        minWidth: 220,
+        widthGrow: 1,
         formatter: function formatter(c) {
           return badge(clsVol(c.getValue()), c.getValue(), c.getValue());
         }
       }, {
-        title: 'Last',
-        field: 'last',
-        hozAlign: 'right'
-      }, {
-        title: 'Entry',
-        field: 'entry',
-        hozAlign: 'right'
-      }, {
-        title: 'SL',
-        field: 'sl',
-        hozAlign: 'right'
-      }, {
-        title: 'TP',
-        field: 'tp',
-        hozAlign: 'right'
-      }, {
-        title: 'RR',
-        field: 'rr',
-        hozAlign: 'right'
-      }, {
-        title: 'Reason',
-        field: 'reason',
-        widthGrow: 2,
+        title: 'Rank',
+        field: 'rank',
+        width: 90,
+        hozAlign: 'right',
         formatter: function formatter(c) {
-          var _c$getValue2;
-          return ((_c$getValue2 = c.getValue()) !== null && _c$getValue2 !== void 0 ? _c$getValue2 : '').toString().slice(0, 90);
+          var v = c.getValue();
+          return v === null || v === undefined || v === '' ? '—' : String(v);
         }
       }],
-      // Fallback: kalau rowClick/cellClick tidak kepanggil karena overlay/formatter,
-      // update panel lewat event selection (pasti kepanggil saat row ter-select).
-      rowSelected: function rowSelected(row) {
-        try {
-          renderPanel(row.getData());
-        } catch (e) {}
-      },
-      rowSelectionChanged: function rowSelectionChanged(data, rows) {
-        if (!rows || !rows.length) return;
-        try {
-          renderPanel(rows[0].getData());
-        } catch (e) {}
-      },
-      rowClick: function rowClick(_, row) {
-        // Tabulator can throw if selectable is not enabled. Don't let it block panel render.
-        try {
-          row.select();
-        } catch (e) {}
-        renderPanel(row.getData());
-        if (window.innerWidth < 1024) openDrawer();
-      },
-      rowTap: function rowTap(_, row) {
-        // touch / klik yang kadang miss
-        try {
-          row.select();
-        } catch (e) {}
-        renderPanel(row.getData());
-        if (window.innerWidth < 1024) openDrawer();
-      },
-      cellClick: function cellClick(_, cell) {
-        // klik badge/sel tetap kebaca
-        var row = cell.getRow();
-        try {
-          row.select();
-        } catch (e) {}
-        renderPanel(row.getData());
+      rowSelectionChanged: function rowSelectionChanged(_, rows) {
+        if (!(rows !== null && rows !== void 0 && rows.length)) return;
+        renderPanel(rows[0].getData());
         if (window.innerWidth < 1024) openDrawer();
       }
     });
+
+    // HARD BIND: ini yang bikin klik selalu update panel kanan
+    t.on("rowClick", function (e, row) {
+      renderPanel(row.getData());
+      if (window.innerWidth < 1024) openDrawer();
+    });
+    t.on("cellClick", function (e, cell) {
+      var row = cell.getRow();
+      renderPanel(row.getData());
+      if (window.innerWidth < 1024) openDrawer();
+    });
+
+    // optional: kalau mau tetap dukung select-based update
+    t.on("rowSelected", function (row) {
+      try {
+        renderPanel(row.getData());
+      } catch (_) {}
+    });
+    return t;
   }
   function selectFirstIfNeeded() {
     var _state$selected;
@@ -475,12 +654,12 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
             setKpiCounts(rows);
             paintKpiActive();
             noteEl = $('#reco-note');
-            if (note && String(note).trim()) {
+            if (noteEl && note && String(note).trim()) {
               noteEl.style.display = '';
-              noteEl.textContent = String(note);
-            } else {
+              noteEl.innerHTML = renderNoteWithStatusBadges(note);
+            } else if (noteEl) {
               noteEl.style.display = 'none';
-              noteEl.textContent = '';
+              noteEl.innerHTML = '';
             }
             applyTables();
             selectFirstIfNeeded();

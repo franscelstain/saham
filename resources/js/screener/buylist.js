@@ -2,20 +2,20 @@
   const endpoint = window.__SCREENER__?.endpoints?.buylist;
   const $ = (q) => document.querySelector(q);
 
-// --- SAFE DOM helpers (tahan banting) ---
-function el(q){ try { return document.querySelector(q); } catch(_) { return null; } }
-function setText(q, v){
-  const n = el(q);
-  if (!n) return false;
-  n.textContent = (v === null || v === undefined) ? '' : String(v);
-  return true;
-}
-function setHtml(q, v){
-  const n = el(q);
-  if (!n) return false;
-  n.innerHTML = (v === null || v === undefined) ? '' : String(v);
-  return true;
-}
+  // --- SAFE DOM helpers (tahan banting) ---
+  function el(q){ try { return document.querySelector(q); } catch(_) { return null; } }
+  function setText(q, v){
+    const n = el(q);
+    if (!n) return false;
+    n.textContent = (v === null || v === undefined) ? '' : String(v);
+    return true;
+  }
+  function setHtml(q, v){
+    const n = el(q);
+    if (!n) return false;
+    n.innerHTML = (v === null || v === undefined) ? '' : String(v);
+    return true;
+  }
 
   const state = {
     rows: [],
@@ -37,66 +37,219 @@ function setHtml(q, v){
     return s.replaceAll('_', ' ');
   }
 
+  function badge(cls, text, title = null) {
+    const raw = (text ?? '—').toString();
+    const disp = raw.replaceAll('_', ' ');
+    const tt = (title === null || title === undefined || title === '') ? '' :
+      ` title="${escapeHtml((title ?? raw).toString().replaceAll('_',' '))}"`;
 
-  function badge(cls, text, title) {
-    const t = title ? ` title="${String(title).replace(/"/g, '&quot;')}"` : '';
-    return `<span class="badge ${cls}"${t}>${fmt(text)}</span>`;
+    return `
+      <span class="inline-flex items-center justify-center whitespace-nowrap
+                   px-2.5 py-1 text-xs font-semibold leading-none
+                   rounded-md align-middle ${cls}"${tt}>
+        ${escapeHtml(disp)}
+      </span>
+    `;
+  }
+
+  function escapeHtml(s) {
+    return (s ?? '').toString()
+      .replaceAll('&','&amp;').replaceAll('<','&lt;')
+      .replaceAll('>','&gt;').replaceAll('"','&quot;')
+      .replaceAll("'","&#039;");
   }
 
   function clsStatus(st) {
     const map = {
-      BUY_OK: 'badge-success',
-      BUY_PULLBACK: 'badge-success',
-      WAIT: 'badge-warning',
-      WAIT_ENTRY_WINDOW: 'badge-warning',
-      WAIT_PULLBACK: 'badge-warning',
-      WAIT_REL_VOL: 'badge-warning',
-      WAIT_STRENGTH: 'badge-warning',
-      WAIT_EOD_GUARD: 'badge-warning',
-      WAIT_CALENDAR: 'badge-warning',
-      CAPITAL_TOO_SMALL: 'badge-error',
-      RR_TOO_LOW: 'badge-error',
-      RISK_TOO_WIDE: 'badge-error',
-      NO_INTRADAY: 'badge-error',
-      STALE_INTRADAY: 'badge-error',
-      SKIP_BAD_INTRADAY: 'badge-neutral',
-      SKIP_BREAKDOWN: 'badge-neutral',
-      SKIP_EOD_GUARD: 'badge-neutral',
-      SKIP_FEE_DRAG: 'badge-neutral',
-      SKIP_DAY_FRIDAY: 'badge-neutral',
-      SKIP_DAY_THURSDAY_LATE: 'badge-neutral',
-      LATE_ENTRY: 'badge-ghost',
-      LUNCH_WINDOW: 'badge-ghost',
-      EXPIRED: 'badge-ghost',
+      // BUY = paling yakin (hijau tua)
+      BUY_OK: 'bg-emerald-700 text-white',
+      BUY_PULLBACK: 'bg-emerald-700 text-white',
+
+      // WAIT = butuh syarat (amber)
+      WAIT: 'bg-amber-500 text-white',
+      WAIT_ENTRY_WINDOW: 'bg-amber-500 text-white',
+      WAIT_PULLBACK: 'bg-amber-500 text-white',
+      WAIT_REL_VOL: 'bg-amber-500 text-white',
+      WAIT_STRENGTH: 'bg-amber-500 text-white',
+      WAIT_EOD_GUARD: 'bg-amber-500 text-white',
+      WAIT_CALENDAR: 'bg-amber-500 text-white',
+
+      // ERROR / tidak layak (merah)
+      CAPITAL_TOO_SMALL: 'bg-rose-600 text-white',
+      RR_TOO_LOW: 'bg-rose-600 text-white',
+      RISK_TOO_WIDE: 'bg-rose-600 text-white',
+      NO_INTRADAY: 'bg-rose-600 text-white',
+      STALE_INTRADAY: 'bg-rose-600 text-white',
+
+      // SKIP / neutral (slate)
+      SKIP_BAD_INTRADAY: 'bg-slate-700 text-white',
+      SKIP_BREAKDOWN: 'bg-slate-700 text-white',
+      SKIP_EOD_GUARD: 'bg-slate-700 text-white',
+      SKIP_FEE_DRAG: 'bg-slate-700 text-white',
+      SKIP_DAY_FRIDAY: 'bg-slate-700 text-white',
+      SKIP_DAY_THURSDAY_LATE: 'bg-slate-700 text-white',
+
+      // ghost/info (abu)
+      LATE_ENTRY: 'bg-gray-600 text-white',
+      LUNCH_WINDOW: 'bg-gray-600 text-white',
+      EXPIRED: 'bg-gray-600 text-white',
     };
-    return map[st] || 'badge-outline';
+
+    return map[st] || 'bg-slate-500 text-white';
+  }
+
+  function fmtPrice(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+  }
+
+  // Harga saham IDX: default tanpa desimal, tapi kalau data punya pecahan, tampilkan max 4.
+  function fmtPx(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    const s = String(v);
+    const n = Number(s);
+    if (!Number.isFinite(n)) return '—';
+    const hasFrac = s.includes('.') && !/^\d+\.0+$/.test(s);
+    const maxFrac = hasFrac ? 4 : 0;
+    return n.toLocaleString('id-ID', { maximumFractionDigits: maxFrac });
+  }
+
+
+  function fmtInt(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    const i = Math.round(n);
+    return i.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+  }
+
+  function fmt2(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+  }
+
+  function fmtPct(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return `${n.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`;
+  }
+
+  function firstVal(obj, keys) {
+    for (const k of keys) {
+      const v = obj?.[k];
+      if (v !== null && v !== undefined && v !== '') return v;
+    }
+    return null;
+  }
+
+  function resolveOHLC(row) {
+    // Intraday candidates (kalau sudah ada)
+    const o_i = firstVal(row, ['open_price', 'i_open', 'intraday_open']);
+    const h_i = firstVal(row, ['high_price', 'i_high', 'intraday_high']);
+    const l_i = firstVal(row, ['low_price', 'i_low', 'intraday_low']);
+    const c_i = firstVal(row, ['last_price', 'intraday_close', 'i_close']);
+
+    const intradayOk = (o_i !== null || h_i !== null || l_i !== null) && (c_i !== null);
+
+    if (intradayOk) {
+      return { src: 'Intraday', o: o_i, h: h_i, l: l_i, c: c_i };
+    }
+
+    // Fallback ke EOD
+    const o = firstVal(row, ['open']);
+    const h = firstVal(row, ['high']);
+    const l = firstVal(row, ['low']);
+    const c = firstVal(row, ['close']);
+    return { src: 'EOD', o, h, l, c };
+  }
+
+  function setPanelLogo(logoUrl, ticker) {
+    const img = el('#p-logo-img');
+    const fb  = el('#p-logo-fallback');
+
+    const t = (ticker ?? '').toString().trim().toUpperCase();
+    if (fb) fb.textContent = (t[0] || '?');
+
+    if (!img || !fb) return;
+
+    const url = (logoUrl ?? '').toString().trim();
+    if (!url) {
+      img.classList.add('hidden');
+      fb.classList.remove('hidden');
+      return;
+    }
+
+    img.onload = () => { img.classList.remove('hidden'); fb.classList.add('hidden'); };
+    img.onerror = () => { img.classList.add('hidden'); fb.classList.remove('hidden'); };
+    img.src = url;
   }
 
   function clsSignal(s) {
     const map = {
-      'Layak Beli': 'badge-outline badge-success',
-      'Perlu Konfirmasi': 'badge-outline badge-warning',
-      'Hati - Hati': 'badge-outline badge-warning',
-      'Hindari': 'badge-outline badge-error',
-      'False Breakout / Batal': 'badge-outline badge-neutral',
+      // urutan kualitas sinyal (paling kuat -> paling lemah)
+      'Layak Beli': 'bg-emerald-600 text-white',
+      'Perlu Konfirmasi': 'bg-sky-600 text-white',
+      'Hati - Hati': 'bg-amber-500 text-white',
+      'Hindari': 'bg-rose-600 text-white',
+      'False Breakout / Batal': 'bg-slate-600 text-white',
+      'Unknown': 'bg-slate-500 text-white',
     };
-    return map[s] || 'badge-outline';
-  }
+    return map[s] || 'bg-slate-500 text-white';
+  };
 
   function clsVol(v) {
     const map = {
-      'Strong Burst / Breakout': 'badge-success',
-      'Volume Burst / Accumulation': 'badge-success',
-      'Early Interest': 'badge-info',
-      'Normal': 'badge-neutral',
-      'Quiet': 'badge-neutral',
-      'Quiet/Normal – Volume lemah': 'badge-neutral',
-      'Dormant': 'badge-outline',
-      'Ultra Dry': 'badge-outline',
-      'Climax / Euphoria': 'badge-warning',
-      'Climax / Euphoria – hati-hati': 'badge-warning',
+      // volume momentum: beda tingkat
+      'Strong Burst / Breakout': 'bg-emerald-700 text-white',
+      'Volume Burst / Accumulation': 'bg-emerald-600 text-white',
+      'Early Interest': 'bg-sky-600 text-white',
+
+      // normal -> lemah
+      'Normal': 'bg-slate-600 text-white',
+      'Quiet': 'bg-slate-500 text-white',
+      'Quiet/Normal – Volume lemah': 'bg-slate-500 text-white',
+      'Dormant': 'bg-slate-400 text-white',
+      'Ultra Dry': 'bg-slate-300 text-slate-900',
+
+      // euforia
+      'Climax / Euphoria': 'bg-orange-600 text-white',
+      'Climax / Euphoria – hati-hati': 'bg-orange-500 text-white',
     };
-    return map[v] || 'badge-outline';
+    return map[v] || 'bg-slate-500 text-white';
+  };
+
+  function renderNoteWithStatusBadges(note) {
+    const s = (note ?? '').toString();
+    if (!s.trim()) return '';
+
+    const re = /\b[A-Z][A-Z0-9_]{2,}\b/g;
+
+    let out = '';
+    let last = 0;
+    const matches = [...s.matchAll(re)];
+
+    for (const m of matches) {
+      const token = m[0];
+      const idx = m.index ?? 0;
+
+      // teks sebelum token (escape)
+      out += escapeHtml(s.slice(last, idx));
+
+      // token jadi badge (JANGAN di-escape)
+      const cls = clsStatus(token);
+      // kalau token tidak dikenal, tampilkan teks biasa
+      if (cls && cls !== 'badge-outline' && cls !== 'bg-slate-500 text-white') {
+        out += badge(cls, token.replaceAll('_', ' ')); // text display sudah spasi
+      } else {
+        out += escapeHtml(token.replaceAll('_', ' '));
+      }
+
+      last = idx + token.length;
+    }
+
+    out += escapeHtml(s.slice(last));
+    return out;
   }
 
   function isBuy(st) {
@@ -145,6 +298,8 @@ function setHtml(q, v){
       snapshot_at: r.snapshot_at ?? r.snapshotAt,
       last_bar_at: r.last_bar_at ?? r.lastBarAt,
       rank: r.rank ?? r.rank_score ?? r.rankScore,
+      signalName: r.signalName ?? r.signal_name ?? r.signal,
+      volumeLabelName: r.volumeLabelName ?? r.volume_label_name ?? r.volume_label
     }));
 
     const picks = (json.reco && (json.reco.picks || json.reco.rows || json.reco)) || [];
@@ -160,6 +315,8 @@ function setHtml(q, v){
         snapshot_at: r.snapshot_at ?? r.snapshotAt,
         last_bar_at: r.last_bar_at ?? r.lastBarAt,
         rank: r.rank ?? r.rank_score ?? r.rankScore,
+        signalName: r.signalName ?? r.signal_name ?? r.signal,
+        volumeLabelName: r.volumeLabelName ?? r.volume_label_name ?? r.volume_label
       }));
     } else {
       const set = new Set((picks || []).map(String));
@@ -194,20 +351,32 @@ function setHtml(q, v){
     state.selected = row || null;
     setText('#kpi-selected', row?.ticker ? row.ticker : '—');
 
-    setText('#p-ticker', fmt(row?.ticker));
-    const logo = $('#p-logo');
-    if (logo) {
-      const url = row?.logoUrl || row?.logo_url || row?.logo || row?.company_logo || null;
-      if (url) { logo.src = url; logo.classList.remove('hidden'); }
-      else { logo.classList.add('hidden'); }
-    }
+    const ticker = row?.ticker ?? row?.ticker_code ?? '—';
+    const name   = row?.company_name ?? row?.companyName ?? '—';
+
+    // harga saat ini: prioritas intraday last_price, fallback ke last, lalu close (EOD)
+    const priceRaw = row?.last_price ?? row?.last ?? row?.close ?? null;
+
+    setText('#p-ticker', fmt(ticker));
+    setText('#p-name', fmt(name));
+    setText('#p-price', fmtPx(priceRaw));
+
+    const url = row?.logoUrl || row?.logo_url || row?.logo || row?.company_logo || null;
+    setPanelLogo(url, ticker);
+
+    const ohlc = resolveOHLC(row);
+    setText('#p-ohlc-src', ohlc.src ? `(${ohlc.src})` : '—');
+    setText('#p-o', fmtPx(ohlc.o));
+    setText('#p-h', fmtPx(ohlc.h));
+    setText('#p-l', fmtPx(ohlc.l));
+    setText('#p-c', fmtPx(ohlc.c));
+
     setHtml('#p-badges',
       badge(clsStatus(row?.status), pretty(row?.status), row?.status) +
       badge(clsSignal(row?.signalName), pretty(row?.signalName), row?.signalName) +
       badge(clsVol(row?.volumeLabelName), pretty(row?.volumeLabelName), row?.volumeLabelName) 
     );
 
-    setText('#p-last', fmt(row?.last));
     setText('#p-rank', fmt(row?.rank));
     setText('#p-entry', fmt(row?.entry));
     setText('#p-rr', fmt(row?.rr));
@@ -219,13 +388,37 @@ function setHtml(q, v){
     setText('#p-lastbar', fmt(row?.last_bar_at));
 
     setText('#p-json', row ? JSON.stringify(row, null, 2) : '—');
+
+    // Market
+    setText('#p-relvol', fmt2(firstVal(row, ['relvol_today','relvol','vol_ratio'])));
+    setText('#p-pos', fmtPct(firstVal(row, ['pos_in_range','pos_pct','pos'])));
+    setText('#p-eodlow', fmtInt(firstVal(row, ['eod_low'])));
+    setText('#p-priceok', String(firstVal(row, ['price_ok']) ?? '—').replaceAll('_',' '));
+
+    // Plan
+    setText('#p-entry', fmtInt(firstVal(row, ['entry'])));
+    setText('#p-steps', String(firstVal(row, ['buy_steps','steps','buySteps']) ?? '—'));
+    setText('#p-sl', fmtInt(firstVal(row, ['sl'])));
+    setText('#p-tp1', fmtInt(firstVal(row, ['tp1','tp_1'])));
+    setText('#p-tp2', fmtInt(firstVal(row, ['tp2','tp_2','tp2_price'])));
+    setText('#p-be', fmtInt(firstVal(row, ['be','break_even','breakEven'])));
+    setText('#p-out', fmtInt(firstVal(row, ['out','out_buy_fee','out_buyfee'])));
+    setText('#p-lots', String(firstVal(row, ['lots']) ?? '—'));
+    setText('#p-cost', fmtInt(firstVal(row, ['est_cost','estCost','cost_est'])));
+    
+    // Risk/Result
+    setText('#p-rr', fmt2(firstVal(row, ['rr'])));
+    setText('#p-risk', fmtPct(firstVal(row, ['risk_pct','risk_percent','risk'])));
+    setText('#p-profit2', fmtInt(firstVal(row, ['profit_tp2_net','profit2_net','profit_tp2'])));
+    setText('#p-rr2net', fmt2(firstVal(row, ['rr_tp2_net','rr2_net'])));
+    setText('#p-rr2', fmt2(firstVal(row, ['rr_tp2','rr2'])));
     renderDrawer(row);
   }
 
   
   function renderDrawer(row) {
     // Mobile drawer uses d-* ids; kalau drawer markup tidak ada / tidak lengkap, jangan crash
-    const required = ['#d-ticker','#d-badges','#d-last','#d-rank','#d-entry','#d-rr','#d-sl','#d-tp','#d-reason','#d-json'];
+    const required = ['#d-ticker','#d-badges','#d-rank','#d-entry','#d-rr','#d-sl','#d-tp','#d-reason','#d-json'];
     for (const q of required) { if (!el(q)) return; }
 
     setText('#d-ticker', fmt(row?.ticker));
@@ -257,72 +450,76 @@ function openDrawer() {
   let tblAll = null;
 
   function makeTable(el, height) {
-    return new Tabulator(el, {
+    const t = new Tabulator(el, {
       layout: 'fitColumns',
       height,
-      selectable: 1,
+      selectableRows: false,
       rowHeight: 44,
       placeholder: 'No data',
+      columnDefaults: { headerSort: false, resizable: false },
       columns: [
-        {
-          title: 'Ticker', field: 'ticker', width: 150,
-          formatter: (c) => {
-            const t = (c.getValue() ?? '').toString();
-            const logo = (c.getRow().getData()?.logoUrl ?? '').toString(); // siap kalau nanti ada
-            const img = logo
-              ? `<img src="${logo}" class="w-6 h-6 rounded-full" onerror="this.style.display='none'">`
-              : `<div class="w-6 h-6 rounded-full bg-primary/10 text-primary grid place-items-center text-xs font-bold">${t.slice(0,1) || '?'}</div>`;
-            return `<div class="flex items-center gap-2">${img}<span class="font-semibold">${t}</span></div>`;
-          },
+      {
+        title: 'Ticker', field: 'ticker', width: 160,
+        formatter: (c) => {
+          const t = (c.getValue() ?? '').toString();
+          const logo = (c.getRow().getData()?.logoUrl ?? '').toString();
+          const img = logo
+            ? `<img src="${logo}" class="w-6 h-6 rounded-full" onerror="this.style.display='none'">`
+            : `<div class="w-6 h-6 rounded-full bg-primary/10 text-primary grid place-items-center text-xs font-bold">${(t.slice(0,1) || '?')}</div>`;
+          return `<div class="flex items-center gap-2">${img}<span class="font-semibold">${t}</span></div>`;
         },
-        {
-          title: 'Status', field: 'status', width: 150,
-          formatter: (c) => badge(clsStatus(c.getValue()), c.getValue(), c.getValue()),
-        },
-        {
-          title: 'Signal', field: 'signalName', width: 170,
-          formatter: (c) => badge(clsSignal(c.getValue()), c.getValue(), c.getValue()),
-        },
-        {
-          title: 'Vol', field: 'volumeLabelName', width: 150,
-          formatter: (c) => badge(clsVol(c.getValue()), c.getValue(), c.getValue()),
-        },
-        { title: 'Last', field: 'last', hozAlign: 'right' },
-        { title: 'Entry', field: 'entry', hozAlign: 'right' },
-        { title: 'SL', field: 'sl', hozAlign: 'right' },
-        { title: 'TP', field: 'tp', hozAlign: 'right' },
-        { title: 'RR', field: 'rr', hozAlign: 'right' },
-        {
-          title: 'Reason', field: 'reason', widthGrow: 2,
-          formatter: (c) => (c.getValue() ?? '').toString().slice(0, 90),
-        },
-      ],
-      // Fallback: kalau rowClick/cellClick tidak kepanggil karena overlay/formatter,
-      // update panel lewat event selection (pasti kepanggil saat row ter-select).
-      rowSelected: (row) => { try { renderPanel(row.getData()); } catch (e) {} },
-      rowSelectionChanged: (data, rows) => {
-        if (!rows || !rows.length) return;
-        try { renderPanel(rows[0].getData()); } catch (e) {}
       },
 
-      rowClick: (_, row) => {
-        // Tabulator can throw if selectable is not enabled. Don't let it block panel render.
-        try { row.select(); } catch (e) {}
-        renderPanel(row.getData());
-        if (window.innerWidth < 1024) openDrawer();
+      {
+        title: 'Status', field: 'status', width: 190,
+        formatter: (c) => badge(clsStatus(c.getValue()), c.getValue(), c.getValue()),
       },
-      rowTap: (_, row) => { // touch / klik yang kadang miss
-        try { row.select(); } catch (e) {}
-        renderPanel(row.getData());
-        if (window.innerWidth < 1024) openDrawer();
+
+      {
+        title: 'Signal', field: 'signalName', minWidth: 170,
+        formatter: (c) => badge(clsSignal(c.getValue()), c.getValue(), c.getValue()),
       },
-      cellClick: (_, cell) => { // klik badge/sel tetap kebaca
-        const row = cell.getRow();
-        try { row.select(); } catch (e) {}
-        renderPanel(row.getData());
+
+      // Vol yang menyerap sisa lebar, jadi nggak ada “kolom kosong”
+      {
+        title: 'Vol', field: 'volumeLabelName', minWidth: 220, widthGrow: 1,
+        formatter: (c) => badge(clsVol(c.getValue()), c.getValue(), c.getValue()),
+      },
+
+      {
+        title: 'Rank', field: 'rank', width: 90, hozAlign: 'right',
+        formatter: (c) => {
+          const v = c.getValue();
+          return (v === null || v === undefined || v === '') ? '—' : String(v);
+        },
+      },
+    ],
+
+      rowSelectionChanged: (_, rows) => {
+        if (!rows?.length) return;
+        renderPanel(rows[0].getData());
         if (window.innerWidth < 1024) openDrawer();
       },
     });
+
+    // HARD BIND: ini yang bikin klik selalu update panel kanan
+    t.on("rowClick", function(e, row){
+      renderPanel(row.getData());
+      if (window.innerWidth < 1024) openDrawer();
+    });
+
+    t.on("cellClick", function(e, cell){
+      const row = cell.getRow();
+      renderPanel(row.getData());
+      if (window.innerWidth < 1024) openDrawer();
+    });
+
+    // optional: kalau mau tetap dukung select-based update
+    t.on("rowSelected", function(row){
+      try { renderPanel(row.getData()); } catch(_) {}
+    });
+
+    return t;
   }
 
   function selectFirstIfNeeded() {
@@ -375,12 +572,12 @@ function openDrawer() {
     paintKpiActive();
 
     const noteEl = $('#reco-note');
-    if (note && String(note).trim()) {
+    if (noteEl && note && String(note).trim()) {
       noteEl.style.display = '';
-      noteEl.textContent = String(note);
-    } else {
+      noteEl.innerHTML = renderNoteWithStatusBadges(note);
+    } else if (noteEl) {
       noteEl.style.display = 'none';
-      noteEl.textContent = '';
+      noteEl.innerHTML = '';
     }
 
     applyTables();

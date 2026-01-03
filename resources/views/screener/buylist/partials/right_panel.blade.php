@@ -6,31 +6,87 @@
     </div>
 
     <div class="mt-2 flex items-center gap-3">
-      <img id="p-logo" class="hidden w-10 h-10 rounded-full border border-base-300 shadow-sm object-cover" alt="logo">
-      <div class="text-2xl font-extrabold tracking-wide" id="p-ticker">—</div>
+      <!-- Logo (fallback huruf pertama kalau logo kosong/error) -->
+      <div class="w-12 h-12 rounded-full overflow-hidden ring-1 ring-base-300 bg-base-200 grid place-items-center">
+        <div id="p-logo-fallback" class="w-full h-full grid place-items-center bg-primary/10 text-primary font-extrabold">
+          ?
+        </div>
+        <img id="p-logo-img" class="w-full h-full object-cover hidden" alt="logo">
+      </div>
+
+      <div class="min-w-0">
+        <div class="text-2xl font-extrabold tracking-wide leading-tight" id="p-ticker">—</div>
+        <div class="text-sm opacity-70 truncate" id="p-name">—</div>
+        <div class="text-3xl font-extrabold mt-1 leading-none" id="p-price">—</div>
+      </div>
     </div>
-    <div class="mt-2 flex flex-wrap gap-2" id="p-badges"></div>
+    <div class="mt-2 flex flex-wrap gap-2" id="p-badges"></div>    
 
-    <div class="divider my-3 opacity-60"></div>
-
-    <div class="grid grid-cols-2 gap-2 text-sm">
-      <div><span class="opacity-70">Last:</span> <span class="font-semibold" id="p-last">—</span></div>
-      <div><span class="opacity-70">Rank:</span> <span class="font-semibold" id="p-rank">—</span></div>
-      <div><span class="opacity-70">Entry:</span> <span class="font-semibold" id="p-entry">—</span></div>
-      <div><span class="opacity-70">RR:</span> <span class="font-semibold" id="p-rr">—</span></div>
-      <div><span class="opacity-70">SL:</span> <span class="font-semibold" id="p-sl">—</span></div>
-      <div><span class="opacity-70">TP:</span> <span class="font-semibold" id="p-tp">—</span></div>
-    </div>
-
-    <div class="mt-3">
-      <div class="text-sm opacity-70 mb-1">Reason</div>
+    <div class="mt-3 grid gap-3">
       <div class="detail-kv">
-        <div class="v" id="p-reason">—</div>
+        <div class="flex items-center justify-between">
+          <div class="k font-medium">OHLC <span class="opacity-70" id="p-ohlc-src">—</span></div>
+        </div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <div><span class="opacity-70">Open</span> <span class="font-semibold" id="p-o">—</span></div>
+          <div><span class="opacity-70">High</span> <span class="font-semibold" id="p-h">—</span></div>
+          <div><span class="opacity-70">Low</span> <span class="font-semibold" id="p-l">—</span></div>
+          <div><span class="opacity-70">Close</span> <span class="font-semibold" id="p-c">—</span></div>
+        </div>
       </div>
-      <div class="mt-2 text-sm">
-        <div><span class="opacity-70">snapshot_at:</span> <span id="p-snapshot">—</span></div>
-        <div><span class="opacity-70">last_bar_at:</span> <span id="p-lastbar">—</span></div>
+
+      <div class="detail-kv">
+        <div class="k font-medium">Market</div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <div><span class="opacity-70">RelVol</span> <span class="font-semibold" id="p-relvol">—</span></div>
+          <div><span class="opacity-70">Pos%</span> <span class="font-semibold" id="p-pos">—</span></div>
+          <div><span class="opacity-70">EOD Low</span> <span class="font-semibold" id="p-eodlow">—</span></div>
+          <div><span class="opacity-70">Price OK</span> <span class="font-semibold" id="p-priceok">—</span></div>
+        </div>
       </div>
+
+      <div class="detail-kv">
+        <div class="k font-medium">Plan</div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <div><span class="opacity-70">Entry</span> <span class="font-semibold" id="p-entry">—</span></div>
+          <div><span class="opacity-70">Buy Steps</span> <span class="font-semibold" id="p-steps">—</span></div>
+          <div><span class="opacity-70">SL</span> <span class="font-semibold" id="p-sl">—</span></div>
+          <div><span class="opacity-70">TP1</span> <span class="font-semibold" id="p-tp1">—</span></div>
+          <div><span class="opacity-70">TP2</span> <span class="font-semibold" id="p-tp2">—</span></div>
+          <div><span class="opacity-70">BE</span> <span class="font-semibold" id="p-be">—</span></div>
+          <div><span class="opacity-70">Out</span> <span class="font-semibold" id="p-out">—</span></div>
+          <div><span class="opacity-70">Lots</span> <span class="font-semibold" id="p-lots">—</span></div>
+          <div><span class="opacity-70">Est Cost</span> <span class="font-semibold" id="p-cost">—</span></div>
+        </div>
+      </div>
+
+      <div class="detail-kv">
+        <div class="k font-medium">Risk / Result</div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <div><span class="opacity-70">RR</span> <span class="font-semibold" id="p-rr">—</span></div>
+          <div><span class="opacity-70">Risk%</span> <span class="font-semibold" id="p-risk">—</span></div>
+          <div><span class="opacity-70">Profit TP2 (Net)</span> <span class="font-semibold" id="p-profit2">—</span></div>
+          <div><span class="opacity-70">RR TP2 (Net)</span> <span class="font-semibold" id="p-rr2net">—</span></div>
+          <div><span class="opacity-70">RR (TP2)</span> <span class="font-semibold" id="p-rr2">—</span></div>
+        </div>
+      </div>
+
+      <div class="detail-kv">
+        <div class="k font-medium">Meta</div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <div><span class="opacity-70">Rank</span> <span class="font-semibold" id="p-rank">—</span></div>
+          <div><span class="opacity-70">Snapshot At</span> <span class="font-semibold" id="p-snapshot">—</span></div>
+          <div><span class="opacity-70">Last Bar At</span> <span class="font-semibold" id="p-lastbar">—</span></div>
+        </div>
+      </div>
+
+      <div class="detail-kv">
+        <div class="k font-medium">Reason</div>
+        <div class="mt-2">
+          <div class="v" id="p-reason">—</div>
+        </div>
+      </div>
+
     </div>
 
     <details class="collapse collapse-arrow border border-base-300/60 bg-base-100/60 mt-3">

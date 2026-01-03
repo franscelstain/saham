@@ -15,8 +15,9 @@
         <div class="divider my-2 opacity-60"></div>
 
         <div class="grid grid-cols-2 gap-2 text-sm">
-          <div><span class="opacity-70">Last:</span> <span class="font-semibold" id="d-last">—</span></div>
+          <div><span class="opacity-70">Rank:</span> <span class="font-semibold" id="d-rank">—</span></div>
           <div><span class="opacity-70">Entry:</span> <span class="font-semibold" id="d-entry">—</span></div>
+          <div><span class="opacity-70">RR:</span> <span class="font-semibold" id="d-rr">—</span></div>
           <div><span class="opacity-70">SL:</span> <span class="font-semibold" id="d-sl">—</span></div>
           <div><span class="opacity-70">TP:</span> <span class="font-semibold" id="d-tp">—</span></div>
         </div>

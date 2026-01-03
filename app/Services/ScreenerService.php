@@ -421,13 +421,26 @@ class ScreenerService
 
             $c->pos_in_range  = $posInRange !== null ? round($posInRange * 100, 2) : null;
 
+            // ===== Trade plan (hitung untuk semua row agar panel detail lengkap) =====
+            $plan = $this->buildTradePlan($c, $capital);
+            foreach ($plan as $k => $v) {
+                $c->{$k} = $v;
+            }
+            
+            // alias key supaya UI gampang (snake_case dari service + nama singkat untuk table/panel)
+            $c->entry           = $c->entry_ideal ?? null;
+            $c->sl              = $c->stop_loss ?? null;
+            $c->tp1             = $c->tp1 ?? null;
+            $c->tp2             = $c->tp2 ?? null;
+            $c->be              = $c->break_even ?? null;
+            $c->out             = $c->est_out_total ?? null;         // total buy + fee (estimasi)
+            $c->profit_tp2_net  = $c->est_profit_tp2 ?? null; // profit TP2 setelah fee (estimasi)
+            $c->rr_tp2_net      = $c->rr_net_tp2 ?? null;     // RR TP2 net
+            $c->risk_pct        = $c->risk_pct_real ?? null;
+            $c->rank            = $c->rank_score ?? null;
+
             // ===== Trade plan + risk filters =====
             if ($status === 'BUY_OK') {
-                $plan = $this->buildTradePlan($c, $capital);
-                foreach ($plan as $k => $v) {
-                    $c->{$k} = $v;
-                }
-
                 if (($c->lots ?? 0) < 1) {
                     $status = 'CAPITAL_TOO_SMALL';
                     $reason = $c->plan_blocked_reason ?? 'Modal tidak cukup untuk 1 lot sesuai risk rule';
@@ -436,8 +449,7 @@ class ScreenerService
                 // ===== HARD GUARD: net profit harus masuk akal setelah fee + tick =====
                 if ($status === 'BUY_OK') {
                     $netTp2 = isset($c->est_profit_tp2) && $c->est_profit_tp2 !== null ? (float) $c->est_profit_tp2 : null;
-                    $netPctTp2 = isset($c->est_profit_pct_tp2) && $c->est_profit_pct_tp2 !== null ? (float) $c->est_profit_pct_tp2 : null;
-
+                    
                     // 1) reject keras kalau TP2 net <= 0 (fee drag)
                     if ($netTp2 !== null && $netTp2 <= 0) {
                         $status = 'SKIP_FEE_DRAG';
@@ -499,6 +511,8 @@ class ScreenerService
             }
 
             $c->rank_score = round($this->computeRankScore($c), 3);
+            $c->signal_name = $this->signalName((int) $c->signal_code);
+            $c->volume_label_name = $this->volumeLabelName($c->volume_label_code !== null ? (int) $c->volume_label_code : null);
 
             return $c;
         });
@@ -735,16 +749,28 @@ class ScreenerService
     private function buildTradePlan($c, ?float $capital = null): array
     {
         $last = $c->last_price !== null ? (float)$c->last_price : null;
+
+        // fallback kalau NO_INTRADAY: pakai EOD close sebagai "last"
+        if ($last === null && isset($c->close) && $c->close !== null) {
+            $last = (float) $c->close;
+        }
+
+        // intraday OHLC (kalau ada)
         $open = $c->open_price !== null ? (float)$c->open_price : null;
         $high = $c->high_price !== null ? (float)$c->high_price : null;
         $low  = $c->low_price !== null ? (float)$c->low_price : null;
+
+        // fallback kalau intraday OHLC kosong: pakai EOD OHLC
+        if ($open === null && isset($c->open) && $c->open !== null) $open = (float)$c->open;
+        if ($high === null && isset($c->high) && $c->high !== null) $high = (float)$c->high;
+        if ($low  === null && isset($c->low)  && $c->low  !== null) $low  = (float)$c->low;
+
+        if ($last === null) return [];
 
         $eodLow = $c->eod_low !== null ? (float)$c->eod_low : null;
         $atr    = isset($c->atr14) && $c->atr14 !== null ? (float)$c->atr14 : null;
 
         $volLabel = isset($c->volume_label_code) ? (int)$c->volume_label_code : 0;
-
-        if ($last === null) return [];
 
         $range = ($high !== null && $low !== null) ? max(0.0, $high - $low) : 0.0;
 

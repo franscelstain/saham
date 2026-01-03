@@ -18,19 +18,14 @@ Route::prefix('yahoo')->group(function () {
 // Screener
 Route::prefix('screener')->group(function () {
     Route::get('/', [ScreenerController::class, 'screenerPage'])->name('screener.index');
-    Route::get('/candidates', [ScreenerController::class, 'candidates'])->name('screener.candidates');
-    Route::get('/buylist-today', [ScreenerController::class, 'buylistToday'])->name('screener.buylistToday');
+    
+    // halaman UI
+    Route::get('/buylist', [ScreenerController::class, 'buylistUi']);
 
-    // capital (POST)
-    Route::post('/buylist-today/capital', [ScreenerController::class, 'setCapital'])->name('screener.setCapital');
+    // data JSON (1 endpoint)
+    Route::get('/buylist/data', [ScreenerController::class, 'buylistData']);
 });
 
 Route::get('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');
 
 // php artisan screener:compute-daily --date=2025-12-15
-
-// halaman UI
-Route::get('/screener/buylist', [ScreenerController::class, 'buylistUi']);
-
-// data JSON (1 endpoint)
-Route::get('/screener/buylist/data', [ScreenerController::class, 'buylistData']);
