@@ -626,15 +626,11 @@
   // Refresh cycle
   // -------------------------
   async function refresh() {
-    const metaEl = el('#meta-server');
-    if (metaEl) metaEl.textContent = 'Loading…';
-
     let meta, rows, recoRows, note;
     try {
       ({ meta, rows, recoRows, note } = await fetchData());
     } catch (e) {
       console.error(e);
-      if (metaEl) metaEl.textContent = 'Server: error (lihat console)';
       return;
     }
 

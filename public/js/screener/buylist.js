@@ -769,30 +769,27 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
   function _refresh() {
     _refresh = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee6() {
       var _ref11, _ref12, _meta$eodDate, _meta$today;
-      var metaEl, meta, rows, recoRows, note, _yield$fetchData, noteEl, eod, _t5;
+      var meta, rows, recoRows, note, _yield$fetchData, noteEl, eod, _t5;
       return _regenerator().w(function (_context6) {
         while (1) switch (_context6.p = _context6.n) {
           case 0:
-            metaEl = el('#meta-server');
-            if (metaEl) metaEl.textContent = 'Loading…';
-            _context6.p = 1;
-            _context6.n = 2;
+            _context6.p = 0;
+            _context6.n = 1;
             return fetchData();
-          case 2:
+          case 1:
             _yield$fetchData = _context6.v;
             meta = _yield$fetchData.meta;
             rows = _yield$fetchData.rows;
             recoRows = _yield$fetchData.recoRows;
             note = _yield$fetchData.note;
-            _context6.n = 4;
+            _context6.n = 3;
             break;
-          case 3:
-            _context6.p = 3;
+          case 2:
+            _context6.p = 2;
             _t5 = _context6.v;
             console.error(_t5);
-            if (metaEl) metaEl.textContent = 'Server: error (lihat console)';
             return _context6.a(2);
-          case 4:
+          case 3:
             state.rows = rows;
             state.recoRows = recoRows;
             setKpiCounts(rows);
@@ -805,16 +802,16 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
               noteEl.style.display = 'none';
               noteEl.innerHTML = '';
             }
-            _context6.n = 5;
+            _context6.n = 4;
             return applyTables();
-          case 5:
+          case 4:
             selectFirstIfNeeded();
             eod = (_ref11 = (_ref12 = (_meta$eodDate = meta.eodDate) !== null && _meta$eodDate !== void 0 ? _meta$eodDate : meta.eod_date) !== null && _ref12 !== void 0 ? _ref12 : meta.eodDateStr) !== null && _ref11 !== void 0 ? _ref11 : '-';
             setText('#meta-server', "Server: ".concat((_meta$today = meta.today) !== null && _meta$today !== void 0 ? _meta$today : '-', " \u2022 EOD: ").concat(eod));
-          case 6:
+          case 5:
             return _context6.a(2);
         }
-      }, _callee6, null, [[1, 3]]);
+      }, _callee6, null, [[0, 2]]);
     }));
     return _refresh.apply(this, arguments);
   }

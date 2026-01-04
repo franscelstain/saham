@@ -32,6 +32,4 @@
     <option value="60" selected>60s</option>
     <option value="120">120s</option>
   </select>
-
-  <div class="text-xs opacity-70" id="meta-server">—</div>
 </div>
