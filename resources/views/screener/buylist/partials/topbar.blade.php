@@ -3,9 +3,11 @@
 
   <div class="px-4 py-3 flex items-center gap-3">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-info text-primary-content grid place-items-center font-extrabold shadow-sm">
-        S
-      </div>
+      <img
+        src="{{ asset('images/brand/tradeaxis.png') }}"
+        alt="TradeAxis"
+        class="w-10 h-10 rounded-2xl shadow-sm"
+      >
       <div class="leading-tight">
         <div class="font-semibold tracking-wide">{{ $title ?? 'Screener' }}</div>
         <div class="text-xs opacity-70">Buylist & status monitor</div>

@@ -6,7 +6,7 @@
 
 @section('content')
 <div class="min-h-screen bg-base-200">
-  @include('screener.buylist.partials.topbar', ['title' => 'Buylist Today'])
+  @include('screener.buylist.partials.topbar', ['title' => 'TradeAxis'])
 
   <div class="px-4 py-4 space-y-4">
     @include('screener.buylist.partials.meta', [
