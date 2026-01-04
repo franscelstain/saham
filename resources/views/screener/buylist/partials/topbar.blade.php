@@ -12,6 +12,22 @@
       </div>
     </div>
 
+    {{-- Main menu --}}
+    <div class="ml-2 hidden md:flex items-center gap-2">
+      <a href="{{ url('/screener') }}"
+         class="btn btn-sm {{ request()->is('screener') ? 'btn-secondary' : 'btn-ghost' }}">
+        Daftar Saham
+      </a>
+      <a href="{{ url('/screener/buylist') }}"
+         class="btn btn-sm {{ request()->is('screener/buylist*') ? 'btn-secondary' : 'btn-ghost' }}">
+        Buylist
+      </a>
+      <a href="{{ url('/screener/sell') }}"
+         class="btn btn-sm {{ request()->is('screener/sell*') ? 'btn-secondary' : 'btn-ghost' }}">
+        Sell
+      </a>
+    </div>
+
     <div class="flex-1"></div>
 
     <label class="input input-bordered flex items-center gap-2 bg-white text-base-content border-white/30 shadow-md focus-within:ring-2 focus-within:ring-primary/30 w-[360px] max-w-full">

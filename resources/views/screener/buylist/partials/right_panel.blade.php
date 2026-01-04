@@ -2,7 +2,10 @@
   <div class="ui-surface p-4">
     <div class="flex items-center justify-between">
       <div class="font-semibold">Detail</div>
-      <button id="btn-copy-plan" class="btn btn-primary btn-xs btn-cta hover:bg-primary/90 hover:text-primary-content">COPY</button>
+      <div class="flex items-center gap-2">
+        <button id="btn-update-intraday" class="btn btn-outline btn-xs">UPDATE</button>
+        <button id="btn-copy-plan" class="btn btn-primary btn-xs btn-cta hover:bg-primary/90 hover:text-primary-content">COPY</button>
+      </div>
     </div>
 
     <div class="mt-2 flex items-center gap-3">

@@ -582,9 +582,59 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
   // -------------------------
   var tblBuy = null;
   var tblAll = null;
+
+  // --- Tabulator safety: avoid renderer=null crash (race / DOM replaced) ---
+  function isTableAlive(t) {
+    return !!(t && t.element && document.body.contains(t.element));
+  }
+  function waitTableBuilt(t) {
+    if (!t) return Promise.reject(new Error('Tabulator: table is null'));
+    if (t.__built) return Promise.resolve();
+    return new Promise(function (resolve) {
+      try {
+        t.on('tableBuilt', function () {
+          t.__built = true;
+          resolve();
+        });
+      } catch (_) {
+        // if event hook fails, just resolve (won't block app)
+        t.__built = true;
+        resolve();
+      }
+    });
+  }
+  function ensureTablesReady() {
+    return _ensureTablesReady.apply(this, arguments);
+  }
+  function _ensureTablesReady() {
+    _ensureTablesReady = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee4() {
+      return _regenerator().w(function (_context4) {
+        while (1) switch (_context4.n) {
+          case 0:
+            if (!(!tblBuy || !tblAll)) {
+              _context4.n = 1;
+              break;
+            }
+            return _context4.a(2, false);
+          case 1:
+            if (!(!isTableAlive(tblBuy) || !isTableAlive(tblAll))) {
+              _context4.n = 2;
+              break;
+            }
+            return _context4.a(2, false);
+          case 2:
+            _context4.n = 3;
+            return Promise.all([waitTableBuilt(tblBuy), waitTableBuilt(tblAll)]);
+          case 3:
+            return _context4.a(2, true);
+        }
+      }, _callee4);
+    }));
+    return _ensureTablesReady.apply(this, arguments);
+  }
   function makeTable(containerEl, height) {
     var t = new Tabulator(containerEl, {
-      layout: 'fitColumns',
+      layout: 'fitDataFill',
       height: height || '520px',
       selectableRows: false,
       rowHeight: 44,
@@ -637,6 +687,11 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
         }
       }]
     });
+
+    // mark built as soon as Tabulator finishes init
+    t.on('tableBuilt', function () {
+      t.__built = true;
+    });
     t.on("rowClick", function (_, row) {
       renderPanel(row.getData());
       if (window.innerWidth < 1024) openDrawer();
@@ -655,46 +710,88 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     if (src.length) renderPanel(src[0]);
   }
   function applyTables() {
-    var buyFiltered = applyClientFilter(state.recoRows);
-    var allFiltered = applyClientFilter(state.rows);
-    tblBuy.replaceData(buyFiltered);
-    tblAll.replaceData(allFiltered);
-    setText('#meta-buy', "".concat(buyFiltered.length, " rows"));
-    setText('#meta-all', "".concat(allFiltered.length, " rows"));
-  }
-
-  // -------------------------
+    return _applyTables.apply(this, arguments);
+  } // -------------------------
   // Refresh cycle
   // -------------------------
+  function _applyTables() {
+    _applyTables = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee5() {
+      var ready, buyFiltered, allFiltered, _t3, _t4;
+      return _regenerator().w(function (_context5) {
+        while (1) switch (_context5.p = _context5.n) {
+          case 0:
+            _context5.n = 1;
+            return ensureTablesReady();
+          case 1:
+            ready = _context5.v;
+            if (ready) {
+              _context5.n = 2;
+              break;
+            }
+            return _context5.a(2);
+          case 2:
+            buyFiltered = applyClientFilter(state.recoRows || []);
+            allFiltered = applyClientFilter(state.rows || []);
+            _context5.p = 3;
+            tblBuy.replaceData(buyFiltered);
+            tblAll.replaceData(allFiltered);
+            _context5.n = 7;
+            break;
+          case 4:
+            _context5.p = 4;
+            _t3 = _context5.v;
+            console.error('Tabulator replaceData failed; trying redraw+setData', _t3);
+            _context5.p = 5;
+            tblBuy.redraw(true);
+            tblAll.redraw(true);
+            tblBuy.setData(buyFiltered);
+            tblAll.setData(allFiltered);
+            _context5.n = 7;
+            break;
+          case 6:
+            _context5.p = 6;
+            _t4 = _context5.v;
+            console.error('Tabulator fallback setData failed', _t4);
+            return _context5.a(2);
+          case 7:
+            setText('#meta-buy', "".concat(buyFiltered.length, " rows"));
+            setText('#meta-all', "".concat(allFiltered.length, " rows"));
+          case 8:
+            return _context5.a(2);
+        }
+      }, _callee5, null, [[5, 6], [3, 4]]);
+    }));
+    return _applyTables.apply(this, arguments);
+  }
   function refresh() {
     return _refresh.apply(this, arguments);
   }
   function _refresh() {
-    _refresh = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee4() {
+    _refresh = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee6() {
       var _ref11, _ref12, _meta$eodDate, _meta$today;
-      var metaEl, meta, rows, recoRows, note, _yield$fetchData, noteEl, eod, _t3;
-      return _regenerator().w(function (_context4) {
-        while (1) switch (_context4.p = _context4.n) {
+      var metaEl, meta, rows, recoRows, note, _yield$fetchData, noteEl, eod, _t5;
+      return _regenerator().w(function (_context6) {
+        while (1) switch (_context6.p = _context6.n) {
           case 0:
             metaEl = el('#meta-server');
             if (metaEl) metaEl.textContent = 'Loading…';
-            _context4.p = 1;
-            _context4.n = 2;
+            _context6.p = 1;
+            _context6.n = 2;
             return fetchData();
           case 2:
-            _yield$fetchData = _context4.v;
+            _yield$fetchData = _context6.v;
             meta = _yield$fetchData.meta;
             rows = _yield$fetchData.rows;
             recoRows = _yield$fetchData.recoRows;
             note = _yield$fetchData.note;
-            _context4.n = 4;
+            _context6.n = 4;
             break;
           case 3:
-            _context4.p = 3;
-            _t3 = _context4.v;
-            console.error(_t3);
+            _context6.p = 3;
+            _t5 = _context6.v;
+            console.error(_t5);
             if (metaEl) metaEl.textContent = 'Server: error (lihat console)';
-            return _context4.a(2);
+            return _context6.a(2);
           case 4:
             state.rows = rows;
             state.recoRows = recoRows;
@@ -708,14 +805,16 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
               noteEl.style.display = 'none';
               noteEl.innerHTML = '';
             }
-            applyTables();
+            _context6.n = 5;
+            return applyTables();
+          case 5:
             selectFirstIfNeeded();
             eod = (_ref11 = (_ref12 = (_meta$eodDate = meta.eodDate) !== null && _meta$eodDate !== void 0 ? _meta$eodDate : meta.eod_date) !== null && _ref12 !== void 0 ? _ref12 : meta.eodDateStr) !== null && _ref11 !== void 0 ? _ref11 : '-';
             setText('#meta-server', "Server: ".concat((_meta$today = meta.today) !== null && _meta$today !== void 0 ? _meta$today : '-', " \u2022 EOD: ").concat(eod));
-          case 5:
-            return _context4.a(2);
+          case 6:
+            return _context6.a(2);
         }
-      }, _callee4, null, [[1, 3]]);
+      }, _callee6, null, [[1, 3]]);
     }));
     return _refresh.apply(this, arguments);
   }
@@ -793,9 +892,18 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
 
     // auto refresh
     var autoRefresh = el('#auto-refresh');
-    if (autoRefresh) autoRefresh.addEventListener('change', function (e) {
-      return e.target.checked ? startAuto() : stopAuto();
-    });
+    if (autoRefresh) {
+      autoRefresh.addEventListener('change', function (e) {
+        e.target.checked ? startAuto() : stopAuto();
+
+        // force repaint supaya style toggle langsung balik normal
+        var x = e.target;
+        x.style.transform = 'translateZ(0)'; // repaint trick
+        requestAnimationFrame(function () {
+          x.style.transform = '';
+        });
+      });
+    }
     var autoInterval = el('#auto-interval');
     if (autoInterval) autoInterval.addEventListener('change', function () {
       return el('#auto-refresh') && el('#auto-refresh').checked ? startAuto() : null;
@@ -805,7 +913,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     var search = el('#global-search');
     if (search) search.addEventListener('input', function () {
       state.search = search.value || '';
-      applyTables();
+      applyTables()["catch"](console.error);
     });
     document.addEventListener('keydown', function (e) {
       if (e.key === '/') {
@@ -820,7 +928,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
       btn.addEventListener('click', function () {
         state.kpiFilter = btn.getAttribute('data-kpi') || 'ALL';
         paintKpiActive();
-        applyTables();
+        applyTables()["catch"](console.error);
       });
     });
 
@@ -923,7 +1031,12 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
   }
   document.addEventListener('DOMContentLoaded', function () {
     wireUI();
-    refresh()["catch"](console.error);
+    // Wait Tabulator fully built to avoid renderer=null during first refresh
+    ensureTablesReady().then(function () {
+      return refresh()["catch"](console.error);
+    })["catch"](function () {
+      return refresh()["catch"](console.error);
+    });
   });
 })();
 

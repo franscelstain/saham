@@ -38,7 +38,10 @@
   <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
   <script>
     window.__SCREENER__ = {
-      endpoints: { buylist: "{{ url('/screener/buylist/data') }}" }
+      endpoints: {
+        buylist: "{{ url('/screener/buylist/data') }}",
+        intradayUpdate: "{{ url('/screener/intraday/update') }}"
+      }
     };
   </script>
   <script src="{{ mix('/js/screener/buylist.js') }}"></script>

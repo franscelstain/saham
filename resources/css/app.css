@@ -69,74 +69,99 @@
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* Tabulator (keep minimal, theme-aware; avoid hard-coded whites)             */
-/* -------------------------------------------------------------------------- */
+/* =========================
+   TABULATOR — ONE FRAME
+   ========================= */
 
-.tabulator {
-  border: 0 !important;
-  background: transparent !important;
+.tabulator{
   font-size: 14px;
+  border: 1px solid color-mix(in oklab, hsl(var(--bc)) 14%, transparent) !important;
+  border-radius: 14px !important;
+  overflow: hidden; /* ini yang nyatuin header + body */
+  background: color-mix(in oklab, hsl(var(--b1)) 92%, transparent) !important;
 }
 
-/* Header */
-.tabulator .tabulator-header {
-  background: color-mix(in oklab, hsl(var(--b2)) 75%, hsl(var(--b1))) !important;
-  border: 1px solid color-mix(in oklab, hsl(var(--bc)) 12%, transparent) !important;
-  border-bottom: 0 !important;
-  border-radius: 14px 14px 0 0;
-  overflow: hidden;
+/* ---------- Header ---------- */
+.tabulator .tabulator-header{
+  background: color-mix(in oklab, hsl(var(--b2)) 88%, hsl(var(--b1)) 12%) !important;
+  border: 0 !important;                /* jangan bikin frame kedua */
+  border-bottom: 1px solid color-mix(in oklab, hsl(var(--bc)) 14%, transparent) !important; /* divider */
+  border-radius: 0 !important;         /* ikut frame parent */
 }
-.tabulator .tabulator-header .tabulator-col {
+
+.tabulator .tabulator-header .tabulator-col{
   background: transparent !important;
   border-right: 1px solid color-mix(in oklab, hsl(var(--bc)) 10%, transparent) !important;
   font-weight: 650;
-  color: color-mix(in oklab, hsl(var(--bc)) 78%, transparent);
+  color: color-mix(in oklab, hsl(var(--bc)) 78%, transparent) !important;
 }
-.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+
+.tabulator .tabulator-header .tabulator-col:last-child{
+  border-right: 0 !important;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content{
   padding: 10px 10px !important;
 }
 
-/* Body */
-.tabulator .tabulator-tableholder {
-  border: 1px solid color-mix(in oklab, hsl(var(--bc)) 12%, transparent) !important;
-  border-top: 0 !important;
-  border-radius: 0 0 14px 14px;
-  background: color-mix(in oklab, hsl(var(--b1)) 92%, transparent) !important;
+/* ---------- Body holder ---------- */
+.tabulator .tabulator-tableholder{
+  border: 0 !important;                 /* jangan bikin frame kedua */
+  border-radius: 0 !important;
+  background: transparent !important;   /* frame parent yang pegang background */
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
+
+/* biar table bisa melebar -> scroll X di dalam */
+.tabulator .tabulator-table{
+  min-width: max-content;
+}
+
 .tabulator .tabulator-row {
-  background: transparent !important;
   cursor: pointer;
 }
-.tabulator .tabulator-row .tabulator-cell {
+
+/* ---------- Cells & dividers ---------- */
+.tabulator .tabulator-row .tabulator-cell{
+  padding: 10px 10px !important;
   border-right: 1px solid color-mix(in oklab, hsl(var(--bc)) 7%, transparent) !important;
   border-bottom: 1px solid color-mix(in oklab, hsl(var(--bc)) 7%, transparent) !important;
-  padding: 10px 10px !important;
-  color: color-mix(in oklab, hsl(var(--bc)) 88%, transparent);
+  color: color-mix(in oklab, hsl(var(--bc)) 88%, transparent) !important;
+  background: transparent !important;
 }
-.tabulator .tabulator-row:nth-child(2n) {
-  background: color-mix(in oklab, hsl(var(--b2)) 22%, transparent) !important;
-}
-.tabulator .tabulator-row.tabulator-selected {
-  background: color-mix(in oklab, hsl(var(--p)) 16%, transparent) !important;
-}
-.tabulator .tabulator-row:hover {
-  background: color-mix(in oklab, hsl(var(--b2)) 32%, transparent) !important;
+.tabulator .tabulator-row .tabulator-cell:last-child{
+  border-right: 0 !important;
 }
 
-/* Zebra striping Tabulator: apply to CELLS, not ROWS */
-.tabulator .tabulator-row.tabulator-row-odd .tabulator-cell {
-  background-color: rgba(0, 0, 0, 0.02) !important;
+/* ---------- Zebra (row pertama putih) ---------- */
+.tabulator .tabulator-row.tabulator-row-odd,
+.tabulator .tabulator-row.tabulator-row-odd .tabulator-cell{
+  background: transparent !important;
 }
-.tabulator .tabulator-row.tabulator-row-even .tabulator-cell {
-  background-color: transparent !important;
+.tabulator .tabulator-row.tabulator-row-even,
+.tabulator .tabulator-row.tabulator-row-even .tabulator-cell{
+  background: color-mix(in oklab, hsl(var(--b2)) 34%, hsl(var(--b1)) 66%) !important;
 }
 
-/* Sort arrows */
-.tabulator .tabulator-col.tabulator-sortable:hover {
-  background: color-mix(in oklab, hsl(var(--b2)) 40%, transparent) !important;
+/* ---------- Hover ---------- */
+.tabulator .tabulator-row:not(.tabulator-selected):hover,
+.tabulator .tabulator-row:not(.tabulator-selected):hover .tabulator-cell{
+  background: color-mix(in oklab, hsl(var(--b2)) 46%, hsl(var(--b1)) 54%) !important;
 }
-.tabulator .tabulator-col .tabulator-arrow {
+
+/* ---------- Selected ---------- */
+.tabulator .tabulator-row.tabulator-selected,
+.tabulator .tabulator-row.tabulator-selected .tabulator-cell{
+  background: color-mix(in oklab, hsl(var(--p)) 22%, hsl(var(--b1)) 78%) !important;
+}
+.tabulator .tabulator-row.tabulator-selected:hover,
+.tabulator .tabulator-row.tabulator-selected:hover .tabulator-cell{
+  background: color-mix(in oklab, hsl(var(--p)) 28%, hsl(var(--b1)) 72%) !important;
+}
+
+/* ---------- Sort arrows ---------- */
+.tabulator .tabulator-col .tabulator-arrow{
   border-bottom-color: color-mix(in oklab, hsl(var(--bc)) 55%, transparent) !important;
 }
 

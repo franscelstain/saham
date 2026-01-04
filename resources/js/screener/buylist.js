@@ -499,9 +499,39 @@
   let tblBuy = null;
   let tblAll = null;
 
+  // --- Tabulator safety: avoid renderer=null crash (race / DOM replaced) ---
+  function isTableAlive(t) {
+    return !!(t && t.element && document.body.contains(t.element));
+  }
+
+  function waitTableBuilt(t) {
+    if (!t) return Promise.reject(new Error('Tabulator: table is null'));
+    if (t.__built) return Promise.resolve();
+    return new Promise((resolve) => {
+      try {
+        t.on('tableBuilt', () => {
+          t.__built = true;
+          resolve();
+        });
+      } catch (_) {
+        // if event hook fails, just resolve (won't block app)
+        t.__built = true;
+        resolve();
+      }
+    });
+  }
+
+  async function ensureTablesReady() {
+    // called from refresh/apply to prevent "verticalFillMode" / renderer null
+    if (!tblBuy || !tblAll) return false;
+    if (!isTableAlive(tblBuy) || !isTableAlive(tblAll)) return false;
+    await Promise.all([waitTableBuilt(tblBuy), waitTableBuilt(tblAll)]);
+    return true;
+  }
+
   function makeTable(containerEl, height) {
     const t = new Tabulator(containerEl, {
-      layout: 'fitColumns',
+      layout: 'fitDataFill',
       height: height || '520px',
       selectableRows: false,
       rowHeight: 44,
@@ -541,6 +571,9 @@
       ],
     });
 
+    // mark built as soon as Tabulator finishes init
+    t.on('tableBuilt', () => { t.__built = true; });
+
     t.on("rowClick", function (_, row) {
       renderPanel(row.getData());
       if (window.innerWidth < 1024) openDrawer();
@@ -561,12 +594,29 @@
     if (src.length) renderPanel(src[0]);
   }
 
-  function applyTables() {
-    const buyFiltered = applyClientFilter(state.recoRows);
-    const allFiltered = applyClientFilter(state.rows);
+  async function applyTables() {
+    // Guard: Tabulator can throw renderer=null if replaceData runs too early / element detached
+    const ready = await ensureTablesReady();
+    if (!ready) return;
 
-    tblBuy.replaceData(buyFiltered);
-    tblAll.replaceData(allFiltered);
+    const buyFiltered = applyClientFilter(state.recoRows || []);
+    const allFiltered = applyClientFilter(state.rows || []);
+
+    try {
+      tblBuy.replaceData(buyFiltered);
+      tblAll.replaceData(allFiltered);
+    } catch (e) {
+      console.error('Tabulator replaceData failed; trying redraw+setData', e);
+      try {
+        tblBuy.redraw(true);
+        tblAll.redraw(true);
+        tblBuy.setData(buyFiltered);
+        tblAll.setData(allFiltered);
+      } catch (e2) {
+        console.error('Tabulator fallback setData failed', e2);
+        return;
+      }
+    }
 
     setText('#meta-buy', `${buyFiltered.length} rows`);
     setText('#meta-all', `${allFiltered.length} rows`);
@@ -603,7 +653,7 @@
       noteEl.innerHTML = '';
     }
 
-    applyTables();
+    await applyTables();
     selectFirstIfNeeded();
 
     const eod = meta.eodDate ?? meta.eod_date ?? meta.eodDateStr ?? '-';
@@ -689,7 +739,7 @@
     const search = el('#global-search');
     if (search) search.addEventListener('input', () => {
       state.search = search.value || '';
-      applyTables();
+      applyTables().catch(console.error);
     });
 
     document.addEventListener('keydown', (e) => {
@@ -702,7 +752,7 @@
       btn.addEventListener('click', () => {
         state.kpiFilter = btn.getAttribute('data-kpi') || 'ALL';
         paintKpiActive();
-        applyTables();
+        applyTables().catch(console.error);
       });
     });
 
@@ -765,6 +815,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     wireUI();
-    refresh().catch(console.error);
+    // Wait Tabulator fully built to avoid renderer=null during first refresh
+    ensureTablesReady().then(() => refresh().catch(console.error)).catch(() => refresh().catch(console.error));
   });
 })();
