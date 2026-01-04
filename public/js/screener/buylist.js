@@ -894,14 +894,12 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     var autoRefresh = el('#auto-refresh');
     if (autoRefresh) {
       autoRefresh.addEventListener('change', function (e) {
-        e.target.checked ? startAuto() : stopAuto();
+        return e.target.checked ? startAuto() : stopAuto();
+      });
 
-        // force repaint supaya style toggle langsung balik normal
-        var x = e.target;
-        x.style.transform = 'translateZ(0)'; // repaint trick
-        requestAnimationFrame(function () {
-          x.style.transform = '';
-        });
+      // FIX: setelah klik pakai mouse/touch, hilangkan fokus biar toggle gak kelihatan "stuck"
+      autoRefresh.addEventListener('pointerup', function (e) {
+        if (e && e.pointerType) autoRefresh.blur();
       });
     }
     var autoInterval = el('#auto-interval');

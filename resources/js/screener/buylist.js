@@ -731,7 +731,14 @@
 
     // auto refresh
     const autoRefresh = el('#auto-refresh');
-    if (autoRefresh) autoRefresh.addEventListener('change', (e) => e.target.checked ? startAuto() : stopAuto());
+    if (autoRefresh) {
+      autoRefresh.addEventListener('change', (e) => e.target.checked ? startAuto() : stopAuto());
+
+      // FIX: setelah klik pakai mouse/touch, hilangkan fokus biar toggle gak kelihatan "stuck"
+      autoRefresh.addEventListener('pointerup', (e) => {
+        if (e && e.pointerType) autoRefresh.blur();
+      });
+    }
     const autoInterval = el('#auto-interval');
     if (autoInterval) autoInterval.addEventListener('change', () => (el('#auto-refresh') && el('#auto-refresh').checked) ? startAuto() : null);
 
