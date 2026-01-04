@@ -14,10 +14,10 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ },
 
-/***/ "./resources/js/screener/buylist.js"
-/*!******************************************!*\
-  !*** ./resources/js/screener/buylist.js ***!
-  \******************************************/
+/***/ "./resources/js/screener/watchlist.js"
+/*!********************************************!*\
+  !*** ./resources/js/screener/watchlist.js ***!
+  \********************************************/
 () {
 
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
@@ -38,7 +38,7 @@ function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 (function (_window$__SCREENER__) {
-  var endpoint = (_window$__SCREENER__ = window.__SCREENER__) === null || _window$__SCREENER__ === void 0 || (_window$__SCREENER__ = _window$__SCREENER__.endpoints) === null || _window$__SCREENER__ === void 0 ? void 0 : _window$__SCREENER__.buylist;
+  var endpoint = (_window$__SCREENER__ = window.__SCREENER__) === null || _window$__SCREENER__ === void 0 || (_window$__SCREENER__ = _window$__SCREENER__.endpoints) === null || _window$__SCREENER__ === void 0 ? void 0 : _window$__SCREENER__.watchlist;
   var $ = function $(q) {
     return document.querySelector(q);
   };
@@ -424,7 +424,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
               _context3.n = 1;
               break;
             }
-            throw new Error('Missing endpoint buylist');
+            throw new Error('Missing endpoint watchlist');
           case 1:
             url = new URL(endpoint, window.location.origin);
             if (state.capital) url.searchParams.set('capital', String(state.capital));
@@ -1129,7 +1129,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
 /******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
 /******/ 		// [resolve, reject, Promise] = chunk loading, 0 = chunk loaded
 /******/ 		var installedChunks = {
-/******/ 			"/js/screener/buylist": 0,
+/******/ 			"/js/screener/watchlist": 0,
 /******/ 			"css/app": 0
 /******/ 		};
 /******/ 		
@@ -1180,7 +1180,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module depends on other loaded chunks and execution need to be delayed
-/******/ 	__webpack_require__.O(undefined, ["css/app"], () => (__webpack_require__("./resources/js/screener/buylist.js")))
+/******/ 	__webpack_require__.O(undefined, ["css/app"], () => (__webpack_require__("./resources/js/screener/watchlist.js")))
 /******/ 	var __webpack_exports__ = __webpack_require__.O(undefined, ["css/app"], () => (__webpack_require__("./resources/css/app.css")))
 /******/ 	__webpack_exports__ = __webpack_require__.O(__webpack_exports__);
 /******/ 	

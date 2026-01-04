@@ -6,31 +6,31 @@
 
 @section('content')
 <div class="min-h-screen bg-base-200">
-  @include('screener.buylist.partials.topbar', ['title' => 'TradeAxis'])
+  @include('partials.topbar', ['title' => 'TradeAxis'])
 
   <div class="px-4 py-4 space-y-4">
-    @include('screener.buylist.partials.meta', [
+    @include('screener.watchlist.partials.meta', [
       'today' => $today ?? null,
       'eodDate' => $eodDate ?? null,
       'capital' => $capital ?? null,
     ])
 
-    @include('screener.buylist.partials.kpi_row')
+    @include('screener.watchlist.partials.kpi_row')
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
       <div class="lg:col-span-8 space-y-4">
-        @include('screener.buylist.partials.table_recommended')
-        @include('screener.buylist.partials.table_all')
+        @include('screener.watchlist.partials.table_recommended')
+        @include('screener.watchlist.partials.table_all')
       </div>
 
       <div class="lg:col-span-4">
-        @include('screener.buylist.partials.right_panel')
+        @include('screener.watchlist.partials.right_panel')
       </div>
     </div>
   </div>
 
   {{-- Mobile drawer --}}
-  @include('screener.buylist.partials.drawer_detail')
+  @include('screener.watchlist.partials.drawer_detail')
 </div>
 @endsection
 
@@ -39,10 +39,10 @@
   <script>
     window.__SCREENER__ = {
       endpoints: {
-        buylist: "{{ url('/screener/buylist/data') }}",
+        watchlist: "{{ url('/watchlist/data') }}",
         intradayUpdate: "{{ url('/screener/intraday/update') }}"
       }
     };
   </script>
-  <script src="{{ mix('/js/screener/buylist.js') }}"></script>
+  <script src="{{ mix('/js/screener/watchlist.js') }}"></script>
 @endpush

@@ -16,17 +16,17 @@
 
     {{-- Main menu --}}
     <div class="ml-2 hidden md:flex items-center gap-2">
-      <a href="{{ url('/screener') }}"
-         class="btn btn-sm {{ request()->is('screener') ? 'btn-secondary' : 'btn-ghost' }}">
-        Daftar Saham
+      <a href="{{ url('/ticker') }}"
+         class="btn btn-sm {{ request()->is('ticker') ? 'btn-secondary' : 'btn-ghost' }}">
+        Ticker
       </a>
-      <a href="{{ url('/screener/buylist') }}"
-         class="btn btn-sm {{ request()->is('screener/buylist*') ? 'btn-secondary' : 'btn-ghost' }}">
-        Buylist
+      <a href="{{ url('/watchlist') }}"
+         class="btn btn-sm {{ request()->is('watchlist*') ? 'btn-secondary' : 'btn-ghost' }}">
+        Watchlist
       </a>
-      <a href="{{ url('/screener/sell') }}"
-         class="btn btn-sm {{ request()->is('screener/sell*') ? 'btn-secondary' : 'btn-ghost' }}">
-        Sell
+      <a href="{{ url('/portfolio') }}"
+         class="btn btn-sm {{ request()->is('portfolio*') ? 'btn-secondary' : 'btn-ghost' }}">
+        Portfolio
       </a>
     </div>
 

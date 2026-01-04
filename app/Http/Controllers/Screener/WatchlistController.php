@@ -1,17 +1,18 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Screener;
 
-use App\Services\ScreenerService;
+use App\Http\Controllers\Controller;
+use App\Services\Screener\WatchlistService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class ScreenerController extends Controller
+class WatchlistController extends Controller
 {
     private $svc;
 
-    public function __construct(ScreenerService $svc)
+    public function __construct(WatchlistService $svc)
     {
         $this->svc = $svc;
     }
@@ -84,7 +85,7 @@ class ScreenerController extends Controller
         // metadata ringan (optional)
         $data = $this->svc->getTodayBuylistData($today, $capital);
 
-        return view('screener.buylist.index', [
+        return view('screener.watchlist.index', [
             'today'   => $data['today'] ?? ($today ?: date('Y-m-d')),
             'eodDate' => $data['eod_date'] ?? null,
             'capital' => $data['capital'] ?? $capital,

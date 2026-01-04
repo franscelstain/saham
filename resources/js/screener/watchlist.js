@@ -1,5 +1,5 @@
 (function () {
-  const endpoint = window.__SCREENER__?.endpoints?.buylist;
+  const endpoint = window.__SCREENER__?.endpoints?.watchlist;
   const $ = (q) => document.querySelector(q);
 
   // --- SAFE DOM helpers ---
@@ -351,7 +351,7 @@
   // Fetch
   // -------------------------
   async function fetchData() {
-    if (!endpoint) throw new Error('Missing endpoint buylist');
+    if (!endpoint) throw new Error('Missing endpoint watchlist');
 
     const url = new URL(endpoint, window.location.origin);
     if (state.capital) url.searchParams.set('capital', String(state.capital));

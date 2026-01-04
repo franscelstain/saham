@@ -1,57 +1,11 @@
 <?php
 
-namespace App\Repositories;
+namespace App\Repositories\Screener;
 
 use Illuminate\Support\Facades\DB;
 
-class ScreenerRepository
+class WatchlistRepository
 {
-    public function getScreenerHomeData(): array
-    {
-        $latestDate = $this->getLatestEodDate();
-
-        if (!$latestDate) {
-            return [
-                'trade_date' => null,
-                'rows' => collect(),
-            ];
-        }
-
-        $rows = DB::table('ticker_indicators_daily as ind')
-            ->join('tickers as t', 't.ticker_id', '=', 'ind.ticker_id')
-            ->where('ind.is_deleted', 0)
-            ->where('t.is_deleted', 0)
-            ->whereDate('ind.trade_date', $latestDate)
-            ->orderByDesc('ind.score_total')
-            ->limit(100)
-            ->get([
-                'ind.trade_date',
-                't.ticker_code',
-                't.company_name',
-                'ind.signal_code',
-                'ind.volume_label_code',
-                'ind.open',
-                'ind.high',
-                'ind.low',
-                'ind.close',
-                'ind.volume',
-                'ind.ma20',
-                'ind.ma50',
-                'ind.ma200',
-                'ind.vol_ratio',
-                'ind.rsi14',
-                'ind.atr14',
-                'ind.support_20d',
-                'ind.resistance_20d',
-                'ind.score_total',
-            ]);
-
-        return [
-            'trade_date' => $latestDate,
-            'rows' => $rows,
-        ];
-    }
-
     /**
      * Latest EOD date.
      * - If $today provided and $usePrevTradingDay=true => pick max(trade_date) < $today.

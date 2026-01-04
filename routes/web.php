@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
-use App\Http\Controllers\ScreenerController;
+use App\Http\Controllers\Screener\WatchlistController;
 use App\Http\Controllers\YahooFinanceController;
 use App\Http\Controllers\IntradayController;
 
@@ -16,14 +16,12 @@ Route::prefix('yahoo')->group(function () {
 });
 
 // Screener
-Route::prefix('screener')->group(function () {
-    Route::get('/', [ScreenerController::class, 'screenerPage'])->name('screener.index');
-    
+Route::prefix('watchlist')->group(function () {
     // halaman UI
-    Route::get('/buylist', [ScreenerController::class, 'buylistUi']);
+    Route::get('/', [WatchlistController::class, 'buylistUi']);
 
     // data JSON (1 endpoint)
-    Route::get('/buylist/data', [ScreenerController::class, 'buylistData']);
+    Route::get('/data', [WatchlistController::class, 'buylistData']);
 });
 
 Route::get('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');

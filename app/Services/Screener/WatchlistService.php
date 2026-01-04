@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Screener;
 
-use App\Repositories\ScreenerRepository;
+use App\Repositories\Screener\WatchlistRepository;
 use Carbon\Carbon;
 
-class ScreenerService
+class WatchlistService
 {
-    /** @var ScreenerRepository */
+    /** @var WatchlistRepository */
     private $repo;
 
     // ==============================
@@ -46,7 +46,7 @@ class ScreenerService
     // IDX lot
     private const LOT_SIZE = 100;
 
-    public function __construct(ScreenerRepository $repo)
+    public function __construct(WatchlistRepository $repo)
     {
         $this->repo = $repo;
     }
