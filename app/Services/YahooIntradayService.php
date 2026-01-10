@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Repositories\Screener\WatchlistRepository;
 use App\Repositories\IntradayRepository;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
@@ -13,13 +14,15 @@ class YahooIntradayService
 {
     /** @var IntradayRepository */
     private $repo;
+    private $watchRepo;
 
     /** @var Client */
     private $http;
 
-    public function __construct(IntradayRepository $repo)
+    public function __construct(IntradayRepository $repo, WatchlistRepository $watchRepo)
     {
         $this->repo = $repo;
+        $this->watchRepo = $watchRepo;
 
         $this->http = new Client([
             'base_uri' => config('services.yahoo.base_uri', 'https://query1.finance.yahoo.com'),
@@ -151,7 +154,10 @@ class YahooIntradayService
      */
     public function capture(?string $tickerCode = null, string $interval = '1m'): array
     {
-        $tickers = $this->repo->getActiveTickers($tickerCode);
+        // $tickers = $this->repo->getActiveTickers($tickerCode);
+        $today = Carbon::now('Asia/Jakarta')->toDateString();
+        $eodDate = $this->watchRepo->getEodReferenceForToday($today);
+        $candidates = $this->watchRepo->getEodCandidates($eodDate);
 
         // WIB biar konsisten
         $now = Carbon::now('Asia/Jakarta');
@@ -170,7 +176,7 @@ class YahooIntradayService
 
         $rowsToSave = [];
 
-        foreach ($tickers as $t) {
+        foreach ($candidates as $t) {
             $stats['processed']++;
 
             $code = strtoupper(trim($t->ticker_code));

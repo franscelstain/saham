@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Screener\TickerController;
 use App\Http\Controllers\Screener\WatchlistController;
 use App\Http\Controllers\YahooFinanceController;
 use App\Http\Controllers\IntradayController;
@@ -22,6 +23,14 @@ Route::prefix('watchlist')->group(function () {
 
     // data JSON (1 endpoint)
     Route::get('/data', [WatchlistController::class, 'buylistData']);
+});
+
+Route::prefix('ticker')->group(function () {
+    // halaman UI
+    Route::get('/', [TickerController::class, 'index']);
+
+    // data JSON (1 endpoint)
+    Route::get('/data', [TickerController::class, 'data']);
 });
 
 Route::get('/intraday/capture', [IntradayController::class, 'capture'])->name('intraday.capture');

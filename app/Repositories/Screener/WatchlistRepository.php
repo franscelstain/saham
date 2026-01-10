@@ -52,17 +52,17 @@ class WatchlistRepository
     }
 
     /**
-     * Candidates page data: signal (4,5) + vlabel (8,9) + trend filter + rsi<=75.
+     * Candidates page data: decision (4,5) + vlabel (8,9) + trend filter + rsi<=75.
      */
-    public function getCandidatesByDate(string $tradeDate, array $signalCodes, array $volumeLabelCodes)
+    public function getCandidatesByDate(string $tradeDate, array $decisionCodes, array $volumeLabelCodes)
     {
         $q = DB::table('ticker_indicators_daily as ind')
             ->join('tickers as t', 't.ticker_id', '=', 'ind.ticker_id')
             ->where('ind.is_deleted', 0)
             ->where('t.is_deleted', 0)
-            ->whereDate('ind.trade_date', $tradeDate);
-            // ->whereIn('ind.signal_code', $signalCodes)
-            // ->whereIn('ind.volume_label_code', $volumeLabelCodes);
+            ->whereDate('ind.trade_date', $tradeDate)
+            ->whereIn('ind.decision_code', $decisionCodes)
+            ->whereIn('ind.volume_label_code', $volumeLabelCodes);
 
         // Trend filter: close > ma20 > ma50 > ma200
         $q->whereNotNull('ind.close')
@@ -83,7 +83,7 @@ class WatchlistRepository
                 't.ticker_code',
                 't.company_name',
                 'ind.trade_date',
-                'ind.signal_code',
+                'ind.decision_code',
                 'ind.volume_label_code',
                 'ind.open',
                 'ind.high',
@@ -109,7 +109,7 @@ class WatchlistRepository
 
     /**
      * Untuk buylist-today: kandidat berdasarkan EOD reference.
-     * Repo sudah filter signal(4,5) + vlabel(8,9) + trend filter + rsi<=75.
+     * Repo sudah filter decision(4,5) + vlabel(8,9) + trend filter + rsi<=75.
      */
     public function getEodCandidates(string $eodDate)
     {

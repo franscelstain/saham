@@ -1,25 +1,7 @@
 /******/ (() => { // webpackBootstrap
-/******/ 	var __webpack_modules__ = ({
-
-/***/ "./resources/css/app.css"
-/*!*******************************!*\
-  !*** ./resources/css/app.css ***!
-  \*******************************/
-(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-// extracted by mini-css-extract-plugin
-
-
-/***/ },
-
-/***/ "./resources/js/screener/watchlist.js"
 /*!********************************************!*\
   !*** ./resources/js/screener/watchlist.js ***!
   \********************************************/
-() {
-
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i["return"]) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
 function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
@@ -176,7 +158,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     };
     return map[st] || 'bg-slate-500 text-white';
   }
-  function clsSignal(s) {
+  function clsDecision(s) {
     var map = {
       'Layak Beli': 'bg-emerald-600 text-white',
       'Perlu Konfirmasi': 'bg-sky-600 text-white',
@@ -393,7 +375,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
   // Data normalization
   // -------------------------
   function normalizeRow(r) {
-    var _ref, _ref2, _r$last, _ref3, _r$reason, _r$snapshot_at, _r$last_bar_at, _ref4, _r$rank, _ref5, _r$signalName, _ref6, _r$volumeLabelName;
+    var _ref, _ref2, _r$last, _ref3, _r$reason, _r$snapshot_at, _r$last_bar_at, _ref4, _r$rank, _ref5, _r$decisionName, _ref6, _r$volumeLabelName;
     return _objectSpread(_objectSpread({}, r), {}, {
       ticker: r.ticker || r.ticker_code || r.symbol,
       last: (_ref = (_ref2 = (_r$last = r.last) !== null && _r$last !== void 0 ? _r$last : r.last_price) !== null && _ref2 !== void 0 ? _ref2 : r.close) !== null && _ref !== void 0 ? _ref : r.price,
@@ -401,7 +383,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
       snapshot_at: (_r$snapshot_at = r.snapshot_at) !== null && _r$snapshot_at !== void 0 ? _r$snapshot_at : r.snapshotAt,
       last_bar_at: (_r$last_bar_at = r.last_bar_at) !== null && _r$last_bar_at !== void 0 ? _r$last_bar_at : r.lastBarAt,
       rank: (_ref4 = (_r$rank = r.rank) !== null && _r$rank !== void 0 ? _r$rank : r.rank_score) !== null && _ref4 !== void 0 ? _ref4 : r.rankScore,
-      signalName: (_ref5 = (_r$signalName = r.signalName) !== null && _r$signalName !== void 0 ? _r$signalName : r.signal_name) !== null && _ref5 !== void 0 ? _ref5 : r.signal,
+      decisionName: (_ref5 = (_r$decisionName = r.decisionName) !== null && _r$decisionName !== void 0 ? _r$decisionName : r.decision_name) !== null && _ref5 !== void 0 ? _ref5 : r.decision,
       volumeLabelName: (_ref6 = (_r$volumeLabelName = r.volumeLabelName) !== null && _r$volumeLabelName !== void 0 ? _r$volumeLabelName : r.volume_label_name) !== null && _ref6 !== void 0 ? _ref6 : r.volume_label
     });
   }
@@ -513,7 +495,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     setText('#p-h', fmtPx(ohlc.h));
     setText('#p-l', fmtPx(ohlc.l));
     setText('#p-c', fmtPx(ohlc.c));
-    setHtml('#p-badges', badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), pretty(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status) + badge(clsSignal(row === null || row === void 0 ? void 0 : row.signalName), pretty(row === null || row === void 0 ? void 0 : row.signalName), row === null || row === void 0 ? void 0 : row.signalName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), pretty(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName));
+    setHtml('#p-badges', badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), pretty(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status) + badge(clsDecision(row === null || row === void 0 ? void 0 : row.decisionName), pretty(row === null || row === void 0 ? void 0 : row.decisionName), row === null || row === void 0 ? void 0 : row.decisionName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), pretty(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName));
 
     // Rank + Reason + timestamps
     setText('#p-rank', fmt(row === null || row === void 0 ? void 0 : row.rank));
@@ -558,7 +540,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
       if (!el(q)) return;
     }
     setText('#d-ticker', fmt(row === null || row === void 0 ? void 0 : row.ticker));
-    setHtml('#d-badges', badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), pretty(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status) + badge(clsSignal(row === null || row === void 0 ? void 0 : row.signalName), pretty(row === null || row === void 0 ? void 0 : row.signalName), row === null || row === void 0 ? void 0 : row.signalName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), pretty(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName));
+    setHtml('#d-badges', badge(clsStatus(row === null || row === void 0 ? void 0 : row.status), pretty(row === null || row === void 0 ? void 0 : row.status), row === null || row === void 0 ? void 0 : row.status) + badge(clsDecision(row === null || row === void 0 ? void 0 : row.decisionName), pretty(row === null || row === void 0 ? void 0 : row.decisionName), row === null || row === void 0 ? void 0 : row.decisionName) + badge(clsVol(row === null || row === void 0 ? void 0 : row.volumeLabelName), pretty(row === null || row === void 0 ? void 0 : row.volumeLabelName), row === null || row === void 0 ? void 0 : row.volumeLabelName));
     setText('#d-last', fmt(row === null || row === void 0 ? void 0 : row.last));
     setText('#d-rank', fmt(row === null || row === void 0 ? void 0 : row.rank));
     setText('#d-entry', fmt(row === null || row === void 0 ? void 0 : row.entry));
@@ -662,11 +644,11 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
           return badge(clsStatus(c.getValue()), c.getValue(), c.getValue());
         }
       }, {
-        title: 'Signal',
-        field: 'signalName',
+        title: 'Decision',
+        field: 'decisionName',
         minWidth: 170,
         formatter: function formatter(c) {
-          return badge(clsSignal(c.getValue()), c.getValue(), c.getValue());
+          return badge(clsDecision(c.getValue()), c.getValue(), c.getValue());
         }
       }, {
         title: 'Vol',
@@ -819,6 +801,9 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     stopAuto();
     var ai = el('#auto-interval');
     var sec = parseInt((ai ? ai.value : '60') || '60', 10);
+
+    // refresh langsung biar kelihatan jalan
+    refresh()["catch"](console.error);
     state.timer = setInterval(function () {
       return refresh()["catch"](console.error);
     }, sec * 1000);
@@ -894,15 +879,16 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
         return e.target.checked ? startAuto() : stopAuto();
       });
 
-      // FIX: setelah klik pakai mouse/touch, hilangkan fokus biar toggle gak kelihatan "stuck"
-      autoRefresh.addEventListener('pointerup', function (e) {
-        if (e && e.pointerType) autoRefresh.blur();
-      });
+      // AUTO-START kalau sudah checked
+      if (autoRefresh.checked) startAuto();
     }
     var autoInterval = el('#auto-interval');
-    if (autoInterval) autoInterval.addEventListener('change', function () {
-      return el('#auto-refresh') && el('#auto-refresh').checked ? startAuto() : null;
-    });
+    if (autoInterval) {
+      autoInterval.addEventListener('change', function () {
+        var ar = el('#auto-refresh');
+        if (ar && ar.checked) startAuto();
+      });
+    }
 
     // search
     var search = el('#global-search');
@@ -943,7 +929,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
               return _context.a(2);
             case 1:
               s = state.selected;
-              text = "".concat(s.ticker, "\n") + "Status: ".concat(s.status, "\n") + "Signal: ".concat(s.signalName, "\n") + "Vol: ".concat(s.volumeLabelName, "\n") + "Last: ".concat(s.last, "\n") + "Entry: ".concat(s.entry, " | SL: ").concat(s.sl, " | TP: ").concat(s.tp, " | RR: ").concat(s.rr, "\n") + "Reason: ".concat((_s$reason = s.reason) !== null && _s$reason !== void 0 ? _s$reason : '');
+              text = "".concat(s.ticker, "\n") + "Status: ".concat(s.status, "\n") + "Decision: ".concat(s.decisionName, "\n") + "Vol: ".concat(s.volumeLabelName, "\n") + "Last: ".concat(s.last, "\n") + "Entry: ".concat(s.entry, " | SL: ").concat(s.sl, " | TP: ").concat(s.tp, " | RR: ").concat(s.rr, "\n") + "Reason: ".concat((_s$reason = s.reason) !== null && _s$reason !== void 0 ? _s$reason : '');
               _context.p = 2;
               _context.n = 3;
               return navigator.clipboard.writeText(text);
@@ -1034,155 +1020,5 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     });
   });
 })();
-
-/***/ }
-
-/******/ 	});
-/************************************************************************/
-/******/ 	// The module cache
-/******/ 	var __webpack_module_cache__ = {};
-/******/ 	
-/******/ 	// The require function
-/******/ 	function __webpack_require__(moduleId) {
-/******/ 		// Check if module is in cache
-/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
-/******/ 		if (cachedModule !== undefined) {
-/******/ 			return cachedModule.exports;
-/******/ 		}
-/******/ 		// Check if module exists (development only)
-/******/ 		if (__webpack_modules__[moduleId] === undefined) {
-/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
-/******/ 			e.code = 'MODULE_NOT_FOUND';
-/******/ 			throw e;
-/******/ 		}
-/******/ 		// Create a new module (and put it into the cache)
-/******/ 		var module = __webpack_module_cache__[moduleId] = {
-/******/ 			// no module.id needed
-/******/ 			// no module.loaded needed
-/******/ 			exports: {}
-/******/ 		};
-/******/ 	
-/******/ 		// Execute the module function
-/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
-/******/ 	
-/******/ 		// Return the exports of the module
-/******/ 		return module.exports;
-/******/ 	}
-/******/ 	
-/******/ 	// expose the modules object (__webpack_modules__)
-/******/ 	__webpack_require__.m = __webpack_modules__;
-/******/ 	
-/************************************************************************/
-/******/ 	/* webpack/runtime/chunk loaded */
-/******/ 	(() => {
-/******/ 		var deferred = [];
-/******/ 		__webpack_require__.O = (result, chunkIds, fn, priority) => {
-/******/ 			if(chunkIds) {
-/******/ 				priority = priority || 0;
-/******/ 				for(var i = deferred.length; i > 0 && deferred[i - 1][2] > priority; i--) deferred[i] = deferred[i - 1];
-/******/ 				deferred[i] = [chunkIds, fn, priority];
-/******/ 				return;
-/******/ 			}
-/******/ 			var notFulfilled = Infinity;
-/******/ 			for (var i = 0; i < deferred.length; i++) {
-/******/ 				var [chunkIds, fn, priority] = deferred[i];
-/******/ 				var fulfilled = true;
-/******/ 				for (var j = 0; j < chunkIds.length; j++) {
-/******/ 					if ((priority & 1 === 0 || notFulfilled >= priority) && Object.keys(__webpack_require__.O).every((key) => (__webpack_require__.O[key](chunkIds[j])))) {
-/******/ 						chunkIds.splice(j--, 1);
-/******/ 					} else {
-/******/ 						fulfilled = false;
-/******/ 						if(priority < notFulfilled) notFulfilled = priority;
-/******/ 					}
-/******/ 				}
-/******/ 				if(fulfilled) {
-/******/ 					deferred.splice(i--, 1)
-/******/ 					var r = fn();
-/******/ 					if (r !== undefined) result = r;
-/******/ 				}
-/******/ 			}
-/******/ 			return result;
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
-/******/ 	(() => {
-/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/make namespace object */
-/******/ 	(() => {
-/******/ 		// define __esModule on exports
-/******/ 		__webpack_require__.r = (exports) => {
-/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-/******/ 			}
-/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/jsonp chunk loading */
-/******/ 	(() => {
-/******/ 		// no baseURI
-/******/ 		
-/******/ 		// object to store loaded and loading chunks
-/******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
-/******/ 		// [resolve, reject, Promise] = chunk loading, 0 = chunk loaded
-/******/ 		var installedChunks = {
-/******/ 			"/js/screener/watchlist": 0,
-/******/ 			"css/app": 0
-/******/ 		};
-/******/ 		
-/******/ 		// no chunk on demand loading
-/******/ 		
-/******/ 		// no prefetching
-/******/ 		
-/******/ 		// no preloaded
-/******/ 		
-/******/ 		// no HMR
-/******/ 		
-/******/ 		// no HMR manifest
-/******/ 		
-/******/ 		__webpack_require__.O.j = (chunkId) => (installedChunks[chunkId] === 0);
-/******/ 		
-/******/ 		// install a JSONP callback for chunk loading
-/******/ 		var webpackJsonpCallback = (parentChunkLoadingFunction, data) => {
-/******/ 			var [chunkIds, moreModules, runtime] = data;
-/******/ 			// add "moreModules" to the modules object,
-/******/ 			// then flag all "chunkIds" as loaded and fire callback
-/******/ 			var moduleId, chunkId, i = 0;
-/******/ 			if(chunkIds.some((id) => (installedChunks[id] !== 0))) {
-/******/ 				for(moduleId in moreModules) {
-/******/ 					if(__webpack_require__.o(moreModules, moduleId)) {
-/******/ 						__webpack_require__.m[moduleId] = moreModules[moduleId];
-/******/ 					}
-/******/ 				}
-/******/ 				if(runtime) var result = runtime(__webpack_require__);
-/******/ 			}
-/******/ 			if(parentChunkLoadingFunction) parentChunkLoadingFunction(data);
-/******/ 			for(;i < chunkIds.length; i++) {
-/******/ 				chunkId = chunkIds[i];
-/******/ 				if(__webpack_require__.o(installedChunks, chunkId) && installedChunks[chunkId]) {
-/******/ 					installedChunks[chunkId][0]();
-/******/ 				}
-/******/ 				installedChunks[chunkId] = 0;
-/******/ 			}
-/******/ 			return __webpack_require__.O(result);
-/******/ 		}
-/******/ 		
-/******/ 		var chunkLoadingGlobal = self["webpackChunk"] = self["webpackChunk"] || [];
-/******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
-/******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
-/******/ 	})();
-/******/ 	
-/************************************************************************/
-/******/ 	
-/******/ 	// startup
-/******/ 	// Load entry module and return exports
-/******/ 	// This entry module depends on other loaded chunks and execution need to be delayed
-/******/ 	__webpack_require__.O(undefined, ["css/app"], () => (__webpack_require__("./resources/js/screener/watchlist.js")))
-/******/ 	var __webpack_exports__ = __webpack_require__.O(undefined, ["css/app"], () => (__webpack_require__("./resources/css/app.css")))
-/******/ 	__webpack_exports__ = __webpack_require__.O(__webpack_exports__);
-/******/ 	
 /******/ })()
 ;

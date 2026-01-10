@@ -16,7 +16,8 @@ mix.postCss('resources/css/app.css', 'public/css', [
   require('autoprefixer'),
 ]);
 
-mix.js('resources/js/screener/watchlist.js', 'public/js/screener');
+mix.js('resources/js/screener/ticker.js', 'public/js/screener')
+   .js('resources/js/screener/watchlist.js', 'public/js/screener');
 
 if (mix.inProduction()) {
   mix.version();

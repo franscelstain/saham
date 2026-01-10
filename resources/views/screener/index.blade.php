@@ -9,7 +9,7 @@
     <tr>
       <th>No</th><th>Ticker</th><th>Company</th><th>Date</th>
       <th>Close</th><th>MA20</th><th>MA50</th><th>MA200</th>
-      <th>Signal</th><th>Volume Label</th><th>VolRatio</th><th>RSI</th><th>Score</th>
+      <th>Decision</th><th>Volume Label</th><th>VolRatio</th><th>RSI</th><th>Score</th>
     </tr>
   </thead>
   <tbody>
@@ -24,7 +24,7 @@
         <td>{{ $r->ma20 }}</td>
         <td>{{ $r->ma50 }}</td>
         <td>{{ $r->ma200 }}</td>
-        <td>{{ $r->signal_name }}</td>
+        <td>{{ $r->decision_name }}</td>
         <td>{{ $r->volume_label_name }}</td>
         <td>{{ $r->vol_ratio }}</td>
         <td>{{ $r->rsi14 }}</td>

@@ -15,7 +15,7 @@ class ScreenerComputeDaily extends Command
         {--chunk=200 : Chunk tickers per batch}
         {--lookback=420 : Lookback days untuk ambil OHLC (default 420)}';
 
-    protected $description = 'Compute daily indicators + signals + scores and upsert into ticker_indicators_daily';
+    protected $description = 'Compute daily indicators + decision + scores and upsert into ticker_indicators_daily';
 
     public function handle(): int
     {
@@ -111,7 +111,7 @@ class ScreenerComputeDaily extends Command
                         'vol_sma20','vol_ratio',
                         'rsi14','atr14',
                         'support_20d','resistance_20d',
-                        'signal_code','volume_label_code',
+                        'decision_code','volume_label_code',
                         'score_total','score_trend','score_momentum','score_volume','score_breakout','score_risk',
                         'source','is_deleted','updated_at'
                     ]
@@ -224,7 +224,7 @@ class ScreenerComputeDaily extends Command
 
         $rsiOk = ($rsi14 !== null) && ($rsi14 <= 75.0);
 
-        // Untuk signal 4/5 wajib volume burst minimal
+        // Untuk decision 4/5 wajib volume burst minimal
         $volOk = ($volRatio !== null && $volRatio >= 1.5);
 
         // ===== Scoring (simple + konsisten) =====
@@ -263,29 +263,29 @@ class ScreenerComputeDaily extends Command
 
         $scoreTotal = $scoreTrend + $scoreMomentum + $scoreVolume + $scoreBreakout + $scoreRisk;
 
-        // ===== Signal final (disinkronkan dengan operasional buylist) =====
+        // ===== Decision final (disinkronkan dengan operasional buylist) =====
         // 1 False Breakout / Batal
-        // 2 Hati-hati (tunggu volume / overheat)
-        // 3 Hindari (trend chain tidak terpenuhi / data tidak cukup)
+        // 2 Hindari (trend chain tidak terpenuhi / data tidak cukup)
+        // 3 Hati-hati (tunggu volume / overheat)
         // 4 Perlu Konfirmasi (trend+rsi+volume ok, belum breakout confirm)
         // 5 Layak Beli (trend+rsi+volume ok + breakout)
-        $signalCode = 3;
+        $decisionCode = 2;
 
         if ($falseBreakout) {
-            $signalCode = 1;
+            $decisionCode = 1;
         } else {
             // Jika MA chain belum kebentuk, jangan bikin seolah “jelek” tapi kita tetap set aman = Hindari
             if (!$trendOk) {
-                $signalCode = 3;
+                $decisionCode = 2;
             } else {
                 if (!$rsiOk) {
-                    $signalCode = 2;
+                    $decisionCode = 3;
                 } else {
                     // di sini trend+rsi ok
                     if (!$volOk) {
-                        $signalCode = 2; // tunggu volume (biar gak muncul “Perlu Konfirmasi” tapi vol normal/lemah)
+                        $decisionCode = 3; // tunggu volume (biar gak muncul “Perlu Konfirmasi” tapi vol normal/lemah)
                     } else {
-                        $signalCode = $isBreakout ? 5 : 4;
+                        $decisionCode = $isBreakout ? 5 : 4;
                     }
                 }
             }
@@ -314,7 +314,7 @@ class ScreenerComputeDaily extends Command
             'support_20d'       => $support20,
             'resistance_20d'    => $resist20,
 
-            'signal_code'       => $signalCode,
+            'decision_code'     => $decisionCode,
             'volume_label_code' => $volumeLabel,
 
             'score_total'       => (int) $scoreTotal,
@@ -440,12 +440,12 @@ class ScreenerComputeDaily extends Command
     {
         if ($volRatio === null) return null;
 
-        if ($volRatio >= 3.0) return 10; // Climax / Euphoria
-        if ($volRatio >= 2.0) return 9;  // Strong Burst / Breakout
-        if ($volRatio >= 1.5) return 8;  // Volume Burst / Accumulation
-        if ($volRatio >= 1.0) return 6;  // Normal
-        if ($volRatio >= 0.7) return 5;  // Quiet
+        if ($volRatio >= 3.0) return 8; // Climax / Euphoria
+        if ($volRatio >= 2.0) return 7;  // Strong Burst / Breakout
+        if ($volRatio >= 1.5) return 6;  // Volume Burst / Accumulation
+        if ($volRatio >= 1.0) return 4;  // Normal
+        if ($volRatio >= 0.7) return 3;  // Quiet
         if ($volRatio >= 0.4) return 2;  // Quiet/Normal – Volume lemah
-        return 4; // Dormant (sangat sepi)
+        return 1; // Dormant (sangat sepi)
     }
 }

@@ -46,15 +46,15 @@ class WatchlistController extends Controller
                     'd.rsi14',
                     'd.vol_ratio',
                     'd.score_total',
-                    'd.signal_code',
+                    'd.decision_code',
                     'd.volume_label_code',
                 ])
-                ->orderByDesc('d.signal_code')
+                ->orderByDesc('d.decision_code')
                 ->orderByDesc('d.volume_label_code')
                 ->orderByDesc('d.score_total')
                 ->get()
                 ->map(function ($r) {
-                    $r->signal_name = $this->svc->signalName((int) $r->signal_code);
+                    $r->decision_name = $this->svc->decisionName((int) $r->decision_code);
                     $r->volume_label_name = $this->svc->volumeLabelName($r->volume_label_code !== null ? (int) $r->volume_label_code : null);
                     return $r;
                 });

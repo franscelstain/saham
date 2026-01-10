@@ -45,8 +45,9 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->decimal('resistance_20d', 18, 4)->nullable();
 
             // hasil klasifikasi (yang kamu mau)
-            $table->unsignedTinyInteger('signal_code')->default(4); // 1..5
-            $table->unsignedTinyInteger('volume_label_code')->nullable(); // 1..10
+            $table->unsignedTinyInteger('decision_code')->default(4); // 1..10
+            $table->unsignedTinyInteger('signal_code')->default(4); // 1..10
+            $table->unsignedTinyInteger('volume_label_code')->nullable(); // 1..8
 
             // scoring
             $table->smallInteger('score_total')->default(0);

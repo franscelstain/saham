@@ -135,7 +135,7 @@
     return map[st] || 'bg-slate-500 text-white';
   }
 
-  function clsSignal(s) {
+  function clsDecision(s) {
     const map = {
       'Layak Beli': 'bg-emerald-600 text-white',
       'Perlu Konfirmasi': 'bg-sky-600 text-white',
@@ -342,7 +342,7 @@
       snapshot_at: r.snapshot_at ?? r.snapshotAt,
       last_bar_at: r.last_bar_at ?? r.lastBarAt,
       rank: r.rank ?? r.rank_score ?? r.rankScore,
-      signalName: r.signalName ?? r.signal_name ?? r.signal,
+      decisionName: r.decisionName ?? r.decision_name ?? r.decision,
       volumeLabelName: r.volumeLabelName ?? r.volume_label_name ?? r.volume_label,
     };
   }
@@ -422,7 +422,7 @@
 
     setHtml('#p-badges',
       badge(clsStatus(row?.status), pretty(row?.status), row?.status) +
-      badge(clsSignal(row?.signalName), pretty(row?.signalName), row?.signalName) +
+      badge(clsDecision(row?.decisionName), pretty(row?.decisionName), row?.decisionName) +
       badge(clsVol(row?.volumeLabelName), pretty(row?.volumeLabelName), row?.volumeLabelName)
     );
 
@@ -470,7 +470,7 @@
     setText('#d-ticker', fmt(row?.ticker));
     setHtml('#d-badges',
       badge(clsStatus(row?.status), pretty(row?.status), row?.status) +
-      badge(clsSignal(row?.signalName), pretty(row?.signalName), row?.signalName) +
+      badge(clsDecision(row?.decisionName), pretty(row?.decisionName), row?.decisionName) +
       badge(clsVol(row?.volumeLabelName), pretty(row?.volumeLabelName), row?.volumeLabelName)
     );
 
@@ -554,8 +554,8 @@
           formatter: (c) => badge(clsStatus(c.getValue()), c.getValue(), c.getValue()),
         },
         {
-          title: 'Signal', field: 'signalName', minWidth: 170,
-          formatter: (c) => badge(clsSignal(c.getValue()), c.getValue(), c.getValue()),
+          title: 'Decision', field: 'decisionName', minWidth: 170,
+          formatter: (c) => badge(clsDecision(c.getValue()), c.getValue(), c.getValue()),
         },
         {
           title: 'Vol', field: 'volumeLabelName', minWidth: 220, widthGrow: 1,
@@ -658,9 +658,15 @@
 
   function startAuto() {
     stopAuto();
-    const ai = el('#auto-interval');
-    const sec = parseInt((ai ? ai.value : '60') || '60', 10);
-    state.timer = setInterval(() => refresh().catch(console.error), sec * 1000);
+    var ai = el('#auto-interval');
+    var sec = parseInt((ai ? ai.value : '60') || '60', 10);
+
+    // refresh langsung biar kelihatan jalan
+    refresh().catch(console.error);
+
+    state.timer = setInterval(function () {
+      return refresh().catch(console.error);
+    }, sec * 1000);
   }
 
   function stopAuto() {
@@ -728,15 +734,21 @@
     // auto refresh
     const autoRefresh = el('#auto-refresh');
     if (autoRefresh) {
-      autoRefresh.addEventListener('change', (e) => e.target.checked ? startAuto() : stopAuto());
+      autoRefresh.addEventListener('change', function (e) {
+        return e.target.checked ? startAuto() : stopAuto();
+      });
 
-      // FIX: setelah klik pakai mouse/touch, hilangkan fokus biar toggle gak kelihatan "stuck"
-      autoRefresh.addEventListener('pointerup', (e) => {
-        if (e && e.pointerType) autoRefresh.blur();
+      // AUTO-START kalau sudah checked
+      if (autoRefresh.checked) startAuto();
+    }
+
+    const autoInterval = el('#auto-interval');
+    if (autoInterval) {
+      autoInterval.addEventListener('change', () => {
+        const ar = el('#auto-refresh');
+        if (ar && ar.checked) startAuto();
       });
     }
-    const autoInterval = el('#auto-interval');
-    if (autoInterval) autoInterval.addEventListener('change', () => (el('#auto-refresh') && el('#auto-refresh').checked) ? startAuto() : null);
 
     // search
     const search = el('#global-search');
@@ -768,7 +780,7 @@
         const text =
           `${s.ticker}\n` +
           `Status: ${s.status}\n` +
-          `Signal: ${s.signalName}\n` +
+          `Decision: ${s.decisionName}\n` +
           `Vol: ${s.volumeLabelName}\n` +
           `Last: ${s.last}\n` +
           `Entry: ${s.entry} | SL: ${s.sl} | TP: ${s.tp} | RR: ${s.rr}\n` +
