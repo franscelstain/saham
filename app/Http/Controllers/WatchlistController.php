@@ -16,9 +16,11 @@ class WatchlistController extends Controller
 
     public function preopen()
     {
+        $candidates = $this->watchlistService->preopenRaw();
+        $eodDate = $candidates[0]['tradeDate'] ?? Carbon::now()->toDateString();
         return response()->json([
-            'eod_date' => Carbon::now()->toDateString(),
-            'candidates' => $this->watchlistService->preopenRaw(),
+            'eod_date' => $eodDate,
+            'candidates' => $candidates,
         ]);
     }
 }
