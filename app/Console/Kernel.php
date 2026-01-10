@@ -13,7 +13,7 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        \App\Console\Commands\IntradayCaptureCommand::class,
+        \App\Console\Commands\ComputeEod::class,
     ];
 
     /**
@@ -24,9 +24,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $schedule->command('intraday:capture --limit=150 --concurrency=15 --interval=1m')
-            ->everyMinute()
-            ->withoutOverlapping(2);
+        
     }
 
     /**

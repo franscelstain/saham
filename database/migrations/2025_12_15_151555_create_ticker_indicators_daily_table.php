@@ -45,8 +45,13 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->decimal('resistance_20d', 18, 4)->nullable();
 
             // hasil klasifikasi (yang kamu mau)
-            $table->unsignedTinyInteger('signal_code')->default(4); // 1..5
-            $table->unsignedTinyInteger('volume_label_code')->nullable(); // 1..10
+            $table->unsignedTinyInteger('decision_code')->default(1); // 1..5
+            $table->unsignedTinyInteger('signal_code')->nullable(); // 1..10
+            $table->unsignedTinyInteger('volume_label_code')->nullable(); // 1..8
+
+            // Tanggal pertama kali sinyal ini muncul (streak start)
+            $table->date('signal_first_seen_date')->nullable();
+            $table->smallInteger('signal_age_days')->default(0);
 
             // scoring
             $table->smallInteger('score_total')->default(0);
@@ -69,6 +74,7 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->index(['trade_date', 'vol_ratio'], 'idx_ind_date_volratio');
             $table->index(['trade_date', 'signal_code', 'volume_label_code', 'score_total'], 'idx_ind_candidates');
             $table->index(['trade_date', 'rsi14', 'ma20', 'ma50', 'ma200'], 'idx_ind_trend_filter');
+            $table->index(['trade_date', 'signal_code', 'signal_age_days'], 'idx_ti_trade_signal_age');
 
             $table->foreign('ticker_id', 'fk_ind_daily_ticker')
                 ->references('ticker_id')->on('tickers')
