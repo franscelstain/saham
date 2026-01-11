@@ -16,25 +16,30 @@ class WatchlistService
 {
     private WatchlistRepository $watchRepo;
     private TradePlanService $planService;
-    private WatchlistHardFilter $filter;
-    private SetupClassifier $classifier;
+
+    private WatchlistSelector $selector;
     private ExpiryEvaluator $expiry;
     private WatchlistRanker $ranker;
+
+    private WatchlistPresenter $presenter;
+    private WatchlistSorter $sorter;
 
     public function __construct(WatchlistRepository $watchRepo, TradePlanService $planService)
     {
         $this->watchRepo = $watchRepo;
         $this->planService = $planService;
 
-        $this->filter = new WatchlistHardFilter(
+        $filter = new WatchlistHardFilter(
             new TrendFilter(),
             new RsiFilter((float) config('trade.watchlist.rsi_max', 70)),
             new LiquidityFilter((float) config('trade.watchlist.min_value_est', 1000000000))
         );
 
-        $this->classifier = new SetupClassifier(
+        $classifier = new SetupClassifier(
             (float) config('trade.watchlist.rsi_confirm_from', 66)
         );
+
+        $this->selector = new WatchlistSelector($filter, $classifier);
 
         $this->expiry = new ExpiryEvaluator(
             (bool) config('trade.watchlist.expiry_enabled', true),
@@ -48,71 +53,36 @@ class WatchlistService
             (float) config('trade.watchlist.ranking_rr_min', 1.2),
             (array) config('trade.watchlist.ranking_weights', [])
         );
+
+        $this->presenter = new WatchlistPresenter();
+        $this->sorter = new WatchlistSorter();
     }
 
     public function preopenRaw(): array
     {
         $raw = $this->watchRepo->getEodCandidates();
-        $eligible = [];
+        $selected = $this->selector->select($raw);
 
-        foreach ($raw as $c) {
-            $outcome = $this->filter->evaluate($c);
-            if (!$outcome->eligible) continue;
+        $rows = [];
 
-            $setupStatus = $this->classifier->classify($c);
+        foreach ($selected as $item) {
+            $c = $item['candidate'];
+            $outcome = $item['outcome'];
+            $setupStatus = $item['setupStatus'];
+
             $plan = $this->planService->buildFromCandidate($c);
             $expiry = $this->expiry->evaluate($c);
 
-            $row = [
-                'tickerId' => $c->tickerId,
-                'code' => $c->code,
-                'name' => $c->name,
-                'close' => $c->close,
-                'ma20' => $c->ma20,
-                'ma50' => $c->ma50,
-                'ma200' => $c->ma200,
-                'rsi' => $c->rsi,
-                'volume' => $c->volume,
-                'valueEst' => $c->valueEst,
-                'tradeDate' => $c->tradeDate,
-
-                'decisionCode' => $c->decisionCode,
-                'decisionLabel' => $c->decisionLabel,
-                'signalCode' => $c->signalCode,
-                'signalLabel' => $c->signalLabel,
-                'volumeLabelCode' => $c->volumeLabelCode,
-                'volumeLabel' => $c->volumeLabel,
-
-                'setupStatus' => $setupStatus,
-                'reasons' => array_map(fn($r) => $r->code, $outcome->passed()),
-
-                'plan' => $plan,
-                'expiryStatus' => $expiry['expiryStatus'],
-                'isExpired' => $expiry['isExpired'],
-                'signalAgeDays' => $c->signalAgeDays,
-                'signalFirstSeenDate' => $c->signalFirstSeenDate,
-            ];
+            $row = $this->presenter->baseRow($c, $outcome, $setupStatus, $plan, $expiry);
 
             $rank = $this->ranker->rank($row);
-            $row['rankScore'] = $rank['score'];
-            $row['rankReasons'] = $rank['reasons'];
+            $row = $this->presenter->attachRank($row, $rank);
 
-            $eligible[] = $row;
+            $rows[] = $row;
         }
 
-        usort($eligible, function ($a, $b) {
-            $s = ($b['rankScore'] ?? 0) <=> ($a['rankScore'] ?? 0);
-            if ($s !== 0) return $s;
+        $this->sorter->sort($rows);
 
-            // tie-breaker: liquidity desc
-            $l = ($b['valueEst'] ?? 0) <=> ($a['valueEst'] ?? 0);
-            if ($l !== 0) return $l;
-
-            // tie-breaker: rr desc
-            $r = (($b['plan']['rrTp2'] ?? 0) <=> ($a['plan']['rrTp2'] ?? 0));
-            return $r;
-        });
-
-        return $eligible;
+        return $rows;
     }
 }
