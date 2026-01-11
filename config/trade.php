@@ -65,14 +65,31 @@ return [
         ],
     ],
     'watchlist' => [
+        'bucket_top_min_score' => env('WATCHLIST_BUCKET_TOP_MIN_SCORE', 60),
+        'bucket_watch_min_score' => env('WATCHLIST_BUCKET_WATCH_MIN_SCORE', 35),
         'expiry_aging_from_days' => env('WATCHLIST_EXPIRY_AGING_FROM_DAYS', 2), // label banding umur (buat UI)
         'expiry_apply_to_decisions' => [4, 5], // default: Perlu Konfirmasi (4) & Layak Beli (5)
         'expiry_enabled' => env('WATCHLIST_EXPIRY_ENABLED', true),
         'expiry_max_age_days' => env('WATCHLIST_EXPIRY_MAX_AGE_DAYS', 3), // max umur sinyal (hari). 0 = hari pertama muncul.
         'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),
         'ranking_enabled' => env('WATCHLIST_RANKING_ENABLED', true),
+        'ranking_penalty_plan_invalid' => env('WATCHLIST_RANKING_PENALTY_PLAN_INVALID', 30),
+        'ranking_penalty_rr_below_min' => env('WATCHLIST_RANKING_PENALTY_RR_BELOW_MIN', 20),
         'ranking_rr_min' => env('WATCHLIST_RANKING_RR_MIN', 1.2), // Minimal RR TP2 biar kandidat gak ngaco (soft: bukan filter, tapi penalty)
         // Weight v1 (simple)
+        'ranking_signal_weights' => [
+            5 => 18,
+            4 => 12,
+            6 => 10,
+            7 => 8,
+            3 => 6,
+            2 => 4,
+            1 => 0,
+            8 => -10,
+            9 => -15,
+            10 => -25,
+            0 => -3,
+        ],
         'ranking_weights' => [
             'setup_ok' => 40,
             'setup_confirm' => 25,
