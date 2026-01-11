@@ -71,7 +71,8 @@ return [
         'expiry_apply_to_decisions' => [4, 5], // default: Perlu Konfirmasi (4) & Layak Beli (5)
         'expiry_enabled' => env('WATCHLIST_EXPIRY_ENABLED', true),
         'expiry_max_age_days' => env('WATCHLIST_EXPIRY_MAX_AGE_DAYS', 3), // max umur sinyal (hari). 0 = hari pertama muncul.
-        'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),
+        'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),        
+        'preopen_cache_seconds' => env('WATCHLIST_PREOPEN_CACHE_SECONDS', 15),
         'ranking_enabled' => env('WATCHLIST_RANKING_ENABLED', true),
         'ranking_penalty_plan_invalid' => env('WATCHLIST_RANKING_PENALTY_PLAN_INVALID', 30),
         'ranking_penalty_rr_below_min' => env('WATCHLIST_RANKING_PENALTY_RR_BELOW_MIN', 20),
@@ -119,5 +120,9 @@ return [
         ],
         'rsi_max' => env('WATCHLIST_RSI_MAX', 70),
         'rsi_confirm_from' => env('WATCHLIST_RSI_CONFIRM_FROM', 66),
+        'top_picks_max' => env('WATCHLIST_TOP_PICKS_MAX', 5),
+        'top_picks_min_score' => env('WATCHLIST_TOP_PICKS_MIN_SCORE', 60),
+        'top_picks_require_not_expired' => env('WATCHLIST_TOP_PICKS_REQUIRE_NOT_EXPIRED', true),
+        'top_picks_require_setup_ok' => env('WATCHLIST_TOP_PICKS_REQUIRE_SETUP_OK', true),
     ],
 ];

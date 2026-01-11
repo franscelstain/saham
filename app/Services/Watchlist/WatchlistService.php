@@ -47,7 +47,18 @@ class WatchlistService
         }
 
         $pipe->sorter->sort($rows);
+        
+        $grouped = $pipe->grouper->group($rows);
+        $eodDate = $rows[0]['tradeDate'] ?? null;
 
-        return $rows;
+        $grouped['meta'] = array_merge($grouped['meta'] ?? [], [
+            'top_picks_max'   => (int) config('trade.watchlist.top_picks_max', 5)
+        ]);
+
+        return [
+            'eod_date' => $eodDate,
+            'groups'   => $grouped['groups'] ?? ['top_picks' => [], 'watch' => [], 'avoid' => []],
+            'meta'     => $grouped['meta'] ?? [],
+        ];
     }
 }

@@ -44,17 +44,26 @@ class WatchlistPipelineFactory
         $weights['signal_weights'] = (array) config('trade.watchlist.ranking_signal_weights', []);
         $weights['penalty_plan_invalid'] = -abs((int) config('trade.watchlist.ranking_penalty_plan_invalid', 30));
         $weights['penalty_rr_below_min'] = -abs((int) config('trade.watchlist.ranking_penalty_rr_below_min', 20));
+        $rrMin = (float) config('trade.watchlist.ranking_rr_min', 1.2);
 
         $ranker = new WatchlistRanker(
             (bool) config('trade.watchlist.ranking_enabled', true),
-            (float) config('trade.watchlist.ranking_rr_min', 1.2),
+            $rrMin,
             $weights
         );
 
         $bucketer = new WatchlistBucketer(
             (int) config('trade.watchlist.bucket_top_min_score', 60),
             (int) config('trade.watchlist.bucket_watch_min_score', 35),
-            (float) config('trade.watchlist.ranking_rr_min', 1.2)
+            $rrMin
+        );
+
+        $grouper = new WatchlistGrouper(
+            (int) config('trade.watchlist.top_picks_max', 5),
+            (int) config('trade.watchlist.top_picks_min_score', 60),
+            (bool) config('trade.watchlist.top_picks_require_setup_ok', true),
+            (bool) config('trade.watchlist.top_picks_require_not_expired', true),
+            $rrMin
         );
 
         $presenter = new WatchlistPresenter();
@@ -66,7 +75,8 @@ class WatchlistPipelineFactory
             $ranker,
             $bucketer,
             $presenter,
-            $sorter
+            $sorter,
+            $grouper
         );
     }
 }

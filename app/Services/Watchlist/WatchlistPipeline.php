@@ -14,6 +14,7 @@ class WatchlistPipeline
     public WatchlistBucketer $bucketer;
     public WatchlistPresenter $presenter;
     public WatchlistSorter $sorter;
+    public WatchlistGrouper $grouper;
 
     public function __construct(
         WatchlistSelector $selector,
@@ -21,7 +22,8 @@ class WatchlistPipeline
         WatchlistRanker $ranker,
         WatchlistBucketer $bucketer,
         WatchlistPresenter $presenter,
-        WatchlistSorter $sorter
+        WatchlistSorter $sorter,
+        WatchlistGrouper $grouper
     ) {
         $this->selector = $selector;
         $this->expiry = $expiry;
@@ -29,5 +31,6 @@ class WatchlistPipeline
         $this->bucketer = $bucketer;
         $this->presenter = $presenter;
         $this->sorter = $sorter;
+        $this->grouper = $grouper;
     }
 }
