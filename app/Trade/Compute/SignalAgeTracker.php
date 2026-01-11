@@ -5,57 +5,40 @@ namespace App\Trade\Compute;
 class SignalAgeTracker
 {
     /**
-     * Upgrade Expiry Basis (Opsi A):
-     * - Age dihitung berdasarkan "BUY-ish bucket" (decision_code 4/5), bukan decision exact.
-     * - Tujuan: expiry lebih stabil; tidak reset hanya karena 4 <-> 5.
+     * Pure logic. Tidak query DB.
      *
-     * BUY-ish = decision_code in (4, 5)
-     *
-     * Rules:
-     * - Jika current bukan BUY-ish => reset (age=0, first_seen=tradeDate)
-     * - Jika prev tidak ada => (age=0, first_seen=tradeDate)
-     * - Jika prev BUY-ish dan current BUY-ish => age=prev_age+1, first_seen=prev_first_seen (fallback prevTradeDate)
-     * - Jika prev bukan BUY-ish dan current BUY-ish => age=0, first_seen=tradeDate
+     * @param int $tickerId
+     * @param string $tradeDate YYYY-MM-DD
+     * @param int $signalCode current
+     * @param array|null $prevState ['signal_code'=>int,'signal_first_seen_date'=>?string]
      */
-    public function computeDecisionAge(
-        int $currentDecisionCode,
-        $prevSnapshot,
-        string $tradeDate,
-        ?string $prevTradeDate
-    ): array {
-        // default reset
-        $firstSeen = $tradeDate;
-        $age = 0;
-
-        $currentBuyish = $this->isBuyish($currentDecisionCode);
-
-        // kalau hari ini bukan BUY-ish, selalu reset (expiry tidak relevan)
-        if (!$currentBuyish) {
+    public function computeFromPrev(int $tickerId, string $tradeDate, int $signalCode, ?array $prevState): array
+    {
+        if (!$prevState) {
             return [
-                'signal_first_seen_date' => $firstSeen,
-                'signal_age_days' => $age,
+                'signal_first_seen_date' => $tradeDate,
+                'signal_age_days' => 0,
             ];
         }
 
-        // hari ini BUY-ish, cek prev
-        if ($prevSnapshot && $prevTradeDate) {
-            $prevDecision = (int) $prevSnapshot->decision_code;
-            $prevBuyish = $this->isBuyish($prevDecision);
+        $prevSignal = (int) ($prevState['signal_code'] ?? 0);
+        $prevFirstSeen = $prevState['signal_first_seen_date'] ?? null;
 
-            if ($prevBuyish) {
-                $age = ((int)($prevSnapshot->signal_age_days ?? 0)) + 1;
-                $firstSeen = $prevSnapshot->signal_first_seen_date ?: $prevTradeDate;
-            }
+        if ($prevSignal === (int) $signalCode && $prevFirstSeen) {
+            $firstSeen = (string) $prevFirstSeen;
+
+            $ageDays = (int) floor((strtotime($tradeDate) - strtotime($firstSeen)) / 86400);
+            if ($ageDays < 0) $ageDays = 0;
+
+            return [
+                'signal_first_seen_date' => $firstSeen,
+                'signal_age_days' => $ageDays,
+            ];
         }
 
         return [
-            'signal_first_seen_date' => $firstSeen,
-            'signal_age_days' => $age,
+            'signal_first_seen_date' => $tradeDate,
+            'signal_age_days' => 0,
         ];
-    }
-
-    private function isBuyish(int $decisionCode): bool
-    {
-        return in_array($decisionCode, [4, 5], true);
     }
 }

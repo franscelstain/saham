@@ -6,18 +6,23 @@ use Illuminate\Support\Facades\DB;
 
 class TickerIndicatorsDailyRepository
 {
-    public function getPrevSnapshot(int $tickerId, string $prevTradeDate)
+    public function getPrevSignalStateMap(string $prevTradeDate): array
     {
-        return DB::table('ticker_indicators_daily')
-            ->select([
-                'ticker_id', 'trade_date',
-                'decision_code',
-                'signal_first_seen_date',
-                'signal_age_days',
-            ])
-            ->where('ticker_id', $tickerId)
+        $rows = DB::table('ticker_indicators_daily')
+            ->where('is_deleted', 0)
             ->where('trade_date', $prevTradeDate)
-            ->first();
+            ->select(['ticker_id', 'signal_code', 'signal_first_seen_date'])
+            ->get();
+
+        $map = [];
+        foreach ($rows as $r) {
+            $map[(int) $r->ticker_id] = [
+                'signal_code' => (int) ($r->signal_code ?? 0),
+                'signal_first_seen_date' => $r->signal_first_seen_date ? (string) $r->signal_first_seen_date : null,
+            ];
+        }
+
+        return $map;
     }
 
     public function upsert(array $row): void

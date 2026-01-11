@@ -60,6 +60,7 @@ class ComputeEodService
         }
 
         $prev = $this->cal->previousTradingDate($date);
+        $prevStateMap = $prev ? $this->ind->getPrevSignalStateMap($prev) : [];
 
         $lookback = (int) config('trade.compute.lookback_days', 260);
         $startDate = Carbon::parse($date)->subDays($lookback + 60)->toDateString();
@@ -133,10 +134,12 @@ class ComputeEodService
 
             $decisionCode = $this->decision->classify($metrics);
             $volumeLabelCode = $this->volume->classify($volRatio);
-            $patternCode = $this->pattern->classify($metrics); // null
+            $patternCode = $this->pattern->classify($metrics);
 
-            $prevSnap = ($prev) ? $this->ind->getPrevSnapshot($tickerId, $prev) : null;
-            $age = $this->age->computeDecisionAge($decisionCode, $prevSnap, $date, $prev);
+            $prevSnap = $prevStateMap[$tickerId] ?? null;
+
+            // age basis signal_code (pattern), bukan decision_code
+            $age = $this->age->computeFromPrev($tickerId, $date, $patternCode, $prevSnap);
 
             // upsert
             $row = [

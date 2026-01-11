@@ -52,6 +52,7 @@ class ReasonCatalog
     public static function signalBadgeClass(int $signalCode): string
     {
         $map = [
+            0 => 'bg-slate-400 text-slate-900',
             1 => 'bg-slate-500 text-white',   // Base / Sideways
             2 => 'bg-sky-600 text-white',     // Early Uptrend
             3 => 'bg-green-600 text-white', // Accumulation
@@ -102,6 +103,7 @@ class ReasonCatalog
     private static function signalMap(): array
     {
         return [
+            0 => 'Unknown',
             1 => 'Base / Sideways', // Konsolidasi
             2 => 'Early Uptrend', // Trend mulai terbentuk
             3 => 'Accumulation', // Harga stabil + volume menguat

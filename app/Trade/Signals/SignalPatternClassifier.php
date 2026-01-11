@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Trade\Compute\Classifiers;
+namespace App\Trade\Signals;
 
-class PatternClassifier
+class SignalPatternClassifier
 {
     /**
-     * Return signal_code (0..10).
-     * V1: deterministic, EOD-only. Tidak pakai intraday.
+     * Kembalikan signal_code (0..10).
+     * Input: array metrics EOD yg sudah ada di ticker_indicators_daily.
      */
     public function classify(array $m): int
     {
@@ -22,7 +22,7 @@ class PatternClassifier
 
         $rsi = (float) ($m['rsi14'] ?? 0);
 
-        $volRatio = $m['vol_ratio'] ?? null;
+        $volRatio = $m['vol_ratio'] ?? null; // kalau ada
         $volRatio = $volRatio !== null ? (float) $volRatio : null;
 
         $support = $m['support_20d'] ?? null;
@@ -30,9 +30,9 @@ class PatternClassifier
         $support = $support !== null ? (float) $support : null;
         $res     = $res !== null ? (float) $res : null;
 
-        // close position in candle range (0..1)
+        // --- Helper
         $range = max(1e-9, $high - $low);
-        $pos = ($close - $low) / $range;
+        $pos = ($close - $low) / $range; // 0..1 close position in range
         $nearHigh = $pos >= 0.75;
 
         $maStackBull = ($ma20 > 0 && $ma50 > 0 && $ma200 > 0 && $ma20 > $ma50 && $ma50 > $ma200);
@@ -42,28 +42,28 @@ class PatternClassifier
         $volStrong = ($volRatio !== null && $volRatio >= 2.0);
         $volBurst  = ($volRatio !== null && $volRatio >= 1.5);
 
-        // 9) Climax/Euphoria
+        // 9) Climax/Euphoria: RSI tinggi + volume kuat + close near high
         if ($rsi >= 80 && ($volStrong || $volBurst) && $nearHigh) {
             return 9;
         }
 
-        // 4/5) Breakout
+        // 4/5) Breakout: close > resistance
         if ($res !== null && $close > $res) {
-            if ($nearHigh && ($volStrong || $volBurst)) return 5; // Strong Breakout
-            return 4; // Breakout
+            if ($nearHigh && ($volStrong || $volBurst)) return 5; // strong breakout
+            return 4; // breakout biasa
         }
 
-        // 10) False Breakout: high > res tapi close <= res
+        // 10) False breakout: high sempat tembus resistance tapi close balik bawah
         if ($res !== null && $high > $res && $close <= $res) {
             return 10;
         }
 
-        // 6) Breakout retest: close sangat dekat resistance (+/-1%)
+        // 6) Breakout retest: close dekat resistance (retest) tapi tetap di atas MA20/MA50
         if ($res !== null && abs($close - $res) / $res <= 0.01 && ($aboveMA20 || $aboveMA50)) {
             return 6;
         }
 
-        // 7) Pullback healthy: uptrend + mid-range
+        // 7) Pullback healthy: close turun tapi masih di atas MA20/MA50 + MA stack bullish
         if ($maStackBull && ($aboveMA20 || $aboveMA50) && $pos >= 0.35 && $pos <= 0.65) {
             return 7;
         }
@@ -73,17 +73,17 @@ class PatternClassifier
             return 3;
         }
 
-        // 8) Distribution: volume kuat tapi close gak kuat (pos rendah)
+        // 8) Distribution: volume kuat tapi close tidak near high (pos rendah/ tengah)
         if (($volBurst || $volStrong) && $pos < 0.55) {
             return 8;
         }
 
-        // 2) Early uptrend
+        // 2) Early uptrend: MA stack mulai bagus + close di atas MA20/50 + RSI moderate
         if ($maStackBull && $aboveMA20 && $aboveMA50 && $rsi >= 50 && $rsi <= 75) {
             return 2;
         }
 
-        // 1) Base/Sideways
+        // 1) Base/Sideways: fallback saat belum ada pola jelas
         return 1;
     }
 }
