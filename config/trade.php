@@ -65,8 +65,42 @@ return [
         ],
     ],
     'watchlist' => [
+        'expiry_aging_from_days' => env('WATCHLIST_EXPIRY_AGING_FROM_DAYS', 2), // label banding umur (buat UI)
+        'expiry_apply_to_decisions' => [4, 5], // default: Perlu Konfirmasi (4) & Layak Beli (5)
+        'expiry_enabled' => env('WATCHLIST_EXPIRY_ENABLED', true),
+        'expiry_max_age_days' => env('WATCHLIST_EXPIRY_MAX_AGE_DAYS', 3), // max umur sinyal (hari). 0 = hari pertama muncul.
+        'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),
+        'ranking_enabled' => env('WATCHLIST_RANKING_ENABLED', true),
+        'ranking_rr_min' => env('WATCHLIST_RANKING_RR_MIN', 1.2), // Minimal RR TP2 biar kandidat gak ngaco (soft: bukan filter, tapi penalty)
+        // Weight v1 (simple)
+        'ranking_weights' => [
+            'setup_ok' => 40,
+            'setup_confirm' => 25,
+
+            'decision_5' => 20, // Layak Beli
+            'decision_4' => 10, // Perlu Konfirmasi
+
+            'volume_strong_burst' => 15, // code 7 (Strong Burst / Breakout)
+            'volume_burst' => 10,        // code 6 (Volume Burst / Accumulation)
+            'volume_early' => 5,         // code 5 (Early Interest)
+
+            'fresh_age_0' => 10,
+            'fresh_age_1' => 7,
+            'fresh_age_2' => 4,
+
+            'aging' => -8,
+            'expired' => -25,
+
+            'liq_5b' => 10,
+            'liq_2b' => 6,
+            'liq_1b' => 3,
+
+            'rr_ge_2' => 15,
+            'rr_ge_15' => 10,
+            'rr_ge_12' => 5,
+            'rr_lt_min_penalty' => -15,
+        ],
         'rsi_max' => env('WATCHLIST_RSI_MAX', 70),
         'rsi_confirm_from' => env('WATCHLIST_RSI_CONFIRM_FROM', 66),
-        'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),
     ],
 ];
