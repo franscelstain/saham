@@ -62,8 +62,7 @@ class WatchlistPresenter
         $row['rankScore'] = $rank['score'] ?? 0;
         $row['rankReasonCodes'] = $rank['codes'] ?? [];
 
-        // optional debug
-        if (!empty($rank['reasons'])) {
+        if (!empty($rank['reasons']) && config('trade.watchlist.explain_verbose', false)) {
             $row['rankReasons'] = $rank['reasons'];
         }
 

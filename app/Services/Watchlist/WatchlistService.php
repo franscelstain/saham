@@ -55,6 +55,13 @@ class WatchlistService
         $grouped['meta'] = array_merge($grouped['meta'] ?? [], [
             'top_picks_max'   => (int) config('trade.watchlist.top_picks_max', 5),
             'rank_reason_catalog' => ReasonCatalog::rankReasonCatalog(),
+            'rank_reason_schema' => [
+                'code',
+                'message',
+                'severity',
+                'points',
+                'context?',
+            ],
         ]);
 
         return [

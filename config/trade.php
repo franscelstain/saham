@@ -71,6 +71,7 @@ return [
         'expiry_apply_to_decisions' => [4, 5], // default: Perlu Konfirmasi (4) & Layak Beli (5)
         'expiry_enabled' => env('WATCHLIST_EXPIRY_ENABLED', true),
         'expiry_max_age_days' => env('WATCHLIST_EXPIRY_MAX_AGE_DAYS', 3), // max umur sinyal (hari). 0 = hari pertama muncul.
+        'explain_verbose' => env('WATCHLIST_EXPLAIN_VERBOSE', false),
         'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),        
         'preopen_cache_seconds' => env('WATCHLIST_PREOPEN_CACHE_SECONDS', 15),
         'ranking_enabled' => env('WATCHLIST_RANKING_ENABLED', true),

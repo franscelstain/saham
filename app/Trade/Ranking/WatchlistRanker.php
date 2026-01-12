@@ -206,11 +206,21 @@ class WatchlistRanker
      * @param array<int,array> $reasons
      * @param array<int,string> $codes
      */
-    private function addReason(array &$reasons, array &$codes, string $code, string $severity, float $points, array $context = []): void
-    {
-        $codes[] = $code;
+    private function addReason(
+        array &$reasons,
+        array &$codes,
+        string $code,
+        string $severity,
+        float $points,
+        array $context = []
+    ): void {
+        // codes: hanya yang memang ingin di-expose (payload ringan)
+        if ($this->shouldExposeAsCode($code)) {
+            $codes[] = $code;
+        }
 
-        $debug = (bool)($this->w['debug_reasons'] ?? false);
+        // reasons: hanya untuk debug (payload berat)
+        $debug = (bool) ($this->w['debug_reasons'] ?? false);
         if (!$debug) return;
 
         $item = [
@@ -219,8 +229,21 @@ class WatchlistRanker
             'severity' => $severity,
             'points' => (float) $points,
         ];
-        if (!empty($context)) $item['context'] = $context;
+
+        if (!empty($context)) {
+            $item['context'] = $context;
+        }
 
         $reasons[] = $item;
+    }
+
+    private function shouldExposeAsCode(string $code): bool
+    {
+        return (
+            strpos($code,'SIGNAL_') === 0 ||
+            strpos($code, 'LIQ_') === 0 ||
+            strpos($code, 'RR_') === 0 ||
+            in_array($code, ['PLAN_INVALID', 'EXPIRED', 'AGING'], true)
+        );
     }
 }

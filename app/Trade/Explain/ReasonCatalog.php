@@ -54,7 +54,7 @@ class ReasonCatalog
         // SIGNAL_* dynamic
         if (strpos($code, 'SIGNAL_') === 0) {
             $signalCode = (int) ($ctx['signalCode'] ?? substr($code, 7));
-            $label = self::signalLabel($signalCode); // delegator ke LabelCatalog
+            $label = LabelCatalog::signalLabel($signalCode); // delegator ke LabelCatalog
             return $label ?: ('Signal: #' . $signalCode);
         }
 
