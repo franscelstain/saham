@@ -2,7 +2,7 @@
 
 namespace App\DTO\Watchlist;
 
-use App\Trade\Explain\ReasonCatalog;
+use App\Trade\Explain\LabelCatalog;
 
 class CandidateInput
 {
@@ -75,9 +75,9 @@ class CandidateInput
         $this->signalCode           = (int) $row['signal_code'];
         $this->volumeLabelCode      = (int) $row['volume_label_code'];
         
-        $this->volumeLabel          = ReasonCatalog::volumeLabel($this->volumeLabelCode);
-        $this->signalLabel          = ReasonCatalog::signalLabel($this->signalCode);
-        $this->decisionLabel        = ReasonCatalog::decisionLabel($this->decisionCode);
+        $this->volumeLabel          = LabelCatalog::volumeLabel($this->volumeLabelCode);
+        $this->signalLabel          = LabelCatalog::signalLabel($this->signalCode);
+        $this->decisionLabel        = LabelCatalog::decisionLabel($this->decisionCode);
 
         $this->signalFirstSeenDate  = isset($row['signal_first_seen_date']) ? (string) $row['signal_first_seen_date'] : null;
         $this->signalAgeDays        = isset($row['signal_age_days']) ? (int) $row['signal_age_days'] : null;

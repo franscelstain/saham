@@ -80,7 +80,8 @@ class WatchlistGrouper
             $errors = $r['plan']['errors'] ?? [];
             if (!empty($errors)) $planInvalid++;
 
-            if (($r['rankReasons'] ?? null) && in_array('RR_BELOW_MIN', $r['rankReasons'], true)) {
+            $codes = $r['rankReasonCodes'] ?? [];
+            if (!empty($codes) && in_array('RR_BELOW_MIN', $codes, true)) {
                 $rrBelowMin++;
             }
         }

@@ -4,6 +4,7 @@ namespace App\Services\Watchlist;
 
 use App\Repositories\WatchlistRepository;
 use App\Services\Trade\TradePlanService;
+use App\Trade\Explain\ReasonCatalog;
 
 class WatchlistService
 {
@@ -52,7 +53,8 @@ class WatchlistService
         $eodDate = $rows[0]['tradeDate'] ?? null;
 
         $grouped['meta'] = array_merge($grouped['meta'] ?? [], [
-            'top_picks_max'   => (int) config('trade.watchlist.top_picks_max', 5)
+            'top_picks_max'   => (int) config('trade.watchlist.top_picks_max', 5),
+            'rank_reason_catalog' => ReasonCatalog::rankReasonCatalog(),
         ]);
 
         return [

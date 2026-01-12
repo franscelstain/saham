@@ -60,7 +60,13 @@ class WatchlistPresenter
     public function attachRank(array $row, array $rank): array
     {
         $row['rankScore'] = $rank['score'] ?? 0;
-        $row['rankReasons'] = $rank['reasons'] ?? [];
+        $row['rankReasonCodes'] = $rank['codes'] ?? [];
+
+        // optional debug
+        if (!empty($rank['reasons'])) {
+            $row['rankReasons'] = $rank['reasons'];
+        }
+
         return $row;
     }
 }
