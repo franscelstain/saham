@@ -2,11 +2,15 @@
 
 return [
     'compute' => [
+        'eod_cutoff_hour' => env('TRADE_EOD_CUTOFF_HOUR', 16), // WIB
+        'eod_cutoff_min' => env('TRADE_EOD_CUTOFF_MIN', 30),   // WIB
+        'eod_timezone' => env('TRADE_EOD_TZ', 'Asia/Jakarta'),
         'lookback_days' => env('TRADE_COMPUTE_LOOKBACK_DAYS', 260),
         // decision guardrails
         'min_vol_ratio_buy' => env('TRADE_COMPUTE_MIN_VOL_RATIO_BUY', 1.5),
         'min_vol_ratio_confirm' => env('TRADE_COMPUTE_MIN_VOL_RATIO_CONFIRM', 1.0),        
         'rsi_warn' => env('TRADE_COMPUTE_RSI_WARN', 66),
+        'ticker_chunk' => env('TRADE_COMPUTE_TICKER_CHUNK', 200),
         // volume label thresholds (7 batas → menghasilkan 8 level)
         'volume_ratio_thresholds' => [
             0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0

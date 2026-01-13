@@ -6,11 +6,14 @@ use Illuminate\Support\Facades\DB;
 
 class TickerIndicatorsDailyRepository
 {
-    public function getPrevSignalStateMap(string $prevTradeDate): array
+    public function getPrevSnapshotMany(string $prevTradeDate, array $tickerIds): array
     {
+        if (empty($tickerIds)) return [];
+
         $rows = DB::table('ticker_indicators_daily')
             ->where('is_deleted', 0)
             ->where('trade_date', $prevTradeDate)
+            ->whereIn('ticker_id', $tickerIds)
             ->select(['ticker_id', 'signal_code', 'signal_first_seen_date'])
             ->get();
 
@@ -27,10 +30,16 @@ class TickerIndicatorsDailyRepository
 
     public function upsert(array $row): void
     {
+        $update = array_values(array_diff(array_keys($row), [
+            'ticker_id',
+            'trade_date',
+            'created_at',
+        ]));
+        
         DB::table('ticker_indicators_daily')->upsert(
-            [$row],
-            ['ticker_id', 'trade_date'],
-            array_keys($row)
+            [$row], 
+            ['ticker_id', 'trade_date'], 
+            $update
         );
     }
 }

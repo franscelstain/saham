@@ -6,189 +6,312 @@ use Carbon\Carbon;
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Repositories\TickerIndicatorsDailyRepository;
-use App\Trade\Compute\Indicators\IndicatorCalculator;
 use App\Trade\Compute\Classifiers\DecisionClassifier;
 use App\Trade\Compute\Classifiers\VolumeLabelClassifier;
 use App\Trade\Compute\Classifiers\PatternClassifier;
 use App\Trade\Compute\SignalAgeTracker;
+use App\Trade\Compute\Rolling\RollingSma;
+use App\Trade\Compute\Rolling\RollingRsiWilder;
+use App\Trade\Compute\Rolling\RollingAtrWilder;
+use DateTimeInterface;
 
 class ComputeEodService
 {
-    protected $cal;
-    protected $ohlc;
-    protected $ind;
-    protected $calc;
-    protected $decision;
-    protected $volume;
-    protected $pattern;
-    protected $age;
+    private MarketCalendarRepository $cal;
+    private TickerOhlcDailyRepository $ohlc;
+    private TickerIndicatorsDailyRepository $ind;
+
+    private DecisionClassifier $decision;
+    private VolumeLabelClassifier $volume;
+    private PatternClassifier $pattern;
+    private SignalAgeTracker $age;
+    private EodDateResolver $dateResolver;
 
     public function __construct(
         MarketCalendarRepository $cal,
         TickerOhlcDailyRepository $ohlc,
         TickerIndicatorsDailyRepository $ind,
-        IndicatorCalculator $calc,
         DecisionClassifier $decision,
         VolumeLabelClassifier $volume,
         PatternClassifier $pattern,
-        SignalAgeTracker $age
+        SignalAgeTracker $age,
+        EodDateResolver $dateResolver
     ) {
         $this->cal = $cal;
         $this->ohlc = $ohlc;
         $this->ind = $ind;
-        $this->calc = $calc;
         $this->decision = $decision;
         $this->volume = $volume;
         $this->pattern = $pattern;
         $this->age = $age;
+        $this->dateResolver = $dateResolver;
     }
 
-    public function run(?string $tradeDate = null, ?string $tickerCode = null): array
+    public function runDate(?string $tradeDate = null, ?string $tickerCode = null, int $chunkSize = 200): array
     {
-        $date = $tradeDate ?: $this->cal->latestTradingDate();
+        $requested = $tradeDate ? Carbon::parse($tradeDate)->toDateString() : null;
 
-        if (!$date) {
-            return ['status' => 'error', 'message' => 'market_calendar kosong / tidak ada trading day'];
+        $resolved = $this->dateResolver->resolve($requested);
+
+        if (!$resolved) {
+            return [
+                'status' => 'error',
+                'requested_date' => $requested,
+                'resolved_trade_date' => null,
+                'reason' => 'cannot_resolve_trade_date',
+            ];
         }
 
+        $date = $resolved;
+
+        $now = Carbon::now();
+        $today = $now->toDateString();
+        if ($date === $today && $this->dateResolver->isBeforeCutoff($now)) {
+            return [
+                'status' => 'skipped',
+                'requested_date' => $requested,
+                'resolved_trade_date' => $date,
+                'reason' => 'before_cutoff',
+                'ticker_filter' => $tickerCode,
+                'chunk_size' => $chunkSize,
+                'tickers_in_scope' => 0,
+                'chunks' => 0,
+                'processed' => 0,
+                'skipped_no_row' => 0,
+            ];
+        }
+
+        // boleh dijalankan hari libur -> status skipped
         if (!$this->cal->isTradingDay($date)) {
             return [
                 'status' => 'skipped',
-                'trade_date' => $date,
-                'reason' => 'holiday (is_trading_day=0)'
+                'requested_date' => $requested,
+                'resolved_trade_date' => $date,
+                'reason' => 'holiday_or_non_trading_day',
+                'ticker_filter' => $tickerCode,
+                'chunk_size' => $chunkSize,
+                'tickers_in_scope' => 0,
+                'chunks' => 0,
+                'processed' => 0,
+                'skipped_no_row' => 0,
             ];
         }
 
         $prev = $this->cal->previousTradingDate($date);
-        $prevStateMap = $prev ? $this->ind->getPrevSignalStateMap($prev) : [];
 
-        $lookback = (int) config('trade.compute.lookback_days', 260);
-        $startDate = Carbon::parse($date)->subDays($lookback + 60)->toDateString();
+        $startDate = Carbon::parse($date)
+                ->subDays((int) config('trade.compute.lookback_days', 260) + 60)
+                ->toDateString();
 
-        $hist = $this->ohlc->getHistoryRange($startDate, $date);
+        // ticker selection via SQL (hanya ticker yang punya OHLC pada $date)
+        $tickerIds = $this->ohlc->getTickerIdsHavingRowOnDate($date, $tickerCode);
+        if (empty($tickerIds)) {
+            return [
+                'status' => 'ok',
+                'requested_date' => $requested,
+                'resolved_trade_date' => $date,
+                'prev_trade_date' => $prev,
+                'start_date' => $startDate,
 
-        // group by ticker
-        $byTicker = [];
-        foreach ($hist as $r) {
-            $tid = (int) $r->ticker_id;
-            if (!isset($byTicker[$tid])) $byTicker[$tid] = [];
-            $byTicker[$tid][] = $r;
+                'ticker_filter' => $tickerCode,
+                'chunk_size' => $chunkSize,
+                'tickers_in_scope' => 0,
+                'chunks' => 0,
+
+                'processed' => 0,
+                'skipped_no_row' => 0,
+            ];
         }
 
+        $totalSkippedNoRow = 0;
         $processed = 0;
-        $skipped = 0;
+        $ts = now();
+        $seenOnDate = [];
 
-        foreach ($byTicker as $tickerId => $rows) {
-            // cari row hari ini
-            $today = null;
-            foreach ($rows as $r) {
-                if ($r->trade_date === $date) { $today = $r; break; }
-            }
-            if (!$today) { $skipped++; continue; }
+        // process per chunk ticker ids
+        $chunks = array_chunk($tickerIds, max(1, $chunkSize));
+        foreach ($chunks as $ids) {
 
-            // arrays
-            $highs = []; $lows = []; $closes = []; $vols = [];
-            foreach ($rows as $r) {
-                $highs[] = (float)$r->high;
-                $lows[] = (float)$r->low;
-                $closes[] = (float)$r->close;
-                $vols[] = (float)$r->volume;
+            // OPTIONAL (lebih kencang): preload prev snapshot untuk chunk ini (1 query)
+            $prevSnaps = [];
+            if ($prev) {
+                $prevSnaps = $this->ind->getPrevSnapshotMany($prev, $ids); 
+                // implement method ini di repo indikator (lihat catatan bawah)
             }
 
-            $ma20  = $this->calc->sma($closes, 20);
-            $ma50  = $this->calc->sma($closes, 50);
-            $ma200 = $this->calc->sma($closes, 200);
+            $cursor = $this->ohlc->cursorHistoryRange($startDate, $date, $ids);
 
-            $rsi14 = $this->calc->rsiWilder($closes, 14);
-            $atr14 = $this->calc->atrWilder($highs, $lows, $closes, 14);
+            // state per ticker (ringan)
+            $curTicker = null;
 
-            $support20 = $this->calc->rollingMinExcludeToday($lows, 20);
-            $resist20  = $this->calc->rollingMaxExcludeToday($highs, 20);
+            $sma20 = $sma50 = $sma200 = null;
+            $rsi14 = null;
+            $atr14 = null;
 
-            $volSma20Prev = $this->calc->smaExcludeToday($vols, 20);
+            $lows20 = [];
+            $highs20 = [];
 
-            $volRatio = null;
-            if ($volSma20Prev !== null && $volSma20Prev > 0) {
-                $volRatio = round(((float)$today->volume) / $volSma20Prev, 4);
+            $lastVols20 = []; // untuk SMA exclude today
+            $sumVol20 = 0.0;
+
+            foreach ($cursor as $r) {
+                $tid = (int) $r->ticker_id;
+
+                // ticker switch: init rolling engines
+                if ($curTicker !== $tid) {
+                    $curTicker = $tid;
+
+                    $sma20 = new RollingSma(20);
+                    $sma50 = new RollingSma(50);
+                    $sma200 = new RollingSma(200);
+                    $rsi14 = new RollingRsiWilder(14);
+                    $atr14 = new RollingAtrWilder(14);
+
+                    $lows20 = [];
+                    $highs20 = [];
+
+                    $lastVols20 = [];
+                    $sumVol20 = 0.0;
+                }
+
+                // rolling support/resistance exclude today:
+                // compute based on buffer BEFORE pushing today's low/high
+                $support20 = null;
+                $resist20  = null;
+                if (count($lows20) >= 20)  $support20 = min($lows20);
+                if (count($highs20) >= 20) $resist20  = max($highs20);
+
+                // volSma20Prev: avg 20 BEFORE pushing today's vol
+                $volSma20Prev = null;
+                if (count($lastVols20) >= 20) $volSma20Prev = ($sumVol20 / 20.0);
+
+                // update rolling engines using today's bar
+                $close = (float) $r->close;
+                $high  = (float) $r->high;
+                $low   = (float) $r->low;
+                $vol   = (float) $r->volume;
+
+                $sma20->push($close);
+                $sma50->push($close);
+                $sma200->push($close);
+                $rsi14->push($close);
+                $atr14->push($high, $low, $close);
+
+                // update lows/highs buffers (keep 20 latest, exclude today logic already handled)
+                $lows20[] = $low;    if (count($lows20) > 20) array_shift($lows20);
+                $highs20[] = $high;  if (count($highs20) > 20) array_shift($highs20);
+
+                // update vol buffer
+                $lastVols20[] = $vol;
+                $sumVol20 += $vol;
+                if (count($lastVols20) > 20) {
+                    $out = array_shift($lastVols20);
+                    $sumVol20 -= $out;
+                }
+
+                // only upsert when row is exactly $date
+                $rowDate = $r->trade_date instanceof DateTimeInterface
+                        ? $r->trade_date->format('Y-m-d')
+                        : (string) $r->trade_date;
+                if ($rowDate !== $date) {
+                    continue;
+                }
+
+                // if today exists, compute metrics and upsert
+                // volRatio uses volSma20Prev (prev 20, exclude today) computed earlier
+                $volRatio = null;
+                if ($volSma20Prev !== null && $volSma20Prev > 0) {
+                    $volRatio = round($vol / $volSma20Prev, 4);
+                }
+
+                $metrics = [
+                    'open' => (float) $r->open,
+                    'high' => $high,
+                    'low'  => $low,
+                    'close'=> $close,
+                    'volume' => $vol,
+
+                    'ma20' => $sma20->value(),
+                    'ma50' => $sma50->value(),
+                    'ma200'=> $sma200->value(),
+                    'rsi14'=> $rsi14->value(),
+                    'atr14'=> $atr14->value(),
+
+                    'support_20d' => $support20,
+                    'resistance_20d' => $resist20,
+
+                    'vol_sma20' => $volSma20Prev,
+                    'vol_ratio' => $volRatio,
+                ];
+
+                $decisionCode = $this->decision->classify($metrics);
+                $volumeLabelCode = $this->volume->classify($volRatio);
+                $patternCode = $this->pattern->classify($metrics);
+
+                $prevSnap = $prev ? ($prevSnaps[$tid] ?? null) : null;
+                $age = $this->age->computeFromPrev($tid, $date, $patternCode, $prevSnap);
+
+                $row = [
+                    'ticker_id' => $tid,
+                    'trade_date' => $date,
+
+                    'open' => (float) $r->open,
+                    'high' => $high,
+                    'low' => $low,
+                    'close' => $close,
+                    'volume' => (int) $r->volume,
+
+                    'ma20' => $metrics['ma20'] !== null ? round($metrics['ma20'], 4) : null,
+                    'ma50' => $metrics['ma50'] !== null ? round($metrics['ma50'], 4) : null,
+                    'ma200'=> $metrics['ma200'] !== null ? round($metrics['ma200'], 4) : null,
+
+                    'rsi14' => $metrics['rsi14'] !== null ? round($metrics['rsi14'], 4) : null,
+                    'atr14' => $metrics['atr14'] !== null ? round($metrics['atr14'], 4) : null,
+
+                    'support_20d' => $support20 !== null ? round($support20, 4) : null,
+                    'resistance_20d' => $resist20 !== null ? round($resist20, 4) : null,
+
+                    'vol_sma20' => $volSma20Prev !== null ? round($volSma20Prev, 4) : null,
+                    'vol_ratio' => $volRatio,
+
+                    'decision_code' => $decisionCode,
+                    'signal_code' => $patternCode,
+                    'volume_label_code' => $volumeLabelCode,
+
+                    'signal_first_seen_date' => $age['signal_first_seen_date'],
+                    'signal_age_days' => $age['signal_age_days'],
+
+                    'created_at' => $ts,
+                    'updated_at' => $ts,
+                ];
+
+                $seenOnDate[$tid] = true;
+
+                $this->ind->upsert($row);
+                $processed++;
             }
 
-            $metrics = [
-                'open' => (float)$today->open,
-                'high' => (float)$today->high,
-                'low'  => (float)$today->low,
-                'close'=> (float)$today->close,
-                'volume' => (float)$today->volume,
-
-                'ma20' => $ma20,
-                'ma50' => $ma50,
-                'ma200'=> $ma200,
-                'rsi14'=> $rsi14,
-                'atr14'=> $atr14,
-
-                'support_20d' => $support20,
-                'resistance_20d' => $resist20,
-
-                'vol_sma20' => $volSma20Prev,
-                'vol_ratio' => $volRatio,
-            ];
-
-            $decisionCode = $this->decision->classify($metrics);
-            $volumeLabelCode = $this->volume->classify($volRatio);
-            $patternCode = $this->pattern->classify($metrics);
-
-            $prevSnap = $prevStateMap[$tickerId] ?? null;
-
-            // age basis signal_code (pattern), bukan decision_code
-            $age = $this->age->computeFromPrev($tickerId, $date, $patternCode, $prevSnap);
-
-            // upsert
-            $row = [
-                'ticker_id' => $tickerId,
-                'trade_date' => $date,
-
-                'open' => (float)$today->open,
-                'high' => (float)$today->high,
-                'low' => (float)$today->low,
-                'close' => (float)$today->close,
-                'volume' => (int)$today->volume,
-
-                'ma20' => $ma20 !== null ? round($ma20, 4) : null,
-                'ma50' => $ma50 !== null ? round($ma50, 4) : null,
-                'ma200'=> $ma200 !== null ? round($ma200, 4) : null,
-
-                'rsi14' => $rsi14 !== null ? round($rsi14, 4) : null,
-                'atr14' => $atr14 !== null ? round($atr14, 4) : null,
-
-                'support_20d' => $support20 !== null ? round($support20, 4) : null,
-                'resistance_20d' => $resist20 !== null ? round($resist20, 4) : null,
-
-                'vol_sma20' => $volSma20Prev !== null ? round($volSma20Prev, 4) : null,
-                'vol_ratio' => $volRatio,
-
-                'decision_code' => $decisionCode,
-                'signal_code' => $patternCode,
-                'volume_label_code' => $volumeLabelCode,
-
-                'signal_first_seen_date' => $age['signal_first_seen_date'],
-                'signal_age_days' => $age['signal_age_days'],
-
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-
-            $this->ind->upsert($row);
-
-            $processed++;
+            $skippedNoRow = 0;
+            foreach ($ids as $tid) {
+                if (empty($seenOnDate[$tid])) $skippedNoRow++;
+            }
+            $totalSkippedNoRow += $skippedNoRow;
         }
 
         return [
             'status' => 'ok',
-            'trade_date' => $date,
+            'requested_date' => $requested,
+            'resolved_trade_date' => $date,
             'prev_trade_date' => $prev,
             'start_date' => $startDate,
-            'tickers' => count($byTicker),
+
+            'ticker_filter' => $tickerCode,
+            'chunk_size' => $chunkSize,
+            'tickers_in_scope' => count($tickerIds),
+            'chunks' => count($chunks),
+
             'processed' => $processed,
-            'skipped' => $skipped,
+            'skipped_no_row' => $totalSkippedNoRow,
         ];
     }
 }

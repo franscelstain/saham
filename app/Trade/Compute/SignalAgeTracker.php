@@ -2,6 +2,8 @@
 
 namespace App\Trade\Compute;
 
+use Carbon\Carbon;
+
 class SignalAgeTracker
 {
     /**
@@ -21,14 +23,18 @@ class SignalAgeTracker
             ];
         }
 
-        $prevSignal = (int) ($prevState['signal_code'] ?? 0);
+        $prevSignal   = (int) ($prevState['signal_code'] ?? 0);
         $prevFirstSeen = $prevState['signal_first_seen_date'] ?? null;
 
         if ($prevSignal === (int) $signalCode && $prevFirstSeen) {
             $firstSeen = (string) $prevFirstSeen;
 
-            $ageDays = (int) floor((strtotime($tradeDate) - strtotime($firstSeen)) / 86400);
-            if ($ageDays < 0) $ageDays = 0;
+            // Date-only compare, avoids timezone/hour issues
+            $trade = Carbon::parse($tradeDate)->startOfDay();
+            $first = Carbon::parse($firstSeen)->startOfDay();
+
+            // Always non-negative (same behavior as your clamp-to-0)
+            $ageDays = $first->diffInDays($trade);
 
             return [
                 'signal_first_seen_date' => $firstSeen,

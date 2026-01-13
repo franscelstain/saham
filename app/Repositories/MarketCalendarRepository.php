@@ -17,17 +17,6 @@ class MarketCalendarRepository
         return ((int)$row->is_trading_day) === 1;
     }
 
-    public function latestTradingDate(): ?string
-    {
-        $row = DB::table('market_calendar')
-            ->select(['cal_date'])
-            ->where('is_trading_day', 1)
-            ->orderByDesc('cal_date')
-            ->first();
-
-        return $row ? $row->cal_date : null;
-    }
-
     public function previousTradingDate(string $date): ?string
     {
         $row = DB::table('market_calendar')
