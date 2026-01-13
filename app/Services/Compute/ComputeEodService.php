@@ -2,18 +2,18 @@
 
 namespace App\Services\Compute;
 
-use Carbon\Carbon;
-use DateTimeInterface;
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Repositories\TickerIndicatorsDailyRepository;
 use App\Trade\Compute\Classifiers\DecisionClassifier;
-use App\Trade\Compute\Classifiers\VolumeLabelClassifier;
 use App\Trade\Compute\Classifiers\PatternClassifier;
-use App\Trade\Compute\SignalAgeTracker;
-use App\Trade\Compute\Rolling\RollingSma;
-use App\Trade\Compute\Rolling\RollingRsiWilder;
+use App\Trade\Compute\Classifiers\VolumeLabelClassifier;
 use App\Trade\Compute\Rolling\RollingAtrWilder;
+use App\Trade\Compute\Rolling\RollingRsiWilder;
+use App\Trade\Compute\Rolling\RollingSma;
+use App\Trade\Compute\SignalAgeTracker;
+use Carbon\Carbon;
+use DateTimeInterface;
 
 class ComputeEodService
 {
@@ -25,6 +25,7 @@ class ComputeEodService
     private VolumeLabelClassifier $volume;
     private PatternClassifier $pattern;
     private SignalAgeTracker $age;
+
     private EodDateResolver $dateResolver;
 
     public function __construct(
@@ -40,16 +41,22 @@ class ComputeEodService
         $this->cal = $cal;
         $this->ohlc = $ohlc;
         $this->ind = $ind;
+
         $this->decision = $decision;
         $this->volume = $volume;
         $this->pattern = $pattern;
         $this->age = $age;
+
         $this->dateResolver = $dateResolver;
     }
 
     public function runDate(?string $tradeDate = null, ?string $tickerCode = null, int $chunkSize = 200): array
     {
-        $requested = $tradeDate ? Carbon::parse($tradeDate)->toDateString() : null;
+        $tz = (string) config('trade.compute.eod_timezone', 'Asia/Jakarta');
+
+        $requested = $tradeDate
+            ? Carbon::parse($tradeDate, $tz)->toDateString()
+            : null;
 
         $resolved = $this->dateResolver->resolve($requested);
 
@@ -64,8 +71,11 @@ class ComputeEodService
 
         $date = $resolved;
 
-        $now = Carbon::now();
+        // IMPORTANT: pakai timezone config supaya cutoff bener
+        $now = Carbon::now($tz);
         $today = $now->toDateString();
+
+        // Kalau user minta explicit "today" sebelum cutoff -> skip (biar gak compute data yang belum EOD)
         if ($date === $today && $this->dateResolver->isBeforeCutoff($now)) {
             return [
                 'status' => 'skipped',
@@ -81,6 +91,7 @@ class ComputeEodService
             ];
         }
 
+        // Boleh dijalankan saat libur -> status skipped
         if (!$this->cal->isTradingDay($date)) {
             return [
                 'status' => 'skipped',
@@ -98,11 +109,13 @@ class ComputeEodService
 
         $prev = $this->cal->previousTradingDate($date);
 
-        $startDate = Carbon::parse($date)
+        $startDate = Carbon::parse($date, $tz)
             ->subDays((int) config('trade.compute.lookback_days', 260) + 60)
             ->toDateString();
 
+        // hanya ticker yang punya OHLC pada $date
         $tickerIds = $this->ohlc->getTickerIdsHavingRowOnDate($date, $tickerCode);
+
         if (empty($tickerIds)) {
             return [
                 'status' => 'ok',
@@ -121,15 +134,13 @@ class ComputeEodService
             ];
         }
 
-        $totalSkippedNoRow = 0;
         $processed = 0;
-
-        // timestamp sekali (hemat now() call di loop)
-        $ts = now();
+        $totalSkippedNoRow = 0;
 
         $chunks = array_chunk($tickerIds, max(1, $chunkSize));
-        foreach ($chunks as $ids) {
 
+        foreach ($chunks as $ids) {
+            // preload prev snapshot (1 query per chunk)
             $prevSnaps = [];
             if ($prev) {
                 $prevSnaps = $this->ind->getPrevSnapshotMany($prev, $ids);
@@ -170,32 +181,32 @@ class ComputeEodService
                     $sumVol20 = 0.0;
                 }
 
-                // support/resistance (exclude today): nilai diambil dari buffer sebelum push bar hari ini
+                // support/resistance exclude today: hitung dari buffer sebelum push bar hari ini
                 $support20 = null;
-                $resist20  = null;
+                $resist20 = null;
                 if (count($lows20) >= 20)  $support20 = min($lows20);
                 if (count($highs20) >= 20) $resist20  = max($highs20);
 
-                // volSma20Prev: avg 20 sebelum push volume hari ini
+                // volSma20Prev (exclude today)
                 $volSma20Prev = null;
                 if (count($lastVols20) >= 20) $volSma20Prev = ($sumVol20 / 20.0);
 
+                // bar today
                 $close = (float) $r->close;
                 $high  = (float) $r->high;
                 $low   = (float) $r->low;
                 $vol   = (float) $r->volume;
 
+                // update rolling engines
                 $sma20->push($close);
                 $sma50->push($close);
                 $sma200->push($close);
                 $rsi14->push($close);
                 $atr14->push($high, $low, $close);
 
-                $lows20[] = $low;
-                if (count($lows20) > 20) array_shift($lows20);
-
-                $highs20[] = $high;
-                if (count($highs20) > 20) array_shift($highs20);
+                // update buffers
+                $lows20[] = $low;   if (count($lows20) > 20) array_shift($lows20);
+                $highs20[] = $high; if (count($highs20) > 20) array_shift($highs20);
 
                 $lastVols20[] = $vol;
                 $sumVol20 += $vol;
@@ -204,11 +215,8 @@ class ComputeEodService
                     $sumVol20 -= $out;
                 }
 
-                // proses hanya untuk row trade_date == $date
-                $rowDate = $r->trade_date instanceof DateTimeInterface
-                    ? $r->trade_date->format('Y-m-d')
-                    : (string) $r->trade_date;
-
+                // hanya upsert row yang trade_date == $date
+                $rowDate = $this->toDateString($r->trade_date);
                 if ($rowDate !== $date) {
                     continue;
                 }
@@ -240,10 +248,12 @@ class ComputeEodService
 
                 $decisionCode = $this->decision->classify($metrics);
                 $volumeLabelCode = $this->volume->classify($volRatio);
-                $patternCode = $this->pattern->classify($metrics); // ini memang = signal_code
+                $signalCode = $this->pattern->classify($metrics); // patternCode == signal_code
 
                 $prevSnap = $prev ? ($prevSnaps[$tid] ?? null) : null;
-                $age = $this->age->computeFromPrev($tid, $date, $patternCode, $prevSnap);
+                $age = $this->age->computeFromPrev($tid, $date, $signalCode, $prevSnap);
+
+                $ts = Carbon::now($tz);
 
                 $row = [
                     'ticker_id' => $tid,
@@ -269,7 +279,7 @@ class ComputeEodService
                     'vol_ratio' => $volRatio,
 
                     'decision_code' => $decisionCode,
-                    'signal_code' => $patternCode,
+                    'signal_code' => $signalCode,
                     'volume_label_code' => $volumeLabelCode,
 
                     'signal_first_seen_date' => $age['signal_first_seen_date'],
@@ -285,6 +295,7 @@ class ComputeEodService
                 $processed++;
             }
 
+            // diagnostic: harusnya 0 karena ids dipilih dari "having row on date"
             $skippedNoRow = 0;
             foreach ($ids as $tid) {
                 if (empty($seenOnDate[$tid])) $skippedNoRow++;
@@ -307,5 +318,21 @@ class ComputeEodService
             'processed' => $processed,
             'skipped_no_row' => $totalSkippedNoRow,
         ];
+    }
+
+    private function toDateString($value): string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        // kalau string datetime, ambil 10 char pertama
+        $s = (string) $value;
+        if (strlen($s) >= 10) {
+            return substr($s, 0, 10);
+        }
+
+        // fallback
+        return $s;
     }
 }
