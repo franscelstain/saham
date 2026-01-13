@@ -3,6 +3,7 @@
 namespace App\Services\Compute;
 
 use Carbon\Carbon;
+use DateTimeInterface;
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Repositories\TickerIndicatorsDailyRepository;
@@ -13,7 +14,6 @@ use App\Trade\Compute\SignalAgeTracker;
 use App\Trade\Compute\Rolling\RollingSma;
 use App\Trade\Compute\Rolling\RollingRsiWilder;
 use App\Trade\Compute\Rolling\RollingAtrWilder;
-use DateTimeInterface;
 
 class ComputeEodService
 {
@@ -81,7 +81,6 @@ class ComputeEodService
             ];
         }
 
-        // boleh dijalankan hari libur -> status skipped
         if (!$this->cal->isTradingDay($date)) {
             return [
                 'status' => 'skipped',
@@ -100,10 +99,9 @@ class ComputeEodService
         $prev = $this->cal->previousTradingDate($date);
 
         $startDate = Carbon::parse($date)
-                ->subDays((int) config('trade.compute.lookback_days', 260) + 60)
-                ->toDateString();
+            ->subDays((int) config('trade.compute.lookback_days', 260) + 60)
+            ->toDateString();
 
-        // ticker selection via SQL (hanya ticker yang punya OHLC pada $date)
         $tickerIds = $this->ohlc->getTickerIdsHavingRowOnDate($date, $tickerCode);
         if (empty($tickerIds)) {
             return [
@@ -125,23 +123,20 @@ class ComputeEodService
 
         $totalSkippedNoRow = 0;
         $processed = 0;
-        $ts = now();
-        $seenOnDate = [];
 
-        // process per chunk ticker ids
+        // timestamp sekali (hemat now() call di loop)
+        $ts = now();
+
         $chunks = array_chunk($tickerIds, max(1, $chunkSize));
         foreach ($chunks as $ids) {
 
-            // OPTIONAL (lebih kencang): preload prev snapshot untuk chunk ini (1 query)
             $prevSnaps = [];
             if ($prev) {
-                $prevSnaps = $this->ind->getPrevSnapshotMany($prev, $ids); 
-                // implement method ini di repo indikator (lihat catatan bawah)
+                $prevSnaps = $this->ind->getPrevSnapshotMany($prev, $ids);
             }
 
             $cursor = $this->ohlc->cursorHistoryRange($startDate, $date, $ids);
 
-            // state per ticker (ringan)
             $curTicker = null;
 
             $sma20 = $sma50 = $sma200 = null;
@@ -151,13 +146,14 @@ class ComputeEodService
             $lows20 = [];
             $highs20 = [];
 
-            $lastVols20 = []; // untuk SMA exclude today
+            $lastVols20 = [];
             $sumVol20 = 0.0;
+
+            $seenOnDate = [];
 
             foreach ($cursor as $r) {
                 $tid = (int) $r->ticker_id;
 
-                // ticker switch: init rolling engines
                 if ($curTicker !== $tid) {
                     $curTicker = $tid;
 
@@ -174,18 +170,16 @@ class ComputeEodService
                     $sumVol20 = 0.0;
                 }
 
-                // rolling support/resistance exclude today:
-                // compute based on buffer BEFORE pushing today's low/high
+                // support/resistance (exclude today): nilai diambil dari buffer sebelum push bar hari ini
                 $support20 = null;
                 $resist20  = null;
                 if (count($lows20) >= 20)  $support20 = min($lows20);
                 if (count($highs20) >= 20) $resist20  = max($highs20);
 
-                // volSma20Prev: avg 20 BEFORE pushing today's vol
+                // volSma20Prev: avg 20 sebelum push volume hari ini
                 $volSma20Prev = null;
                 if (count($lastVols20) >= 20) $volSma20Prev = ($sumVol20 / 20.0);
 
-                // update rolling engines using today's bar
                 $close = (float) $r->close;
                 $high  = (float) $r->high;
                 $low   = (float) $r->low;
@@ -197,11 +191,12 @@ class ComputeEodService
                 $rsi14->push($close);
                 $atr14->push($high, $low, $close);
 
-                // update lows/highs buffers (keep 20 latest, exclude today logic already handled)
-                $lows20[] = $low;    if (count($lows20) > 20) array_shift($lows20);
-                $highs20[] = $high;  if (count($highs20) > 20) array_shift($highs20);
+                $lows20[] = $low;
+                if (count($lows20) > 20) array_shift($lows20);
 
-                // update vol buffer
+                $highs20[] = $high;
+                if (count($highs20) > 20) array_shift($highs20);
+
                 $lastVols20[] = $vol;
                 $sumVol20 += $vol;
                 if (count($lastVols20) > 20) {
@@ -209,16 +204,15 @@ class ComputeEodService
                     $sumVol20 -= $out;
                 }
 
-                // only upsert when row is exactly $date
+                // proses hanya untuk row trade_date == $date
                 $rowDate = $r->trade_date instanceof DateTimeInterface
-                        ? $r->trade_date->format('Y-m-d')
-                        : (string) $r->trade_date;
+                    ? $r->trade_date->format('Y-m-d')
+                    : (string) $r->trade_date;
+
                 if ($rowDate !== $date) {
                     continue;
                 }
 
-                // if today exists, compute metrics and upsert
-                // volRatio uses volSma20Prev (prev 20, exclude today) computed earlier
                 $volRatio = null;
                 if ($volSma20Prev !== null && $volSma20Prev > 0) {
                     $volRatio = round($vol / $volSma20Prev, 4);
@@ -246,7 +240,7 @@ class ComputeEodService
 
                 $decisionCode = $this->decision->classify($metrics);
                 $volumeLabelCode = $this->volume->classify($volRatio);
-                $patternCode = $this->pattern->classify($metrics);
+                $patternCode = $this->pattern->classify($metrics); // ini memang = signal_code
 
                 $prevSnap = $prev ? ($prevSnaps[$tid] ?? null) : null;
                 $age = $this->age->computeFromPrev($tid, $date, $patternCode, $prevSnap);
