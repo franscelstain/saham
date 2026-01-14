@@ -1,6 +1,15 @@
 <?php
 
+# build_id: ...
+# Tujuan: config dipakai di berbagai file bila dibutuhkan. 
+#         Dan bila ada config yang sebelumnya dipakai secara private bisa diubah strukturnya supaya lebih terorganisir.
+# Catatan: biar reuseable dan konsisten di seluruh aplikasi.
+# path: config/trade.php
+
 return [
+    'compute_eod' => [
+        'upsert_batch_size' => env('TRADE_EOD_UPSERT_BATCH_SIZE', 500),
+    ],
     'clock' => [
         'timezone'    => env('TRADE_EOD_TZ', 'Asia/Jakarta'),
         'eod_cutoff'  => [
