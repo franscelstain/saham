@@ -30,6 +30,26 @@ return [
         // misal 0.05% per sisi
         'slippage_rate' => env('TRADE_SLIPPAGE_RATE', 0.0005),
     ],
+    'market_data' => [
+        'default_provider' => env('TRADE_MD_PROVIDER', 'yahoo'),
+
+        'ohlc_eod' => [
+            'timezone' => env('TRADE_EOD_TZ', 'Asia/Jakarta'), // sama dengan compute.eod_timezone
+            'chunk_tickers' => env('TRADE_MD_CHUNK_TICKERS', 50),
+            'chunk_rows' => env('TRADE_MD_CHUNK_ROWS', 500),
+        ],
+
+        'providers' => [
+            'yahoo' => [
+                'base_url' => env('TRADE_YAHOO_BASE_URL', 'https://query1.finance.yahoo.com'),
+                'suffix' => env('TRADE_YAHOO_SUFFIX', '.JK'), // BEI
+                'timeout' => env('TRADE_YAHOO_TIMEOUT', 20),
+                'retry' => env('TRADE_YAHOO_RETRY', 2),
+                'retry_sleep_ms' => env('TRADE_YAHOO_RETRY_SLEEP_MS', 250),
+                'user_agent' => env('TRADE_YAHOO_UA', 'Mozilla/5.0'),
+            ],
+        ],
+    ],
     'planning' => [
         // risk sizing basis (tanpa intraday)
         // SL distance default (ATR multiple atau %)

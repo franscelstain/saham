@@ -52,4 +52,24 @@ class TickerOhlcDailyRepository
             yield $row;
         }
     }
+
+    public function upsertMany(array $rows): int
+    {
+        if (empty($rows)) return 0;
+
+        // update semua kolom kecuali key + created_at
+        $update = array_values(array_diff(array_keys($rows[0]), [
+            'ticker_id',
+            'trade_date',
+            'created_at',
+        ]));
+
+        DB::table('ticker_ohlc_daily')->upsert(
+            $rows,
+            ['ticker_id', 'trade_date'],
+            $update
+        );
+
+        return count($rows);
+    }
 }
