@@ -24,8 +24,10 @@ class EodDateResolver
      * - Jika requestedDate hari libur: turun ke previous trading day.
      */
     public function resolve(?string $requestedDate = null, ?Carbon $now = null): ?string
-    {
-        $requestedDate = $requestedDate ? Carbon::parse($requestedDate)->toDateString() : null;
+    {        
+        $tz = TradeClock::tz();
+
+        $requestedDate = $requestedDate ? Carbon::parse($requestedDate, $tz)->toDateString() : null;
 
         // 1) Explicit date: do NOT shift for holiday/weekend.
         // Only apply cutoff rule for "today".
