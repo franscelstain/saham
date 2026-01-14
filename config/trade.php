@@ -51,9 +51,10 @@ return [
     ],
     'perf' => [
         'ticker_chunk' => env('TRADE_TICKER_CHUNK', 200),
-        'http_pool'    => env('TRADE_HTTP_POOL', 15),
+        'http_pool' => env('TRADE_HTTP_POOL', 15),
         'http_timeout' => env('TRADE_HTTP_TIMEOUT', 20),
-        'retries'      => env('TRADE_HTTP_RETRIES', 2),
+        'retries' => env('TRADE_HTTP_RETRIES', 2),
+        'retry_sleep_ms' => env('TRADE_HTTP_RETRY_SLEEP_MS', 300),
     ],
     'planning' => [
         // risk sizing basis (tanpa intraday)
