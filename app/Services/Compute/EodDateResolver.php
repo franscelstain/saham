@@ -2,8 +2,9 @@
 
 namespace App\Services\Compute;
 
-use Carbon\Carbon;
 use App\Repositories\MarketCalendarRepository;
+use App\Trade\Support\TradeClock;
+use Carbon\Carbon;
 
 class EodDateResolver
 {
@@ -22,7 +23,7 @@ class EodDateResolver
      * - Jika requestedDate == today dan sebelum cutoff: turun ke prev trading day (biar gak compute data hari ini sebelum EOD).
      * - Jika requestedDate hari libur: turun ke previous trading day.
      */
-    public function resolve(?string $requestedDate = null): ?string
+    public function resolve(?string $requestedDate = null, ?Carbon $now = null): ?string
     {
         $requestedDate = $requestedDate ? Carbon::parse($requestedDate)->toDateString() : null;
 
@@ -32,12 +33,10 @@ class EodDateResolver
             return $requestedDate; // keep as-is, service will decide skip reason
         }
 
-        // 2) Default mode: safe date
-        $today = Carbon::now()->toDateString();
-        $beforeCutoff = $this->isBeforeCutoff();
+        $today = TradeClock::today($now);
+        $date  = $today;
 
-        $date = $today;
-        if ($beforeCutoff) {
+        if (TradeClock::isBeforeEodCutoff($now)) {
             $date = $this->cal->previousTradingDate($today);
         }
 
@@ -53,11 +52,6 @@ class EodDateResolver
     
     public function isBeforeCutoff(?Carbon $now = null): bool
     {
-        $now = $now ?: Carbon::now();
-
-        $cutoffHour = (int) config('trade.compute.eod_cutoff_hour', 16);
-        $cutoffMin  = (int) config('trade.compute.eod_cutoff_min', 5);
-
-        return $now->hour < $cutoffHour || ($now->hour === $cutoffHour && $now->minute < $cutoffMin);
+        return TradeClock::isBeforeEodCutoff($now);
     }
 }
