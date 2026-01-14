@@ -30,16 +30,33 @@ class TickerIndicatorsDailyRepository
 
     public function upsert(array $row): void
     {
-        $update = array_values(array_diff(array_keys($row), [
+        $this->upsertMany([$row], 1);
+    }
+
+    public function upsertMany(array $rows, int $chunkSize = 500): int
+    {
+        if (empty($rows)) return 0;
+
+        $chunkSize = max(1, $chunkSize);
+
+        // update semua kolom kecuali key + created_at
+        $update = array_values(array_diff(array_keys($rows[0]), [
             'ticker_id',
             'trade_date',
             'created_at',
         ]));
-        
-        DB::table('ticker_indicators_daily')->upsert(
-            [$row], 
-            ['ticker_id', 'trade_date'], 
-            $update
-        );
+
+        $total = 0;
+
+        foreach (array_chunk($rows, $chunkSize) as $chunk) {
+            DB::table('ticker_indicators_daily')->upsert(
+                $chunk,
+                ['ticker_id', 'trade_date'],
+                $update
+            );
+            $total += count($chunk);
+        }
+
+        return $total;
     }
 }
