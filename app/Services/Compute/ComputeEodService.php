@@ -12,6 +12,8 @@ use App\Trade\Compute\Rolling\RollingAtrWilder;
 use App\Trade\Compute\Rolling\RollingRsiWilder;
 use App\Trade\Compute\Rolling\RollingSma;
 use App\Trade\Compute\SignalAgeTracker;
+use App\Trade\Support\TradeClock;
+use App\Trade\Support\TradePerf;
 use Carbon\Carbon;
 use DateTimeInterface;
 
@@ -52,7 +54,7 @@ class ComputeEodService
 
     public function runDate(?string $tradeDate = null, ?string $tickerCode = null, int $chunkSize = 200): array
     {
-        $tz = (string) config('trade.compute.eod_timezone', 'Asia/Jakarta');
+        $tz = TradeClock::tz();
 
         $requested = $tradeDate
             ? Carbon::parse($tradeDate, $tz)->toDateString()
@@ -72,11 +74,11 @@ class ComputeEodService
         $date = $resolved;
 
         // IMPORTANT: pakai timezone config supaya cutoff bener
-        $now = Carbon::now($tz);
-        $today = $now->toDateString();
+        $now = TradeClock::now();
+        $today = TradeClock::today();
 
         // Kalau user minta explicit "today" sebelum cutoff -> skip (biar gak compute data yang belum EOD)
-        if ($date === $today && $this->dateResolver->isBeforeCutoff($now)) {
+        if ($date === $today && TradeClock::isBeforeEodCutoff()) {
             return [
                 'status' => 'skipped',
                 'requested_date' => $requested,
@@ -110,7 +112,7 @@ class ComputeEodService
         $prev = $this->cal->previousTradingDate($date);
 
         $startDate = Carbon::parse($date, $tz)
-            ->subDays((int) config('trade.compute.lookback_days', 260) + 60)
+            ->subDays((int) config('trade.indicators.lookback_days', 260) + 60)
             ->toDateString();
 
         // hanya ticker yang punya OHLC pada $date
@@ -253,8 +255,6 @@ class ComputeEodService
                 $prevSnap = $prev ? ($prevSnaps[$tid] ?? null) : null;
                 $age = $this->age->computeFromPrev($tid, $date, $signalCode, $prevSnap);
 
-                $ts = Carbon::now($tz);
-
                 $row = [
                     'ticker_id' => $tid,
                     'trade_date' => $date,
@@ -285,8 +285,8 @@ class ComputeEodService
                     'signal_first_seen_date' => $age['signal_first_seen_date'],
                     'signal_age_days' => $age['signal_age_days'],
 
-                    'created_at' => $ts,
-                    'updated_at' => $ts,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
 
                 $seenOnDate[$tid] = true;
