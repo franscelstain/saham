@@ -43,14 +43,14 @@ class DecisionClassifier
 
         // RSI guardrails (anti-chase)
         $rsiMaxBuy = (float) config('trade.watchlist.rsi_max', 70);
-        $rsiWarn   = (float) config('trade.compute.rsi_warn', 66);
+        $rsiWarn   = (float) config('trade.indicators.decision_guardrails.rsi_warn', 66);
 
         $rsiOver = $rsi > $rsiMaxBuy;
         $rsiHot  = $rsi > $rsiWarn;
 
         // Volume guardrails
-        $minVolRatioBuy = (float) config('trade.compute.min_vol_ratio_buy', 1.5);
-        $minVolRatioConfirm = (float) config('trade.compute.min_vol_ratio_confirm', 1.0);
+        $minVolRatioBuy = (float) config('trade.indicators.decision_guardrails.min_vol_ratio_buy', 1.5);
+        $minVolRatioConfirm = (float) config('trade.indicators.decision_guardrails.min_vol_ratio_confirm', 1.0);
 
         $vr = ($volRatio === null) ? null : (float)$volRatio;
         $volStrong = ($vr !== null) && ($vr >= $minVolRatioBuy);

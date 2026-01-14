@@ -6,6 +6,8 @@ use Carbon\Carbon;
 use App\Repositories\TickerRepository;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Services\MarketData\Contracts\OhlcEodProvider;
+use App\Trade\Support\TradeClock;
+use App\Trade\Support\TradePerf;
 
 class OhlcEodImportService
 {
@@ -25,7 +27,7 @@ class OhlcEodImportService
 
     public function run(string $startDate, string $endDate, ?string $tickerCode = null): array
     {
-        $tz = (string) config('trade.market_data.ohlc_eod.timezone', config('trade.compute.eod_timezone', 'Asia/Jakarta'));
+        $tz = TradeClock::tz();
         $suffix = (string) config('trade.market_data.providers.yahoo.suffix', '.JK');
 
         $startDate = Carbon::parse($startDate, $tz)->toDateString();
@@ -40,7 +42,7 @@ class OhlcEodImportService
             ];
         }
 
-        $tickerChunk = (int) config('trade.market_data.ohlc_eod.chunk_tickers', 50);
+        $tickerChunk = TradePerf::tickerChunk();
         $rowsChunk   = (int) config('trade.market_data.ohlc_eod.chunk_rows', 500);
 
         $list = $this->tickers->listActive($tickerCode);

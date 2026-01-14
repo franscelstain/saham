@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Services\Compute\ComputeEodService;
+use App\Trade\Support\TradeClock;
+use App\Trade\Support\TradePerf;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -29,11 +31,11 @@ class ComputeEod extends Command
     public function handle()
     {
         $ticker = $this->option('ticker') ?: null;
-
         $date   = $this->option('date');
         $from   = $this->option('from');
         $to     = $this->option('to');
-        $chunk  = (int) ($this->option('chunk') ?: config('trade.compute.ticker_chunk', 200));
+        $tz     = TradeClock::tz();
+        $chunk  = (int) ($this->option('chunk') ?: TradePerf::tickerChunk());
 
 
         // normalize from/to
@@ -50,8 +52,8 @@ class ComputeEod extends Command
 
         // --- Range
         if ($from && $to) {
-            $start = Carbon::parse($from);
-            $end   = Carbon::parse($to);
+            $start = Carbon::parse($from, $tz);
+            $end   = Carbon::parse($to, $tz);
 
             if ($start->gt($end)) {
                 $this->error('Invalid range: --to must be >= --from');

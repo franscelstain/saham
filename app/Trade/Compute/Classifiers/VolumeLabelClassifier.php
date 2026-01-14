@@ -24,7 +24,7 @@ class VolumeLabelClassifier
         $r = (float)$volRatio;
 
         // threshold bisa diubah dari config
-        $t = config('trade.compute.volume_ratio_thresholds', [
+        $t = config('trade.indicators.volume_ratio_thresholds', [
             0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0
         ]);
 

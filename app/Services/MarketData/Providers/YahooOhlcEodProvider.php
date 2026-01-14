@@ -2,10 +2,11 @@
 
 namespace App\Services\MarketData\Providers;
 
+use App\Services\MarketData\Contracts\OhlcEodProvider;
+use App\Trade\Support\TradeClock;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use App\Services\MarketData\Contracts\OhlcEodProvider;
 
 class YahooOhlcEodProvider implements OhlcEodProvider
 {
@@ -29,7 +30,7 @@ class YahooOhlcEodProvider implements OhlcEodProvider
 
     public function fetchDaily(string $symbol, string $startDate, string $endDate): array
     {
-        $tz = (string) config('trade.market_data.ohlc_eod.timezone', config('trade.compute.eod_timezone', 'Asia/Jakarta'));
+        $tz = TradeClock::tz();
 
         // Yahoo download uses unix seconds.
         // period2 is exclusive-ish; safest: endDate endOfDay + 1 day startOfDay
