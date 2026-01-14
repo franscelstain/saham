@@ -15,6 +15,7 @@ use App\Trade\Compute\SignalAgeTracker;
 use App\Trade\Support\TradeClock;
 use App\Trade\Support\TradePerf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use DateTimeInterface;
 
 class ComputeEodService
@@ -139,6 +140,11 @@ class ComputeEodService
         $processed = 0;
         $totalSkippedNoRow = 0;
 
+        DB::disableQueryLog();
+
+        $upsertBatchSize = (int) config('trade.compute_eod.upsert_batch_size', 500);
+        if ($upsertBatchSize <= 0) $upsertBatchSize = 500;
+
         $chunks = array_chunk($tickerIds, max(1, $chunkSize));
 
         foreach ($chunks as $ids) {
@@ -163,6 +169,7 @@ class ComputeEodService
             $sumVol20 = 0.0;
 
             $seenOnDate = [];
+            $rowsBuffer = [];
 
             foreach ($cursor as $r) {
                 $tid = (int) $r->ticker_id;
@@ -291,8 +298,18 @@ class ComputeEodService
 
                 $seenOnDate[$tid] = true;
 
-                $this->ind->upsert($row);
+                $rowsBuffer[] = $row;
                 $processed++;
+
+                if (count($rowsBuffer) >= $upsertBatchSize) {
+                    $this->ind->upsertMany($rowsBuffer, $upsertBatchSize);
+                    $rowsBuffer = [];
+                }
+            }
+
+            if (!empty($rowsBuffer)) {
+                $this->ind->upsertMany($rowsBuffer, $upsertBatchSize);
+                $rowsBuffer = [];
             }
 
             // diagnostic: harusnya 0 karena ids dipilih dari "having row on date"
