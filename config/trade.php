@@ -1,19 +1,11 @@
 <?php
 
 return [
-    'compute' => [
-        'eod_cutoff_hour' => env('TRADE_EOD_CUTOFF_HOUR', 16), // WIB
-        'eod_cutoff_min' => env('TRADE_EOD_CUTOFF_MIN', 30),   // WIB
-        'eod_timezone' => env('TRADE_EOD_TZ', 'Asia/Jakarta'),
-        'lookback_days' => env('TRADE_COMPUTE_LOOKBACK_DAYS', 260),
-        // decision guardrails
-        'min_vol_ratio_buy' => env('TRADE_COMPUTE_MIN_VOL_RATIO_BUY', 1.5),
-        'min_vol_ratio_confirm' => env('TRADE_COMPUTE_MIN_VOL_RATIO_CONFIRM', 1.0),        
-        'rsi_warn' => env('TRADE_COMPUTE_RSI_WARN', 66),
-        'ticker_chunk' => env('TRADE_COMPUTE_TICKER_CHUNK', 200),
-        // volume label thresholds (7 batas → menghasilkan 8 level)
-        'volume_ratio_thresholds' => [
-            0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0
+    'clock' => [
+        'timezone'    => env('TRADE_EOD_TZ', 'Asia/Jakarta'),
+        'eod_cutoff'  => [
+            'hour' => env('TRADE_EOD_CUTOFF_HOUR', 16),
+            'min'  => env('TRADE_EOD_CUTOFF_MIN', 30),
         ],
     ],
     'fees' => [
@@ -30,12 +22,19 @@ return [
         // misal 0.05% per sisi
         'slippage_rate' => env('TRADE_SLIPPAGE_RATE', 0.0005),
     ],
+    'indicators' => [
+        'lookback_days' => env('TRADE_LOOKBACK_DAYS', 260),
+        'volume_ratio_thresholds' => [0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0],
+        'decision_guardrails' => [
+            'min_vol_ratio_buy'     => env('TRADE_MIN_VOL_RATIO_BUY', 1.5),
+            'min_vol_ratio_confirm' => env('TRADE_MIN_VOL_RATIO_CONFIRM', 1.0),
+            'rsi_warn'              => env('TRADE_RSI_WARN', 66),
+        ],
+    ],
     'market_data' => [
         'default_provider' => env('TRADE_MD_PROVIDER', 'yahoo'),
 
         'ohlc_eod' => [
-            'timezone' => env('TRADE_EOD_TZ', 'Asia/Jakarta'), // sama dengan compute.eod_timezone
-            'chunk_tickers' => env('TRADE_MD_CHUNK_TICKERS', 50),
             'chunk_rows' => env('TRADE_MD_CHUNK_ROWS', 500),
         ],
 
@@ -49,6 +48,12 @@ return [
                 'user_agent' => env('TRADE_YAHOO_UA', 'Mozilla/5.0'),
             ],
         ],
+    ],
+    'perf' => [
+        'ticker_chunk' => env('TRADE_TICKER_CHUNK', 200),
+        'http_pool'    => env('TRADE_HTTP_POOL', 15),
+        'http_timeout' => env('TRADE_HTTP_TIMEOUT', 20),
+        'retries'      => env('TRADE_HTTP_RETRIES', 2),
     ],
     'planning' => [
         // risk sizing basis (tanpa intraday)
