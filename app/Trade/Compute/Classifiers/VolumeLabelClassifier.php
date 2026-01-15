@@ -42,7 +42,10 @@ final class VolumeLabelClassifier
         if ($r < $t[2]) return 4;
         if ($r < $t[3]) return 5;
         if ($r < $t[4]) return 6;
-        if ($r < $t[6]) return 7; // < 4.0 masih Strong Burst
-        return 8;   // >= t[5] itu sudah strong → t[6] tetap 8 juga
+
+        // Note: t[5] (default 3.0) currently unused by design.
+        // Climax threshold uses t[6] (default 4.0).
+        if ($r < $t[6]) return 7; // Strong Burst / Breakout (< 4.0)
+        return 8;                 // Climax / Euphoria (>= 4.0)
     }
 }
