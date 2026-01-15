@@ -1,5 +1,3 @@
-# build_id: v2.1.12
-
 # TradeAxis Watchlist – Design Spec (EOD-driven)  
 File: `WATCHLIST.md`
 
@@ -433,3 +431,201 @@ Tahap 3 (intraday penuh, bila dibutuhkan):
   - risk metrics (ATR/gap/dv20/candle),
   - day-of-week,
   - market regime.
+
+---
+
+## 18) UI Output Spec (kandidat vs recommended pick)
+
+UI kamu (sesuai mockup) sudah tepat: **semua kandidat tetap punya kartu data** yang konsisten, lalu **khusus recommended pick** ditambah strategi pembelian lengkap (allocation + trade plan + lots).
+
+### 18.1 Field yang tampil untuk *setiap kandidat* (baseline card)
+
+**OHLC**
+- `open`, `high`, `low`, `close`
+
+**Market**
+- `rel_vol` (RelVol / vol_ratio)
+- `pos_pct` (Pos% / posisi close terhadap range atau terhadap MA—definisikan konsisten)
+- `eod_low` (low EOD / level risiko reference)
+- `price_ok` (boolean; lolos price filter)
+
+**Plan (ringkas, untuk kandidat biasa)**
+- `entry` (tipe entry ringkas: breakout/pullback/reversal/watch-only)
+- `sl` (jika sudah bisa dihitung dari EOD; kalau tidak, tampil “TBD” + reason)
+- `tp1`, `tp2` (opsional untuk kandidat biasa; minimal tampil “target zone”)
+- `out` (exit rule ringkas / invalidation)
+- `buy_steps` (untuk kandidat biasa: bisa “single entry” / “wait retest”)
+- `lots` (untuk kandidat biasa: boleh kosong jika modal belum dimasukkan)
+- `est_cost` (boleh kosong jika modal belum dimasukkan)
+
+**Risk / Result**
+- `rr` (RR ke TP1 atau RR utama)
+- `risk_pct` (risk% dari modal—jika sizing aktif)
+- `profit_tp2_net` (jika sizing aktif + fee diset)
+- `rr_tp2` dan/atau `rr_tp2_net`
+
+**Meta**
+- `rank`
+- `snapshot_at`
+- `last_bar_at` (tanggal bar terakhir yang dipakai)
+
+**Reason**
+- ringkasan + reason codes (lihat Section 9)
+
+> Catatan: untuk kandidat biasa, “Plan” boleh lebih ringkas (entry + invalidation + risk note).
+> Tapi **field set-nya tetap sama** supaya UI konsisten.
+
+### 18.2 Tambahan khusus untuk *recommended pick*
+Recommended pick harus menampilkan **strategi eksekusi yang bisa dipakai**:
+- Alokasi beli (BUY 1 / BUY 2 split / BUY 3 small / NO TRADE)
+- Entry price (trigger/range), SL, TP1, TP2, BE, trailing, buy steps
+- Lots + estimasi biaya berdasarkan modal user
+- RR, risk%, profit net (opsional, tapi ideal)
+
+---
+
+## 19) Portfolio Allocation Engine (Top 3 → BUY 0/1/2 + %)
+
+Bagian ini mengubah “Top 3 pick” menjadi **keputusan portofolio harian** yang realistis untuk weekly swing:
+- beli 1 saja, atau beli 2 split, atau tidak beli sama sekali.
+- outputnya juga mengatur “size multiplier” berdasar hari (Mon/Tue/Wed/Thu/Fri) dan kondisi market.
+
+### 19.1 Output yang disimpan (per hari)
+- `trade_plan_mode`: `NO_TRADE | BUY_1 | BUY_2_SPLIT | BUY_3_SMALL | CARRY_ONLY`
+- `max_positions_today`
+- `allocations`: array object `{ticker_id, ticker_code, alloc_pct, alloc_amount?}`
+- `capital_total` (jika user memasukkan modal; kalau tidak ada, simpan null)
+- `risk_per_trade_pct` (default config, mis. 0.5%–1.0%)
+
+### 19.2 Rule deterministik untuk memilih BUY_1 / BUY_2 / NO_TRADE
+**NO_TRADE**
+- `market_regime == risk-off` (atau breadth jelek + index down) DAN/ATAU
+- semua kandidat gagal quality gate (liq sangat rendah / ATR terlalu tinggi / gap risk ekstrem / data incomplete)
+
+**BUY_1**
+- `score1 - score2 >= gap_threshold` (mis. 8–10) ATAU
+- pick #2/#3 punya red-flag (liq bucket C, volatility ekstrem, gap risk tinggi)
+- atau modal kecil sehingga diversifikasi justru bikin eksekusi jelek
+
+**BUY_2_SPLIT**
+- top2 lolos quality gate, confidence minimal `Med`, dan gap skor kecil
+- (opsional) beda sektor untuk menghindari korelasi tinggi
+
+**BUY_3_SMALL** (jarang)
+- semua top3 confidence High, likuiditas bagus, market risk-on
+
+### 19.3 Aturan split % (langsung keluar angka)
+- default: `70/30` jika score1 > score2 cukup jelas
+- `60/40` jika skor sangat dekat
+- `50/30/20` untuk BUY_3_SMALL
+
+> Semua split harus tercatat di `allocations[]`.
+
+---
+
+## 20) Trade Plan Engine (Entry, SL, TP1, TP2, BE, Out) – Top picks & kandidat lain
+
+Engine ini menghasilkan level-level plan **berbasis EOD**, bukan prediksi intraday.
+Karena watchlist EOD-only, entry harus berupa:
+- **trigger** (breakout) atau
+- **range limit** (pullback) atau
+- **confirm trigger** (reversal).
+
+### 20.1 Output yang disimpan (per kandidat)
+- `entry_type`: `BREAKOUT_TRIGGER | PULLBACK_LIMIT | REVERSAL_CONFIRM | WATCH_ONLY`
+- `entry_trigger_price` atau `entry_limit_low/high`
+- `stop_loss_price`
+- `tp1_price`, `tp2_price`
+- `be_price` (break-even rule; biasanya = entry setelah TP1)
+- `out_rule` (invalid if / exit rule ringkas)
+- `buy_steps` (mis. “60% on trigger, 40% on retest”)
+- `rr_tp1`, `rr_tp2` (gross)
+- (opsional) `rr_tp2_net`, `profit_tp2_net` jika fee aktif
+
+### 20.2 Data tambahan yang wajib disediakan agar plan akurat
+Selain OHLC + MA/RSI/vol_ratio, plan butuh:
+- `prev_close`, `prev_high`, `prev_low`
+- `atr14`, `atr_pct`
+- `hhv20`, `llv20` (atau minimal highest/lowest N days)
+- `tick_size` (fraksi harga sesuai price band; untuk “+1 tick” yang benar)
+- (opsional) `support_level`, `resistance_level` dari swing detection
+- `fee_buy`, `fee_sell` (opsional untuk net profit)
+
+### 20.3 Formula plan per setup_type (contoh deterministik)
+Gunakan tick rounding setiap kali menghasilkan harga.
+
+**A) Breakout / Strong Burst**
+- Entry: `trigger = max(prev_high, hhv20) + 1_tick`
+- Buy steps: `60% on trigger`, `40% on retest (optional)`
+- SL: `min(prev_low, trigger - 1.0*ATR)` (pilih yang paling “logis & ketat”)
+- TP1: `entry + 1R`
+- TP2: `entry + 2R` (atau target weekly +4%/+5% jika kamu mau mode itu)
+- BE: setelah TP1 tercapai, `SL = entry` (atau `entry + 0.2R`)
+- Out: invalid jika `gap_up > x*ATR` atau close jatuh kembali di bawah level breakout
+
+**B) Pullback (uptrend)**
+- Entry: `limit_range = [MA20 - 0.2ATR, MA20 + 0.3ATR]` (contoh; tune)
+- SL: di bawah support/MA (atau `entry - 1ATR`)
+- TP1: ke `prev_high` atau `entry + 1R`
+- TP2: `entry + 2R`
+- Out: batal jika breakdown support jelas (close < support/MA dengan range besar)
+
+**C) Reversal**
+- Entry: confirm `trigger = prev_high + 1_tick` (setelah reversal candle EOD)
+- SL: `swing_low` atau `llvN` (N=5/10)
+- TP1/TP2: konservatif: `1R` dan `2R`
+- Out: jika gagal follow-through (kembali close di bawah area reversal)
+
+**D) Base / Sideways**
+- Default: `WATCH_ONLY` sampai breakout trigger valid
+- Entry/SL/TP mengikuti breakout rule saat trigger terjadi
+
+> Kandidat non-top pick tetap dibuatkan plan, tapi bisa diberi:
+> - `entry_type = WATCH_ONLY` atau
+> - `size_multiplier` kecil
+> agar tidak mendorong overtrading.
+
+---
+
+## 21) Position Sizing Engine (Modal → Lots)
+
+Ini yang membuat watchlist bisa bilang “beli berapa lots” saat user memasukkan modal.
+
+### 21.1 Input
+- `capital_total` (modal user)
+- `alloc_pct` per ticker (hasil Section 19)
+- `entry_price`, `stop_loss_price`
+- `risk_per_trade_pct` (default config)
+- `lot_size = 100` (IDX)
+- (opsional) `fee_buy`, `fee_sell`
+
+### 21.2 Output per kandidat (khususnya recommended pick)
+- `alloc_amount`
+- `lots_recommended`
+- `est_cost` (≈ entry * lots * 100 + fee_buy)
+- `max_loss_if_sl` (≈ (entry - sl) * lots * 100 + fee)
+- `risk_pct` (max_loss_if_sl / capital_total)
+
+### 21.3 Formula sizing (deterministik)
+- `risk_budget = capital_total * risk_per_trade_pct`
+- `risk_per_share = entry - sl`
+- `shares_by_risk = floor(risk_budget / risk_per_share)`
+- `shares_by_alloc = floor((capital_total * alloc_pct) / entry)`
+- `shares_final = min(shares_by_risk, shares_by_alloc)`
+- `lots = floor(shares_final / 100)`
+
+Rules:
+- jika `lots == 0` → ticker otomatis menjadi `WATCH_ONLY` (atau alokasi dialihkan)
+- jika `risk_per_share <= 0` → plan invalid (data/level salah) → jangan trade
+- jika `risk_pct` melewati batas config → turunkan lots atau ubah entry (tunggu pullback)
+
+---
+
+## 22) Integration Notes (supaya cepat & SRP tetap rapi)
+- **ComputeEOD**: hitung semua indikator + level-level plan (ATR, hhv/llv, wick/body, dv20).
+- **MarketContext job**: IHSG regime + breadth + kalender.
+- **WatchlistBuild**: scoring + ranking + setup_type + timing windows + reason codes.
+- **TradePlanBuild** (bisa bagian dari watchlist build): entry/SL/TP/BE/out + rr.
+- **PositionSizing**: hanya jalan kalau user memasukkan `capital_total` (atau ada default dari profile).
+
+Semua output disimpan di DB agar UI bisa menampilkan kartu kandidat seperti mockup, dan recommended pick punya strategi eksekusi lengkap.
