@@ -2,88 +2,150 @@
 
 namespace App\Trade\Compute\Classifiers;
 
+use App\Trade\Compute\Config\PatternThresholds;
+
 class PatternClassifier
 {
+    private PatternThresholds $t;
+
+    public function __construct(PatternThresholds $thresholds)
+    {
+        $this->t = $thresholds;
+    }
+
     /**
-     * Return signal_code (0..10).
-     * V1: deterministic, EOD-only. Tidak pakai intraday.
+     * signal_code map:
+     * 0 Unknown
+     * 1 Base / Sideways
+     * 2 Early Uptrend
+     * 3 Accumulation
+     * 4 Breakout
+     * 5 Strong Breakout
+     * 6 Breakout Retest
+     * 7 Pullback Healthy
+     * 8 Distribution
+     * 9 Climax / Euphoria
+     * 10 False Breakout
      */
     public function classify(array $m): int
     {
-        $close = (float) ($m['close'] ?? 0);
+        $close = isset($m['close']) ? (float)$m['close'] : 0.0;
         if ($close <= 0) return 0;
 
-        $high = (float) ($m['high'] ?? $close);
-        $low  = (float) ($m['low'] ?? $close);
+        $open = isset($m['open']) ? (float)$m['open'] : $close;
+        $high = isset($m['high']) ? (float)$m['high'] : $close;
+        $low  = isset($m['low'])  ? (float)$m['low']  : $close;
 
-        $ma20  = (float) ($m['ma20'] ?? 0);
-        $ma50  = (float) ($m['ma50'] ?? 0);
-        $ma200 = (float) ($m['ma200'] ?? 0);
+        $ma20  = isset($m['ma20'])  ? (float)$m['ma20']  : 0.0;
+        $ma50  = isset($m['ma50'])  ? (float)$m['ma50']  : 0.0;
+        $ma200 = isset($m['ma200']) ? (float)$m['ma200'] : 0.0;
 
-        $rsi = (float) ($m['rsi14'] ?? 0);
+        $rsi = (isset($m['rsi14']) && $m['rsi14'] !== null) ? (float)$m['rsi14'] : null;
 
-        $volRatio = $m['vol_ratio'] ?? null;
-        $volRatio = $volRatio !== null ? (float) $volRatio : null;
+        $volRatio = (isset($m['vol_ratio']) && $m['vol_ratio'] !== null) ? (float)$m['vol_ratio'] : null;
 
-        $support = $m['support_20d'] ?? null;
-        $res     = $m['resistance_20d'] ?? null;
-        $support = $support !== null ? (float) $support : null;
-        $res     = $res !== null ? (float) $res : null;
+        $support = (isset($m['support_20d']) && $m['support_20d'] !== null) ? (float)$m['support_20d'] : null;
+        $res     = (isset($m['resistance_20d']) && $m['resistance_20d'] !== null) ? (float)$m['resistance_20d'] : null;
 
-        // close position in candle range (0..1)
         $range = max(1e-9, $high - $low);
-        $pos = ($close - $low) / $range;
+        $pos = ($close - $low) / $range;           // 0..1
         $nearHigh = $pos >= 0.75;
+        $nearLow  = $pos <= 0.35;
+
+        $body = abs($close - $open);
+        $bodyPct = $body / max(1e-9, $close);
+
+        $volStrong = ($volRatio !== null && $volRatio >= $this->t->volStrong);
+        $volBurst  = ($volRatio !== null && $volRatio >= $this->t->volBurst);
 
         $maStackBull = ($ma20 > 0 && $ma50 > 0 && $ma200 > 0 && $ma20 > $ma50 && $ma50 > $ma200);
-        $aboveMA20 = ($ma20 > 0 && $close > $ma20);
-        $aboveMA50 = ($ma50 > 0 && $close > $ma50);
+        $earlyUp = ($ma20 > 0 && $ma50 > 0 && $close > $ma20 && $close > $ma50 && $ma20 >= $ma50);
 
-        $volStrong = ($volRatio !== null && $volRatio >= 2.0);
-        $volBurst  = ($volRatio !== null && $volRatio >= 1.5);
+        // breakout logic
+        $isBreakout = false;
+        $isFalseBreakout = false;
+        $nearRes = false;
 
-        // 9) Climax/Euphoria
-        if ($rsi >= 80 && ($volStrong || $volBurst) && $nearHigh) {
-            return 9;
+        if ($res !== null) {
+            $isBreakout = $close > $res;
+
+            // high tembus, tapi close balik (jebakan)
+            $isFalseBreakout = ($high > $res) && ($close <= $res);
+
+            // "near resistance" untuk retest (dengan toleransi 1.5%)
+            $nearRes = abs($close - $res) / max(1e-9, $res) <= 0.015;
         }
 
-        // 4/5) Breakout
-        if ($res !== null && $close > $res) {
-            if ($nearHigh && ($volStrong || $volBurst)) return 5; // Strong Breakout
-            return 4; // Breakout
-        }
-
-        // 10) False Breakout: high > res tapi close <= res
-        if ($res !== null && $high > $res && $close <= $res) {
+        // ---------- 10 False Breakout ----------
+        if ($isFalseBreakout) {
             return 10;
         }
 
-        // 6) Breakout retest: close sangat dekat resistance (+/-1%)
-        if ($res !== null && abs($close - $res) / $res <= 0.01 && ($aboveMA20 || $aboveMA50)) {
-            return 6;
+        // ---------- 9 Climax / Euphoria ----------
+        // kondisi umum: RSI sangat tinggi + volume strong (atau burst) + candle besar/close near high
+        if ($rsi !== null && $rsi >= 80.0 && ($volStrong || $volBurst) && ($nearHigh || $bodyPct >= 0.03)) {
+            return 9;
         }
 
-        // 7) Pullback healthy: uptrend + mid-range
-        if ($maStackBull && ($aboveMA20 || $aboveMA50) && $pos >= 0.35 && $pos <= 0.65) {
-            return 7;
+        // ---------- 5 Strong Breakout ----------
+        if ($isBreakout && $volStrong && $nearHigh && ($rsi === null || $rsi < 80.0)) {
+            return 5;
         }
 
-        // 3) Accumulation: dekat support + volume meningkat
-        if ($support !== null && abs($close - $support) / $support <= 0.02 && ($volBurst || $volStrong)) {
-            return 3;
+        // ---------- 4 Breakout ----------
+        if ($isBreakout && $volBurst) {
+            return 4;
         }
 
-        // 8) Distribution: volume kuat tapi close gak kuat (pos rendah)
-        if (($volBurst || $volStrong) && $pos < 0.55) {
+        // ---------- 6 Breakout Retest ----------
+        // syarat minimal: sebelumnya sudah "di atas res" akan sulit dibuktikan tanpa state,
+        // jadi kita pakai heuristik: close dekat resistance + trend masih ok + tidak breakdown + volume tidak mati
+        if ($res !== null && $nearRes && $maStackBull && $close >= $res * 0.985) {
+            // retest lebih valid kalau close di atas MA20 atau RSI masih sehat
+            if (($ma20 > 0 && $close >= $ma20) || ($rsi !== null && $rsi >= 45.0)) {
+                return 6;
+            }
+        }
+
+        // ---------- 8 Distribution ----------
+        // volume tinggi tapi close lemah / rejection (pos rendah atau close jauh dari high)
+        if (($volBurst || $volStrong) && ($nearLow || $pos < 0.55)) {
             return 8;
         }
 
-        // 2) Early uptrend
-        if ($maStackBull && $aboveMA20 && $aboveMA50 && $rsi >= 50 && $rsi <= 75) {
-            return 2;
+        // ---------- 7 Pullback Healthy ----------
+        // uptrend bullish tapi koreksi wajar dekat MA20 / support, RSI sehat
+        if ($maStackBull) {
+            $nearMa20 = ($ma20 > 0) ? (abs($close - $ma20) / max(1e-9, $ma20) <= 0.02) : false;
+            $nearSupport = false;
+            if ($support !== null) {
+                $nearSupport = abs($close - $support) / max(1e-9, $support) <= 0.03;
+            }
+
+            $rsiOk = ($rsi === null) || ($rsi >= 40.0 && $rsi <= 70.0);
+
+            if (($nearMa20 || $nearSupport) && $rsiOk) {
+                return 7;
+            }
         }
 
-        // 1) Base/Sideways
+        // ---------- 3 Accumulation ----------
+        // base/sideways tapi volume menguat + close cukup kuat (near high)
+        // (tanpa MA stack bullish kuat)
+        if (!$maStackBull && $volBurst && $nearHigh) {
+            return 3;
+        }
+
+        // ---------- 2 Early Uptrend ----------
+        if ($earlyUp) {
+            // hindari kalau sudah breakout (sudah ke-return di atas)
+            // dan hindari euphoria
+            if ($rsi === null || $rsi < 75.0) {
+                return 2;
+            }
+        }
+
+        // ---------- 1 Base / Sideways ----------
         return 1;
     }
 }

@@ -1,12 +1,4 @@
-# Compute EOD v2 — Explained (Untuk Pemula & Developer)
-
-Dokumen ini menjelaskan **Compute EOD v2** dengan bahasa sederhana.
-Tujuannya supaya:
-- mudah dipahami walau baru belajar,
-- tidak salah tafsir istilah teknikal,
-- dan konsisten dengan Sprint 1–3 yang sudah kita bangun.
-
----
+# Compute EOD — Explained (Untuk Pemula & Developer)
 
 ## 1. Apa itu Compute EOD?
 
@@ -22,7 +14,7 @@ Compute EOD **TIDAK**:
 - menentukan entry intraday
 - mengeksekusi trading
 
-Compute EOD hanya menyediakan **fakta teknikal**, bukan keputusan.
+Compute EOD menghasilkan indikator (fakta), sinyal/volume (interpretasi), dan decision (rekomendasi EOD berbasis rule). decision bukan eksekusi order
 
 ---
 
@@ -43,7 +35,7 @@ Dengan Compute EOD:
 
 ## 3. Data yang Dihasilkan Compute EOD
 
-Compute EOD v2 menghasilkan data di tabel:
+Compute EOD menghasilkan data di tabel:
 
 `ticker_indicators_daily`
 
@@ -86,6 +78,11 @@ Signal disimpan sebagai:
 - `signal_code` (angka)
 - ditampilkan ke user lewat mapping label
 
+Signal Retest vs age: 
+Signal age saat ini dihitung dari signal_code (pattern).
+Kalau suatu hari ingin “Breakout Retest” benar-benar butuh state “pernah breakout sebelumnya”, kamu perlu jelaskan bahwa:
+- Retest idealnya berbasis state/history, bukan cuma heuristik 1 hari.
+
 ---
 
 ## 5. Volume Label (Volume Label Code)
@@ -111,11 +108,17 @@ Volume **bukan arah**, tapi **kekuatan**.
 
 Volume hanya memberi konteks.
 
+definisi vol_ratio dan “prev 20 hari”
+- vol_ratio = volume_today / avg_volume_prev_20 (exclude today)
+- vol_sma20 dihitung dari 20 hari sebelumnya (tidak termasuk hari ini)
+- vol_ratio = volume / vol_sma20
+- volume_label mapping berdasarkan threshold ratio
+
 ---
 
 ## 6. Decision (Decision Code)
 
-Decision adalah **kesimpulan EOD** berbasis rule sistem.
+Decision adalah **kesimpulan EOD** berbasis rule sistem. Decision sudah memasukkan konteks Signal + Volume (override) supaya tidak kontradiksi (false breakout / climax / distribution).
 
 Decision menjawab:
 > "Dengan rule watchlist, ini layak dipertimbangkan atau tidak?"
@@ -210,8 +213,3 @@ Watchlist = **alat seleksi**
 - Expiry hanya valid jika signal age benar
 
 Jika Compute EOD salah → semua di atasnya ikut salah.
-
----
-
-Dokumen ini adalah referensi tetap.
-Jika kamu ragu arti suatu istilah di code, kembali ke dokumen ini.

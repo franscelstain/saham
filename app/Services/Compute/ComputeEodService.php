@@ -255,9 +255,14 @@ class ComputeEodService
                     'vol_ratio' => $volRatio,
                 ];
 
-                $decisionCode = $this->decision->classify($metrics);
+                $signalCode = $this->pattern->classify($metrics);
                 $volumeLabelCode = $this->volume->classify($volRatio);
-                $signalCode = $this->pattern->classify($metrics); // patternCode == signal_code
+
+                // inject context untuk decision
+                $metrics['signal_code'] = $signalCode;
+                $metrics['volume_label'] = $volumeLabelCode;
+
+                $decisionCode = $this->decision->classify($metrics);
 
                 $prevSnap = $prev ? ($prevSnaps[$tid] ?? null) : null;
                 $age = $this->age->computeFromPrev($tid, $date, $signalCode, $prevSnap);

@@ -2,39 +2,47 @@
 
 namespace App\Trade\Compute\Classifiers;
 
-class VolumeLabelClassifier
+final class VolumeLabelClassifier
 {
+    /** @var float[] */
+    private array $t;
+
     /**
-     * Volume label berbasis vol_ratio:
-     * vol_ratio = volume_today / vol_sma20_prev
-     *
-     * Output code (8 level):
+     * thresholds harus 7 angka (ascending), contoh default:
+     * [0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0]
+     */
+    public function __construct(array $thresholds)
+    {
+        $this->t = array_values(array_map('floatval', $thresholds));
+        if (count($this->t) < 7) {
+            $this->t = [0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0];
+        }
+    }
+
+    /**
      * 1 Dormant
      * 2 Ultra Dry
      * 3 Quiet
      * 4 Normal
      * 5 Early Interest
-     * 6 Volume Burst
-     * 7 Strong Burst
+     * 6 Volume Burst / Accumulation
+     * 7 Strong Burst / Breakout
      * 8 Climax / Euphoria
      */
-    public function classify($volRatio): ?int
+    public function classify(?float $volRatio): int
     {
-        if ($volRatio === null) return null;
-        $r = (float)$volRatio;
+        if ($volRatio === null) return 1;
+        $r = (float) $volRatio;
+        if ($r <= 0) return 1;
 
-        // threshold bisa diubah dari config
-        $t = config('trade.indicators.volume_ratio_thresholds', [
-            0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0
-        ]);
+        $t = $this->t;
 
-        if ($r < (float)$t[0]) return 1;
-        if ($r < (float)$t[1]) return 2;
-        if ($r < (float)$t[2]) return 3;
-        if ($r < (float)$t[3]) return 4;
-        if ($r < (float)$t[4]) return 5;
-        if ($r < (float)$t[5]) return 6;
-        if ($r < (float)$t[6]) return 7;
-        return 8;
+        if ($r < $t[0]) return 2;
+        if ($r < $t[1]) return 3;
+        if ($r < $t[2]) return 4;
+        if ($r < $t[3]) return 5;
+        if ($r < $t[4]) return 6;
+        if ($r < $t[6]) return 7; // < 4.0 masih Strong Burst
+        return 8;   // >= t[5] itu sudah strong → t[6] tetap 8 juga
     }
 }

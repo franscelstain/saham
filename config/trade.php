@@ -1,6 +1,5 @@
 <?php
 
-# build_id: ...
 # Tujuan: config dipakai di berbagai file bila dibutuhkan. 
 #         Dan bila ada config yang sebelumnya dipakai secara private bisa diubah strukturnya supaya lebih terorganisir.
 # Catatan: biar reuseable dan konsisten di seluruh aplikasi.
@@ -35,9 +34,14 @@ return [
         'lookback_days' => env('TRADE_LOOKBACK_DAYS', 260),
         'volume_ratio_thresholds' => [0.4, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0],
         'decision_guardrails' => [
+            'rsi_max_buy'          => env('TRADE_RSI_MAX_BUY', 70),
+            'rsi_warn'             => env('TRADE_RSI_WARN', 66),
             'min_vol_ratio_buy'     => env('TRADE_MIN_VOL_RATIO_BUY', 1.5),
             'min_vol_ratio_confirm' => env('TRADE_MIN_VOL_RATIO_CONFIRM', 1.0),
-            'rsi_warn'              => env('TRADE_RSI_WARN', 66),
+        ],
+        'pattern_thresholds' => [
+            'vol_strong' => env('TRADE_PATTERN_VOL_STRONG', 2.0),
+            'vol_burst'  => env('TRADE_PATTERN_VOL_BURST', 1.5),
         ],
     ],
     'market_data' => [
@@ -158,8 +162,8 @@ return [
             'rr_ge_12' => 5,
             'rr_lt_min_penalty' => -15,
         ],
-        'rsi_max' => env('WATCHLIST_RSI_MAX', 70),
-        'rsi_confirm_from' => env('WATCHLIST_RSI_CONFIRM_FROM', 66),
+        'rsi_max' => env('TRADE_RSI_MAX_BUY', 70),
+        'rsi_confirm_from' => env('TRADE_RSI_WARN', 66),
         'top_picks_max' => env('WATCHLIST_TOP_PICKS_MAX', 5),
         'top_picks_min_score' => env('WATCHLIST_TOP_PICKS_MIN_SCORE', 60),
         'top_picks_require_not_expired' => env('WATCHLIST_TOP_PICKS_REQUIRE_NOT_EXPIRED', true),
