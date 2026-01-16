@@ -1,350 +1,273 @@
 # MARKET_DATA_FAILURE_PLAYBOOK.md — SOP Saat Market Data Bermasalah
-*(Tujuan: fitur tidak rusak diam-diam, cepat terdeteksi, cepat pulih, dan tetap audit-able)*
+*(Tujuan: cepat terdeteksi, cepat pulih, tidak mencemari canonical, dan stabil di production)*
 
-Dokumen ini adalah **playbook operasional**. Saat Market Data bermasalah, ini jadi panduan:
-- cara mendeteksi,
-- cara mengklasifikasi severity,
-- langkah investigasi (urutannya),
-- tindakan pemulihan (tanpa merusak data),
-- dan keputusan kapan harus “tahan canonical” vs lanjut.
+Dokumen ini adalah playbook operasional. Saat Market Data bermasalah, ini jadi panduan:
+- deteksi,
+- klasifikasi severity,
+- investigasi (urutannya),
+- pemulihan yang aman,
+- keputusan kapan harus “tahan canonical”.
 
-Playbook ini sengaja tidak mengunci implementasi teknis, tapi mendefinisikan **aksi yang harus terjadi** agar sistem stabil.
-
----
-
-## 0) Prinsip Operasional (Jangan Dilanggar)
-
-1) **Lebih baik tidak update canonical daripada update salah.**  
-   RAW boleh masuk dengan flag, canonical jangan kalau masih ragu.
-
-2) **Setiap fallback, missing, disagreement, dan reject quality gate harus terlihat di ringkasan run.**  
-   Tanpa ringkasan yang bisa dibaca manusia, masalah akan terpendam.
-
-3) **Semua keputusan yang mengubah canonical harus punya jejak.**  
-   “Kenapa canonical berubah?” harus bisa dijawab.
-
-4) **Cutoff itu aturan keras.**  
-   Jangan pernah memasukkan candle “hari ini” sebelum cutoff.
+**Catatan agar tidak salah kaprah:**
+- Penyebutan compute-eod/watchlist/portfolio hanya untuk menjelaskan **dampak downstream**.
+- Itu **bukan** larangan reuse.
+- Kalau ada logic/config yang sama dan dipakai bareng, fix-nya harus di **shared/public component** supaya semua modul konsisten.
 
 ---
 
-## 1) Klasifikasi Severity (Agar Keputusan Tidak Random)
+## 0) Prinsip Operasional (jangan dilanggar)
+
+1) **Lebih baik tidak update canonical daripada update salah.**
+2) **Setiap fallback/missing/disagreement/reject harus terlihat di health summary run.**
+3) **Semua keputusan yang mengubah canonical harus punya jejak alasan.**
+4) **Cutoff itu aturan keras.**
+5) **Kalau masalah ada di aturan umum (cutoff, calendar, normalisasi, validator), perbaiki di shared/public.**  
+   Jangan patch lokal di satu modul.
+
+---
+
+## 1) Klasifikasi Severity
 
 ### S0 — Informational
-Contoh:
-- 1–2 ticker gagal fetch karena simbol tidak dikenal.
-- Disagreement kecil yang tidak melewati threshold.
-Aksi:
-- catat, masuk backlog untuk perbaikan, tidak perlu tindakan cepat.
+- 1–2 ticker gagal fetch (symbol tidak dikenal)
+- disagreement kecil
+Aksi: catat, backlog.
 
 ### S1 — Minor
-Contoh:
-- fallback terjadi tapi coverage tetap tinggi.
-- missing data pada 1–3 ticker di trading day.
-Aksi:
-- lakukan retry terarah (subset), validasi hasil, pastikan canonical aman.
+- fallback terjadi tapi coverage tetap tinggi
+- missing 1–3 ticker pada trading day
+Aksi: retry terarah, verifikasi, canonical aman.
 
 ### S2 — Major
-Contoh:
-- provider utama down / rate-limited berat.
-- missing data pada banyak ticker trading day.
-- disagreement major melonjak.
-Aksi:
-- aktifkan fallback massal (AUTO), atau tahan canonical dan jadwalkan rerun setelah stabil.
+- provider utama down/rate-limited berat
+- missing banyak ticker trading day
+- disagreement major melonjak
+Aksi: fallback massal / tahan canonical / rerun saat stabil.
 
 ### S3 — Critical
-Contoh:
-- canonical terkontaminasi partial day / timezone shift.
-- banyak bar invalid lolos ke canonical (quality gate bocor).
-- mapping symbol salah menyebabkan ticker tertukar.
-Aksi:
-- **freeze canonical** (hentikan update),
-- lakukan rollback/rebuild canonical dari RAW yang benar,
-- audit dampak ke compute-eod/watchlist/portfolio.
+- canonical tercemar partial day
+- timezone shift (tanggal geser)
+- quality gate bocor (invalid masuk canonical)
+- symbol mapping salah (ticker tertukar)
+Aksi: freeze canonical, rollback/rebuild, audit dampak.
 
 ---
 
-## 2) Sinyal Deteksi (Yang Harus Selalu Dicek Setelah Run)
+## 2) Sinyal Deteksi (wajib dicek setelah setiap run)
 
-Setelah setiap run, cek minimal ini:
+Cek minimal:
+1) **Effective date range** (cutoff benar?)
+2) **Coverage** (% ticker punya bar di trading day terbaru)
+3) **Fallback rate** + alasan dominan
+4) **Hard rejects** (lonjakan abnormal?)
+5) **Disagreement major** (lonjakan abnormal?)
+6) **Missing trading day** (bukan sekadar “tidak ada data”)
 
-1) **Effective date range**  
-   Pastikan end date sesuai cutoff.
-
-2) **Coverage**  
-   - berapa % ticker punya bar untuk trading day terbaru?
-   - berapa ticker missing?
-
-3) **Fallback rate**  
-   - berapa % ticker pakai provider utama vs fallback?
-   - alasan fallback dominan apa?
-
-4) **Invalid/reject count**  
-   - berapa bar gagal hard quality gate?
-   - apakah lonjakan abnormal?
-
-5) **Disagreement major count**  
-   - berapa bar berbeda signifikan antar sumber?
-
-Jika salah satu metrik melonjak, anggap run bermasalah meski “secara teknis sukses”.
+Kalau salah satu melonjak, anggap run bermasalah meski “exit code sukses”.
 
 ---
 
-## 3) Prosedur Investigasi Cepat (Urutan Wajib)
+## 3) Prosedur Investigasi Cepat (urutan wajib)
 
-Urutan ini mencegah kamu buang waktu di tempat yang salah.
-
-### Step 1 — Validasi aturan waktu (cutoff & timezone)
+### Step 1 — Validasi cutoff & timezone (shared rules)
 Pertanyaan:
-- Run dilakukan jam berapa WIB?
-- End date yang dipakai apa?
-- Ada indikasi bar “hari ini” masuk sebelum cutoff?
+- Run jam berapa WIB?
+- End date sesuai cutoff?
+- Ada bar “today” masuk sebelum cutoff?
+- Ada indikasi tanggal geser karena UTC→WIB?
 
-Jika iya → langsung klasifikasi minimal **S3** (karena ini merusak indikator).
+Jika ya → S3.
 
-### Step 2 — Bedakan “non-trading day” vs “missing trading day”
-Pertanyaan:
-- Tanggal bermasalah itu trading day?
-- Kalau bukan trading day, tidak perlu panik.
+**Catatan:** jika root cause di cutoff resolver / timezone normalizer, fix harus di shared/public.
 
-Jika trading day dan banyak missing → lanjut Step 3.
+### Step 2 — Kalender: trading day atau bukan?
+- non-trading day → banyak “missing” bisa normal
+- trading day → missing adalah masalah
 
-### Step 3 — Apakah provider down / rate limit?
+### Step 3 — Provider: down / rate limit?
 Indikator:
-- error HTTP melonjak,
-- timeout melonjak,
-- response kosong massal,
-- fallback rate melonjak.
+- timeout/error melonjak
+- response kosong massal
+- fallback melonjak
 
-Jika iya → lanjut prosedur Provider Down.
-
-### Step 4 — Apakah ada masalah normalisasi (symbol, volume unit, precision)?
+### Step 4 — Normalisasi: symbol/unit/precision?
 Indikator:
-- harga/volume tidak masuk akal untuk banyak ticker,
-- ticker tertentu tiba-tiba punya range harga ekstrem (heuristic),
-- banyak reject karena open/close di luar high/low.
+- harga/volume mustahil massal
+- banyak reject open/close di luar range
+- pola data terlihat tertukar
 
-Jika iya → prosedur Normalisasi.
-
-### Step 5 — Apakah kualitas data vendor bermasalah (stale/outlier)?
+### Step 5 — Data quality: stale/outlier/disagreement?
 Indikator:
-- series tidak bergerak (stale),
-- outlier spike pada subset ticker,
-- disagreement major naik tapi hanya pada 1 sumber.
-
-Jika iya → prosedur Data Quality Vendor.
+- series tidak bergerak (stale)
+- spike ekstrem subset ticker
+- disagreement major terkonsentrasi di satu sumber
 
 ---
 
 ## 4) Playbook Kasus Utama
 
 ### Case A — Provider Down / Rate Limited (S2)
-Gejala:
-- provider utama gagal massal
-- fallback melonjak atau semua gagal
-
 Tindakan:
-1) Pastikan cutoff benar (jangan sampai panik lalu memasukkan partial).
-2) Aktifkan mode fallback AUTO dengan priority list.
-3) Jalankan retry dengan throttling lebih konservatif.
-4) Jika fallback tersedia dan lolos quality gate:
-   - canonical boleh dibangun dari fallback,
-   - tapi flag “FALLBACK_USED” di canonical.
-5) Jika fallback juga tidak stabil:
-   - simpan RAW yang ada,
-   - **tahan canonical update** untuk tanggal itu,
-   - rerun nanti.
-
-Keputusan cepat:
-- Jika coverage canonical < threshold (misal < 95% untuk trading day) → tahan canonical.
+1) pastikan cutoff benar (jangan memasukkan partial karena panik)
+2) fallback AUTO sesuai priority
+3) retry subset missing dengan throttling konservatif
+4) canonical:
+   - boleh dibangun dari fallback jika lolos quality gate
+   - wajib flag `FALLBACK_USED`
+5) jika coverage < threshold → tahan canonical (`CANONICAL_HELD`) dan rerun setelah stabil
 
 ---
 
-### Case B — Partial Day Masuk Canonical (S3 Critical)
+### Case B — Partial Day Masuk Canonical (S3)
 Gejala:
-- ada bar untuk “today” padahal run sebelum cutoff
-- indikator berubah drastis antara siang dan malam
+- bar “today” masuk sebelum cutoff
+- indikator berubah drastis setelah rerun
 
 Tindakan:
-1) Freeze canonical update untuk tanggal “today”.
-2) Hapus/rollback canonical untuk tanggal tersebut (sesuai mekanisme yang aman).
-3) Pastikan RAW tetap ada untuk audit.
-4) Perbaiki guardrail:
-   - canonical builder harus reject bar “today” sebelum cutoff (hard rule).
-5) Rebuild canonical hanya setelah cutoff atau ke “yesterday”.
-
-Catatan:
-- Ini harus dianggap critical karena merusak compute-eod dan watchlist.
+1) freeze canonical update untuk tanggal itu
+2) rollback/hapus canonical yang tercemar (mekanisme aman)
+3) RAW tetap disimpan (audit)
+4) perbaiki guardrail: canonical builder reject “today” sebelum cutoff
+5) rebuild canonical setelah cutoff atau pakai yesterday
 
 ---
 
-### Case C — Timezone Shift (Tanggal Geser) (S3 Critical)
+### Case C — Timezone Shift (S3)
 Gejala:
-- gap/hole tanggal
-- bar duplikat atau “double day”
-- trade_date tidak sinkron dengan kalender trading day
+- gap/double day
+- trade_date tidak align dengan kalender
 
 Tindakan:
-1) Freeze canonical.
-2) Ambil sampel beberapa ticker dan cek:
-   - timestamp mentah vs trade_date hasil normalisasi.
-3) Perbaiki normalisasi timezone:
-   - trade_date harus definisi WIB.
-4) Rebuild canonical dari RAW yang sudah dinormalisasi ulang.
-5) Verifikasi dengan:
-   - jumlah trading days dalam range,
-   - keselarasan dengan market calendar.
+1) freeze canonical
+2) audit sample ticker: timestamp mentah vs trade_date hasil normalisasi
+3) perbaiki normalisasi timezone (trade_date=WIB)
+4) rebuild canonical untuk range terdampak
+5) verifikasi terhadap market calendar (continuity, jumlah trading day)
 
 ---
 
-### Case D — Symbol Mapping Salah / Ticker Tertukar (S3 Critical)
+### Case D — Symbol Mapping Salah / Ticker Tertukar (S3)
 Gejala:
-- beberapa ticker tiba-tiba punya harga yang mustahil (BBCA jadi 200, dst)
-- disagreement major masif tapi “aneh”
-- pola data dua ticker seperti tertukar
+- ticker tertentu tiba-tiba punya range harga mustahil
+- data dua ticker terlihat tertukar
 
 Tindakan:
-1) Freeze canonical.
-2) Identifikasi subset ticker yang terdampak.
-3) Audit RAW:
-   - sumber symbol apa yang dipakai provider?
-4) Perbaiki mapping tunggal:
-   - jangan ada mapping tersebar.
-5) Rebuild canonical untuk ticker terdampak pada range yang salah.
-6) Jalankan sanity check:
-   - range harga wajar per ticker,
-   - continuity check.
+1) freeze canonical
+2) identifikasi ticker terdampak
+3) audit RAW: symbol eksternal apa yang dipakai
+4) perbaiki mapping tunggal (shared/public)
+5) rebuild canonical untuk ticker/range terdampak
+6) sanity check: range harga wajar + continuity
 
 ---
 
-### Case E — Volume Unit Salah (lot vs shares) (S2 Major → bisa jadi S3 kalau masuk canonical lama)
+### Case E — Volume Unit Salah (S2 → bisa S3 jika lama tercemar)
 Gejala:
-- volume tiba-tiba 100x lebih besar/kecil
-- sinyal volume burst jadi banjir palsu
+- volume loncat 100x / turun 100x
+- sinyal volume burst banjir palsu
 
 Tindakan:
-1) Pastikan definisi unit volume internal.
-2) Audit provider mana yang beda unit.
-3) Perbaiki konversi di normalizer provider tersebut.
-4) Rebuild canonical untuk range terdampak.
-5) Jalankan ulang compute-eod untuk range terdampak (kalau indikator bergantung volume).
+1) pastikan definisi unit internal (shared rule)
+2) audit provider yang beda unit
+3) perbaiki normalizer provider
+4) rebuild canonical range terdampak
+5) jadwalkan rerun compute-eod untuk range itu jika indikator memakai volume
 
 ---
 
-### Case F — Outlier / Glitch Harga Ekstrem (S2 Major)
-Gejala:
-- harga spike gila pada subset ticker
-- banyak reject atau banyak sinyal teknikal abnormal
-
+### Case F — Outlier / Glitch Harga Ekstrem (S2)
 Tindakan:
-1) Cek apakah ada corporate action hint (split, reverse, dll).
-2) Jika tidak ada CA hint:
-   - bar tersebut harus ditahan dari canonical (hard/soft rule sesuai threshold).
-3) Simpan RAW + flag “OUTLIER”.
-4) Jika ada sumber lain untuk tanggal itu:
-   - canonical ambil sumber lain (priority + quality gate).
-5) Jika semua sumber outlier:
-   - tahan canonical untuk ticker itu saja,
-   - masuk daftar investigasi/manual review.
+1) cek kemungkinan corporate action hint
+2) jika tidak ada CA:
+   - tahan canonical bar outlier (reject/flag sesuai threshold)
+3) simpan RAW + flag `OUTLIER`
+4) jika sumber lain tersedia:
+   - canonical ambil sumber lain (priority + quality gate)
+5) jika semua sumber outlier:
+   - tahan canonical untuk ticker itu
+   - masuk daftar investigasi/manual review
 
 ---
 
-### Case G — Data Stale (S2 Major)
+### Case G — Data Stale (S2)
 Gejala:
-- candle terbaru tidak muncul padahal trading day
-- series tidak berubah beberapa hari
-- provider mengulang data lama
+- trading day tapi bar terbaru tidak muncul
+- vendor mengulang data lama
 
 Tindakan:
-1) Verifikasi trading day.
-2) Jalankan lookback import (5–10 trading days) untuk ticker terdampak.
-3) Bandingkan dengan sumber lain:
-   - jika sumber lain punya data baru → provider stale, turunkan prioritas sementara.
-4) Canonical:
-   - jangan pakai bar yang stale sebagai “hari terbaru” jika jelas salah.
-5) Masukkan flag “STALE_PROVIDER” untuk sumber tersebut.
+1) verifikasi trading day
+2) run lookback untuk ticker terdampak
+3) bandingkan dengan sumber lain
+4) turunkan prioritas provider stale sementara
+5) canonical jangan pakai stale sebagai “latest”
+6) flag `STALE_PROVIDER`
 
 ---
 
-### Case H — Banyak Missing Data pada Trading Day (S2 Major)
-Gejala:
-- coverage turun signifikan
-- missing tersebar luas
-
+### Case H — Missing Massal di Trading Day (S2)
 Tindakan:
-1) Cek kalender + cutoff.
-2) Cek provider down/rate limit.
-3) Jalankan retry batch:
-   - subset missing dulu (hemat waktu).
-4) Jika masih missing:
-   - fallback mode,
-   - jika fallback sukses → build canonical,
-   - jika tidak → tahan canonical dan rerun setelah stabil.
+1) cek cutoff + kalender
+2) cek provider down/rate limit
+3) retry subset missing
+4) fallback massal jika perlu
+5) jika coverage < threshold → tahan canonical
 
 ---
 
-## 5) Keputusan “Tahan Canonical” (Gating Rules)
+## 5) Gating Rules: kapan canonical harus ditahan
 
-Canonical update untuk trading day terbaru harus **ditahan** jika salah satu kondisi:
-- run dilakukan sebelum cutoff tapi mencoba memasukkan today
-- coverage < threshold (misal 95% ticker untuk trading day)
-- invalid hard rejects melonjak di atas threshold
+Tahan canonical jika:
+- “today” masuk sebelum cutoff
+- coverage trading day terbaru < threshold (misal 95%)
+- hard rejects melonjak di atas threshold
 - timezone shift terdeteksi
 - mapping error terindikasi
-- disagreement major melonjak drastis (indikasi data tidak stabil)
+- disagreement major melonjak drastis
 
 Saat canonical ditahan:
-- RAW tetap disimpan,
-- run summary harus menandai status: `CANONICAL_HELD`.
+- RAW tetap disimpan + flags
+- health summary wajib mencantumkan status `CANONICAL_HELD` + alasan dominan
 
 ---
 
-## 6) Pemulihan: Rebuild, Backfill, dan Dampak ke Modul Lain
+## 6) Pemulihan: rebuild, backfill, dan dampak downstream
 
-### 6.1 Kapan perlu rebuild canonical?
-- aturan priority berubah,
-- provider baru masuk,
-- bug normalisasi/quality gate diperbaiki,
-- ada insiden S3.
+### 6.1 Kapan rebuild canonical?
+- priority rules berubah
+- provider baru masuk
+- bug normalisasi/validator/cutoff diperbaiki
+- insiden S3
 
-### 6.2 Kapan perlu rerun compute-eod?
-Jika canonical berubah pada periode tertentu dan indikator dihitung dari harga/volume:
-- rerun compute-eod untuk range tersebut agar sinyal konsisten.
+### 6.2 Kapan rerun compute-eod?
+Jika canonical berubah pada periode tertentu dan indikator bergantung pada harga/volume:
+- rerun compute-eod untuk range terdampak agar konsisten
 
-### 6.3 Backfill strategy yang aman
-- Jangan backfill masif saat jam sibuk.
-- Backfill dilakukan bertahap (per ticker/per range) dan selalu melalui RAW → canonical.
-- Hasil backfill harus melewati quality gate yang sama.
-
----
-
-## 7) Postmortem Minimal (Supaya Masalah Tidak Ulang)
-
-Setelah insiden S2/S3, catat:
-1) Root cause: provider, normalisasi, cutoff, mapping, dll.
-2) Dampak: tanggal & ticker mana, modul mana terpengaruh.
-3) Fix: guardrail apa yang ditambahkan.
-4) Prevent: metrik/alert apa yang ditambah agar terdeteksi lebih cepat.
+### 6.3 Backfill aman
+- backfill bertahap (per ticker/per range)
+- selalu lewat RAW → canonical
+- quality gate yang sama berlaku
 
 ---
 
-## 8) Checklist Harian Operator (Ringkas tapi Wajib)
+## 7) Postmortem minimal (supaya tidak ulang)
 
-Setiap hari setelah run:
+Untuk S2/S3:
+1) root cause (provider/normalisasi/cutoff/mapping/kalender)
+2) dampak (tanggal + ticker + downstream)
+3) fix (guardrail apa ditambah)
+4) prevent (metrik/threshold apa ditambah)
+
+---
+
+## 8) Checklist harian operator
+
 - [ ] effective_end_date benar (cutoff OK)
-- [ ] coverage trading day terbaru di atas threshold
+- [ ] coverage trading day terbaru >= threshold
 - [ ] fallback rate normal
-- [ ] invalid rejects normal
+- [ ] hard rejects normal
 - [ ] disagreement major normal
 - [ ] missing trading day tidak melonjak
-- [ ] canonical status: updated / held (jelas)
-
----
-
-## 9) Prinsip Penutup
-Market Data yang “tahan produksi” bukan yang tidak pernah gagal, tapi yang:
-- gagal dengan cara yang **terlihat**,
-- bisa **pulih cepat**,
-- dan tidak mencemari canonical diam-diam.
+- [ ] status canonical: updated / held (jelas + alasan)
+- [ ] bila bug ada di aturan umum → fix di shared/public, bukan patch lokal
 
 ---

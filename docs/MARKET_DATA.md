@@ -1,448 +1,389 @@
 # MARKET_DATA.md — Panduan Konseptual untuk Fitur Market Data yang Tahan Produksi
-*(Multi-Source • Akurat • Audit-able • SRP • Performa • Tidak Mudah Rusak)*
+*(Multi-Source • Akurat • Audit-able • SRP • Performa • Reuse Lintas Modul • Tidak Mudah Rusak)*
 
-Dokumen ini adalah **kompas**. Kalau kamu atau AI baca ini di chat lain, harus langsung paham:
-- **apa** yang dibangun,
-- **kenapa** desainnya begitu,
-- **apa saja failure mode** yang biasanya bikin fitur market data “kelihatan jalan” tapi diam-diam merusak sistem,
-- dan **guardrail** apa yang wajib ada supaya stabil di production.
+Dokumen ini adalah **kompas** dan akan jadi panduan coding. Kalau kamu/AI baca ulang di chat lain, harus langsung paham:
+- **apa** yang akan dibangun,
+- **kenapa** desainnya seperti itu,
+- **failure mode** paling sering yang bikin market data “kelihatan jalan” tapi merusak data diam-diam,
+- **guardrail** dan kebijakan operasional supaya stabil di production.
 
-Dokumen ini **bukan** spek coding per file. Tapi ini harus cukup tajam untuk jadi panduan implementasi yang benar dan sulit rusak.
+Dokumen ini sengaja tidak mengunci detail implementasi per file, tapi mendefinisikan *kontrak* dan *invariant* yang wajib dipenuhi.
 
 ---
 
 ## 1) Misi Fitur: “Sumber Kebenaran yang Bisa Dipertanggungjawabkan”
 
-Market Data bukan sekadar “ambil harga”. Ini modul yang menentukan kualitas seluruh aplikasi:
-- compute-eod (indikator & sinyal),
-- watchlist (kandidat & scoring),
-- portfolio (valuasi EOD & analisa).
+Market Data bukan sekadar “ambil harga”. Ini modul pondasi yang menentukan kualitas seluruh sistem.
 
-Kalau Market Data salah, modul lain **pasti** ikut salah. Jadi target utamanya:
+Contoh modul downstream yang memakai hasil Market Data (compute-eod, watchlist, portfolio, dll) disebut untuk menjelaskan **dampak**:
+- Market Data salah → downstream ikut salah.
+- Ini **bukan** aturan bahwa Market Data harus berbeda total atau tidak boleh reuse logic dengan modul lain.
+
+Target utamanya:
 
 ### 1.1 Akurasi yang konsisten, bukan “kadang benar”
 Akurasi di sini artinya:
 - candle EOD benar-benar final,
 - tanggal tidak bergeser karena timezone,
 - volume tidak salah satuan,
-- data outlier terdeteksi sebelum menghancurkan indikator,
-- sumber data tercatat jelas.
+- outlier/glitch terdeteksi sebelum menghancurkan indikator,
+- jejak sumber dan keputusan canonical jelas.
 
-### 1.2 Multi-source itu wajib, tapi canonical harus tunggal
-Multi-source tanpa canonical selection = chaos (modul A pakai sumber X, modul B pakai sumber Y → hasil beda).
-Jadi prinsip:
-- Simpan semua sumber sebagai **RAW (bukti mentah)**.
-- Tetapkan **CANONICAL (1 versi resmi)** yang dipakai semua modul.
+### 1.2 Multi-source wajib, tetapi “truth” tetap tunggal
+Multi-source tanpa “canonical selection” = chaos (modul A pakai sumber X, modul B pakai sumber Y).
+Prinsip:
+- Simpan semua hasil sebagai **RAW (bukti mentah)**.
+- Tetapkan **CANONICAL (1 versi resmi)** yang dipakai semua modul downstream.
 
-### 1.3 Bisa diaudit dan bisa direbuild
+### 1.3 Audit & rebuild adalah fitur inti, bukan bonus
 Wajib bisa menjawab:
-- “Harga ini datang dari sumber apa?”
-- “Kenapa hari itu canonical berubah?”
-- “Kalau vendor baru masuk, bisa rebuild canonical tanpa refetch total?”
+- “Data tanggal X untuk ticker Y asalnya dari mana?”
+- “Kenapa canonical berubah?”
+- “Kalau vendor baru masuk / rules berubah, bisa rebuild canonical tanpa refetch besar?”
 
 ---
 
-## 2) Perilaku Default yang Deterministic: Cutoff & “Run Tanpa Tanggal”
+## 2) Kebijakan Reuse Lintas Modul (Ini yang benar)
 
-Ini penyebab kerusakan paling sering di production: **mengambil hari ini padahal belum final**.
+Ada dua hal yang sering ketukar:
 
-### 2.1 Cutoff EOD (WIB) itu aturan keras
-- Gunakan cutoff default: **16:30 WIB**.
-- Jika import dijalankan **sebelum cutoff**:
-  - end date = **kemarin** (bukan hari ini),
-  - jangan ada partial candle masuk canonical.
+1) **Reuse (boleh & dianjurkan)**  
+2) **Coupling dependency arah salah (dilarang)**
 
-Catatan:
-- Partial candle yang masuk 1 kali saja bisa merusak MA/RSI dan membuat sinyal palsu.
-- “Ah nanti malam kita run lagi” tidak cukup, karena indikator sudah terlanjur terhitung dari data salah.
+### 2.1 Reuse itu dianjurkan bila fungsinya sama & dipakai bareng
+Jika ada logic yang sama dipakai oleh Market Data + compute-eod + watchlist (atau modul lain), maka:
+- **jangan duplikasi**
+- **jangan taruh di folder privat salah satu modul**
+- ekstrak jadi **shared/public component** supaya 1 implementasi dipakai bersama.
 
-### 2.2 Run tanpa parameter tanggal harus otomatis dan aman
-Kalau dijalankan tanpa input:
+Contoh komponen yang biasanya shared:
+- **Cutoff & effective date resolver** (run tanpa tanggal, lookback window, perhitungan end-date yang aman)
+- **Market calendar helper** (trading day awareness)
+- **Timezone + unit normalizer** (WIB trade_date, volume unit)
+- **Quality gate core rules** (hard/soft validation, outlier flags)
+- **Telemetry summary builder** (ringkasan run yang konsisten)
+- **Symbol/ticker mapping resolver** (kalau banyak modul membutuhkannya)
+
+### 2.2 Yang dilarang: dependency arah yang salah
+Yang harus dihindari:
+- Market Data memanggil compute-eod/watchlist secara langsung.
+- Modul downstream menjadi “pemilik” logic core yang seharusnya shared.
+
+Arah yang benar:
+- downstream mengonsumsi canonical Market Data,
+- shared logic berada di layer public yang tidak “milik” satu modul.
+
+### 2.3 Kebijakan config: harus public-friendly, konsisten, dan tidak “private-looking”
+Kalau suatu config/konvensi dipakai lintas modul:
+- naming harus generik dan tidak mengikat ke satu modul,
+- urutan/struktur harus konsisten,
+- jangan ada “aturan cutoff A” dan “aturan cutoff B” di tempat berbeda.
+
+Kunci stabilitas: **satu aturan dipakai semua.**
+
+---
+
+## 3) Perilaku Default Deterministic: Cutoff & “Run Tanpa Tanggal” (Wajib)
+
+Kesalahan paling sering di production: **mengambil data “hari ini” padahal belum final** → besok berubah → indikator kacau.
+
+### 3.1 Cutoff EOD (WIB) adalah aturan keras
+- Cutoff default: **16:30 WIB** (bisa configurable).
+- Jika run **sebelum cutoff**:
+  - end date efektif = **kemarin**
+  - canonical **tidak boleh** menerima bar “today”
+
+Ini bukan preferensi. Ini guardrail wajib.
+
+### 3.2 Run tanpa parameter tanggal harus otomatis dan aman
+Jika dijalankan tanpa input:
 - tentukan `effective_end_date`:
   - now >= cutoff → today
   - now < cutoff → yesterday
 - tentukan `effective_start_date`:
-  - gunakan **lookback window kecil** (misal 5–10 trading days) untuk “menambal” keterlambatan update vendor
-  - tetap configurable
+  - gunakan **lookback window kecil** (misal 5–10 trading days) untuk menambal data yang telat update
+  - configurable
 
-Kenapa butuh lookback?
-- vendor kadang telat 1–2 hari
-- weekend/holiday menyebabkan “gap pattern” yang sering bikin logic import salah
-- re-run kecil jauh lebih murah daripada backfill besar.
-
----
-
-## 3) Prinsip SRP yang Wajib (Kalau Dilanggar, Stabilitas Pasti Turun)
-
-Pisahkan peran. Kalau dicampur, debug dan scaling akan hancur.
-
-### 3.1 Provider
-Tanggung jawab provider:
-- fetch data dari satu sumber,
-- parse response,
-- keluarkan hasil mentah dalam format internal standar.
-
-Provider **tidak boleh**:
-- menentukan canonical,
-- menyembunyikan error,
-- melakukan “smart fixing” diam-diam (karena jadi sulit audit).
-
-### 3.2 Normalizer
-Tanggung jawab:
-- menyamakan timezone, format symbol, precision, unit volume.
-- output harus konsisten lintas provider.
-
-### 3.3 Validator / Quality Gate
-Tanggung jawab:
-- menilai bar valid atau tidak,
-- flag outlier / suspicious bar,
-- menjaga agar canonical tidak tercemar.
-
-### 3.4 Orchestrator / Import Runner
-Tanggung jawab:
-- menentukan date range (cutoff + lookback),
-- batching + throttling,
-- retry policy,
-- fallback antar provider,
-- mencatat telemetry run.
-
-### 3.5 Canonical Selector
-Tanggung jawab:
-- memilih 1 bar yang dipakai sistem dari banyak RAW.
-- tidak fetch data; hanya bekerja dengan data hasil provider + kualitasnya.
-
-### 3.6 Audit / Telemetry
-Tanggung jawab:
-- membuat bukti dan jejak yang bisa dipakai investigasi.
-Log “sekadar teks” tidak cukup kalau kamu mau sistem tahan produksi.
+Kenapa butuh lookback walau “harian”?
+- vendor sering telat 1–2 hari
+- holiday/weekend menciptakan gap pattern
+- rerun kecil lebih murah daripada backfill besar
 
 ---
 
-## 4) Konsep Data RAW vs CANONICAL (Kunci untuk “Tidak Mudah Rusak”)
+## 4) Prinsip SRP yang Wajib (Kalau dicampur, pasti rapuh)
 
-### 4.1 RAW = bukti mentah, semua sumber
+Pisahkan tanggung jawab. Minimal peran konseptual berikut harus jelas:
+
+### 4.1 Provider
+- fetch + parse dari 1 sumber
+- output ke format internal standar
+- **tidak** memilih canonical
+- **tidak** menyembunyikan error
+- **tidak** melakukan “smart fixing” diam-diam
+
+### 4.2 Normalizer
+- menyamakan timezone, symbol, precision, unit volume
+- definisi `trade_date` tunggal: **WIB**
+
+### 4.3 Validator / Quality Gate
+- hard rules (reject canonical)
+- soft rules (flag suspicious)
+- menjaga canonical tidak tercemar
+
+### 4.4 Orchestrator / Import Runner
+- menentukan range (cutoff + lookback)
+- batching/throttling
+- retry policy
+- fallback antar provider
+- membuat telemetry ringkasan run
+
+### 4.5 Canonical Selector
+- memilih 1 bar resmi dari RAW
+- bekerja dari data yang sudah dinormalisasi dan divalidasi
+
+### 4.6 Audit / Telemetry
+- bukti & jejak untuk investigasi
+- bukan cuma log teks
+
+---
+
+## 5) RAW vs CANONICAL (Kunci supaya tidak mudah rusak)
+
+### 5.1 RAW = bukti mentah dari semua sumber
 RAW disimpan walau:
 - invalid,
 - disagreement,
-- ada error partial,
-karena RAW itu sumber audit.
+- error,
+karena RAW itu bahan audit.
 
-Tapi RAW harus punya metadata:
-- source,
-- waktu import,
-- status validasi,
-- error/flags.
+RAW minimal harus membawa:
+- source
+- waktu import
+- status validasi/flags
+- error detail (jika ada)
+- identitas data provider (symbol eksternal, metadata penting)
 
-### 4.2 CANONICAL = satu versi resmi
+### 5.2 CANONICAL = satu versi resmi untuk seluruh downstream
 Canonical hanya boleh dibangun dari RAW yang:
 - lolos quality gate,
-- memenuhi aturan cutoff,
-- memenuhi aturan prioritas sumber.
+- sesuai cutoff,
+- menang priority (atau fallback yang sah).
 
-Canonical wajib menyimpan minimal:
-- sumber terpilih,
-- alasan pemilihan (misal priority winner, fallback used, etc),
-- flags jika data suspicious (biar modul lain bisa aware).
-
----
-
-## 5) Normalisasi yang Benar: Penyebab Bug yang “Licin” dan Sulit Ditemukan
-
-Multi-source tanpa normalisasi akan menghasilkan bug “licin”: tampak jalan, tapi hasil salah.
-
-### 5.1 Timezone shift (bug paling mematikan)
-Banyak provider mengembalikan timestamp UTC. Kalau salah konversi:
-- bar tanggal 2026-01-16 WIB bisa terbaca sebagai 2026-01-15, atau sebaliknya.
-
-Dampaknya:
-- compute-eod menghitung indikator dengan urutan tanggal salah,
-- watchlist menilai breakout palsu,
-- portfolio valuasi salah hari.
-
-Guardrail:
-- semua `trade_date` harus ditetapkan di **Asia/Jakarta** sebagai definisi tunggal.
-- jika provider memberi timestamp, konversi ke WIB dan ambil tanggal WIB.
-
-### 5.2 Unit volume (lot vs shares)
-Beberapa sumber memberi volume dalam lembar, ada yang dalam lot.
-Dampak:
-- volume spike palsu → sinyal “strong burst” palsu.
-
-Guardrail:
-- definisikan unit volume internal (misal “shares/lembar”).
-- semua provider wajib dikonversi ke unit internal.
-
-### 5.3 Precision & rounding
-Perbedaan rounding (2 decimal vs 4 decimal) bisa bikin:
-- high < close karena rounding,
-- open/close keluar dari range karena truncation.
-
-Guardrail:
-- tentukan precision internal (misal 4 decimal),
-- normalizer melakukan rounding konsisten,
-- validator punya toleransi kecil.
-
-### 5.4 Symbol mapping
-Provider punya format symbol sendiri (misal `.JK`).
-Bug mapping membuat data ticker A masuk ke ticker B.
-
-Guardrail:
-- mapping symbol harus eksplisit dan testable.
-- jangan “string concat” di banyak tempat; jadikan satu sumber kebenaran mapping.
+Canonical wajib menyimpan:
+- selected source
+- flags penting (fallback used, disagree major, outlier flagged, dsb)
+- jejak alasan (cukup ringkas tapi bisa ditelusuri)
 
 ---
 
-## 6) Quality Gate: Menolak Data Jelek Sebelum Masuk Canonical
+## 6) Normalisasi: Bug “Licin” yang paling sering merusak tanpa ketahuan
 
-Quality gate adalah “filter sanitasi” agar 1 glitch vendor tidak merusak semua modul.
+### 6.1 Timezone shift (paling mematikan)
+Banyak provider memberi timestamp UTC.
+Guardrail:
+- `trade_date` internal = **WIB** definisi tunggal
+- timestamp provider → konversi WIB → baru ambil tanggal WIB
+- tes edge-case: sesi penutupan vs UTC date
 
-### 6.1 Aturan validasi minimal (hard rules)
-- `high >= low`
-- `open` dan `close` berada di dalam `[low, high]` (toleransi kecil)
+### 6.2 Unit volume (lot vs shares)
+Guardrail:
+- definisikan unit internal (misal “lembar/shares”)
+- semua provider wajib konversi ke unit internal
+- tambahkan flag kalau volume abnormal
+
+### 6.3 Precision & rounding
+Guardrail:
+- tetapkan precision internal
+- rounding konsisten di normalizer
+- validator punya toleransi kecil agar tidak false reject
+
+### 6.4 Symbol mapping
+Guardrail:
+- mapping tunggal dan testable
+- simpan symbol eksternal di RAW untuk audit
+- sanity check heuristic untuk mendeteksi “ticker tertukar”
+
+---
+
+## 7) Quality Gate: Menolak data jelek sebelum masuk canonical
+
+### 7.1 Hard rules (reject canonical)
+- high >= low
+- open/close berada dalam [low, high] (toleransi kecil)
 - harga > 0
 - volume >= 0
-- tidak future date
-- tidak melanggar cutoff (hari ini sebelum cutoff → reject untuk canonical)
+- bukan future date
+- tidak melanggar cutoff (today sebelum cutoff → reject)
 
-### 6.2 Suspicious rules (soft rules, menghasilkan flag)
-- gap harga ekstrem vs hari sebelumnya (misal > X%) → flag
-- volume 0 di trading day → flag
-- candle sama persis berhari-hari → flag (indikasi data stale)
-- high==low==open==close pada banyak hari → flag
+Hard rule gagal:
+- RAW boleh simpan (audit)
+- canonical **tidak boleh** ambil
+
+### 7.2 Soft rules (flag)
+- gap ekstrem vs hari sebelumnya (threshold)
+- volume 0 pada trading day
+- series stale (bar tidak update)
+- candle flat berkepanjangan
+
+Soft rules:
+- canonical boleh masuk dengan flag, atau ditahan jika threshold parah
+
+### 7.3 Disagreement antar sumber
+Jika selisih besar:
+- simpan semua RAW
+- canonical pilih sesuai priority
+- flag `DISAGREE_MAJOR` supaya investigasi cepat
+
+---
+
+## 8) Strategi Multi-Source: Priority, Fallback, Anti-Rusak
+
+### 8.1 Priority harus eksplisit dan configurable
+Tujuannya bukan “membatasi”, tapi membuat canonical **stabil** dan bisa diprediksi.
+
+### 8.2 Fallback harus punya alasan dan tercatat
+Trigger fallback contoh:
+- HTTP error / timeout
+- rate limit
+- data kosong
+- quality gate gagal banyak
+
+### 8.3 Jangan fallback liar tanpa kontrol
+Tanpa telemetry:
+- kamu tidak tahu kualitas run
+- canonical jadi campuran random
+Minimal ringkasan run harus menunjukkan:
+- provider utama sukses berapa %
+- fallback berapa kali dan alasan dominan
+
+---
+
+## 9) Calendar Awareness: bedakan “no data expected” vs “missing”
+
+Importer harus sadar trading day.
+- non-trading day: tidak ada data itu normal
+- trading day: missing adalah problem yang harus dicatat dan ditangani (retry/backfill)
+
+---
+
+## 10) Corporate Actions: split adalah bom waktu kalau diabaikan
+
+Kebijakan minimal harus jelas (implementasi boleh bertahap):
+- apakah series untuk compute-eod memakai raw atau adjusted?
+- apakah canonical menyimpan info “adjustment/CA hint tersedia”?
+- outlier rule harus bisa di-override jika CA terdeteksi
 
 Prinsip:
-- hard rules → boleh simpan RAW, tapi canonical reject.
-- soft rules → canonical boleh masuk *dengan flag* (atau tahan jika threshold berat).
-
-### 6.3 Data disagreement antar sumber
-Jika banyak sumber tersedia dan beda signifikan:
-- simpan semua di RAW,
-- canonical pilih sesuai priority,
-- tapi jika selisih melewati batas, beri flag `DISAGREE_MAJOR` agar investigasi mudah.
+- jangan “memperbaiki” split diam-diam tanpa jejak audit
 
 ---
 
-## 7) Strategi Multi-Source: Priority, Fallback, dan Anti-Rusak
+## 11) Observability: supaya tidak rusak diam-diam
 
-### 7.1 Priority list harus eksplisit
-Contoh urutan (hanya contoh, jangan dianggap mengunci):
-1) sumber authoritative (misal file/resmi)
-2) vendor A
-3) vendor B
-4) fallback (misal Yahoo)
-
-Priority ini harus configurable.
-
-### 7.2 Fallback bukan “asal pindah”
-Fallback harus punya alasan dan tercatat.
-Trigger fallback misalnya:
-- HTTP error / timeout,
-- rate limit,
-- data kosong,
-- data tidak lolos quality gate terlalu banyak.
-
-### 7.3 Jangan lakukan fallback “per request” tanpa kontrol
-Kalau tiap ticker fallback berbeda-beda tanpa telemetry, kamu akan:
-- tidak tahu kualitas run,
-- tidak tahu vendor mana yang bermasalah,
-- sulit audit kenapa canonical campur.
-
-Minimal harus ada ringkasan run:
-- provider utama sukses berapa %
-- fallback terjadi berapa kali dan kenapa
+Health summary minimal per run:
+- effective date range (cutoff result)
+- coverage (% ticker punya bar untuk trading day terbaru)
+- fallback rate + alasan dominan
+- invalid hard rejects count
+- disagreement major count
+- missing trading day list
+- status canonical: updated / held + alasan
 
 ---
 
-## 8) Market Calendar Awareness: Menghindari False Missing dan False Data
+## 12) Failure Modes paling sering + Mitigasi (tajam)
 
-Importer harus bisa bedakan:
-- “tidak ada data karena bukan trading day”
-- “tidak ada data padahal trading day (missing)”
+### FM-1: Partial candle “today” masuk canonical
+Mitigasi:
+- cutoff hard rule
+- canonical builder reject “today” sebelum cutoff
+- telemetry selalu tampilkan effective_end_date
 
-Kalau tidak:
-- kamu akan mengira vendor error padahal hari libur,
-- atau lebih parah: kamu memaksa import dan menyimpan garbage.
+### FM-2: Timezone shift (tanggal geser)
+Mitigasi:
+- trade_date internal = WIB
+- test edge UTC/WIB
+- rebuild canonical jika pernah tercemar
 
-Minimal kebutuhan:
-- pengetahuan trading day vs non-trading day
-- jika trading day dan data tidak ada → masuk daftar “needs backfill / investigate”
-
----
-
-## 9) Corporate Actions: Split Itu Bom Waktu Kalau Dibiarkan
-
-Split/reverse split membuat harga “lompat” dan menghancurkan indikator historis jika tidak ditangani.
-
-Kebijakan yang wajib jelas sejak awal (meski implementasi bisa bertahap):
-- apakah seri EOD yang dipakai compute-eod adalah raw atau adjusted?
-- apakah canonical menyimpan info “adjusted available”?
-- bagaimana mendeteksi event split jika provider berbeda?
-
-Prinsip aman untuk awal:
-- simpan informasi kalau provider menyediakan adjusted/CA hints,
-- quality gate memiliki rule “gap ekstrem” yang bisa di-override jika hari itu terdeteksi corporate action,
-- jangan diam-diam menormalisasi split tanpa jejak (harus audit-able).
-
----
-
-## 10) Observability & Operasional: “Biar Tidak Rusak Diam-Diam”
-
-Sistem market data yang paling berbahaya adalah yang “kelihatan sukses”, tapi:
-- beberapa ticker missing,
-- sebagian data stale,
-- canonical tercemar partial,
-- dan baru ketahuan saat trading salah.
-
-### 10.1 Sinyal kesehatan harian (minimal)
-Wajib ada ringkasan:
-- range efektif yang diimport
-- jumlah ticker target
-- sukses/fail per provider
-- jumlah bar valid vs invalid
-- jumlah ticker yang missing pada trading day
-- daftar “critical issues” (misal provider utama down)
-
-### 10.2 Alerting (minimal konsep)
-Bukan berarti harus pakai sistem alert besar. Minimal:
-- jika missing trading day di atas threshold → dianggap run bermasalah
-- jika fallback melonjak → vendor utama bermasalah
-- jika disagreement major melonjak → ada isu data kualitas
-
----
-
-## 11) Failure Modes yang Paling Sering Terjadi + Mitigasi
-
-Bagian ini sengaja tajam. Ini daftar masalah nyata yang sering bikin market data hancur.
-
-### FM-1: Partial candle “hari ini” masuk canonical
-**Gejala**: indikator berubah di malam hari; sinyal muncul lalu hilang besok.
-**Mitigasi**:
-- cutoff rule keras,
-- canonical builder menolak trade_date “today” jika run sebelum cutoff,
-- telemetry: selalu tampilkan `effective_end_date`.
-
-### FM-2: Timezone shift menyebabkan tanggal geser
-**Gejala**: ada “lubang” atau “double day”, indikator salah urutan.
-**Mitigasi**:
-- trade_date internal = WIB, wajib.
-- test konversi untuk edge case (UTC close vs WIB date).
-
-### FM-3: Volume salah unit (lot vs lembar)
-**Gejala**: sinyal volume burst palsu.
-**Mitigasi**:
-- unit internal didefinisikan,
-- provider wajib konversi,
-- validator flag volume aneh.
+### FM-3: Volume salah unit
+Mitigasi:
+- unit internal didefinisikan
+- provider wajib konversi
+- flag volume abnormal
 
 ### FM-4: Symbol mapping salah (ticker tertukar)
-**Gejala**: data BBCA masuk BBRI, dsb; sulit ketahuan.
-**Mitigasi**:
-- mapping tunggal,
-- sanity check: range harga wajar per ticker (heuristic),
-- audit: source symbol disimpan di RAW.
+Mitigasi:
+- mapping tunggal
+- simpan symbol eksternal di RAW
+- sanity check range harga/continuity
 
-### FM-5: Provider stale (mengulang data lama)
-**Gejala**: tanggal berjalan tapi nilainya tidak berubah; missing trading day.
-**Mitigasi**:
-- lookback window,
-- rule: “expected new bar” pada trading day,
-- flag “STALE_SERIES”.
+### FM-5: Provider stale (data lama diulang)
+Mitigasi:
+- lookback window
+- stale detection rule
+- turunkan prioritas sementara
 
-### FM-6: Outlier / glitch harga ekstrem
-**Gejala**: MA/RSI rusak; watchlist tiba-tiba penuh kandidat palsu.
-**Mitigasi**:
-- quality gate hard + soft rules,
-- disagreement check antar sumber,
-- canonical reject jika outlier ekstrem dan tidak ada CA hint.
+### FM-6: Outlier/glitch ekstrem
+Mitigasi:
+- hard/soft gate
+- disagreement check
+- CA hint override bila valid
 
-### FM-7: Rate limit / timeout bikin import setengah jalan
-**Gejala**: sebagian ticker update, sebagian tidak.
-**Mitigasi**:
-- batching + throttling,
-- retry policy yang terkontrol,
-- run summary menampilkan “coverage %”.
+### FM-7: Rate limit / timeout (import setengah jalan)
+Mitigasi:
+- throttling
+- retry terkontrol
+- coverage gating (kalau rendah, tahan canonical)
 
-### FM-8: Holiday / non-trading day disalahartikan missing
-**Gejala**: false alarm; atau importer memaksa fetch dan simpan nonsense.
-**Mitigasi**:
-- calendar awareness minimal,
-- bedakan missing vs expected-no-data.
+### FM-8: Holiday disalahartikan missing
+Mitigasi:
+- calendar awareness
+- klasifikasi expected-no-data vs missing-trading-day
 
-### FM-9: Data disagreement antar sumber besar-besaran
-**Gejala**: canonical berubah-ubah; hasil backtest tidak stabil.
-**Mitigasi**:
-- priority list + canonical stabil,
-- disagreement flag + threshold,
-- rebuild canonical bisa dilakukan dengan aturan baru.
+### FM-9: Disagreement massal
+Mitigasi:
+- priority stabil
+- disagreement flag + threshold
+- rebuild canonical dengan rules baru jika perlu
 
 ---
 
-## 12) Tahap Implementasi (Roadmap) yang Fokus Stabilitas
+## 13) Roadmap Implementasi (fokus stabilitas)
 
-### Tahap 0 — Aturan keras & kontrak konsep
+### Tahap 0 — Sepakati aturan & komponen shared/public
 Output:
-- definisi cutoff + default date behavior,
-- definisi normalisasi (timezone, unit, precision),
-- definisi quality gate,
-- definisi RAW vs CANONICAL (konsep + metadata minimum),
-- definisi telemetry minimum.
+- cutoff resolver (shared)
+- calendar helper (shared)
+- normalisasi rules (shared)
+- quality gate core (shared)
+- telemetry summary builder (shared)
 
-### Tahap 1 — Jalur EOD yang “benar dulu”, bukan “banyak dulu”
-Output:
-- satu provider yang stabil,
-- RAW tersimpan,
-- canonical terbentuk dengan cutoff + quality gate,
-- run summary jelas.
+### Tahap 1 — Jalur EOD yang benar dulu
+- 1 provider
+- RAW + canonical
+- cutoff + quality gate + health summary
 
-Kriteria lulus:
-- tidak ada partial day masuk,
-- rerun idempotent,
-- coverage tinggi dan terukur.
-
-### Tahap 2 — Tambah provider + fallback
-Output:
-- provider kedua,
-- priority + fallback,
-- disagreement flag.
-
-Kriteria lulus:
-- provider utama down tidak bikin data kosong,
-- alasan fallback terbaca jelas.
-
-### Tahap 3 — Hardening: gap, stale, outlier, calendar
-Output:
-- missing trading day tracking,
-- stale detection,
-- outlier handling lebih matang,
-- calendar awareness minimal.
-
-### Tahap 4 — Rebuild & backfill yang aman
-Output:
-- rebuild canonical dari RAW,
-- backfill lama bertahap,
-- aturan baru bisa diterapkan tanpa chaos.
+### Tahap 2 — Multi-provider + fallback + disagreement flags
+### Tahap 3 — Hardening: gap/stale/outlier/calendar
+### Tahap 4 — Rebuild canonical + backfill bertahap
 
 ---
 
-## 13) Definisi “Sukses” yang Tidak Bisa Ditawar
+## 14) Definisi “Sukses” (tidak bisa ditawar)
 
-Fitur Market Data dianggap sukses jika:
-1) Run tanpa tanggal selalu menghasilkan range yang benar berdasarkan cutoff.
-2) Canonical tidak pernah tercemar data parsial.
-3) Semua data canonical bisa ditelusuri ke RAW + sumbernya.
-4) Jika provider down/rate-limited, sistem tetap jalan dengan fallback dan bisa diaudit.
-5) Ada indikator kesehatan run (coverage, missing, fallback, disagreement) sehingga kerusakan tidak terjadi diam-diam.
-6) Perubahan vendor/aturan tidak membuat data historis jadi tidak konsisten karena rebuild bisa dilakukan.
+1) Run tanpa tanggal selalu benar sesuai cutoff.
+2) Canonical tidak pernah tercemar partial day.
+3) Canonical bisa ditelusuri ke RAW + sumber.
+4) Fallback terjadi dengan alasan jelas dan audit-able.
+5) Kerusakan tidak terjadi diam-diam (health summary jelas).
+6) Reuse lintas modul terjadi lewat shared/public component, bukan duplikasi.
+7) Rules shared tidak drift (tidak ada versi cutoff/validator berbeda per modul).
 
 ---
 
-## 14) Prinsip Akhir: “Lebih Baik Tidak Update daripada Update Salah”
-Kalau quality gate mendeteksi data mencurigakan parah, lebih baik:
-- simpan RAW + flag,
-- tahan canonical,
-- laporkan di run summary,
-daripada memaksa canonical masuk dan merusak seluruh indikator.
-
-Ini kunci supaya sistem tidak “rusak halus” di production.
+## 15) Prinsip akhir
+**Lebih baik canonical ditahan daripada canonical salah.**
+RAW + flag boleh. Canonical harus bersih.
 
 ---
