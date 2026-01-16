@@ -17,12 +17,14 @@ Dokumen ini adalah playbook operasional. Saat Market Data bermasalah, ini jadi p
 
 ## 0) Prinsip Operasional (jangan dilanggar)
 
+Prinsip global tentang SRP, shared/public, config policy, dan logging mengikuti `SRP_Performa.md`.
+Cutoff dan aturan run-tanpa-tanggal mengikuti `MARKET_DATA.md` (Bagian 3).
+
 1) **Lebih baik tidak update canonical daripada update salah.**
 2) **Setiap fallback/missing/disagreement/reject harus terlihat di health summary run.**
-3) **Semua keputusan yang mengubah canonical harus punya jejak alasan.**
-4) **Cutoff itu aturan keras.**
-5) **Kalau masalah ada di aturan umum (cutoff, calendar, normalisasi, validator), perbaiki di shared/public.**  
-   Jangan patch lokal di satu modul.
+3) **Semua keputusan yang mengubah canonical harus punya jejak alasan (audit-able).**
+4) **Cutoff adalah aturan keras** → jangan override ad-hoc saat incident.
+5) Jika root-cause ada di aturan umum (cutoff/calendar/normalisasi/validator/telemetry), perbaiki di **shared/public** (jangan patch lokal di satu modul).
 
 ---
 

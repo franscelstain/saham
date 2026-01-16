@@ -126,7 +126,9 @@ Minimal:
 
 ---
 
-## 4) Pipeline pembuatan watchlist (SRP + performa)
+## 4) Pipeline pembuatan watchlist (konsep)
+
+> Aturan SRP/performa global mengikuti `SRP_Performa.md`. Bagian ini hanya menjelaskan urutan proses dan kontrak input/output antar job.
 
 ### Step 0 – Ingestion OHLC
 - Import OHLC EOD dari sumber(s).
@@ -140,7 +142,7 @@ Menghasilkan `ticker_indicators_daily` + kolom turunan penting:
 - fitur candle
 - ATR/gap/dv20 (jika diputuskan dihitung di compute-eod)
 
-> Prinsip: **watchlist tidak menghitung berat**. Watchlist hanya membaca hasil yang sudah dihitung.
+> Prinsip: **watchlist tidak menghitung indikator berat**. Watchlist membaca hasil compute job (compute-eod/market-context), lalu fokus ke seleksi, scoring, ranking, dan reason codes.
 
 ### Step 2 – ComputeMarketContext (per hari)
 Menghasilkan:
@@ -622,7 +624,7 @@ Rules:
 ---
 
 ## 22) Integration Notes (supaya cepat & SRP tetap rapi)
-- **ComputeEOD**: hitung semua indikator + level-level plan (ATR, hhv/llv, wick/body, dv20).
+- **ComputeEOD**: hitung indikator + feature layer (MA/RSI/vol_ratio, ATR, hhv/llv, wick/body, dv20, dsb). **Bukan** entry/SL/TP/plan.
 - **MarketContext job**: IHSG regime + breadth + kalender.
 - **WatchlistBuild**: scoring + ranking + setup_type + timing windows + reason codes.
 - **TradePlanBuild** (bisa bagian dari watchlist build): entry/SL/TP/BE/out + rr.

@@ -43,43 +43,24 @@ Wajib bisa menjawab:
 
 ---
 
-## 2) Kebijakan Reuse Lintas Modul (Ini yang benar)
+## 2) Reuse & Config Policy (aturan global)
 
-Ada dua hal yang sering ketukar:
+Aturan **reuse lintas modul** dan **kebijakan config lintas modul** adalah aturan global TradeAxis.
 
-1) **Reuse (boleh & dianjurkan)**  
-2) **Coupling dependency arah salah (dilarang)**
+- Referensi: `SRP_Performa.md` (bagian *Shared/Public Component* + *Config Policy*).
+- Dokumen ini **tidak** mendefinisikan ulang aturan tersebut; di sini hanya memberi konteks Market Data.
 
-### 2.1 Reuse itu dianjurkan bila fungsinya sama & dipakai bareng
-Jika ada logic yang sama dipakai oleh Market Data + compute-eod + watchlist (atau modul lain), maka:
-- **jangan duplikasi**
-- **jangan taruh di folder privat salah satu modul**
-- ekstrak jadi **shared/public component** supaya 1 implementasi dipakai bersama.
+Contoh komponen yang *biasanya* layak diekstrak jadi shared/public (jika dipakai lintas modul):
+- Cutoff & effective date resolver
+- Market calendar helper (trading day awareness)
+- Timezone + unit normalizer (WIB trade_date, volume unit)
+- Quality gate core rules (hard/soft validation, outlier flags)
+- Telemetry/health summary builder (ringkasan run yang konsisten)
+- Symbol/ticker mapping resolver
 
-Contoh komponen yang biasanya shared:
-- **Cutoff & effective date resolver** (run tanpa tanggal, lookback window, perhitungan end-date yang aman)
-- **Market calendar helper** (trading day awareness)
-- **Timezone + unit normalizer** (WIB trade_date, volume unit)
-- **Quality gate core rules** (hard/soft validation, outlier flags)
-- **Telemetry summary builder** (ringkasan run yang konsisten)
-- **Symbol/ticker mapping resolver** (kalau banyak modul membutuhkannya)
-
-### 2.2 Yang dilarang: dependency arah yang salah
-Yang harus dihindari:
-- Market Data memanggil compute-eod/watchlist secara langsung.
-- Modul downstream menjadi “pemilik” logic core yang seharusnya shared.
-
-Arah yang benar:
-- downstream mengonsumsi canonical Market Data,
-- shared logic berada di layer public yang tidak “milik” satu modul.
-
-### 2.3 Kebijakan config: harus public-friendly, konsisten, dan tidak “private-looking”
-Kalau suatu config/konvensi dipakai lintas modul:
-- naming harus generik dan tidak mengikat ke satu modul,
-- urutan/struktur harus konsisten,
-- jangan ada “aturan cutoff A” dan “aturan cutoff B” di tempat berbeda.
-
-Kunci stabilitas: **satu aturan dipakai semua.**
+Catatan boundary khusus Market Data:
+- Market Data **tidak boleh** memanggil compute-eod/watchlist/portfolio.
+- Downstream mengonsumsi **canonical** Market Data.
 
 ---
 
@@ -111,7 +92,11 @@ Kenapa butuh lookback walau “harian”?
 
 ---
 
-## 4) Prinsip SRP yang Wajib (Kalau dicampur, pasti rapuh)
+## 4) SRP Market Data (turunan dari SRP_Performa.md)
+
+Batasan SRP global (Command/Service/Repository/Domain Compute/Provider) mengikuti `SRP_Performa.md`.
+Bagian ini memetakan peran konseptual **khusus Market Data** agar implementasi tidak tercampur.
+
 
 Pisahkan tanggung jawab. Minimal peran konseptual berikut harus jelas:
 
