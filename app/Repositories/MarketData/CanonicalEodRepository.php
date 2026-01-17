@@ -33,7 +33,7 @@ class CanonicalEodRepository
         }
     }
 
-        public function countByRunId(int $runId): int
+    public function countByRunId(int $runId): int
     {
         if ($runId <= 0) return 0;
 

@@ -1,5 +1,8 @@
 <?php
 
+# build_id: v2.2.36
+# tujuan: Periksa perubahan dan cari potensi bug/performance issue.
+
 namespace App\Services\MarketData;
 
 use App\Repositories\TickerOhlcDailyRepository;
@@ -79,7 +82,7 @@ final class PublishEodService
         $published = 0;
         $rejectedNull = 0;
 
-        $this->canRepo->chunkByRunId($runId, function ($rows) use (
+        $this->canRepo->chunkByRunId($runId, $batch, function ($rows) use (
                 &$published,
                 &$rejectedNull,
                 $now
@@ -87,13 +90,8 @@ final class PublishEodService
                 $payload = [];
 
                 foreach ($rows as $r) {
-                    // STRICT: avoid DB errors on NOT NULL columns in ticker_ohlc_daily.
-                    // If any required value is null, skip and count reject.
+                    // Minimal strict: key fields only.
                     if ($r->ticker_id === null || $r->trade_date === null) {
-                        $rejectedNull++;
-                        continue;
-                    }
-                    if ($r->open === null || $r->high === null || $r->low === null || $r->close === null || $r->volume === null) {
                         $rejectedNull++;
                         continue;
                     }
@@ -101,13 +99,13 @@ final class PublishEodService
                     $row = [
                         'ticker_id' => (int) $r->ticker_id,
                         'trade_date' => (string) $r->trade_date,
-                        'open' => (float) $r->open,
-                        'high' => (float) $r->high,
-                        'low'  => (float) $r->low,
-                        'close'=> (float) $r->close,
-                        'volume' => (int) $r->volume,
+                        'open' => $r->open  !== null ? (float) $r->open : null,
+                        'high' => $r->high !== null ? (float) $r->high : null,
+                        'low'  => $r->low !== null ? (float) $r->low : null,
+                        'close'=> $r->close !== null ? (float) $r->close : null,
+                        'volume' => $r->volume !== null ? (int) $r->volume : null,
                         'source' => $r->chosen_source !== null ? (string) $r->chosen_source : null,
-                        'run_id' => (int) $r->run_id,
+                        'run_id' => (int) $runId,
                         'adj_close' => $r->adj_close !== null ? (float) $r->adj_close : null,
                         'ca_hint' => null,
                         'created_at' => $now,
