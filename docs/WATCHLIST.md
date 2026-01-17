@@ -18,7 +18,7 @@ Watchlist di bawah ini **berbasis data EOD** sebagai sumber utama, namun boleh m
 ## 1) Output yang harus dihasilkan watchlist
 
 ### 1.1 Output global (per hari)
-- `trade_date`
+- `trade_date` *(mengikuti effective date Market Data: cutoff + trading day)*
 - `dow` (Mon/Tue/Wed/Thu/Fri)
 - `market_regime` (risk-on / neutral / risk-off)
 - `market_notes` (contoh: “IHSG down 5D”, “breadth lemah”)
@@ -67,6 +67,10 @@ Yang benar:
 ## 3) Data yang dibutuhkan (akurat & audit-able)
 
 ### 3.1 Data mentah wajib (ticker_ohlc_daily)
+Catatan penting:
+- `ticker_ohlc_daily` dianggap **CANONICAL output** dari Market Data.
+- Watchlist **tidak boleh** membaca RAW market data; hanya canonical.
+
 Per `ticker_id + trade_date`:
 - `open`, `high`, `low`, `close`, `volume`
 

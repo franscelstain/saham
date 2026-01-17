@@ -160,6 +160,11 @@ Canonical wajib menyimpan:
 - flags penting (fallback used, disagree major, outlier flagged, dsb)
 - jejak alasan (cukup ringkas tapi bisa ditelusuri)
 
+### 5.3 Kontrak Downstream (ComputeEOD / Watchlist)
+- Modul downstream membaca hanya **CANONICAL** (bukan RAW).
+- Output canonical yang dianggap resmi untuk OHLC harian: `ticker_ohlc_daily` (unik `(ticker_id, trade_date)`).
+- `trade_date` yang dipakai downstream mengikuti **effective date** (cutoff) dan harus merupakan **trading day** (market calendar).
+
 ---
 
 ## 6) Normalisasi: Bug “Licin” yang paling sering merusak tanpa ketahuan

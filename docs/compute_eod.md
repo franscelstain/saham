@@ -9,6 +9,12 @@
 3. Menentukan **jenis sinyal** dan **kondisi volume**
 4. Menyimpan hasilnya ke database
 
+### Kontrak Input (Wajib)
+- Compute EOD membaca OHLC dari **CANONICAL output Market Data** (lihat MARKET_DATA.md bagian RAW vs CANONICAL), bukan dari RAW.
+- Compute EOD hanya memproses tanggal yang dianggap **trading day** (berdasarkan market calendar).
+- `trade_date` yang dihitung harus mengikuti **effective date** Market Data (aturan cutoff), bukan "today" sebelum cutoff.
+
+
 Compute EOD **TIDAK**:
 - melakukan beli / jual
 - menentukan entry intraday
