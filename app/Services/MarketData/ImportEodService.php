@@ -1,8 +1,5 @@
 <?php
 
-# buid_id: v2.2.19 
-# tujuan: fixing $provErrCode dipakai tapi tidak pernah di-initialize
-
 namespace App\Services\MarketData;
 
 use App\Repositories\TickerRepository;
