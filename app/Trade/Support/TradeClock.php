@@ -17,6 +17,11 @@ final class TradeClock
         return $now ?: Carbon::now(self::tz());
     }
 
+    public static function eodCutoff(): string
+    {
+        return sprintf('%02d:%02d', self::eodCutoffHour(), self::eodCutoffMin());
+    }
+
     public static function eodCutoffHour(): int
     {
         return (int) config('trade.clock.eod_cutoff.hour', 16);

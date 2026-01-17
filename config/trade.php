@@ -46,11 +46,15 @@ return [
     ],
     'market_data' => [
         'default_provider' => env('TRADE_MD_PROVIDER', 'yahoo'),
-
+        'eod' => [
+            'lookback_trading_days' => env('TRADE_MD_LOOKBACK_TRADING_DAYS', 7),
+        ],
+        'gating' => [
+            'coverage_min_pct' => env('TRADE_MD_COVERAGE_MIN', 95),
+        ],
         'ohlc_eod' => [
             'chunk_rows' => env('TRADE_MD_CHUNK_ROWS', 500),
         ],
-
         'providers' => [
             'yahoo' => [
                 'base_url' => env('TRADE_YAHOO_BASE_URL', 'https://query1.finance.yahoo.com'),
@@ -60,6 +64,12 @@ return [
                 'retry_sleep_ms' => env('TRADE_YAHOO_RETRY_SLEEP_MS', 250),
                 'user_agent' => env('TRADE_YAHOO_UA', 'Mozilla/5.0'),
             ],
+        ],
+        'providers_priority' => ['yahoo'],
+        'quality' => [
+            'price_in_range_tolerance' => env('TRADE_MD_TOL', 0.0001),
+            'disagree_major_pct' => env('TRADE_MD_DISAGREE_PCT', 2.0),
+            'gap_extreme_pct' => env('TRADE_MD_GAP_EXTREME_PCT', 20.0),
         ],
     ],
     'perf' => [
