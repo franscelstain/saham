@@ -202,6 +202,7 @@ final class ValidateEodService
                     $status = 'WARN';
                     $counts['WARN']++;
                 } else {
+                    // Only count OK if no earlier error status
                     if ($status === 'OK') $counts['OK']++;
                 }
             } else {
@@ -224,6 +225,7 @@ final class ValidateEodService
             ];
         }
 
+        // Summary
         $total = count($rows);
         $summary = [
             'status' => 'OK',

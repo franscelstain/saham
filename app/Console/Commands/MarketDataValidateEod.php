@@ -92,6 +92,7 @@ final class MarketDataValidateEod extends Command
             }
         }
 
+        // Render per-ticker table (compact)
         if ($rows) {
             $table = [];
             foreach ($rows as $r) {
@@ -108,6 +109,7 @@ final class MarketDataValidateEod extends Command
             $this->table(['Ticker', 'Status', 'Close(primary)', 'Close(validator)', 'Diff %', 'Err'], $table);
         }
 
+        // Exit code: fail if hard mismatch or validator error exists
         $counts = (array) ($summary['counts'] ?? []);
         $hasBad = ((int) ($counts['DISAGREE_MAJOR'] ?? 0) > 0) || ((int) ($counts['VALIDATOR_ERROR'] ?? 0) > 0);
         $failed = (string) ($summary['status'] ?? '') === 'FAILED';
