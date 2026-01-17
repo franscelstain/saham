@@ -1,7 +1,7 @@
 <?php
 
-# build_id: v2.2.15
-# tujuan: nilai kualitas perubahan dan cari potensi bug/performance issue.
+# buid_id: v2.2.19 
+# tujuan: fixing $provErrCode dipakai tapi tidak pernah di-initialize
 
 namespace App\Services\MarketData;
 
@@ -126,12 +126,44 @@ final class ImportEodService
             'updated_at' => now(),
         ]);
 
+        if ($targetDays === 0) {
+            $notes = ['no_trading_days_in_range'];
+
+            $this->runs->finishRun($runId, [
+                'status' => 'FAILED',
+                'coverage_pct' => 0,
+                'fallback_pct' => 0,
+                'hard_rejects' => 0,
+                'soft_flags' => 0,
+                'disagree_major' => 0,
+                'missing_trading_day' => 0,
+                'notes' => implode(' | ', $notes),
+            ]);
+
+            return [
+                'run_id' => $runId,
+                'status' => 'FAILED',
+                'effective_start' => $fromEff,
+                'effective_end' => $toEff,
+                'target_tickers' => $targetTickers,
+                'target_days' => 0,
+                'expected_points' => 0,
+                'canonical_points' => 0,
+                'coverage_pct' => 0,
+                'fallback_pct' => 0,
+                'hard_rejects' => 0,
+                'soft_flags' => 0,
+                'notes' => $notes,
+            ];
+        }
+
         // Metrics
         $hardRejects = 0;
         $softFlags = 0;
         $fallbackPicks = 0;
         $totalPicks = 0;
         $provErr = []; // ex: ['yahoo' => 12]
+        $provErrCode = []; // ex: ['yahoo' => ['NET_ERROR'=>5,'HTTP_502'=>7]]
 
         // Buffer rows for batch insert/upsert
         $rawRowsBuf = [];
@@ -157,6 +189,12 @@ final class ImportEodService
 
                     if ($res->errorCode) {
                         $provErr[$src] = ($provErr[$src] ?? 0) + 1;
+
+                        $code = (string) $res->errorCode;
+                        if ($code === '') $code = 'UNKNOWN';
+                        if (!isset($provErrCode[$src])) $provErrCode[$src] = [];
+                        $provErrCode[$src][$code] = ($provErrCode[$src][$code] ?? 0) + 1;
+
                         continue;
                     }
                 
@@ -266,7 +304,21 @@ final class ImportEodService
 
         if ($provErr) {
             $parts = [];
-            foreach ($provErr as $src => $cnt) $parts[] = $src . '=' . $cnt;
+
+            foreach ($provErr as $src => $cnt) {
+                $detail = '';
+
+                if (!empty($provErrCode[$src])) {
+                    arsort($provErrCode[$src]); // terbesar dulu
+                    $top = array_slice($provErrCode[$src], 0, 3, true); // top 3 aja biar nggak spam
+                    $pairs = [];
+                    foreach ($top as $code => $n) $pairs[] = $code . '=' . $n;
+                    $detail = ' (' . implode(',', $pairs) . ')';
+                }
+
+                $parts[] = $src . '=' . $cnt . $detail;
+            }
+
             $notes[] = 'provider_errors: ' . implode(',', $parts);
         }
 
@@ -279,6 +331,7 @@ final class ImportEodService
         // Kalau HELD -> hapus semua canonical yg terlanjur ke-upsert di batch sebelumnya
         if ($status === 'CANONICAL_HELD') {
             $this->canRepo->deleteByRunId($runId);
+            $notes[] = 'held_deleted_canonical: run_id=' . $runId;
         }
 
         $this->runs->finishRun($runId, [
