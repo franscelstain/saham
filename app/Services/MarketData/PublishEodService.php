@@ -77,24 +77,35 @@ final class PublishEodService
 
         // Stream canonical rows in chunks to avoid memory blowups.
         $published = 0;
+        $rejectedNull = 0;
 
-        $this->canRepo->chunkByRunId($runId, $batch, function ($rows) use (
+        $this->canRepo->chunkByRunId($runId, function ($rows) use (
                 &$published,
-                $batch,
+                &$rejectedNull,
                 $now
             ) {
                 $payload = [];
 
                 foreach ($rows as $r) {
-                    // Minimal required fields
+                    // STRICT: avoid DB errors on NOT NULL columns in ticker_ohlc_daily.
+                    // If any required value is null, skip and count reject.
+                    if ($r->ticker_id === null || $r->trade_date === null) {
+                        $rejectedNull++;
+                        continue;
+                    }
+                    if ($r->open === null || $r->high === null || $r->low === null || $r->close === null || $r->volume === null) {
+                        $rejectedNull++;
+                        continue;
+                    }
+
                     $row = [
                         'ticker_id' => (int) $r->ticker_id,
                         'trade_date' => (string) $r->trade_date,
-                        'open' => $r->open !== null ? (float) $r->open : null,
-                        'high' => $r->high !== null ? (float) $r->high : null,
-                        'low'  => $r->low  !== null ? (float) $r->low  : null,
-                        'close'=> $r->close!== null ? (float) $r->close: null,
-                        'volume' => $r->volume !== null ? (int) $r->volume : null,
+                        'open' => (float) $r->open,
+                        'high' => (float) $r->high,
+                        'low'  => (float) $r->low,
+                        'close'=> (float) $r->close,
+                        'volume' => (int) $r->volume,
                         'source' => $r->chosen_source !== null ? (string) $r->chosen_source : null,
                         'run_id' => (int) $r->run_id,
                         'adj_close' => $r->adj_close !== null ? (float) $r->adj_close : null,
@@ -110,7 +121,7 @@ final class PublishEodService
                     $this->ohlcRepo->upsertMany($payload);
                     $published += count($payload);
                 }
-            }, 'canonical_id'); // chunkById requires an integer key; assumes md_canonical_eod has canonical_id PK
+            });
 
         if ($published === 0) {
             $notes[] = 'no_canonical_rows';
@@ -124,13 +135,22 @@ final class PublishEodService
         }
 
         // Optional: append notes to md_runs.notes (do not fail publish if notes update fails)
-        $add = 'published_ohlc_rows=' . $published;
-        if (!$this->runRepo->appendNote($runId, $add)) {
+        $add1 = 'published_ohlc_rows=' . $published;
+        $add2 = 'rejected_null_fields=' . $rejectedNull;
+
+        $ok1 = $this->runRepo->appendNote($runId, $add1);
+        $ok2 = $this->runRepo->appendNote($runId, $add2);
+
+        if (!$ok1 || !$ok2) {
             $notes[] = 'warn_notes_update_failed';
         }
 
         $notes[] = 'publish_ok';
         $notes[] = 'published=' . $published;
+
+        if ($rejectedNull > 0) {
+            $notes[] = 'warn_rejected_null_fields=' . $rejectedNull;
+        }
 
         return [
             'status' => 'SUCCESS',
