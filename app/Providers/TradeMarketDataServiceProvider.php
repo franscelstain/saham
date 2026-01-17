@@ -9,6 +9,7 @@ use App\Trade\MarketData\Config\ProviderPriority;
 use App\Trade\MarketData\Config\QualityRules;
 use App\Trade\MarketData\Providers\Contracts\EodProvider;
 use App\Trade\MarketData\Providers\Yahoo\YahooEodProvider;
+use App\Trade\MarketData\Providers\EodHd\EodhdEodProvider;
 
 class TradeMarketDataServiceProvider extends ServiceProvider
 {
@@ -39,6 +40,12 @@ class TradeMarketDataServiceProvider extends ServiceProvider
         $this->app->bind(YahooEodProvider::class, function () {
             $cfg = (array) config('trade.market_data.providers.yahoo', []);
             return new YahooEodProvider($cfg);
+        });
+
+        // Validator provider (NOT tagged into import pipeline to avoid daily API limits)
+        $this->app->bind(EodhdEodProvider::class, function () {
+            $cfg = (array) config('trade.market_data.providers.eodhd', []);
+            return new EodhdEodProvider($cfg);
         });
 
         // registry sederhana: nanti bisa jadi map providerName => instance

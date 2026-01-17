@@ -64,12 +64,34 @@ return [
                 'retry_sleep_ms' => env('TRADE_YAHOO_RETRY_SLEEP_MS', 250),
                 'user_agent' => env('TRADE_YAHOO_UA', 'Mozilla/5.0'),
             ],
+
+            // Provider 2 (validator) - EODHD
+            // Dipakai untuk validasi subset ticker (recommended/candidates) karena free plan ada limit calls/hari.
+            'eodhd' => [
+                'base_url' => env('TRADE_EODHD_BASE_URL', 'https://eodhd.com/api'),
+                'suffix' => env('TRADE_EODHD_SUFFIX', '.JK'),
+                'api_token' => env('TRADE_EODHD_API_TOKEN', ''),
+                'timeout' => env('TRADE_EODHD_TIMEOUT', 20),
+                'retry' => env('TRADE_EODHD_RETRY', 1),
+                'retry_sleep_ms' => env('TRADE_EODHD_RETRY_SLEEP_MS', 250),
+                // Hard cap untuk penggunaan harian (opsional, enforcement di layer command/service)
+                'daily_call_limit' => env('TRADE_EODHD_DAILY_CALL_LIMIT', 20),
+            ],
         ],
         'providers_priority' => ['yahoo'],
         'quality' => [
             'price_in_range_tolerance' => env('TRADE_MD_TOL', 0.0001),
             'disagree_major_pct' => env('TRADE_MD_DISAGREE_PCT', 2.0),
             'gap_extreme_pct' => env('TRADE_MD_GAP_EXTREME_PCT', 20.0),
+        ],
+
+        // Validator settings (post-screener / post-candidate) - does NOT affect import coverage.
+        'validator' => [
+            'enabled' => env('TRADE_MD_VALIDATOR_ENABLED', true),
+            'provider' => env('TRADE_MD_VALIDATOR_PROVIDER', 'eodhd'),
+            'max_tickers' => env('TRADE_MD_VALIDATOR_MAX_TICKERS', 20),
+            // Disagree threshold yang dipakai untuk badge/peringatan di UI.
+            'disagree_major_pct' => env('TRADE_MD_VALIDATOR_DISAGREE_PCT', 1.5),
         ],
     ],
     'perf' => [
