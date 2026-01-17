@@ -1,8 +1,5 @@
 <?php
 
-# build_id: v2.1.11
-# path: app/Repositories/TickerIndicatorsDailyRepository.php
-
 namespace App\Repositories;
 
 use Illuminate\Support\Facades\DB;
