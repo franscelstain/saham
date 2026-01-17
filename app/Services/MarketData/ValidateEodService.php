@@ -3,10 +3,11 @@
 namespace App\Services\MarketData;
 
 use App\Repositories\TickerRepository;
+use App\Repositories\MarketData\CanonicalEodRepository;
+use App\Repositories\MarketData\RunRepository;
 use App\Trade\MarketData\Normalize\EodBarNormalizer;
 use App\Trade\MarketData\Providers\EodHd\EodhdEodProvider;
 use App\Trade\Support\TradeClock;
-use Illuminate\Support\Facades\DB;
 
 /**
  * ValidateEodService
@@ -21,7 +22,13 @@ use Illuminate\Support\Facades\DB;
 final class ValidateEodService
 {
     /** @var TickerRepository */
-    private $tickers;
+    private $tickerRepo;
+
+    /** @var RunRepository */
+    private $runRepo;
+
+    /** @var CanonicalEodRepository */
+    private $canRepo;
 
     /** @var EodhdEodProvider */
     private $validator;
@@ -29,9 +36,15 @@ final class ValidateEodService
     /** @var EodBarNormalizer */
     private $normalizer;
 
-    public function __construct(TickerRepository $tickers, EodhdEodProvider $validator)
-    {
-        $this->tickers = $tickers;
+    public function __construct(
+        TickerRepository $tickerRepo, 
+        RunRepository $runRepo, 
+        CanonicalEodRepository $canRepo, 
+        EodhdEodProvider $validator
+    ) {
+        $this->tickerRepo = $tickerRepo;
+        $this->runRepo = $runRepo;
+        $this->canRepo = $canRepo;
         $this->validator = $validator;
         $this->normalizer = new EodBarNormalizer(TradeClock::tz());
     }
@@ -82,7 +95,7 @@ final class ValidateEodService
         }
 
         // Resolve ticker_id by calling existing repository (safe even if it returns 900 rows).
-        $active = $this->tickers->listActive(null);
+        $active = $this->tickerRepo->listActive(null);
         $codeToId = [];
         foreach ($active as $t) {
             $code = strtoupper((string) ($t['ticker_code'] ?? ''));
@@ -91,7 +104,7 @@ final class ValidateEodService
         }
 
         // Determine which canonical run to validate against.
-        $runId = $canonicalRunId ?: $this->findLatestSuccessfulImportRunIdForDate($tradeDate);
+        $runId = $canonicalRunId ?: $this->runRepo->findLatestSuccessImportRunCoveringDate($tradeDate);
         if (!$runId) {
             return [
                 'summary' => ['status' => 'FAILED', 'reason' => 'NO_CANONICAL_RUN', 'trade_date' => $tradeDate],
@@ -108,7 +121,7 @@ final class ValidateEodService
         }
         $tickerIds = array_values(array_unique($tickerIds));
 
-        $primaryByTickerId = $this->loadCanonicalByRunAndDate($runId, $tradeDate, $tickerIds);
+        $primaryByTickerId = $this->canRepo->loadByRunAndDate($runId, $tradeDate, $tickerIds);
 
         $disagreeMajorPct = (float) config('trade.market_data.validator.disagree_major_pct', 1.5);
         // Simple warn threshold: half of disagree threshold (but at least 0.2%)
@@ -246,47 +259,5 @@ final class ValidateEodService
             'rows' => $rows,
             'notes' => $notes,
         ];
-    }
-
-    private function findLatestSuccessfulImportRunIdForDate(string $tradeDate): ?int
-    {
-        $row = DB::table('md_runs')
-            ->select('run_id')
-            ->where('job', 'import_eod')
-            ->where('status', 'SUCCESS')
-            ->where('effective_start_date', '<=', $tradeDate)
-            ->where('effective_end_date', '>=', $tradeDate)
-            ->orderByDesc('run_id')
-            ->first();
-
-        if (!$row || !isset($row->run_id)) return null;
-        return (int) $row->run_id;
-    }
-
-    /**
-     * @param int[] $tickerIds
-     * @return array<int,array{close:float|null, chosen_source:string|null}>
-     */
-    private function loadCanonicalByRunAndDate(int $runId, string $tradeDate, array $tickerIds): array
-    {
-        if (!$tickerIds) return [];
-
-        $rows = DB::table('md_canonical_eod')
-            ->select('ticker_id', 'close', 'chosen_source')
-            ->where('run_id', $runId)
-            ->where('trade_date', $tradeDate)
-            ->whereIn('ticker_id', $tickerIds)
-            ->get();
-
-        $out = [];
-        foreach ($rows as $r) {
-            $tid = (int) ($r->ticker_id ?? 0);
-            if ($tid <= 0) continue;
-            $out[$tid] = [
-                'close' => $r->close !== null ? (float) $r->close : null,
-                'chosen_source' => $r->chosen_source !== null ? (string) $r->chosen_source : null,
-            ];
-        }
-        return $out;
     }
 }

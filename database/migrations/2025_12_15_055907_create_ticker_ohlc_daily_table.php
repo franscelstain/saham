@@ -17,16 +17,18 @@ class CreateTickerOhlcDailyTable extends Migration
             $table->engine = 'InnoDB';
             $table->bigIncrements('ohlc_daily_id');
             $table->unsignedBigInteger('ticker_id');
+            $table->unsignedBigInteger('run_id')->nullable();
             $table->date('trade_date');
 
-            $table->decimal('open', 18, 4);
-            $table->decimal('high', 18, 4);
-            $table->decimal('low', 18, 4);
-            $table->decimal('close', 18, 4);
+            $table->decimal('open', 18, 4)->nullable();
+            $table->decimal('high', 18, 4)->nullable();
+            $table->decimal('low', 18, 4)->nullable();
+            $table->decimal('close', 18, 4)->nullable();
 
             $table->decimal('adj_close', 18, 4)->nullable();
-            $table->unsignedBigInteger('volume');
+            $table->unsignedBigInteger('volume')->nullable();
 
+            $table->string('ca_hint', 32)->nullable();
             $table->string('source', 30)->nullable();
             $table->boolean('is_deleted')->default(0);
             $table->timestamp('created_at')->useCurrent();
@@ -37,6 +39,10 @@ class CreateTickerOhlcDailyTable extends Migration
 
             $table->foreign('ticker_id', 'ticker_ohlc_daily_ticker_id_foreign')
                 ->references('ticker_id')->on('tickers')
+                ->onUpdate('cascade');
+
+            $table->foreign('run_id', 'ticker_ohlc_daily_run_id_foreign')
+                ->references('run_id')->on('md_runs')
                 ->onUpdate('cascade');
         });
     }

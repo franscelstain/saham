@@ -21,4 +21,79 @@ class RunRepository
             ->where('run_id', $runId)
             ->update($patch);
     }
+
+    public function find(int $runId): ?object
+    {
+        if ($runId <= 0) return null;
+
+        return DB::table('md_runs')
+            ->where('run_id', $runId)
+            ->first();
+    }
+
+    public function findLatestSuccessImportRunCoveringDate(string $tradeDate): ?int
+    {
+        $row = DB::table('md_runs')
+            ->select('run_id')
+            ->where('job', 'import_eod')
+            ->where('status', 'SUCCESS')
+            ->where('effective_start_date', '<=', $tradeDate)
+            ->where('effective_end_date', '>=', $tradeDate)
+            ->orderByDesc('run_id')
+            ->first();
+
+        return $row && isset($row->run_id) ? (int) $row->run_id : null;
+    }
+
+    public function getStatus(int $runId): ?string
+    {
+        $row = $this->find($runId);
+        if (!$row) return null;
+
+        $status = $row->status ?? null;
+        return $status !== null ? (string) $status : null;
+    }
+
+    /**
+     * @return array{ok:bool, status?:string, reason?:string}
+     */
+    public function assertSuccess(int $runId): array
+    {
+        $row = $this->find($runId);
+        if (!$row) {
+            return ['ok' => false, 'reason' => 'run_not_found'];
+        }
+
+        $status = (string) ($row->status ?? '');
+        if ($status !== 'SUCCESS') {
+            return [
+                'ok' => false,
+                'status' => $status ?: 'UNKNOWN',
+                'reason' => 'run_status_not_success',
+            ];
+        }
+
+        return ['ok' => true, 'status' => $status];
+    }
+
+    public function appendNote(int $runId, string $note, string $sep = ' | '): bool
+    {
+        $note = trim($note);
+        if ($runId <= 0 || $note === '') return false;
+
+        $row = $this->find($runId);
+        if (!$row) return false;
+
+        $old = (string) ($row->notes ?? '');
+        $new = $old !== '' ? ($old . $sep . $note) : $note;
+
+        $affected = DB::table('md_runs')
+            ->where('run_id', $runId)
+            ->update([
+                'notes' => $new,
+                'updated_at' => now(),
+            ]);
+
+        return $affected > 0;
+    }
 }
