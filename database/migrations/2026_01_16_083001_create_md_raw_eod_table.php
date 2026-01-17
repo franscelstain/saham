@@ -40,7 +40,7 @@ class CreateMdRawEodTable extends Migration
             $table->timestamp('imported_at')->useCurrent();
 
             $table->unique(['run_id','ticker_id','trade_date','source'], 'uq_md_raw_run_ticker_date_source');
-            $table->index(['ticker_id','trade_date'], 'idx_md_raw_ticker_date');
+            $table->index(['run_id', 'ticker_id','trade_date'], 'idx_md_raw_run_ticker_date');
             $table->index(['source','trade_date'], 'idx_md_raw_source_date');
 
             $table->foreign('run_id', 'fk_md_raw_run')

@@ -324,6 +324,42 @@ final class ImportEodService
             $this->canRepo->upsertMany($canRowsBuf, $batchUpsert);
             $canRowsBuf = [];
         }
+        
+        // Phase 2: Disagreement Major (multi-source)
+        $disagreeMajor = 0;
+        if ($status === 'SUCCESS') {
+            $canonicalPoints = $this->canRepo->countByRunId($runId);
+            $dg = $this->disagreeSvc->compute($runId, $canonicalPoints, 0.03, 10);
+
+            $disagreeMajor = (int) ($dg['disagree_major'] ?? 0);
+            $ratio = (float) ($dg['disagree_major_ratio'] ?? 0.0);
+
+            if ($disagreeMajor > 0) {
+                $notes[] = 'disagree_major=' . $disagreeMajor;
+                $notes[] = 'disagree_thr=3%';
+                $notes[] = 'disagree_ratio=' . number_format($ratio * 100.0, 2) . '%';
+
+                // Add a few samples to help investigation (max 3 in notes to avoid spam)
+                $samples = is_array($dg['samples'] ?? null) ? $dg['samples'] : [];
+                $take = array_slice($samples, 0, 3);
+                if ($take) {
+                    $parts = [];
+                    foreach ($take as $s) {
+                        $parts[] =
+                            ((int) ($s['ticker_id'] ?? 0)) . '@' . ((string) ($s['trade_date'] ?? '')) .
+                            '=' . number_format(((float) ($s['pct'] ?? 0.0)) * 100.0, 2) . '%';
+                    }
+                    $notes[] = 'disagree_samples=' . implode(',', $parts);
+                }
+
+                $shouldHold = ($ratio >= 0.01) || ($disagreeMajor >= 20);
+                if ($shouldHold) {
+                    $status = 'CANONICAL_HELD';
+                    $notes[] = 'held_reason=disagree_major';
+                    $notes[] = 'held_rule=ratio>=1% OR count>=20';
+                }
+            }
+        }
 
         // Kalau HELD -> hapus semua canonical yg terlanjur ke-upsert di batch sebelumnya
         if ($status === 'CANONICAL_HELD') {
@@ -337,7 +373,7 @@ final class ImportEodService
             'fallback_pct' => round($fallbackPct, 2),
             'hard_rejects' => (int) $hardRejects,
             'soft_flags' => (int) $softFlags,
-            'disagree_major' => 0,
+            'disagree_major' => (int) $disagreeMajor,
             'missing_trading_day' => 0,
             'notes' => $notes ? implode(' | ', $notes) : null,
         ]);
