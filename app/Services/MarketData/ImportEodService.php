@@ -25,6 +25,10 @@ final class ImportEodService
     /** @var ImportPolicy */
     private $policy;
 
+    /** @var QualityRules */
+    private $rules;
+
+
     /** @var TickerRepository */
     private $tickers;
 
@@ -77,6 +81,7 @@ final class ImportEodService
         array $providersByName // bind this in ServiceProvider: ['yahoo' => YahooEodProvider]
     ) {
         $this->policy = $policy;
+        $this->rules = $rules;
         $this->tickers = $tickers;
         $this->calendar = $calendar;
         $this->runs = $runs;
@@ -384,14 +389,14 @@ final class ImportEodService
         $disagreeMajor = 0;
         if ($status === 'SUCCESS') {
             $canonicalPoints = $this->canRepo->countByRunId($runId);
-            $dg = $this->disagreeSvc->compute($runId, $canonicalPoints, 0.03, 10);
+            $dg = $this->disagreeSvc->compute($runId, $canonicalPoints, $this->rules->disagreeMajorRatio(), 10);
 
             $disagreeMajor = (int) ($dg['disagree_major'] ?? 0);
             $ratio = (float) ($dg['disagree_major_ratio'] ?? 0.0);
 
             if ($disagreeMajor > 0) {
                 $notes[] = 'disagree_major=' . $disagreeMajor;
-                $notes[] = 'disagree_thr=3%';
+                $notes[] = 'disagree_thr=' . number_format($this->rules->disagreeMajorPct(), 2) . '%';
                 $notes[] = 'disagree_ratio=' . number_format($ratio * 100.0, 2) . '%';
 
                 // Add a few samples to help investigation (max 3 in notes to avoid spam)
@@ -446,7 +451,7 @@ final class ImportEodService
         }
 
         if ($status === 'SUCCESS') {
-            $sq = $this->softQualitySvc->evaluate($runId, $fromEff, $toEff, $targetTickers, 0.25);
+            $sq = $this->softQualitySvc->evaluate($runId, $fromEff, $toEff, $targetTickers, $this->rules->gapExtremeRatio());
 
             $softFlagsGate = (int) ($sq['soft_flags'] ?? 0);
             if ($softFlagsGate > 0) {

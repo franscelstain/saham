@@ -23,4 +23,8 @@ final class QualityRules
     public function tol(): float { return $this->priceInRangeTolerance; }
     public function disagreeMajorPct(): float { return $this->disagreeMajorPct; }
     public function gapExtremePct(): float { return $this->gapExtremePct; }
+
+    // Helpers: config stores percentages (2.0 == 2%).
+    public function disagreeMajorRatio(): float { return $this->disagreeMajorPct / 100.0; }
+    public function gapExtremeRatio(): float { return $this->gapExtremePct / 100.0; }
 }
