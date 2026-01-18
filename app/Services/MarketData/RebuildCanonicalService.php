@@ -12,7 +12,7 @@ use App\Trade\MarketData\Config\ImportPolicy;
 use App\Trade\MarketData\Config\QualityRules;
 use App\Trade\MarketData\Config\ProviderPriority;
 
-use App\Trade\MarketData\DTO\EodBar;
+use App\DTO\MarketData\EodBar;
 use App\Trade\MarketData\Select\CanonicalSelector;
 use App\Trade\MarketData\Validate\EodQualityGate;
 

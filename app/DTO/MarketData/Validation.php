@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Trade\MarketData\DTO;
+namespace App\DTO\MarketData;
 
 final class Validation
 {

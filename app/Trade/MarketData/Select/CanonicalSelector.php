@@ -3,9 +3,9 @@
 namespace App\Trade\MarketData\Select;
 
 use App\Trade\MarketData\Config\ProviderPriority;
-use App\Trade\MarketData\DTO\CanonicalPick;
-use App\Trade\MarketData\DTO\EodBar;
-use App\Trade\MarketData\DTO\Validation;
+use App\DTO\MarketData\CanonicalPick;
+use App\DTO\MarketData\EodBar;
+use App\DTO\MarketData\Validation;
 
 final class CanonicalSelector
 {

@@ -3,8 +3,8 @@
 namespace App\Trade\MarketData\Providers\Yahoo;
 
 use App\Trade\MarketData\Providers\Contracts\EodProvider;
-use App\Trade\MarketData\DTO\RawBar;
-use App\Trade\MarketData\DTO\ProviderFetchResult;
+use App\DTO\MarketData\RawBar;
+use App\DTO\MarketData\ProviderFetchResult;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;

@@ -2,7 +2,7 @@
 
 namespace App\Trade\MarketData\Providers\Contracts;
 
-use App\Trade\MarketData\DTO\ProviderFetchResult;
+use App\DTO\MarketData\ProviderFetchResult;
 
 interface EodProvider
 {

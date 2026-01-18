@@ -3,8 +3,8 @@
 namespace App\Trade\MarketData\Validate;
 
 use App\Trade\MarketData\Config\QualityRules;
-use App\Trade\MarketData\DTO\EodBar;
-use App\Trade\MarketData\DTO\Validation;
+use App\DTO\MarketData\EodBar;
+use App\DTO\MarketData\Validation;
 
 final class EodQualityGate
 {

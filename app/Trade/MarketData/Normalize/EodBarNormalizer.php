@@ -2,8 +2,8 @@
 
 namespace App\Trade\MarketData\Normalize;
 
-use App\Trade\MarketData\DTO\RawBar;
-use App\Trade\MarketData\DTO\EodBar;
+use App\DTO\MarketData\RawBar;
+use App\DTO\MarketData\EodBar;
 use Carbon\Carbon;
 
 final class EodBarNormalizer
