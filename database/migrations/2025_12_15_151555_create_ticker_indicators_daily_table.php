@@ -25,6 +25,8 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->decimal('high', 18, 4)->nullable();
             $table->decimal('low', 18, 4)->nullable();
             $table->decimal('close', 18, 4)->nullable();
+            $table->enum('basis_used', ['close', 'adj_close'])->nullable();
+            $table->decimal('price_used', 18, 4)->nullable();
             $table->unsignedBigInteger('volume')->nullable();
 
             // moving averages
@@ -75,6 +77,7 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->index(['trade_date', 'signal_code', 'volume_label_code', 'score_total'], 'idx_ind_candidates');
             $table->index(['trade_date', 'rsi14', 'ma20', 'ma50', 'ma200'], 'idx_ind_trend_filter');
             $table->index(['trade_date', 'signal_code', 'signal_age_days'], 'idx_ti_trade_signal_age');
+            $table->index(['trade_date', 'basis_used'], 'idx_tid_basis_date');
 
             $table->foreign('ticker_id', 'fk_ind_daily_ticker')
                 ->references('ticker_id')->on('tickers')

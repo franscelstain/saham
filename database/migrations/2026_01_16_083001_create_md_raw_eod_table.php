@@ -42,9 +42,6 @@ class CreateMdRawEodTable extends Migration
             $table->unique(['run_id','ticker_id','trade_date','source'], 'uq_md_raw_run_ticker_date_source');
             $table->index(['run_id', 'ticker_id','trade_date'], 'idx_md_raw_run_ticker_date');
             $table->index(['source','trade_date'], 'idx_md_raw_source_date');
-
-            $table->foreign('run_id', 'fk_md_raw_run')
-                ->references('run_id')->on('md_runs')->onDelete('cascade');
         });
     }
 

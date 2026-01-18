@@ -96,18 +96,30 @@ final class PublishEodService
                         continue;
                     }
 
+                    $close = $r->close !== null ? (float) $r->close : null;
+                    $adj   = $r->adj_close !== null ? (float) $r->adj_close : null;
+
+                    $priceBasis = null;
+                    if ($adj !== null && $adj > 0) {
+                        $priceBasis = 'adj_close';
+                    } elseif ($close !== null && $close > 0) {
+                        $priceBasis = 'close';
+                    }
+
                     $row = [
                         'ticker_id' => (int) $r->ticker_id,
                         'trade_date' => (string) $r->trade_date,
                         'open' => $r->open  !== null ? (float) $r->open : null,
                         'high' => $r->high !== null ? (float) $r->high : null,
                         'low'  => $r->low !== null ? (float) $r->low : null,
-                        'close'=> $r->close !== null ? (float) $r->close : null,
+                        'close'=> $close,
                         'volume' => $r->volume !== null ? (int) $r->volume : null,
                         'source' => $r->chosen_source !== null ? (string) $r->chosen_source : null,
                         'run_id' => (int) $runId,
-                        'adj_close' => $r->adj_close !== null ? (float) $r->adj_close : null,
+                        'adj_close' => $adj,
+                        'price_basis' => $priceBasis,
                         'ca_hint' => null,
+                        'ca_event' => null,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];

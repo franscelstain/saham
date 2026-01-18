@@ -44,10 +44,6 @@ class CreateTickerOhlcDailyTable extends Migration
             $table->foreign('ticker_id', 'ticker_ohlc_daily_ticker_id_foreign')
                 ->references('ticker_id')->on('tickers')
                 ->onUpdate('cascade');
-
-            $table->foreign('run_id', 'ticker_ohlc_daily_run_id_foreign')
-                ->references('run_id')->on('md_runs')
-                ->onUpdate('cascade');
         });
     }
 

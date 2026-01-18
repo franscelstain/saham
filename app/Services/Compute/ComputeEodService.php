@@ -3,8 +3,9 @@
 namespace App\Services\Compute;
 
 use App\Repositories\MarketCalendarRepository;
-use App\Repositories\TickerOhlcDailyRepository;
 use App\Repositories\TickerIndicatorsDailyRepository;
+use App\Repositories\TickerOhlcDailyRepository;
+use App\Services\MarketData\PriceBasisPolicy;
 use App\Trade\Compute\Classifiers\DecisionClassifier;
 use App\Trade\Compute\Classifiers\PatternClassifier;
 use App\Trade\Compute\Classifiers\VolumeLabelClassifier;
@@ -30,6 +31,7 @@ class ComputeEodService
     private SignalAgeTracker $age;
 
     private EodDateResolver $dateResolver;
+    private PriceBasisPolicy $basisPolicy;
 
     public function __construct(
         MarketCalendarRepository $cal,
@@ -39,7 +41,8 @@ class ComputeEodService
         VolumeLabelClassifier $volume,
         PatternClassifier $pattern,
         SignalAgeTracker $age,
-        EodDateResolver $dateResolver
+        EodDateResolver $dateResolver,
+        PriceBasisPolicy $basisPolicy
     ) {
         $this->cal = $cal;
         $this->ohlc = $ohlc;
@@ -51,6 +54,7 @@ class ComputeEodService
         $this->age = $age;
 
         $this->dateResolver = $dateResolver;
+        $this->basisPolicy = $basisPolicy;
     }
 
     public function runDate(?string $tradeDate = null, ?string $tickerCode = null, int $chunkSize = 200): array
@@ -200,18 +204,26 @@ class ComputeEodService
                 $volSma20Prev = null;
                 if (count($lastVols20) >= 20) $volSma20Prev = ($sumVol20 / 20.0);
 
-                // bar today
-                $close = (float) $r->close;
+                // bar today (real market close)
+                $closeReal = $r->close !== null ? (float) $r->close : 0.0;
                 $high  = (float) $r->high;
                 $low   = (float) $r->low;
                 $vol   = (float) $r->volume;
 
-                // update rolling engines
-                $sma20->push($close);
-                $sma50->push($close);
-                $sma200->push($close);
-                $rsi14->push($close);
-                $atr14->push($high, $low, $close);
+                // Phase 5: price basis for indicators
+                $adj = isset($r->adj_close) && $r->adj_close !== null ? (float) $r->adj_close : null;
+                $pick = $this->basisPolicy->pickForIndicators($closeReal, $adj);
+
+                $priceUsed = (float) $pick['price'];
+                $basisUsed = (string) $pick['basis'];
+
+                $sma20->push($priceUsed);
+                $sma50->push($priceUsed);
+                $sma200->push($priceUsed);
+                $rsi14->push($priceUsed);
+
+                // ATR tetap pakai data real
+                $atr14->push($high, $low, $closeReal);
 
                 // update buffers
                 $lows20[] = $low;   if (count($lows20) > 20) array_shift($lows20);

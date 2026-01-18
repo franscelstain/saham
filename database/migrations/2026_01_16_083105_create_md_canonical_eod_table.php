@@ -37,9 +37,6 @@ class CreateMdCanonicalEodTable extends Migration
             $table->unique(['run_id', 'ticker_id', 'trade_date'], 'uq_md_can_run_ticker_date');
             $table->index(['trade_date','chosen_source'], 'idx_md_can_date_source');
             $table->index(['ticker_id', 'trade_date'], 'idx_md_can_ticker_date');
-
-            $table->foreign('run_id', 'fk_md_can_run')
-                ->references('run_id')->on('md_runs')->onDelete('cascade');
         });
     }
 
