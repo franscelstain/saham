@@ -3,6 +3,7 @@
 namespace App\Repositories\MarketData;
 
 use Illuminate\Support\Facades\DB;
+use App\DTO\MarketData\RawEodBar;
 
 class RawEodRepository
 {
@@ -81,5 +82,17 @@ class RawEodRepository
         $q->orderBy('ticker_id')->orderBy('trade_date')->orderBy('source');
 
         return $q->cursor();
+    }
+
+    /**
+     * DTO variant of cursorByRunAndRange.
+     *
+     * @return \Generator<int,RawEodBar>
+     */
+    public function cursorDtoByRunAndRange(int $runId, string $from, string $to, ?int $tickerId = null)
+    {
+        foreach ($this->cursorByRunAndRange($runId, $from, $to, $tickerId) as $r) {
+            yield RawEodBar::fromObject($r);
+        }
     }
 }

@@ -6,8 +6,19 @@ use Carbon\Carbon;
 
 final class TradeClock
 {
+    /** @var TradeClockConfig|null */
+    private static $cfg;
+
+    public static function init(TradeClockConfig $cfg): void
+    {
+        self::$cfg = $cfg;
+    }
+
     public static function tz(): string
     {
+        if (self::$cfg) return self::$cfg->timezone();
+
+        // Fallback for safety (app may call TradeClock before providers boot)
         return (string) config('trade.clock.timezone', 'Asia/Jakarta');
     }
 
@@ -24,11 +35,17 @@ final class TradeClock
 
     public static function eodCutoffHour(): int
     {
+        if (self::$cfg) return self::$cfg->eodCutoffHour();
+
+        // Fallback for safety
         return (int) config('trade.clock.eod_cutoff.hour', 16);
     }
 
     public static function eodCutoffMin(): int
     {
+        if (self::$cfg) return self::$cfg->eodCutoffMin();
+
+        // Fallback for safety
         return (int) config('trade.clock.eod_cutoff.min', 30);
     }
 

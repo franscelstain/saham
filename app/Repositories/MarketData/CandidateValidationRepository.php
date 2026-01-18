@@ -3,6 +3,7 @@
 namespace App\Repositories\MarketData;
 
 use Illuminate\Support\Facades\DB;
+use App\DTO\MarketData\CandidateValidation;
 
 /**
  * CandidateValidationRepository
@@ -113,6 +114,34 @@ final class CandidateValidationRepository
             ];
         }
 
+        return $out;
+    }
+
+    /**
+     * DTO variant of mapByDateAndCodes.
+     *
+     * @param string $tradeDate
+     * @param string[] $tickerCodes
+     * @param string $provider
+     * @return array<string,CandidateValidation>
+     */
+    public function mapDtoByDateAndCodes(string $tradeDate, array $tickerCodes, string $provider = 'EODHD'): array
+    {
+        $rows = $this->mapByDateAndCodes($tradeDate, $tickerCodes, $provider);
+        $out = [];
+        foreach ($rows as $code => $r) {
+            $dto = new CandidateValidation();
+            $dto->runId = 0;
+            $dto->tradeDate = $tradeDate;
+            $dto->tickerId = 0;
+            $dto->tickerCode = (string) $code;
+            $dto->status = (string) ($r['status'] ?? '');
+            $dto->primaryClose = $r['primary_close'] ?? null;
+            $dto->validatorClose = $r['validator_close'] ?? null;
+            $dto->diffPct = $r['diff_pct'] ?? null;
+            $dto->note = null;
+            $out[(string) $code] = $dto;
+        }
         return $out;
     }
 }

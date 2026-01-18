@@ -54,6 +54,14 @@ return [
             'days' => 14,
         ],
 
+        // Domain log: Market Data (RAW/Canonical/Publish/Validator)
+        'market_data' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/market_data.log'),
+            'level' => 'debug',
+            'days' => 30,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

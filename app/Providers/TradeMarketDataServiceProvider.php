@@ -7,9 +7,13 @@ use App\Services\MarketData\ImportEodService;
 use App\Trade\MarketData\Config\ImportPolicy;
 use App\Trade\MarketData\Config\ProviderPriority;
 use App\Trade\MarketData\Config\QualityRules;
+use App\Trade\MarketData\Config\ValidatorPolicy;
 use App\Trade\MarketData\Providers\Contracts\EodProvider;
 use App\Trade\MarketData\Providers\Yahoo\YahooEodProvider;
 use App\Trade\MarketData\Providers\EodHd\EodhdEodProvider;
+use App\Services\MarketData\DisagreementMajorService;
+use App\Services\MarketData\MissingTradingDayService;
+use App\Services\MarketData\SoftQualityRulesService;
 
 class TradeMarketDataServiceProvider extends ServiceProvider
 {
@@ -34,6 +38,14 @@ class TradeMarketDataServiceProvider extends ServiceProvider
             $gapPct = (float) config('trade.market_data.quality.gap_extreme_pct', 20.0);
 
             return new QualityRules($tol, $disagreePct, $gapPct);
+        });
+
+        // Validator policy (Phase 7) to avoid config() reads inside service.
+        $this->app->singleton(ValidatorPolicy::class, function () {
+            $max = (int) config('trade.market_data.validator.max_tickers', 20);
+            $callLimit = (int) config('trade.market_data.providers.eodhd.daily_call_limit', 20);
+            $disagreeMajorPct = (float) config('trade.market_data.validator.disagree_major_pct', 1.5);
+            return new ValidatorPolicy($max, $callLimit, $disagreeMajorPct);
         });
 
         // Provider bindings (multi-source ready)
@@ -71,6 +83,9 @@ class TradeMarketDataServiceProvider extends ServiceProvider
                 $app->make(\App\Repositories\MarketData\RunRepository::class),
                 $app->make(\App\Repositories\MarketData\RawEodRepository::class),
                 $app->make(\App\Repositories\MarketData\CanonicalEodRepository::class),
+                $app->make(DisagreementMajorService::class),
+                $app->make(MissingTradingDayService::class),
+                $app->make(SoftQualityRulesService::class),
                 $app->make('md.eod.providers_map')
             );
         });

@@ -18,6 +18,7 @@ use App\Trade\MarketData\Select\CanonicalSelector;
 use App\Trade\MarketData\Validate\EodQualityGate;
 
 use App\Trade\Support\TradeClock;
+use Illuminate\Support\Facades\Log;
 
 final class ImportEodService
 {
@@ -180,6 +181,10 @@ final class ImportEodService
         $provErr = []; // ex: ['yahoo' => 12]
         $provErrCode = []; // ex: ['yahoo' => ['NET_ERROR'=>5,'HTTP_502'=>7]]
 
+        // Guardrail: avoid log spam. Keep only few samples per provider/run.
+        $provErrSample = []; // ex: ['yahoo' => 3]
+        $hardRejectSample = 0;
+
         // Buffer rows for batch insert/upsert
         $rawRowsBuf = [];
         $canRowsBuf = [];
@@ -210,6 +215,21 @@ final class ImportEodService
                         if (!isset($provErrCode[$src])) $provErrCode[$src] = [];
                         $provErrCode[$src][$code] = ($provErrCode[$src][$code] ?? 0) + 1;
 
+                        // Log few samples only
+                        $provErrSample[$src] = ($provErrSample[$src] ?? 0) + 1;
+                        if ($provErrSample[$src] <= 3) {
+                            Log::channel('market_data')->warning('md.import.provider_error', [
+                                'run_id' => $runId,
+                                'source' => $src,
+                                'ticker_code' => $tcode,
+                                'symbol' => $symbol,
+                                'from' => $fromEff,
+                                'to' => $toEff,
+                                'error_code' => $code,
+                                'error_msg' => $res->errorMsg,
+                            ]);
+                        }
+
                         continue;
                     }
                 
@@ -226,7 +246,24 @@ final class ImportEodService
                     foreach ($barsByDate as $d => $norm) {
                         $val = $this->gate->validate($norm);
 
-                        if (!$val->hardValid) $hardRejects++;
+                        if (!$val->hardValid) {
+                            $hardRejects++;
+
+                            // Sample few hard rejects for audit
+                            $hardRejectSample++;
+                            if ($hardRejectSample <= 10) {
+                                Log::channel('market_data')->info('md.import.hard_reject', [
+                                    'run_id' => $runId,
+                                    'source' => $src,
+                                    'ticker_code' => $tcode,
+                                    'trade_date' => $d,
+                                    'close' => $norm->close,
+                                    'volume' => $norm->volume,
+                                    'error_code' => $val->errorCode,
+                                    'flags' => $val->flags,
+                                ]);
+                            }
+                        }
                         if ($val->flags) $softFlags += count($val->flags);
 
                         $candidates[$d][$src] = ['bar' => $norm, 'val' => $val];

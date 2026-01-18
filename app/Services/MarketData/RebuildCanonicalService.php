@@ -53,6 +53,9 @@ final class RebuildCanonicalService
     /** @var CanonicalSelector */
     private $selector;
 
+    /** @var ProviderPriority */
+    private $priority;
+
     /** @var DisagreementMajorService */
     private $disagreeSvc;
 
@@ -84,6 +87,8 @@ final class RebuildCanonicalService
         $this->disagreeSvc = $disagreeSvc;
         $this->missingSvc = $missingSvc;
         $this->softQualitySvc = $softQualitySvc;
+
+        $this->priority = $priority;
 
         $this->gate = new EodQualityGate($rules);
         $this->selector = new CanonicalSelector($priority);
@@ -499,14 +504,8 @@ final class RebuildCanonicalService
      */
     private function selectorPriorityNames(): array
     {
-        // CanonicalSelector only stores ProviderPriority; we can re-read config.
-        // Keep it simple for audit: read from config to reflect current policy.
-        $list = (array) config('trade.market_data.providers_priority', ['yahoo']);
-        $out = [];
-        foreach ($list as $s) {
-            $s = strtolower(trim((string) $s));
-            if ($s !== '') $out[] = $s;
-        }
-        return $out ?: ['yahoo'];
+        // Keep for audit: reflect current bound policy (no config() reads here).
+        $names = $this->priority ? $this->priority->names() : [];
+        return $names ?: ['yahoo'];
     }
 }

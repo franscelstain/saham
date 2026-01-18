@@ -6,6 +6,7 @@ use App\Repositories\TickerRepository;
 use App\Repositories\MarketData\CanonicalEodRepository;
 use App\Repositories\MarketData\RunRepository;
 use App\Trade\MarketData\Normalize\EodBarNormalizer;
+use App\Trade\MarketData\Config\ValidatorPolicy;
 use App\Trade\MarketData\Providers\EodHd\EodhdEodProvider;
 use App\Trade\Support\TradeClock;
 
@@ -36,16 +37,21 @@ final class ValidateEodService
     /** @var EodBarNormalizer */
     private $normalizer;
 
+    /** @var ValidatorPolicy */
+    private $policy;
+
     public function __construct(
         TickerRepository $tickerRepo, 
         RunRepository $runRepo, 
         CanonicalEodRepository $canRepo, 
-        EodhdEodProvider $validator
+        EodhdEodProvider $validator,
+        ValidatorPolicy $policy
     ) {
         $this->tickerRepo = $tickerRepo;
         $this->runRepo = $runRepo;
         $this->canRepo = $canRepo;
         $this->validator = $validator;
+        $this->policy = $policy;
         $this->normalizer = new EodBarNormalizer(TradeClock::tz());
     }
 
@@ -67,9 +73,9 @@ final class ValidateEodService
             ];
         }
 
-        // Enforce caps (validator config + provider config + option)
-        $cfgMax = (int) config('trade.market_data.validator.max_tickers', 20);
-        $callLimit = (int) config('trade.market_data.providers.eodhd.daily_call_limit', 20);
+        // Enforce caps (policy + option)
+        $cfgMax = (int) $this->policy->maxTickers();
+        $callLimit = (int) $this->policy->dailyCallLimit();
         $optMax = $maxTickers !== null ? (int) $maxTickers : $cfgMax;
         $cap = max(1, min($cfgMax, $callLimit, $optMax));
 
@@ -123,7 +129,7 @@ final class ValidateEodService
 
         $primaryByTickerId = $this->canRepo->loadByRunAndDate($runId, $tradeDate, $tickerIds);
 
-        $disagreeMajorPct = (float) config('trade.market_data.validator.disagree_major_pct', 1.5);
+        $disagreeMajorPct = (float) $this->policy->disagreeMajorPct();
         // Simple warn threshold: half of disagree threshold (but at least 0.2%)
         $warnPct = max(0.2, $disagreeMajorPct / 2.0);
 
