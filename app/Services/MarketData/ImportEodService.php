@@ -4,18 +4,18 @@ namespace App\Services\MarketData;
 
 use App\Repositories\TickerRepository;
 use App\Repositories\MarketCalendarRepository;
+use App\Repositories\MarketData\CanonicalEodRepository;
 use App\Repositories\MarketData\RunRepository;
 use App\Repositories\MarketData\RawEodRepository;
-use App\Repositories\MarketData\CanonicalEodRepository;
 
 use App\Trade\MarketData\Config\ImportPolicy;
 use App\Trade\MarketData\Config\QualityRules;
 use App\Trade\MarketData\Config\ProviderPriority;
 
-use App\Trade\MarketData\Providers\Contracts\EodProvider;
 use App\Trade\MarketData\Normalize\EodBarNormalizer;
-use App\Trade\MarketData\Validate\EodQualityGate;
+use App\Trade\MarketData\Providers\Contracts\EodProvider;
 use App\Trade\MarketData\Select\CanonicalSelector;
+use App\Trade\MarketData\Validate\EodQualityGate;
 
 use App\Trade\Support\TradeClock;
 
@@ -51,6 +51,12 @@ final class ImportEodService
     /** @var CanonicalSelector */
     private $selector;
 
+    /** @var DisagreementMajorService */
+    private $disagreeSvc;
+
+    /** @var MissingTradingDayService */
+    private $missingSvc;
+
     public function __construct(
         ImportPolicy $policy,
         QualityRules $rules,
@@ -60,6 +66,8 @@ final class ImportEodService
         RunRepository $runs,
         RawEodRepository $rawRepo,
         CanonicalEodRepository $canRepo,
+        DisagreementMajorService $disagreeSvc,
+        MissingTradingDayService $missingSvc,
         array $providersByName // bind this in ServiceProvider: ['yahoo' => YahooEodProvider]
     ) {
         $this->policy = $policy;
@@ -68,6 +76,8 @@ final class ImportEodService
         $this->runs = $runs;
         $this->rawRepo = $rawRepo;
         $this->canRepo = $canRepo;
+        $this->disagreeSvc = $disagreeSvc;
+        $this->missingSvc = $missingSvc;
 
         $this->providersByName = [];
         foreach ($providersByName as $k => $p) {
@@ -361,6 +371,35 @@ final class ImportEodService
             }
         }
 
+        $missingTradingDay = 0;
+
+        if ($status === 'SUCCESS') {
+            $mt = $this->missingSvc->compute(
+                $runId,
+                $fromEff,
+                $toEff,
+                $targetTickers,
+                0.60, // 60% minimal per day
+                5
+            );
+
+            $missingTradingDay = (int) ($mt['missing_days'] ?? 0);
+
+            if ($missingTradingDay > 0) {
+                $notes[] = 'missing_trading_day=' . $missingTradingDay;
+                $notes[] = 'missing_dates=' . implode(',', array_slice((array)($mt['missing_dates'] ?? []), 0, 5));
+                $status = 'CANONICAL_HELD';
+                $notes[] = 'held_reason=missing_trading_day';
+            } else {
+                $lowDays = (int) ($mt['low_coverage_days'] ?? 0);
+                if ($lowDays >= 2) {
+                    $notes[] = 'low_coverage_days=' . $lowDays;
+                    $status = 'CANONICAL_HELD';
+                    $notes[] = 'held_reason=low_coverage_days';
+                }
+            }
+        }
+
         // Kalau HELD -> hapus semua canonical yg terlanjur ke-upsert di batch sebelumnya
         if ($status === 'CANONICAL_HELD') {
             $this->canRepo->deleteByRunId($runId);
@@ -374,7 +413,7 @@ final class ImportEodService
             'hard_rejects' => (int) $hardRejects,
             'soft_flags' => (int) $softFlags,
             'disagree_major' => (int) $disagreeMajor,
-            'missing_trading_day' => 0,
+            'missing_trading_day' => (int) $missingTradingDay,
             'notes' => $notes ? implode(' | ', $notes) : null,
         ]);
 
