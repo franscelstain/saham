@@ -3,8 +3,6 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use App\Services\MarketData\Contracts\OhlcEodProvider;
-use App\Services\MarketData\Providers\YahooOhlcEodProvider;
 use App\Trade\Support\TradeClock;
 use App\Trade\Support\TradeClockConfig;
 
@@ -17,11 +15,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->bind(OhlcEodProvider::class, function () {
-            // nanti kalau multi-provider: pilih dari config('trade.market_data.default_provider')
-            return new YahooOhlcEodProvider();
-        });
-
         // TradeClockConfig: wrapper config agar TradeClock tidak baca config() langsung.
         $this->app->singleton(TradeClockConfig::class, function () {
             $tz = (string) config('trade.clock.timezone', 'Asia/Jakarta');
