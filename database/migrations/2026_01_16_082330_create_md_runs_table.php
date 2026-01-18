@@ -18,12 +18,8 @@ class CreateMdRunsTable extends Migration
             $table->bigIncrements('run_id');
 
             $table->string('job', 50)->default('import_eod');
-
-            // Phase 6 (rebuild): lineage & mode (audit trail)
             $table->string('run_mode', 16)->default('FETCH');
-            // parent_run_id: run yang memicu run ini (misal rebuild/publish ulang)
             $table->unsignedBigInteger('parent_run_id')->nullable();
-            // raw_source_run_id: RAW run_id yang dijadikan sumber rebuild canonical (tanpa refetch)
             $table->unsignedBigInteger('raw_source_run_id')->nullable();
             $table->string('timezone', 40);
             $table->string('cutoff', 10); // "16:30"
