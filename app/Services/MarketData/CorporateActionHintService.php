@@ -4,6 +4,7 @@ namespace App\Services\MarketData;
 
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\TickerOhlcDailyRepository;
+use App\Trade\Support\TradeClock;
 
 final class CorporateActionHintService
 {
@@ -101,7 +102,7 @@ final class CorporateActionHintService
                 'trade_date' => $tradeDate,
                 'ca_event' => $event,
                 'ca_hint' => $hint,
-                'updated_at' => now(),
+                'updated_at' => TradeClock::now(),
             ];
         }
 
