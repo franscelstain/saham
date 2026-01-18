@@ -251,7 +251,7 @@ class ComputeEodService
                     'open' => (float) $r->open,
                     'high' => $high,
                     'low'  => $low,
-                    'close'=> $close,
+                    'close'=> $closeReal,
                     'volume' => $vol,
 
                     'ma20' => $sma20->value(),
@@ -286,7 +286,9 @@ class ComputeEodService
                     'open' => (float) $r->open,
                     'high' => $high,
                     'low' => $low,
-                    'close' => $close,
+                    'close' => $closeReal,
+                    'basis_used' => $basisUsed,
+                    'price_used' => $priceUsed,
                     'volume' => (int) $r->volume,
 
                     'ma20' => $metrics['ma20'] !== null ? round($metrics['ma20'], 4) : null,
