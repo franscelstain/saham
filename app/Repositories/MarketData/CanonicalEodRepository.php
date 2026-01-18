@@ -113,44 +113,6 @@ class CanonicalEodRepository
     }
 
     /**
-     * DTO variant of loadByRunAndDate.
-     *
-     * @param int[] $tickerIds
-     * @return array<int,CanonicalEodBar> map by ticker_id
-     */
-    public function loadDtoByRunAndDate(int $runId, string $tradeDate, array $tickerIds): array
-    {
-        if ($runId <= 0 || empty($tickerIds)) return [];
-
-        $rows = DB::table('md_canonical_eod')
-            ->select(
-                'run_id',
-                'ticker_id',
-                'trade_date',
-                'chosen_source',
-                'close',
-                'adj_close',
-                'volume',
-                'price_basis',
-                'price_used',
-                'ca_event'
-            )
-            ->where('run_id', $runId)
-            ->where('trade_date', $tradeDate)
-            ->whereIn('ticker_id', $tickerIds)
-            ->get();
-
-        $out = [];
-        foreach ($rows as $r) {
-            $tid = (int) ($r->ticker_id ?? 0);
-            if ($tid <= 0) continue;
-            $out[$tid] = CanonicalEodBar::fromObject($r);
-        }
-
-        return $out;
-    }
-
-    /**
      * Upsert canonical per (run_id,ticker_id,trade_date).
      *
      * @param array<int,array<string,mixed>> $rows
