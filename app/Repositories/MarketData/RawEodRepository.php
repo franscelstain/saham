@@ -44,4 +44,42 @@ class RawEodRepository
     {
         return (int) DB::table('md_raw_eod')->where('run_id', $runId)->count();
     }
+
+    /**
+     * Stream RAW rows for a run within date range (memory-safe).
+     *
+     * NOTE: This is used by Phase 6 (rebuild canonical) to avoid refetch.
+     *
+     * @return \Generator<int,object>
+     */
+    public function cursorByRunAndRange(int $runId, string $from, string $to, ?int $tickerId = null)
+    {
+        $q = DB::table('md_raw_eod')
+            ->select(
+                'run_id',
+                'ticker_id',
+                'trade_date',
+                'source',
+                'open',
+                'high',
+                'low',
+                'close',
+                'adj_close',
+                'volume',
+                'hard_valid',
+                'flags',
+                'error_code'
+            )
+            ->where('run_id', $runId)
+            ->whereBetween('trade_date', [$from, $to]);
+
+        if ($tickerId !== null && $tickerId > 0) {
+            $q->where('ticker_id', $tickerId);
+        }
+
+        // Group-friendly ordering for streaming reduce
+        $q->orderBy('ticker_id')->orderBy('trade_date')->orderBy('source');
+
+        return $q->cursor();
+    }
 }

@@ -21,10 +21,11 @@ final class DisagreementMajorService
      *   samples:array<int,array{ticker_id:int,trade_date:string,pct:float,min:float,max:float,sources:int}>
      * }
      */
-    public function compute(int $runId, int $canonicalPoints, float $thresholdPct = 0.03, int $maxSamples = 10): array
+    public function compute(int $runId, int $canonicalPoints, float $thresholdPct = 0.03, int $maxSamples = 10, ?int $rawRunId = null): array
     {
         // Jika belum ada multi-source import, hasilnya 0 (normal).
-        $rows = $this->rawRepo->aggregateCloseRangeByRun($runId);
+        $useRaw = ($rawRunId !== null && $rawRunId > 0) ? $rawRunId : $runId;
+        $rows = $this->rawRepo->aggregateCloseRangeByRun($useRaw);
 
         $major = 0;
         $samples = [];
