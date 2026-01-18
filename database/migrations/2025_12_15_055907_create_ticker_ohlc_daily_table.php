@@ -26,9 +26,12 @@ class CreateTickerOhlcDailyTable extends Migration
             $table->decimal('close', 18, 4)->nullable();
 
             $table->decimal('adj_close', 18, 4)->nullable();
+            $table->enum('price_basis', ['close', 'adj_close'])->nullable();
+
             $table->unsignedBigInteger('volume')->nullable();
 
             $table->string('ca_hint', 32)->nullable();
+            $table->string('ca_event', 32)->nullable();
             $table->string('source', 30)->nullable();
             $table->boolean('is_deleted')->default(0);
             $table->timestamp('created_at')->useCurrent();
@@ -36,6 +39,7 @@ class CreateTickerOhlcDailyTable extends Migration
 
             $table->unique(['ticker_id', 'trade_date'], 'uq_ohlc_daily_ticker_date');
             $table->index('trade_date', 'idx_ohlc_daily_date');
+            $table->index(['trade_date', 'ca_event'], 'idx_ohlc_ca_event_date');
 
             $table->foreign('ticker_id', 'ticker_ohlc_daily_ticker_id_foreign')
                 ->references('ticker_id')->on('tickers')
