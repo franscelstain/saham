@@ -42,6 +42,7 @@ class TickerOhlcDailyRepository
                 'od.high',
                 'od.low',
                 'od.close',
+                'od.adj_close',
                 'od.volume',
             ])
             ->orderBy('od.ticker_id')
@@ -51,6 +52,26 @@ class TickerOhlcDailyRepository
         foreach ($q->cursor() as $row) {
             yield $row;
         }
+    }
+
+    public function listForDate(string $tradeDate, ?int $runId = null): array
+    {
+        $q = \DB::table('ticker_ohlc_daily')
+            ->select(['ticker_id', 'close', 'adj_close'])
+            ->where('trade_date', $tradeDate);
+
+        if ($runId !== null && $runId > 0) {
+            $q->where('run_id', $runId);
+        }
+
+        $rows = $q->get();
+        return $rows ? $rows->map(function ($r) {
+            return [
+                'ticker_id' => (int) $r->ticker_id,
+                'close' => $r->close !== null ? (float) $r->close : null,
+                'adj_close' => $r->adj_close !== null ? (float) $r->adj_close : null,
+            ];
+        })->all() : [];
     }
 
     public function mapPrevCloseVolume(string $prevDate, array $tickerIds): array
@@ -72,6 +93,17 @@ class TickerOhlcDailyRepository
             ];
         }
         return $map;
+    }
+
+    public function upsertCaHints(array $rows): void
+    {
+        if (!$rows) return;
+
+        \DB::table('ticker_ohlc_daily')->upsert(
+            $rows,
+            ['ticker_id', 'trade_date'],
+            ['ca_event', 'ca_hint', 'updated_at']
+        );
     }
 
     public function upsertMany(array $rows): int

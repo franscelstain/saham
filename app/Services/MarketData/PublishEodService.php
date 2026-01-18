@@ -1,6 +1,6 @@
 <?php
 
-# build_id: v2.2.36
+# build_id: v2.2.49
 # tujuan: Periksa perubahan dan cari potensi bug/performance issue.
 
 namespace App\Services\MarketData;
@@ -8,6 +8,7 @@ namespace App\Services\MarketData;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Repositories\MarketData\CanonicalEodRepository;
 use App\Repositories\MarketData\RunRepository;
+use App\Services\MarketData\CorporateActionHintService;
 use App\Trade\Support\TradeClock;
 
 final class PublishEodService
@@ -21,11 +22,19 @@ final class PublishEodService
     /** @var RunRepository */
     private $runRepo;
 
-    public function __construct(TickerOhlcDailyRepository $ohlcRepo, RunRepository $runRepo, CanonicalEodRepository $canRepo)
-    {
+    /** @var CorporateActionHintService */
+    private $caHintSvc;
+
+    public function __construct(
+        TickerOhlcDailyRepository $ohlcRepo, 
+        RunRepository $runRepo, 
+        CanonicalEodRepository $canRepo, 
+        CorporateActionHintService $caHintSvc
+    ) {
         $this->ohlcRepo = $ohlcRepo;
         $this->runRepo = $runRepo;
         $this->canRepo = $canRepo;
+        $this->caHintSvc = $caHintSvc;
     }
 
     /**
@@ -78,6 +87,9 @@ final class PublishEodService
 
         $now = TradeClock::now();
 
+        // Track trade_date(s) published in this run (for CA hint pass)
+        $dates = [];
+
         // Stream canonical rows in chunks to avoid memory blowups.
         $published = 0;
         $rejectedNull = 0;
@@ -85,7 +97,9 @@ final class PublishEodService
         $this->canRepo->chunkByRunId($runId, $batch, function ($rows) use (
                 &$published,
                 &$rejectedNull,
-                $now
+                &$dates,
+                $now,
+                $runId
             ) {
                 $payload = [];
 
@@ -95,6 +109,9 @@ final class PublishEodService
                         $rejectedNull++;
                         continue;
                     }
+
+                    // collect date for CA hint pass
+                    $dates[(string) $r->trade_date] = true;
 
                     $close = $r->close !== null ? (float) $r->close : null;
                     $adj   = $r->adj_close !== null ? (float) $r->adj_close : null;
@@ -125,6 +142,7 @@ final class PublishEodService
                     ];
 
                     $payload[] = $row;
+
                 }
 
                 if ($payload) {
@@ -143,6 +161,19 @@ final class PublishEodService
                 'notes' => $notes,
             ];
         }
+
+        // apply CA hints (split detector) after publish succeeded
+        if (!empty($dates)) {
+            $uniqueDates = array_keys($dates);
+            foreach ($uniqueDates as $d) {
+                $stats = $this->caHintSvc->applyForDate($d, $runId);
+                // Optional: append summary to run notes
+                if (!empty($stats['updated'])) {
+                    $this->runRepo->appendNote($runId, 'ca_hint_updated=' . (int) $stats['updated'] . '|split=' . (int) $stats['split'] . '|rsplit=' . (int) $stats['reverse_split'] . '|adj_diff=' . (int) $stats['adj_diff']);
+                }
+            }
+        }
+
 
         // Optional: append notes to md_runs.notes (do not fail publish if notes update fails)
         $add1 = 'published_ohlc_rows=' . $published;
