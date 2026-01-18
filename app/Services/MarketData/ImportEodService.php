@@ -400,6 +400,28 @@ final class ImportEodService
             }
         }
 
+        if ($status === 'SUCCESS') {
+            $sq = $this->softQualitySvc->evaluate($runId, $fromEff, $toEff, $targetTickers, 0.25);
+
+            $softFlags = (int) $sq['soft_flags'];
+            if ($softFlags > 0) {
+                $notes[] = 'soft_flags=' . $softFlags;
+                foreach ($sq['rule_counts'] as $k => $v) {
+                    if ($v > 0) $notes[] = "soft_{$k}={$v}";
+                }
+                foreach ($sq['samples'] as $k => $s) {
+                    $notes[] = "soft_sample_{$k}={$s}";
+                }
+            }
+
+            if (!empty($sq['hold'])) {
+                $status = 'CANONICAL_HELD';
+                $notes[] = 'held_reason=soft_quality';
+                $notes[] = 'soft_hold_reason=' . ($sq['hold_reason'] ?? 'unknown');
+            }
+        }
+
+
         // Kalau HELD -> hapus semua canonical yg terlanjur ke-upsert di batch sebelumnya
         if ($status === 'CANONICAL_HELD') {
             $this->canRepo->deleteByRunId($runId);

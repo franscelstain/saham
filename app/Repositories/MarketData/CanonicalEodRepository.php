@@ -68,6 +68,17 @@ class CanonicalEodRepository
             ->delete();
     }
 
+    public function listByRunAndDate(int $runId, string $tradeDate): array
+    {
+        $rows = DB::table('md_canonical_eod')
+            ->select('ticker_id','open','high','low','close','volume','adj_close','chosen_source')
+            ->where('run_id', $runId)
+            ->where('trade_date', $tradeDate)
+            ->get();
+
+        return $rows ? $rows->all() : [];
+    }
+
     /**
      * Load canonical close per ticker untuk 1 tanggal (dipakai validator).
      *

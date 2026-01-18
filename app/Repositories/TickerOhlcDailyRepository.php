@@ -53,6 +53,27 @@ class TickerOhlcDailyRepository
         }
     }
 
+    public function mapPrevCloseVolume(string $prevDate, array $tickerIds): array
+    {
+        if (!$tickerIds) return [];
+
+        $rows = DB::table('ticker_ohlc_daily')
+            ->select('ticker_id', 'close', 'volume')
+            ->where('trade_date', $prevDate)
+            ->whereIn('ticker_id', $tickerIds)
+            ->get();
+
+        $map = [];
+        foreach ($rows as $r) {
+            $tid = (int) $r->ticker_id;
+            $map[$tid] = [
+                'close' => $r->close !== null ? (float) $r->close : null,
+                'volume' => $r->volume !== null ? (int) $r->volume : null,
+            ];
+        }
+        return $map;
+    }
+
     public function upsertMany(array $rows): int
     {
         if (empty($rows)) return 0;
