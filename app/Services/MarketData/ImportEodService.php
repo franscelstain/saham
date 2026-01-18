@@ -57,6 +57,10 @@ final class ImportEodService
     /** @var MissingTradingDayService */
     private $missingSvc;
 
+    /** @var SoftQualityRulesService */
+    private $softQualitySvc;
+
+
     public function __construct(
         ImportPolicy $policy,
         QualityRules $rules,
@@ -68,6 +72,7 @@ final class ImportEodService
         CanonicalEodRepository $canRepo,
         DisagreementMajorService $disagreeSvc,
         MissingTradingDayService $missingSvc,
+        SoftQualityRulesService $softQualitySvc,
         array $providersByName // bind this in ServiceProvider: ['yahoo' => YahooEodProvider]
     ) {
         $this->policy = $policy;
@@ -78,6 +83,8 @@ final class ImportEodService
         $this->canRepo = $canRepo;
         $this->disagreeSvc = $disagreeSvc;
         $this->missingSvc = $missingSvc;
+        $this->softQualitySvc = $softQualitySvc;
+
 
         $this->providersByName = [];
         foreach ($providersByName as $k => $p) {
@@ -167,6 +174,7 @@ final class ImportEodService
         // Metrics
         $hardRejects = 0;
         $softFlags = 0;
+        $softFlagsGate = 0;
         $fallbackPicks = 0;
         $totalPicks = 0;
         $provErr = []; // ex: ['yahoo' => 12]
@@ -403,9 +411,9 @@ final class ImportEodService
         if ($status === 'SUCCESS') {
             $sq = $this->softQualitySvc->evaluate($runId, $fromEff, $toEff, $targetTickers, 0.25);
 
-            $softFlags = (int) $sq['soft_flags'];
-            if ($softFlags > 0) {
-                $notes[] = 'soft_flags=' . $softFlags;
+            $softFlagsGate = (int) ($sq['soft_flags'] ?? 0);
+            if ($softFlagsGate > 0) {
+                $notes[] = 'soft_flags_phase4=' . $softFlagsGate;
                 foreach ($sq['rule_counts'] as $k => $v) {
                     if ($v > 0) $notes[] = "soft_{$k}={$v}";
                 }
@@ -428,12 +436,14 @@ final class ImportEodService
             $notes[] = 'held_deleted_canonical: run_id=' . $runId;
         }
 
+        $softFlagsTotal = (int) ($softFlags + $softFlagsGate);
+
         $this->runs->finishRun($runId, [
             'status' => $status,
             'coverage_pct' => round($coveragePct, 2),
             'fallback_pct' => round($fallbackPct, 2),
             'hard_rejects' => (int) $hardRejects,
-            'soft_flags' => (int) $softFlags,
+            'soft_flags' => $softFlagsTotal,
             'disagree_major' => (int) $disagreeMajor,
             'missing_trading_day' => (int) $missingTradingDay,
             'notes' => $notes ? implode(' | ', $notes) : null,
@@ -451,7 +461,7 @@ final class ImportEodService
             'coverage_pct' => round($coveragePct, 2),
             'fallback_pct' => round($fallbackPct, 2),
             'hard_rejects' => (int) $hardRejects,
-            'soft_flags' => (int) $softFlags,
+            'soft_flags' => $softFlagsTotal,
             'notes' => $notes,
         ];
     }

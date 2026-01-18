@@ -5,7 +5,12 @@ namespace App\Services\MarketData;
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Repositories\MarketData\CanonicalEodRepository;
+use App\Trade\Support\TradeClock;
 
+/**
+ * Phase 4 (soft rules): flag common anomalies without stopping the pipeline by default.
+ * Can optionally HOLD the run if the anomaly is severe/massive.
+ */
 final class SoftQualityRulesService
 {
     private $can;
@@ -28,7 +33,7 @@ final class SoftQualityRulesService
      *   rule_counts:array<string,int>,
      *   hold:bool,
      *   hold_reason:?string,
-     *   samples:array<string,string>  // rule => "sample text"
+     *   samples:array<string,string>
      * }
      */
     public function evaluate(
@@ -38,13 +43,20 @@ final class SoftQualityRulesService
         int $expectedTickers,
         float $gapExtremePct = 0.25
     ): array {
+        $today = TradeClock::today();
+
         $softFlags = 0;
         $counts = [
+            // Mandatory per MANIFEST
+            'future_date' => 0,
+            'gap_extreme' => 0,
+            'stale_bar' => 0,
+            'flat_bar' => 0,
+            'flat_repeat' => 0,
+
+            // Keep useful safety flags (still soft unless massive / corrupt)
             'ohlc_inconsistent' => 0,
             'volume_missing' => 0,
-            'gap_extreme' => 0,
-            'flatline_with_volume' => 0,
-            'price_out_of_bounds' => 0,
         ];
         $samples = [];
 
@@ -63,21 +75,30 @@ final class SoftQualityRulesService
         }
 
         foreach ($dates as $d) {
-            // Pull canonical rows for the day (need a repo method for this)
-            $rows = $this->can->listByRunAndDate($runId, $d); // you add this method (select minimal cols)
-
-            if (!$rows) continue;
-
-            // prev context
-            $prev = $this->cal->previousTradingDate($d);
-            $prevMap = [];
-            if ($prev) {
-                $tickerIds = array_map(function($r){ return (int)$r->ticker_id; }, $rows);
-                $prevMap = $this->ohlc->mapPrevCloseVolume($prev, $tickerIds);
+            // Hard-ish rule (requested): future trade_date should never happen.
+            if ($d > $today) {
+                $counts['future_date']++; $softFlags++;
+                if (!isset($samples['future_date'])) $samples['future_date'] = "date={$d} > today={$today}";
+                $hold = true;
+                $holdReason = 'future_date';
+                break;
             }
 
-            $missingVolDay = 0;
+            // Canonical rows for that day
+            $rows = $this->can->listByRunAndDate($runId, $d);
+            if (!$rows) continue;
+
+            // prev context (from published table)
+            $prev = $this->cal->previousTradingDate($d);
+            $prevPrev = $prev ? $this->cal->previousTradingDate($prev) : null;
+
+            $tickerIds = array_map(function ($r) { return (int) $r->ticker_id; }, $rows);
+            $prevMap = $prev ? $this->ohlc->mapPrevCloseVolume($prev, $tickerIds) : [];
+            $prevPrevMap = $prevPrev ? $this->ohlc->mapPrevCloseVolume($prevPrev, $tickerIds) : [];
+
             $gapExtremeDay = 0;
+            $staleDay = 0;
+            $flatRepeatDay = 0;
 
             foreach ($rows as $r) {
                 $tid = (int) $r->ticker_id;
@@ -86,71 +107,100 @@ final class SoftQualityRulesService
                 $h = $r->high  !== null ? (float) $r->high  : null;
                 $l = $r->low   !== null ? (float) $r->low   : null;
                 $c = $r->close !== null ? (float) $r->close : null;
-                $v = $r->volume!== null ? (int) $r->volume : null;
+                $v = $r->volume !== null ? (int) $r->volume : null;
 
-                // Rule 1: OHLC inconsistent (critical)
+                // OHLC inconsistent (corrupt) => HOLD immediately.
                 if ($h !== null && $l !== null && $h < $l) {
                     $counts['ohlc_inconsistent']++; $softFlags++;
                     if (!isset($samples['ohlc_inconsistent'])) $samples['ohlc_inconsistent'] = "{$tid}@{$d}: high<low";
                     $hold = true; $holdReason = 'ohlc_inconsistent';
-                    continue;
+                    break;
                 }
                 if (($o !== null && $o < 0) || ($h !== null && $h < 0) || ($l !== null && $l < 0) || ($c !== null && $c < 0)) {
                     $counts['ohlc_inconsistent']++; $softFlags++;
                     if (!isset($samples['ohlc_inconsistent'])) $samples['ohlc_inconsistent'] = "{$tid}@{$d}: negative_price";
                     $hold = true; $holdReason = 'ohlc_inconsistent';
-                    continue;
+                    break;
                 }
                 if ($h !== null && $c !== null && $c > $h) {
                     $counts['ohlc_inconsistent']++; $softFlags++;
                     if (!isset($samples['ohlc_inconsistent'])) $samples['ohlc_inconsistent'] = "{$tid}@{$d}: close>high";
                     $hold = true; $holdReason = 'ohlc_inconsistent';
-                    continue;
+                    break;
                 }
                 if ($l !== null && $c !== null && $c < $l) {
                     $counts['ohlc_inconsistent']++; $softFlags++;
                     if (!isset($samples['ohlc_inconsistent'])) $samples['ohlc_inconsistent'] = "{$tid}@{$d}: close<low";
                     $hold = true; $holdReason = 'ohlc_inconsistent';
-                    continue;
+                    break;
                 }
 
-                // Rule 2: volume missing
+                // volume missing (soft)
                 if (($o !== null || $h !== null || $l !== null || $c !== null) && ($v === null || $v === 0)) {
                     $counts['volume_missing']++; $softFlags++;
-                    $missingVolDay++;
                     if (!isset($samples['volume_missing'])) $samples['volume_missing'] = "{$tid}@{$d}: volume_null_or_zero";
                 }
 
-                // Rule 3: gap extreme vs prev close
+                // Rule: gap extreme vs previous close
                 $prevClose = $prevMap[$tid]['close'] ?? null;
                 if ($prevClose !== null && $prevClose > 0 && $c !== null) {
                     $gap = abs($c - $prevClose) / $prevClose;
                     if ($gap >= $gapExtremePct) {
                         $counts['gap_extreme']++; $softFlags++;
                         $gapExtremeDay++;
-                        if (!isset($samples['gap_extreme'])) $samples['gap_extreme'] = "{$tid}@{$d}: gap=" . round($gap*100,2) . "%";
+                        if (!isset($samples['gap_extreme'])) $samples['gap_extreme'] = "{$tid}@{$d}: gap=" . round($gap * 100, 2) . '%';
                     }
                 }
 
-                // Rule 4: flatline with volume
-                if ($o !== null && $h !== null && $l !== null && $c !== null && $o == $h && $h == $l && $l == $c && $v !== null && $v > 0) {
-                    $counts['flatline_with_volume']++; $softFlags++;
-                    if (!isset($samples['flatline_with_volume'])) $samples['flatline_with_volume'] = "{$tid}@{$d}: flatline vol={$v}";
+                // Rule: stale bar (close + volume same as previous trading day)
+                $prevVol = $prevMap[$tid]['volume'] ?? null;
+                if ($prevClose !== null && $prevVol !== null && $c !== null && $v !== null) {
+                    if ($c == $prevClose && $v == $prevVol) {
+                        $counts['stale_bar']++; $softFlags++;
+                        $staleDay++;
+                        if (!isset($samples['stale_bar'])) $samples['stale_bar'] = "{$tid}@{$d}: same close+vol as {$prev}";
+                    }
                 }
 
-                // Rule 5: price out of bounds
-                if ($c !== null && ($c < 10 || $c > 500000)) {
-                    $counts['price_out_of_bounds']++; $softFlags++;
-                    if (!isset($samples['price_out_of_bounds'])) $samples['price_out_of_bounds'] = "{$tid}@{$d}: close={$c}";
+                // Rule: flat bar
+                $isFlat = ($o !== null && $h !== null && $l !== null && $c !== null && $o == $h && $h == $l && $l == $c);
+                if ($isFlat) {
+                    $counts['flat_bar']++; $softFlags++;
+                    if (!isset($samples['flat_bar'])) $samples['flat_bar'] = "{$tid}@{$d}: flat";
+
+                    // Repeat heuristic: flat today AND (close == prev close) AND prevPrev close == prev close
+                    // -> indicates "berkep" (flat streak).
+                    $ppClose = $prevPrevMap[$tid]['close'] ?? null;
+                    if ($prevClose !== null && $c == $prevClose && $ppClose !== null && $ppClose == $prevClose) {
+                        $counts['flat_repeat']++; $softFlags++;
+                        $flatRepeatDay++;
+                        if (!isset($samples['flat_repeat'])) $samples['flat_repeat'] = "{$tid}@{$d}: flat streak (>=3 days)";
+                    }
                 }
             }
 
-            // Soft HOLD heuristics (mass issues)
+            if ($hold) break;
+
+            // Optional HOLD if massive anomaly in 1 day
             if (!$hold && $expectedTickers > 0) {
-                if ($missingVolDay / $expectedTickers >= 0.30) {
-                    $hold = true; $holdReason = "volume_missing_mass@{$d}";
-                } elseif ($gapExtremeDay / $expectedTickers >= 0.05) {
-                    $hold = true; $holdReason = "gap_extreme_mass@{$d}";
+                $gapRatio = $gapExtremeDay / $expectedTickers;
+                $staleRatio = $staleDay / $expectedTickers;
+                $flatRepeatRatio = $flatRepeatDay / $expectedTickers;
+
+                // Gap extreme mass -> suspicious feed/split not handled
+                if ($gapRatio >= 0.05) {
+                    $hold = true;
+                    $holdReason = "gap_extreme_mass@{$d}";
+                }
+                // Stale mass -> data stuck
+                elseif ($staleRatio >= 0.30) {
+                    $hold = true;
+                    $holdReason = "stale_mass@{$d}";
+                }
+                // Flat repeat mass -> data stuck
+                elseif ($flatRepeatRatio >= 0.10) {
+                    $hold = true;
+                    $holdReason = "flat_repeat_mass@{$d}";
                 }
             }
 
@@ -158,9 +208,9 @@ final class SoftQualityRulesService
         }
 
         return [
-            'soft_flags' => $softFlags,
+            'soft_flags' => (int) $softFlags,
             'rule_counts' => $counts,
-            'hold' => $hold,
+            'hold' => (bool) $hold,
             'hold_reason' => $holdReason,
             'samples' => $samples,
         ];
