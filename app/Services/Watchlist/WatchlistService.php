@@ -3,6 +3,7 @@
 namespace App\Services\Watchlist;
 
 use App\Repositories\WatchlistRepository;
+use App\Repositories\MarketData\CandidateValidationRepository;
 use App\Services\Trade\TradePlanService;
 use App\Trade\Explain\ReasonCatalog;
 
@@ -11,15 +12,18 @@ class WatchlistService
     private WatchlistRepository $watchRepo;
     private TradePlanService $planService;
     private WatchlistPipelineFactory $factory;
+    private CandidateValidationRepository $valRepo;
 
     public function __construct(
         WatchlistRepository $watchRepo, 
         TradePlanService $planService,
-        WatchlistPipelineFactory $factory
+        WatchlistPipelineFactory $factory,
+        CandidateValidationRepository $valRepo
     ) {
         $this->watchRepo = $watchRepo;
         $this->planService = $planService;
         $this->factory = $factory;
+        $this->valRepo = $valRepo;
     }
 
     public function preopenRaw(): array
@@ -51,6 +55,37 @@ class WatchlistService
         
         $grouped = $pipe->grouper->group($rows);
         $eodDate = $rows[0]['tradeDate'] ?? null;
+
+        // Phase 7: attach cached validator result (EODHD) for recommended picks (top_picks).
+        // No external API call here. Data is populated via market-data:validate-eod.
+        if ($eodDate && !empty($grouped['groups']['top_picks'])) {
+            $codes = [];
+            foreach ((array) $grouped['groups']['top_picks'] as $r) {
+                if (is_array($r) && !empty($r['code'])) $codes[] = (string) $r['code'];
+            }
+
+            try {
+                $map = $this->valRepo->mapByDateAndCodes((string) $eodDate, $codes, 'EODHD');
+            } catch (\Throwable $e) {
+                $map = [];
+            }
+
+            if ($map) {
+                $newTop = [];
+                foreach ((array) $grouped['groups']['top_picks'] as $r) {
+                    if (!is_array($r)) {
+                        $newTop[] = $r;
+                        continue;
+                    }
+                    $code = strtoupper((string) ($r['code'] ?? ''));
+                    if ($code !== '' && isset($map[$code])) {
+                        $r['validator'] = $map[$code];
+                    }
+                    $newTop[] = $r;
+                }
+                $grouped['groups']['top_picks'] = $newTop;
+            }
+        }
 
         $grouped['meta'] = array_merge($grouped['meta'] ?? [], [
             'top_picks_max'   => (int) config('trade.watchlist.top_picks_max', 5),

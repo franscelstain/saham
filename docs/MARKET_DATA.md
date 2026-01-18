@@ -377,3 +377,20 @@ Output:
 RAW + flag boleh. Canonical harus bersih.
 
 ---
+
+## 16) Phase 7 — Validator Subset untuk Kandidat (EODHD)
+
+Tujuan: EODHD dipakai otomatis untuk ticker yang benar-benar mau dieksekusi (recommended picks), bukan manual input.
+
+Konsep:
+- Validasi hanya subset (top picks) agar sesuai limit API calls/hari.
+- Hasil validasi disimpan agar UI bisa menampilkan badge tanpa refetch.
+
+Cara pakai:
+- Jalankan validasi subset (auto ambil dari watchlist top_picks):
+  - `php artisan market-data:validate-eod --date=YYYY-MM-DD`
+  - atau tanpa `--date` (akan pakai latest eod_date dari watchlist)
+- Hasil akan upsert ke tabel `md_candidate_validations` (jika migration sudah dijalankan).
+- Endpoint watchlist akan attach field `validator` untuk item di grup `top_picks` (jika data tersedia).
+
+---

@@ -4,6 +4,9 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\MarketData\ValidateEodService;
+use App\Services\Watchlist\WatchlistService;
+use App\Repositories\MarketData\CandidateValidationRepository;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * market-data:validate-eod
@@ -22,6 +25,7 @@ final class MarketDataValidateEod extends Command
         {--tickers= : Comma-separated ticker codes (ex: BBCA,BBRI)}
         {--max= : Max tickers to validate (override cap, still limited by config/provider)}
         {--run_id= : Optional canonical run_id override}
+        {--save=1 : Persist results into md_candidate_validations if table exists}
     ';
 
     protected $description = 'Validate canonical EOD against validator provider (EODHD) for subset tickers';
@@ -29,10 +33,18 @@ final class MarketDataValidateEod extends Command
     /** @var ValidateEodService */
     private $svc;
 
-    public function __construct(ValidateEodService $svc)
+    /** @var WatchlistService */
+    private $watchSvc;
+
+    /** @var CandidateValidationRepository */
+    private $valRepo;
+
+    public function __construct(ValidateEodService $svc, WatchlistService $watchSvc, CandidateValidationRepository $valRepo)
     {
         parent::__construct();
         $this->svc = $svc;
+        $this->watchSvc = $watchSvc;
+        $this->valRepo = $valRepo;
     }
 
     public function handle(): int
@@ -41,12 +53,33 @@ final class MarketDataValidateEod extends Command
         $tickersOpt = $this->option('tickers') ? (string) $this->option('tickers') : '';
         $max = $this->option('max') !== null ? (int) $this->option('max') : null;
         $runId = $this->option('run_id') !== null ? (int) $this->option('run_id') : null;
+        $save = $this->option('save') !== null ? (int) $this->option('save') : 1;
 
         $tickers = [];
         if ($tickersOpt !== '') {
             foreach (explode(',', $tickersOpt) as $t) {
                 $t = strtoupper(trim($t));
                 if ($t !== '') $tickers[] = $t;
+            }
+        }
+
+        // Phase 7: automatic tickers source
+        // If user doesn't pass --tickers, take from watchlist top picks (recommended picks) to avoid manual input.
+        if (!$tickers) {
+            $wl = $this->watchSvc->preopenRaw();
+            $wlDate = (string) ($wl['eod_date'] ?? '');
+
+            // If user didn't pass --date, default to watchlist latest eod_date.
+            if (trim($date) === '' && $wlDate !== '') {
+                $date = $wlDate;
+            }
+
+            $groups = (array) ($wl['groups'] ?? []);
+            $top = (array) ($groups['top_picks'] ?? []);
+            foreach ($top as $row) {
+                if (!is_array($row)) continue;
+                $code = strtoupper(trim((string) ($row['code'] ?? '')));
+                if ($code !== '') $tickers[] = $code;
             }
         }
 
@@ -107,6 +140,12 @@ final class MarketDataValidateEod extends Command
             }
 
             $this->table(['Ticker', 'Status', 'Close(primary)', 'Close(validator)', 'Diff %', 'Err'], $table);
+        }
+
+        // Persist results (optional) to avoid re-calling validator when rendering UI.
+        if ($save === 1 && $rows && Schema::hasTable('md_candidate_validations')) {
+            $saved = $this->valRepo->upsertFromValidateRows((string) ($summary['trade_date'] ?? $date), $rows);
+            $this->line('saved_rows: ' . $saved);
         }
 
         // Exit code: fail if hard mismatch or validator error exists
