@@ -180,9 +180,16 @@ class ComputeEodService
 
             // SRP_Performa: heavy per-bar compute lives in calculator (domain).
             // Service tetap bertanggung jawab atas logging, batching upsert, dan summary.
-            $calc = $this->calculator->onInvalidBarOnTradeDate(function (array $ctx) use ($log) {
-                $log->warning('compute_eod.invalid_canonical_bar', $ctx);
-            });
+            $calc = $this->calculator
+                ->onInvalidBarOnTradeDate(function (array $ctx) use ($log) {
+                    $log->warning('compute_eod.invalid_canonical_bar', $ctx);
+                })
+                ->onInsufficientWindowOnTradeDate(function (array $ctx) use ($log) {
+                    $log->warning('compute_eod.insufficient_window', $ctx);
+                })
+                ->onCorporateActionOnTradeDate(function (array $ctx) use ($log) {
+                    $log->warning('compute_eod.corporate_action_detected', $ctx);
+                });
 
             $seenOnDate = [];
             $invalidOnDate = [];

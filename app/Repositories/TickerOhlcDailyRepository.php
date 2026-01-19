@@ -44,6 +44,8 @@ class TickerOhlcDailyRepository
                 'od.close',
                 'od.adj_close',
                 'od.volume',
+                'od.ca_event',
+                'od.ca_hint',
             ])
             ->orderBy('od.ticker_id')
             ->orderBy('od.trade_date');
