@@ -84,7 +84,7 @@ class WatchlistAllocationEngine
     public function buildActionPlan(array $topPicksRows, string $dow, ?float $capitalTotal = null): array
     {
         // NOTE:
-        // Output meta.recommendations sekarang mendukung banyak strategi (ranked).
+        // Output recommendations sekarang mendukung banyak strategi (ranked).
         // Field lama (mode/positions/split/buy_plan) tetap ada untuk kompatibilitas,
         // dan merepresentasikan strategi #1 (paling ideal).
         $base = [
@@ -468,6 +468,15 @@ class WatchlistAllocationEngine
                     'estimated_cost' => $est,
                     'remaining_cash' => $remaining,
 
+                    'eod_open' => isset($row['open']) && is_numeric($row['open']) ? (float)$row['open'] : null,
+                    'eod_high' => isset($row['high']) && is_numeric($row['high']) ? (float)$row['high'] : null,
+                    'eod_low' => isset($row['low']) && is_numeric($row['low']) ? (float)$row['low'] : null,
+                    'eod_close' => isset($row['close']) && is_numeric($row['close']) ? (float)$row['close'] : null,
+                    'eod_volume' => isset($row['volume']) && is_numeric($row['volume']) ? (int)$row['volume'] : null,
+                    'decision_label' => (string)($row['decision_label'] ?? ''),
+                    'signal_label' => (string)($row['signal_label'] ?? ''),
+                    'volume_label' => (string)($row['volume_label'] ?? ''),
+
                     'timing_summary' => (string)($row['timing_summary'] ?? ''),
                     'pre_buy_checklist' => (array)($row['pre_buy_checklist'] ?? []),
                     'entry_windows' => (array)($row['entry_windows'] ?? []),
@@ -501,6 +510,15 @@ class WatchlistAllocationEngine
                 'lots' => null,
                 'estimated_cost' => null,
                 'remaining_cash' => null,
+
+                'eod_open' => isset($row['open']) && is_numeric($row['open']) ? (float)$row['open'] : null,
+                'eod_high' => isset($row['high']) && is_numeric($row['high']) ? (float)$row['high'] : null,
+                'eod_low' => isset($row['low']) && is_numeric($row['low']) ? (float)$row['low'] : null,
+                'eod_close' => isset($row['close']) && is_numeric($row['close']) ? (float)$row['close'] : null,
+                'eod_volume' => isset($row['volume']) && is_numeric($row['volume']) ? (int)$row['volume'] : null,
+                'decision_label' => (string)($row['decision_label'] ?? ''),
+                'signal_label' => (string)($row['signal_label'] ?? ''),
+                'volume_label' => (string)($row['volume_label'] ?? ''),
 
                 'timing_summary' => (string)($row['timing_summary'] ?? ''),
                 'pre_buy_checklist' => (array)($row['pre_buy_checklist'] ?? []),

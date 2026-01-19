@@ -148,12 +148,10 @@ class WatchlistService
         $recommendations = $this->alloc->buildActionPlan((array)($groups['top_picks'] ?? []), $dow ?: '', $capital);
 
         $meta = array_merge($grouped['meta'] ?? [], [
-            'as_of_date' => $eodDate,
             'generated_at' => Carbon::now(config('trade.clock.timezone', 'Asia/Jakarta'))->toIso8601String(),
             'dow' => $dow,
             'market_regime' => 'neutral',
             'market_notes' => 'market_regime belum tersedia di build ini (default neutral).',
-            'recommendations' => $recommendations,
         ]);
 
         return [
@@ -161,6 +159,7 @@ class WatchlistService
             'eod_date' => $eodDate,
             'groups'   => $groups,
             'meta'     => $meta,
+            'recommendations' => $recommendations,
         ];
     }
 
