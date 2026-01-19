@@ -93,8 +93,10 @@ final class SoftQualityRulesService
             $prevPrev = $prev ? $this->cal->previousTradingDate($prev) : null;
 
             $tickerIds = array_map(function ($r) { return (int) $r->ticker_id; }, $rows);
-            $prevMap = $prev ? $this->ohlc->mapPrevCloseVolume($prev, $tickerIds) : [];
-            $prevPrevMap = $prevPrev ? $this->ohlc->mapPrevCloseVolume($prevPrev, $tickerIds) : [];
+            // perf: load prev+prevPrev in one query instead of two
+            $ctx = $this->ohlc->mapCloseVolumeByDates(array_values(array_filter([$prev, $prevPrev])), $tickerIds);
+            $prevMap = $prev ? ($ctx[$prev] ?? []) : [];
+            $prevPrevMap = $prevPrev ? ($ctx[$prevPrev] ?? []) : [];
 
             $gapExtremeDay = 0;
             $staleDay = 0;

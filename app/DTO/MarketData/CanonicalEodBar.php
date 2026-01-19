@@ -23,12 +23,6 @@ final class CanonicalEodBar
     public $adjClose;
     /** @var ?int */
     public $volume;
-    /** @var ?string */
-    public $priceBasis;
-    /** @var ?float */
-    public $priceUsed;
-    /** @var ?string */
-    public $caEvent;
 
     public static function fromObject(object $r): self
     {
@@ -41,9 +35,6 @@ final class CanonicalEodBar
         $o->close = $r->close !== null ? (float) $r->close : null;
         $o->adjClose = $r->adj_close !== null ? (float) $r->adj_close : null;
         $o->volume = $r->volume !== null ? (int) $r->volume : null;
-        $o->priceBasis = $r->price_basis !== null ? (string) $r->price_basis : null;
-        $o->priceUsed = $r->price_used !== null ? (float) $r->price_used : null;
-        $o->caEvent = $r->ca_event !== null ? (string) $r->ca_event : null;
         return $o;
     }
 
@@ -58,9 +49,6 @@ final class CanonicalEodBar
             'close' => $this->close,
             'adj_close' => $this->adjClose,
             'volume' => $this->volume,
-            'price_basis' => $this->priceBasis,
-            'price_used' => $this->priceUsed,
-            'ca_event' => $this->caEvent,
         ];
     }
 }

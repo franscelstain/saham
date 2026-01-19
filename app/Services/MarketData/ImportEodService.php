@@ -199,7 +199,44 @@ final class ImportEodService
 
         $tickerChunks = array_chunk($tickerRows, max(1, $chunkSize));
 
+        // perf: fetch per-provider in parallel per chunk (still 1 req per symbol, but concurrent)
+        $poolConc = max(1, (int) config('trade.perf.http_pool', 15));
+
         foreach ($tickerChunks as $chunk) {
+            // Prefetch results for this chunk to avoid serial HTTP per ticker.
+            // prefetch[source] = ['symByTid' => [tid=>symbol], 'resBySym' => [symbol=>ProviderFetchResult]]
+            $prefetch = [];
+
+            foreach ($this->providersByName as $src => $provider) {
+                $symByTid = [];
+                $symbols = [];
+
+                foreach ($chunk as $t) {
+                    $tid = (int) $t['ticker_id'];
+                    $tcode = (string) $t['ticker_code'];
+                    $symbol = $provider->mapTickerCodeToSymbol($tcode);
+                    $symByTid[$tid] = $symbol;
+                    if ($symbol !== '') $symbols[] = $symbol;
+                }
+
+                $symbols = array_values(array_unique($symbols));
+
+                // provider may implement fetchMany(...) for concurrency.
+                if (method_exists($provider, 'fetchMany')) {
+                    $resBySym = $provider->fetchMany($symbols, $fromEff, $toEff, $poolConc);
+                } else {
+                    $resBySym = [];
+                    foreach ($symbols as $symbol) {
+                        $resBySym[$symbol] = $provider->fetch($symbol, $fromEff, $toEff);
+                    }
+                }
+
+                $prefetch[$src] = [
+                    'symByTid' => $symByTid,
+                    'resBySym' => $resBySym,
+                ];
+            }
+
             foreach ($chunk as $t) {
                 $tid = (int) $t['ticker_id'];
                 $tcode = (string) $t['ticker_code'];
@@ -209,8 +246,8 @@ final class ImportEodService
                 $candidates = [];
 
                 foreach ($this->providersByName as $src => $provider) {
-                    $symbol = $provider->mapTickerCodeToSymbol($tcode);
-                    $res = $provider->fetch($symbol, $fromEff, $toEff);
+                    $symbol = $prefetch[$src]['symByTid'][$tid] ?? $provider->mapTickerCodeToSymbol($tcode);
+                    $res = $prefetch[$src]['resBySym'][$symbol] ?? $provider->fetch($symbol, $fromEff, $toEff);
 
                     if ($res->errorCode) {
                         $provErr[$src] = ($provErr[$src] ?? 0) + 1;

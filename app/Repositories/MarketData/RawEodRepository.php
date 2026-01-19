@@ -32,6 +32,8 @@ class RawEodRepository
         return DB::table('md_raw_eod')
             ->selectRaw('ticker_id, trade_date, COUNT(DISTINCT source) AS sources, MIN(`close`) AS min_close, MAX(`close`) AS max_close')
             ->where('run_id', $runId)
+            // Only compare sources that passed hard gate. Invalid rows create noise + waste time.
+            ->where('hard_valid', 1)
             ->whereNotNull('close')
             ->groupBy('ticker_id', 'trade_date')
             ->havingRaw('COUNT(DISTINCT source) >= 2')

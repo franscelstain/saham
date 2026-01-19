@@ -41,6 +41,7 @@ class CreateMdRawEodTable extends Migration
 
             $table->unique(['run_id','ticker_id','trade_date','source'], 'uq_md_raw_run_ticker_date_source');
             $table->index(['run_id', 'ticker_id','trade_date'], 'idx_md_raw_run_ticker_date');
+            $table->index(['run_id', 'hard_valid', 'ticker_id', 'trade_date'], 'idx_md_raw_run_valid_ticker_date');
             $table->index(['source','trade_date'], 'idx_md_raw_source_date');
         });
     }

@@ -95,6 +95,39 @@ class TickerOhlcDailyRepository
         return $map;
     }
 
+    /**
+     * Bulk load close+volume map for multiple dates in a single query.
+     *
+     * @param array<int,string> $dates
+     * @param array<int,int> $tickerIds
+     * @return array<string,array<int,array{close:?float,volume:?int}>>
+     */
+    public function mapCloseVolumeByDates(array $dates, array $tickerIds): array
+    {
+        $dates = array_values(array_unique(array_filter(array_map('strval', $dates))));
+        if (!$dates || !$tickerIds) return [];
+
+        $rows = DB::table('ticker_ohlc_daily')
+            ->select('trade_date', 'ticker_id', 'close', 'volume')
+            ->whereIn('trade_date', $dates)
+            ->whereIn('ticker_id', $tickerIds)
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $d = (string) $r->trade_date;
+            $tid = (int) $r->ticker_id;
+
+            if (!isset($out[$d])) $out[$d] = [];
+            $out[$d][$tid] = [
+                'close' => $r->close !== null ? (float) $r->close : null,
+                'volume' => $r->volume !== null ? (int) $r->volume : null,
+            ];
+        }
+
+        return $out;
+    }
+
     public function upsertCaHints(array $rows): void
     {
         if (!$rows) return;

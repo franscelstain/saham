@@ -35,6 +35,7 @@ class CreateMdCanonicalEodTable extends Migration
             $table->timestamp('built_at')->useCurrent();
 
             $table->unique(['run_id', 'ticker_id', 'trade_date'], 'uq_md_can_run_ticker_date');
+            $table->index(['run_id', 'trade_date'], 'idx_md_can_run_date');
             $table->index(['trade_date','chosen_source'], 'idx_md_can_date_source');
             $table->index(['ticker_id', 'trade_date'], 'idx_md_can_ticker_date');
         });
