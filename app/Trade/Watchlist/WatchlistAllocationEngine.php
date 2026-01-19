@@ -99,6 +99,8 @@ class WatchlistAllocationEngine
             'entry_rule' => 'LIMIT_ONLY',
             'entry_slices' => 2,
             'slice_plan' => ['60% di entry, 40% saat konfirmasi (hold/break).'],
+            'timing_summary_default' => '',
+            'pre_buy_checklist_default' => [],
             'capital_total' => $capitalTotal,
             'reserve_cash_pct' => 0.03,
             'buy_plan' => [],
@@ -144,6 +146,10 @@ class WatchlistAllocationEngine
         if (!empty($first['entry_style'])) {
             $base['entry_rule'] = (string)$first['entry_style'];
         }
+
+        // Defaults (dipakai jika strategy tidak override)
+        $base['timing_summary_default'] = $this->buildDefaultTimingSummary((array)$base['entry_windows'], (array)$base['avoid_windows'], (string)$base['entry_rule'], (int)$base['entry_slices']);
+        $base['pre_buy_checklist_default'] = $this->buildDefaultChecklist();
 
         // Build ranked strategies (BUY_3, BUY_2, BUY_1) based on top_picks.
         $strategies = $this->buildStrategies($topPicksRows, $dow, $capitalTotal, (array)$base['entry_windows'], (array)$base['avoid_windows'], (string)$base['entry_rule'], (float)$base['reserve_cash_pct']);
@@ -246,6 +252,9 @@ class WatchlistAllocationEngine
 
         $rankScore = $this->scoreStrategy($rows, $split, 1);
 
+        $timingSummary = $this->buildStrategyTimingSummary(1, $entryWindows, $avoidWindows, $entryRule, $split);
+        $checklist = $this->buildStrategyChecklist(1, $split);
+
         return [
             'strategy_id' => 'S1',
             'label' => 'BUY_1_ONLY',
@@ -256,6 +265,8 @@ class WatchlistAllocationEngine
             'entry_windows' => $entryWindows,
             'avoid_windows' => $avoidWindows,
             'entry_rule' => $entryRule,
+            'timing_summary' => $timingSummary,
+            'pre_buy_checklist' => $checklist,
             'rank_score' => $rankScore,
             'why' => $why,
             'risk_flags' => $this->collectRiskFlags($rows, $split),
@@ -300,6 +311,9 @@ class WatchlistAllocationEngine
 
         $rankScore = $this->scoreStrategy($rows, $split, 2);
 
+        $timingSummary = $this->buildStrategyTimingSummary(2, $entryWindows, $avoidWindows, $entryRule, $split);
+        $checklist = $this->buildStrategyChecklist(2, $split);
+
         return [
             'strategy_id' => 'S2',
             'label' => 'BUY_2_SPLIT',
@@ -310,6 +324,8 @@ class WatchlistAllocationEngine
             'entry_windows' => $entryWindows,
             'avoid_windows' => $avoidWindows,
             'entry_rule' => $entryRule,
+            'timing_summary' => $timingSummary,
+            'pre_buy_checklist' => $checklist,
             'rank_score' => $rankScore,
             'why' => $why,
             'risk_flags' => $this->collectRiskFlags($rows, $split),
@@ -363,6 +379,9 @@ class WatchlistAllocationEngine
 
         $rankScore = $this->scoreStrategy($rows, $split, 3);
 
+        $timingSummary = $this->buildStrategyTimingSummary(3, $entryWindows, $avoidWindows, $entryRule, $split);
+        $checklist = $this->buildStrategyChecklist(3, $split);
+
         return [
             'strategy_id' => 'S3',
             'label' => 'BUY_3_SPLIT',
@@ -373,6 +392,8 @@ class WatchlistAllocationEngine
             'entry_windows' => $entryWindows,
             'avoid_windows' => $avoidWindows,
             'entry_rule' => $entryRule,
+            'timing_summary' => $timingSummary,
+            'pre_buy_checklist' => $checklist,
             'rank_score' => $rankScore,
             'why' => $why,
             'risk_flags' => $this->collectRiskFlags($rows, $split),
@@ -447,6 +468,11 @@ class WatchlistAllocationEngine
                     'estimated_cost' => $est,
                     'remaining_cash' => $remaining,
 
+                    'timing_summary' => (string)($row['timing_summary'] ?? ''),
+                    'pre_buy_checklist' => (array)($row['pre_buy_checklist'] ?? []),
+                    'entry_windows' => (array)($row['entry_windows'] ?? []),
+                    'avoid_windows' => (array)($row['avoid_windows'] ?? []),
+
                     'execution_style' => $exec['execution_style'],
                     'entry_slices' => $exec['entry_slices'],
                     'slice_pcts' => $exec['slice_pcts'],
@@ -475,6 +501,11 @@ class WatchlistAllocationEngine
                 'lots' => null,
                 'estimated_cost' => null,
                 'remaining_cash' => null,
+
+                'timing_summary' => (string)($row['timing_summary'] ?? ''),
+                'pre_buy_checklist' => (array)($row['pre_buy_checklist'] ?? []),
+                'entry_windows' => (array)($row['entry_windows'] ?? []),
+                'avoid_windows' => (array)($row['avoid_windows'] ?? []),
 
                 'execution_style' => $exec['execution_style'],
                 'entry_slices' => $exec['entry_slices'],
@@ -725,6 +756,75 @@ class WatchlistAllocationEngine
         }
 
         return $parts;
+    }
+
+
+
+    private function buildDefaultTimingSummary(array $entryWindows, array $avoidWindows, string $entryRule, int $entrySlices): string
+    {
+        $ew = implode(' & ', array_map('strval', $entryWindows));
+        $aw = implode(', ', array_map('strval', $avoidWindows));
+        $rule = strtoupper(trim($entryRule ?: 'LIMIT_ONLY'));
+        $slices = max(1, $entrySlices);
+
+        $parts = [];
+        if ($ew !== '') $parts[] = 'Entry ideal: ' . $ew . '.';
+        if ($aw !== '') $parts[] = 'Hindari: ' . $aw . '.';
+        $parts[] = 'Rule: ' . $rule . '.';
+        if ($slices > 1) $parts[] = 'Entry bertahap (' . $slices . 'x).';
+
+        return trim(implode(' ', $parts));
+    }
+
+    private function buildDefaultChecklist(): array
+    {
+        return [
+            'Cek spread & antrian bid/ask (hindari spread melebar).',
+            'Gunakan limit order (jangan chasing).',
+            'Pasang SL otomatis sesuai plan (jangan ditunda).',
+        ];
+    }
+
+    private function buildStrategyTimingSummary(int $positions, array $entryWindows, array $avoidWindows, string $entryRule, array $split): string
+    {
+        $base = $this->buildDefaultTimingSummary($entryWindows, $avoidWindows, $entryRule, 2);
+
+        if ($positions <= 1) {
+            return $base . ' Fokus 1 posisi, eksekusi lebih presisi.';
+        }
+
+        // Dominant ticker (alloc terbesar)
+        $dom = null;
+        $domPct = 0.0;
+        foreach ($split as $s) {
+            $pct = (float)($s['alloc_pct'] ?? 0);
+            if ($pct > $domPct) {
+                $domPct = $pct;
+                $dom = (string)($s['ticker'] ?? null);
+            }
+        }
+        $domNote = $dom ? (' Prioritaskan ' . $dom . ' lebih dulu.') : '';
+
+        if ($positions >= 3) {
+            return $base . ' Eksekusi 3 posisi: jangan paksa semua entry di menit yang sama.' . $domNote;
+        }
+
+        return $base . ' Eksekusi 2 posisi: entry bertahap, jaga disiplin sizing.' . $domNote;
+    }
+
+    private function buildStrategyChecklist(int $positions, array $split): array
+    {
+        $items = $this->buildDefaultChecklist();
+
+        if ($positions >= 2) {
+            $items[] = 'Jangan entry bersamaan; eksekusi satu per satu untuk kontrol spread.';
+            $items[] = 'Pastikan sisa cash buffer cukup (fee/slippage + antisipasi average).';
+        }
+        if ($positions >= 3) {
+            $items[] = 'Jika 1 ticker tidak valid (spread/gap jelek), skip ticker itu—jangan memaksa 3 posisi.';
+        }
+
+        return array_values(array_unique($items));
     }
 
     private function findRowByTicker(array $rows, string $ticker): ?array
