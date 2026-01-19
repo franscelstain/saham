@@ -16,13 +16,13 @@ final class CanonicalPick
     /** @var string[] */
     public $flags;
 
-    /** @var MdEodBar */
+    /** @var EodBar */
     public $bar;
 
     /**
      * @param string[] $flags
      */
-    public function __construct(string $tradeDate, string $chosenSource, string $reason, array $flags, MdEodBar $bar)
+    public function __construct(string $tradeDate, string $chosenSource, string $reason, array $flags, EodBar $bar)
     {
         $this->tradeDate = $tradeDate;
         $this->chosenSource = $chosenSource;
