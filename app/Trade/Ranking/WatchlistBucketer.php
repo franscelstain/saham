@@ -20,12 +20,18 @@ class WatchlistBucketer
         $score = (float)($row['rankScore'] ?? 0);
         $isExpired = (bool)($row['isExpired'] ?? false);
 
+        // Rule keras: sinyal yang sudah EXPIRED tidak boleh masuk WATCH maupun TOP_PICKS.
+        // Ini mencegah output watchlist jadi noisy dan kontradiktif.
+        if ($isExpired) {
+            return 'AVOID';
+        }
+
         $errors = $row['plan']['errors'] ?? [];
         $hasErrors = !empty($errors);
 
         $rrTp2 = (float)($row['plan']['rrTp2'] ?? 0);
 
-        if (!$isExpired && !$hasErrors && $rrTp2 >= $this->rrMin && $score >= $this->topMin) {
+        if (!$hasErrors && $rrTp2 >= $this->rrMin && $score >= $this->topMin) {
             return 'TOP_PICKS';
         }
 
