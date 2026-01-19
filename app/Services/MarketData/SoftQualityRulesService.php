@@ -155,9 +155,12 @@ final class SoftQualityRulesService
                 }
 
                 // Rule: stale bar (close + volume same as previous trading day)
+                // NOTE:
+                // - Do NOT count volume==0 as "stale". Many IDX tickers legitimately have no trades
+                //   (volume 0) and will repeat last close across days; that's not a feed-stuck signal.
                 $prevVol = $prevMap[$tid]['volume'] ?? null;
                 if ($prevClose !== null && $prevVol !== null && $c !== null && $v !== null) {
-                    if ($c == $prevClose && $v == $prevVol) {
+                    if ($v > 0 && $prevVol > 0 && $c == $prevClose && $v == $prevVol) {
                         $counts['stale_bar']++; $softFlags++;
                         $staleDay++;
                         if (!isset($samples['stale_bar'])) $samples['stale_bar'] = "{$tid}@{$d}: same close+vol as {$prev}";
@@ -173,7 +176,16 @@ final class SoftQualityRulesService
                     // Repeat heuristic: flat today AND (close == prev close) AND prevPrev close == prev close
                     // -> indicates "berkep" (flat streak).
                     $ppClose = $prevPrevMap[$tid]['close'] ?? null;
-                    if ($prevClose !== null && $c == $prevClose && $ppClose !== null && $ppClose == $prevClose) {
+                    $ppVol = $prevPrevMap[$tid]['volume'] ?? null;
+                    // Only count flat-repeat if there were real trades (volume>0) across the streak.
+                    // If volume is 0/null, treat it as illiquid/no-trade, not a feed-stuck signal.
+                    if (
+                        $v !== null && $v > 0 &&
+                        $prevVol !== null && $prevVol > 0 &&
+                        $ppVol !== null && $ppVol > 0 &&
+                        $prevClose !== null && $c == $prevClose &&
+                        $ppClose !== null && $ppClose == $prevClose
+                    ) {
                         $counts['flat_repeat']++; $softFlags++;
                         $flatRepeatDay++;
                         if (!isset($samples['flat_repeat'])) $samples['flat_repeat'] = "{$tid}@{$d}: flat streak (>=3 days)";
@@ -200,7 +212,8 @@ final class SoftQualityRulesService
                     $holdReason = "stale_mass@{$d}";
                 }
                 // Flat repeat mass -> data stuck
-                elseif ($flatRepeatRatio >= 0.10) {
+                // Tolerate higher ratio because many tickers can be illiquid and show flat bars.
+                elseif ($flatRepeatRatio >= 0.15) {
                     $hold = true;
                     $holdReason = "flat_repeat_mass@{$d}";
                 }

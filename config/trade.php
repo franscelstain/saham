@@ -96,9 +96,7 @@ return [
     ],
     'perf' => [
         'ticker_chunk' => env('TRADE_TICKER_CHUNK', 200),
-        // Concurrency default diturunkan agar lebih "aman tapi tetap kenceng" untuk Yahoo (mengurangi 429).
-        // Override via env TRADE_HTTP_POOL bila ingin lebih agresif.
-        'http_pool' => env('TRADE_HTTP_POOL', 10),
+        'http_pool' => env('TRADE_HTTP_POOL', 15),
         'http_timeout' => env('TRADE_HTTP_TIMEOUT', 20),
         'retries' => env('TRADE_HTTP_RETRIES', 2),
         'retry_sleep_ms' => env('TRADE_HTTP_RETRY_SLEEP_MS', 300),

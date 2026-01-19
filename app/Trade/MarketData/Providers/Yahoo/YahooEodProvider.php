@@ -99,17 +99,11 @@ final class YahooEodProvider implements EodProvider
         $sleepMs = (int) ($this->cfg['retry_sleep_ms'] ?? 200);
         $attempts = max(1, $retry + 1);
 
-        // Adaptive concurrency: kalau Yahoo mulai rate-limit (HTTP 429), turunkan concurrency otomatis
-        // dan hormati header Retry-After bila ada.
-        $curConc = max(1, (int) $concurrency);
-
         $pending = $symbols;
         for ($attempt = 1; $attempt <= $attempts; $attempt++) {
-            $tmp = $this->fetchManyOnce($pending, $from, $to, $curConc);
+            $tmp = $this->fetchManyOnce($pending, $from, $to, $concurrency);
 
             $next = [];
-            $rateLimited = 0;
-            $maxRetryAfterMs = 0;
             foreach ($pending as $sym) {
                 $res = $tmp[$sym] ?? new ProviderFetchResult([], 'NO_RESULT', 'No result');
 
@@ -124,15 +118,6 @@ final class YahooEodProvider implements EodProvider
                     || (strpos((string) $code, 'HTTP_5') === 0)
                     || $code === 'HTTP_429';
 
-                if ($code === 'HTTP_429') {
-                    $rateLimited++;
-                    // Parse "Retry-After" hint dari message (dibentuk di fetchManyOnce())
-                    $msg = (string) ($res->errorMessage ?? '');
-                    if (preg_match('/Retry-After\s*=\s*(\d+)/i', $msg, $m)) {
-                        $maxRetryAfterMs = max($maxRetryAfterMs, ((int) $m[1]) * 1000);
-                    }
-                }
-
                 if ($transient && $attempt < $attempts) {
                     $next[] = $sym;
                 } else {
@@ -143,18 +128,7 @@ final class YahooEodProvider implements EodProvider
             $pending = $next;
             if (!$pending) break;
 
-            // Kalau banyak 429, turunkan concurrency untuk wave berikutnya agar tetap jalan.
-            // Faktor 0.6 cukup agresif untuk cepat keluar dari rate-limit.
-            if ($rateLimited > 0) {
-                $curConc = max(1, (int) floor($curConc * 0.6));
-            }
-
-            // Sleep: gunakan max(retry_sleep_ms, Retry-After bila ada), tambah jitter kecil.
-            $baseSleep = max(0, (int) $sleepMs);
-            $sleep = max($baseSleep, (int) $maxRetryAfterMs);
-            $jitter = $sleep > 0 ? random_int(0, min(250, $sleep)) : 0; // <= 250ms
-
-            usleep(($sleep + $jitter) * 1000);
+            usleep(max(0, $sleepMs) * 1000);
         }
 
         // Ensure all symbols are present in output
@@ -210,14 +184,6 @@ final class YahooEodProvider implements EodProvider
 
                 $code = (int) $response->getStatusCode();
                 $body = (string) $response->getBody();
-
-                // Yahoo rate limit: simpan hint Retry-After untuk backoff wave berikutnya.
-                if ($code === 429) {
-                    $ra = trim((string) $response->getHeaderLine('Retry-After'));
-                    $msg = $ra !== '' ? ('Rate limited (Retry-After=' . $ra . 's)') : 'Rate limited (HTTP 429)';
-                    $out[$symbol] = new ProviderFetchResult([], 'HTTP_429', $msg);
-                    return;
-                }
 
                 $out[$symbol] = $this->parseYahooResponse($symbol, $code, $body);
             },
