@@ -8,6 +8,9 @@
 return [
     'compute_eod' => [
         'upsert_batch_size' => env('TRADE_EOD_UPSERT_BATCH_SIZE', 500),
+        // extra warmup trading days untuk memastikan indikator (RSI/ATR/MA) stabil saat compute di trade_date.
+        // default 60 trading days.
+        'warmup_extra_trading_days' => env('TRADE_EOD_WARMUP_EXTRA_TRADING_DAYS', 60),
     ],
     'clock' => [
         'timezone'    => env('TRADE_EOD_TZ', 'Asia/Jakarta'),

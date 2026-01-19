@@ -6,6 +6,7 @@ use App\Repositories\MarketCalendarRepository;
 use App\Repositories\TickerIndicatorsDailyRepository;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Services\MarketData\PriceBasisPolicy;
+use App\Trade\Compute\Config\ComputeEodPolicy;
 use App\Trade\Compute\Classifiers\DecisionClassifier;
 use App\Trade\Compute\Classifiers\PatternClassifier;
 use App\Trade\Compute\Classifiers\VolumeLabelClassifier;
@@ -32,6 +33,7 @@ class ComputeEodService
 
     private EodDateResolver $dateResolver;
     private PriceBasisPolicy $basisPolicy;
+    private ComputeEodPolicy $policy;
 
     public function __construct(
         MarketCalendarRepository $cal,
@@ -42,7 +44,8 @@ class ComputeEodService
         PatternClassifier $pattern,
         SignalAgeTracker $age,
         EodDateResolver $dateResolver,
-        PriceBasisPolicy $basisPolicy
+        PriceBasisPolicy $basisPolicy,
+        ComputeEodPolicy $policy
     ) {
         $this->cal = $cal;
         $this->ohlc = $ohlc;
@@ -55,6 +58,7 @@ class ComputeEodService
 
         $this->dateResolver = $dateResolver;
         $this->basisPolicy = $basisPolicy;
+        $this->policy = $policy;
     }
 
     public function runDate(?string $tradeDate = null, ?string $tickerCode = null, int $chunkSize = 200): array
@@ -116,9 +120,10 @@ class ComputeEodService
 
         $prev = $this->cal->previousTradingDate($date);
 
-        $startDate = Carbon::parse($date, $tz)
-            ->subDays((int) config('trade.indicators.lookback_days', 260) + 60)
-            ->toDateString();
+        // startDate dihitung dari market_calendar (trading days), bukan calendar days.
+        // Tujuan: konsisten terhadap libur/weekend dan lebih sesuai dengan aturan compute_eod.md
+        $lookbackN = $this->policy->lookbackTradingDays + $this->policy->warmupExtraTradingDays;
+        $startDate = $this->cal->lookbackStartDate($date, $lookbackN);
 
         // hanya ticker yang punya OHLC pada $date
         $tickerIds = $this->ohlc->getTickerIdsHavingRowOnDate($date, $tickerCode);
@@ -146,8 +151,7 @@ class ComputeEodService
 
         DB::disableQueryLog();
 
-        $upsertBatchSize = (int) config('trade.compute_eod.upsert_batch_size', 500);
-        if ($upsertBatchSize <= 0) $upsertBatchSize = 500;
+        $upsertBatchSize = max(1, (int) $this->policy->upsertBatchSize);
 
         $chunks = array_chunk($tickerIds, max(1, $chunkSize));
 
