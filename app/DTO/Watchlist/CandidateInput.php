@@ -22,6 +22,10 @@ class CandidateInput
     public float $ma200;
     public float $rsi;
 
+    // volume metrics
+    public ?float $volSma20 = null;
+    public ?float $volRatio = null;
+
     public ?float $atr14 = null;
     public ?float $support20 = null;
     public ?float $resistance20 = null;
@@ -30,6 +34,9 @@ class CandidateInput
 
     public int $volume;
     public float $valueEst;
+
+    // derived (optional)
+    public ?float $prevClose = null;
 
     // expiry
     public ?string $signalFirstSeenDate = null; // 'YYYY-MM-DD'
@@ -63,6 +70,9 @@ class CandidateInput
         $this->ma200                = (float) $row['ma200'];
         $this->rsi                  = (float) $row['rsi14'];
 
+        $this->volSma20             = isset($row['vol_sma20']) ? (float) $row['vol_sma20'] : null;
+        $this->volRatio             = isset($row['vol_ratio']) ? (float) $row['vol_ratio'] : null;
+
         $this->atr14                = isset($row['atr14']) ? (float) $row['atr14'] : null;
         $this->support20            = isset($row['support_20d']) ? (float) $row['support_20d'] : null;
         $this->resistance20         = isset($row['resistance_20d']) ? (float) $row['resistance_20d'] : null;
@@ -70,6 +80,8 @@ class CandidateInput
         $this->scoreTotal           = (int) $row['score_total'];
         $this->valueEst             = (float) $row['value_est'];
         $this->volume               = (int) $row['volume'];
+
+        $this->prevClose            = isset($row['prev_close']) ? (float) $row['prev_close'] : null;
 
         $this->decisionCode         = (int) $row['decision_code'];
         $this->signalCode           = (int) $row['signal_code'];

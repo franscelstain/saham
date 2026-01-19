@@ -22,7 +22,11 @@ class WatchlistSorter
             $l = ($b['valueEst'] ?? 0) <=> ($a['valueEst'] ?? 0);
             if ($l !== 0) return $l;
 
-            return (($b['plan']['rrTp2'] ?? 0) <=> ($a['plan']['rrTp2'] ?? 0));
+            $r = (($b['plan']['rrTp2'] ?? 0) <=> ($a['plan']['rrTp2'] ?? 0));
+            if ($r !== 0) return $r;
+
+            // deterministic tie-breaker
+            return strcmp((string)($a['code'] ?? ''), (string)($b['code'] ?? ''));
         });
     }
 }
