@@ -5,20 +5,11 @@ namespace App\Services\Compute;
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\TickerIndicatorsDailyRepository;
 use App\Repositories\TickerOhlcDailyRepository;
-use App\Services\MarketData\PriceBasisPolicy;
+use App\Trade\Compute\Calculators\EodIndicatorsStreamCalculator;
 use App\Trade\Compute\Config\ComputeEodPolicy;
-use App\Trade\Compute\Classifiers\DecisionClassifier;
-use App\Trade\Compute\Classifiers\PatternClassifier;
-use App\Trade\Compute\Classifiers\VolumeLabelClassifier;
-use App\Trade\Compute\Rolling\RollingAtrWilder;
-use App\Trade\Compute\Rolling\RollingRsiWilder;
-use App\Trade\Compute\Rolling\RollingSma;
-use App\Trade\Compute\SignalAgeTracker;
 use App\Trade\Support\TradeClock;
-use App\Trade\Support\TradePerf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use DateTimeInterface;
 
 class ComputeEodService
 {
@@ -26,39 +17,25 @@ class ComputeEodService
     private TickerOhlcDailyRepository $ohlc;
     private TickerIndicatorsDailyRepository $ind;
 
-    private DecisionClassifier $decision;
-    private VolumeLabelClassifier $volume;
-    private PatternClassifier $pattern;
-    private SignalAgeTracker $age;
+    private EodIndicatorsStreamCalculator $calculator;
 
     private EodDateResolver $dateResolver;
-    private PriceBasisPolicy $basisPolicy;
     private ComputeEodPolicy $policy;
 
     public function __construct(
         MarketCalendarRepository $cal,
         TickerOhlcDailyRepository $ohlc,
         TickerIndicatorsDailyRepository $ind,
-        DecisionClassifier $decision,
-        VolumeLabelClassifier $volume,
-        PatternClassifier $pattern,
-        SignalAgeTracker $age,
         EodDateResolver $dateResolver,
-        PriceBasisPolicy $basisPolicy,
-        ComputeEodPolicy $policy
+        ComputeEodPolicy $policy,
+        EodIndicatorsStreamCalculator $calculator
     ) {
         $this->cal = $cal;
         $this->ohlc = $ohlc;
         $this->ind = $ind;
-
-        $this->decision = $decision;
-        $this->volume = $volume;
-        $this->pattern = $pattern;
-        $this->age = $age;
-
         $this->dateResolver = $dateResolver;
-        $this->basisPolicy = $basisPolicy;
         $this->policy = $policy;
+        $this->calculator = $calculator;
     }
 
     public function runDate(?string $tradeDate = null, ?string $tickerCode = null, int $chunkSize = 200): array
@@ -92,6 +69,13 @@ class ComputeEodService
 
         // Kalau user minta explicit "today" sebelum cutoff -> skip (biar gak compute data yang belum EOD)
         if ($date === $today && TradeClock::isBeforeEodCutoff()) {
+            $log->info('compute_eod.run.skipped', [
+                'requested_date' => $requested,
+                'resolved_trade_date' => $date,
+                'reason' => 'before_cutoff',
+                'ticker_filter' => $tickerCode,
+                'chunk_size' => $chunkSize,
+            ]);
             return [
                 'status' => 'skipped',
                 'requested_date' => $requested,
@@ -108,6 +92,13 @@ class ComputeEodService
 
         // Boleh dijalankan saat libur -> status skipped
         if (!$this->cal->isTradingDay($date)) {
+            $log->info('compute_eod.run.skipped', [
+                'requested_date' => $requested,
+                'resolved_trade_date' => $date,
+                'reason' => 'holiday_or_non_trading_day',
+                'ticker_filter' => $tickerCode,
+                'chunk_size' => $chunkSize,
+            ]);
             return [
                 'status' => 'skipped',
                 'requested_date' => $requested,
@@ -132,7 +123,25 @@ class ComputeEodService
         // hanya ticker yang punya OHLC pada $date
         $tickerIds = $this->ohlc->getTickerIdsHavingRowOnDate($date, $tickerCode);
 
+        $log->info('compute_eod.run.start', [
+            'requested_date' => $requested,
+            'resolved_trade_date' => $date,
+            'prev_trade_date' => $prev,
+            'start_date' => $startDate,
+            'ticker_filter' => $tickerCode,
+            'chunk_size' => $chunkSize,
+            'tickers_in_scope' => count($tickerIds),
+        ]);
+
         if (empty($tickerIds)) {
+            $log->info('compute_eod.run.done', [
+                'requested_date' => $requested,
+                'resolved_trade_date' => $date,
+                'status' => 'ok',
+                'processed' => 0,
+                'skipped_no_row' => 0,
+                'skipped_invalid' => 0,
+            ]);
             return [
                 'status' => 'ok',
                 'requested_date' => $requested,
@@ -169,198 +178,29 @@ class ComputeEodService
 
             $cursor = $this->ohlc->cursorHistoryRange($startDate, $date, $ids);
 
-            $curTicker = null;
-
-            $sma20 = $sma50 = $sma200 = null;
-            $rsi14 = null;
-            $atr14 = null;
-
-            $lows20 = [];
-            $highs20 = [];
-
-            $lastVols20 = [];
-            $sumVol20 = 0.0;
+            // SRP_Performa: heavy per-bar compute lives in calculator (domain).
+            // Service tetap bertanggung jawab atas logging, batching upsert, dan summary.
+            $calc = $this->calculator->onInvalidBarOnTradeDate(function (array $ctx) use ($log) {
+                $log->warning('compute_eod.invalid_canonical_bar', $ctx);
+            });
 
             $seenOnDate = [];
             $invalidOnDate = [];
             $rowsBuffer = [];
 
-            foreach ($cursor as $r) {
-                $tid = (int) $r->ticker_id;
-
-                if ($curTicker !== $tid) {
-                    $curTicker = $tid;
-
-                    $sma20 = new RollingSma(20);
-                    $sma50 = new RollingSma(50);
-                    $sma200 = new RollingSma(200);
-                    $rsi14 = new RollingRsiWilder(14);
-                    $atr14 = new RollingAtrWilder(14);
-
-                    $lows20 = [];
-                    $highs20 = [];
-
-                    $lastVols20 = [];
-                    $sumVol20 = 0.0;
-                }
-
-                // support/resistance exclude today: hitung dari buffer sebelum push bar hari ini
-                $support20 = null;
-                $resist20 = null;
-                if (count($lows20) >= 20)  $support20 = min($lows20);
-                if (count($highs20) >= 20) $resist20  = max($highs20);
-
-                // volSma20Prev (exclude today)
-                $volSma20Prev = null;
-                if (count($lastVols20) >= 20) $volSma20Prev = ($sumVol20 / 20.0);
-
-                // --- Canonical data quality guard
-                // Jangan pernah menganggap null menjadi 0 karena itu merusak indikator secara drastis.
-                // Jika canonical ternyata invalid, skip bar tsb (dan jika itu bar pada $date, skip upsert untuk ticker tsb).
-                if (!$this->isValidBar($r)) {
-                    $rowDate = $this->toDateString($r->trade_date);
-
-                    if ($rowDate === $date) {
-                        $totalSkippedInvalid++;
-                        $invalidOnDate[$tid] = true;
-                        $log->warning('compute_eod.invalid_canonical_bar', [
-                            'trade_date' => $date,
-                            'ticker_id' => (int) $r->ticker_id,
-                            'open' => $r->open,
-                            'high' => $r->high,
-                            'low' => $r->low,
-                            'close' => $r->close,
-                            'adj_close' => $r->adj_close ?? null,
-                            'volume' => $r->volume,
-                        ]);
-                    }
-
-                    // Skip this bar entirely (tidak ikut warmup rolling metrics).
-                    continue;
-                }
-
-                // bar today (real market close)
-                $closeReal = (float) $r->close;
-                $high  = (float) $r->high;
-                $low   = (float) $r->low;
-                $vol   = (float) $r->volume;
-
-                // Phase 5: price basis for indicators
-                $adj = isset($r->adj_close) && $r->adj_close !== null ? (float) $r->adj_close : null;
-                $pick = $this->basisPolicy->pickForIndicators($closeReal, $adj);
-
-                $priceUsed = (float) $pick['price'];
-                $basisUsed = (string) $pick['basis'];
-
-                $sma20->push($priceUsed);
-                $sma50->push($priceUsed);
-                $sma200->push($priceUsed);
-                $rsi14->push($priceUsed);
-
-                // ATR tetap pakai data real
-                $atr14->push($high, $low, $closeReal);
-
-                // update buffers
-                $lows20[] = $low;   if (count($lows20) > 20) array_shift($lows20);
-                $highs20[] = $high; if (count($highs20) > 20) array_shift($highs20);
-
-                $lastVols20[] = $vol;
-                $sumVol20 += $vol;
-                if (count($lastVols20) > 20) {
-                    $out = array_shift($lastVols20);
-                    $sumVol20 -= $out;
-                }
-
-                // hanya upsert row yang trade_date == $date
-                $rowDate = $this->toDateString($r->trade_date);
-                if ($rowDate !== $date) {
-                    continue;
-                }
-
-                $volRatio = null;
-                if ($volSma20Prev !== null && $volSma20Prev > 0) {
-                    $volRatio = round($vol / $volSma20Prev, 4);
-                }
-
-                $metrics = [
-                    'open' => (float) $r->open,
-                    'high' => $high,
-                    'low'  => $low,
-                    'close'=> $closeReal,
-                    'volume' => $vol,
-
-                    'ma20' => $sma20->value(),
-                    'ma50' => $sma50->value(),
-                    'ma200'=> $sma200->value(),
-                    'rsi14'=> $rsi14->value(),
-                    'atr14'=> $atr14->value(),
-
-                    'support_20d' => $support20,
-                    'resistance_20d' => $resist20,
-
-                    'vol_sma20' => $volSma20Prev,
-                    'vol_ratio' => $volRatio,
-                ];
-
-                $signalCode = $this->pattern->classify($metrics);
-                $volumeLabelCode = $this->volume->classify($volRatio);
-
-                // inject context untuk decision
-                $metrics['signal_code'] = $signalCode;
-                $metrics['volume_label'] = $volumeLabelCode;
-
-                $decisionCode = $this->decision->classify($metrics);
-
-                $prevSnap = $prev ? ($prevSnaps[$tid] ?? null) : null;
-                $age = $this->age->computeFromPrev($tid, $date, $signalCode, $prevSnap);
-
-                $row = [
-                    'ticker_id' => $tid,
-                    'trade_date' => $date,
-
-                    'open' => (float) $r->open,
-                    'high' => $high,
-                    'low' => $low,
-                    'close' => $closeReal,
-                    'basis_used' => $basisUsed,
-                    'price_used' => $priceUsed,
-                    'volume' => (int) $r->volume,
-
-                    'ma20' => $metrics['ma20'] !== null ? round($metrics['ma20'], 4) : null,
-                    'ma50' => $metrics['ma50'] !== null ? round($metrics['ma50'], 4) : null,
-                    'ma200'=> $metrics['ma200'] !== null ? round($metrics['ma200'], 4) : null,
-
-                    // kolom rsi14 di DB = decimal(6,2) -> round 2 supaya output stabil dan tidak bergantung rounding DB.
-                    'rsi14' => $metrics['rsi14'] !== null ? round($metrics['rsi14'], 2) : null,
-                    'atr14' => $metrics['atr14'] !== null ? round($metrics['atr14'], 4) : null,
-
-                    'support_20d' => $support20 !== null ? round($support20, 4) : null,
-                    'resistance_20d' => $resist20 !== null ? round($resist20, 4) : null,
-
-                    'vol_sma20' => $volSma20Prev !== null ? round($volSma20Prev, 4) : null,
-                    'vol_ratio' => $volRatio,
-
-                    'decision_code' => $decisionCode,
-                    'signal_code' => $signalCode,
-                    'volume_label_code' => $volumeLabelCode,
-
-                    'signal_first_seen_date' => $age['signal_first_seen_date'],
-                    'signal_age_days' => $age['signal_age_days'],
-
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-
-                $seenOnDate[$tid] = true;
-
+            foreach ($calc->streamRows($cursor, $date, $prevSnaps, $now) as $row) {
                 $rowsBuffer[] = $row;
-                $processed++;
 
                 if (count($rowsBuffer) >= $upsertBatchSize) {
                     $this->ind->upsertMany($rowsBuffer, $upsertBatchSize);
                     $rowsBuffer = [];
                 }
             }
+
+            $processed += $calc->processedCount();
+            $totalSkippedInvalid += $calc->skippedInvalidOnTradeDateCount();
+            $seenOnDate = $calc->seenOnTradeDateMap();
+            $invalidOnDate = $calc->invalidOnTradeDateMap();
 
             if (!empty($rowsBuffer)) {
                 $this->ind->upsertMany($rowsBuffer, $upsertBatchSize);
@@ -374,6 +214,19 @@ class ComputeEodService
             }
             $totalSkippedNoRow += $skippedNoRow;
         }
+
+        $log->info('compute_eod.run.done', [
+            'requested_date' => $requested,
+            'resolved_trade_date' => $date,
+            'status' => 'ok',
+            'ticker_filter' => $tickerCode,
+            'chunk_size' => $chunkSize,
+            'tickers_in_scope' => count($tickerIds),
+            'chunks' => count($chunks),
+            'processed' => $processed,
+            'skipped_no_row' => $totalSkippedNoRow,
+            'skipped_invalid' => $totalSkippedInvalid,
+        ]);
 
         return [
             'status' => 'ok',
@@ -391,46 +244,5 @@ class ComputeEodService
             'skipped_no_row' => $totalSkippedNoRow,
             'skipped_invalid' => $totalSkippedInvalid,
         ];
-    }
-
-    /**
-     * Guard minimal untuk canonical OHLC.
-     * Null/0 akan merusak rolling MA/RSI/ATR dan membuat output mismatch besar.
-     */
-    private function isValidBar($r): bool
-    {
-        // required prices
-        if ($r->open === null || $r->high === null || $r->low === null || $r->close === null) return false;
-
-        $open = (float) $r->open;
-        $high = (float) $r->high;
-        $low  = (float) $r->low;
-        $close= (float) $r->close;
-
-        if ($open <= 0 || $high <= 0 || $low <= 0 || $close <= 0) return false;
-        if ($high < $low) return false;
-
-        // volume boleh 0 (jarang), tapi tidak boleh null/negatif
-        if ($r->volume === null) return false;
-        $vol = (float) $r->volume;
-        if ($vol < 0) return false;
-
-        return true;
-    }
-
-    private function toDateString($value): string
-    {
-        if ($value instanceof DateTimeInterface) {
-            return $value->format('Y-m-d');
-        }
-
-        // kalau string datetime, ambil 10 char pertama
-        $s = (string) $value;
-        if (strlen($s) >= 10) {
-            return substr($s, 0, 10);
-        }
-
-        // fallback
-        return $s;
     }
 }
