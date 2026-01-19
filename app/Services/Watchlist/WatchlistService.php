@@ -3,6 +3,7 @@
 namespace App\Services\Watchlist;
 
 use App\Repositories\WatchlistRepository;
+use App\Repositories\MarketCalendarRepository;
 use App\Repositories\MarketData\CandidateValidationRepository;
 use App\Services\Trade\TradePlanService;
 use App\Trade\Explain\ReasonCatalog;
@@ -13,6 +14,7 @@ use Carbon\Carbon;
 class WatchlistService
 {
     private WatchlistRepository $watchRepo;
+    private MarketCalendarRepository $calRepo;
     private TradePlanService $planService;
     private WatchlistPipelineFactory $factory;
     private CandidateValidationRepository $valRepo;
@@ -20,12 +22,14 @@ class WatchlistService
     private WatchlistAllocationEngine $alloc;
 
     public function __construct(
-        WatchlistRepository $watchRepo, 
+        WatchlistRepository $watchRepo,
+        MarketCalendarRepository $calRepo,
         TradePlanService $planService,
         WatchlistPipelineFactory $factory,
         CandidateValidationRepository $valRepo
     ) {
         $this->watchRepo = $watchRepo;
+        $this->calRepo = $calRepo;
         $this->planService = $planService;
         $this->factory = $factory;
         $this->valRepo = $valRepo;
@@ -144,14 +148,36 @@ class WatchlistService
             'avoid'     => $this->normalizeRows((array)($groupsInternal['avoid'] ?? [])),
         ];
 
-        // meta.recommendations = action plan (allocation + timing + slices + optional lots)
-        $recommendations = $this->alloc->buildActionPlan((array)($groups['top_picks'] ?? []), $dow ?: '', $capital);
+        $tz = (string) config('trade.clock.timezone', 'Asia/Jakarta');
+        $generatedAt = Carbon::now($tz);
+        $today = $generatedAt->toDateString();
+
+        $stale = $this->computeEodStaleness($eodDate ? (string) $eodDate : null, $today, $tz);
+        $maxStale = (int) config('trade.watchlist.max_stale_trading_days', 1);
+
+        // recommendations = action plan (allocation + timing + slices + optional lots)
+        // If EOD data is stale beyond threshold, do not emit BUY recommendations (avoid misleading output).
+        if ($stale['trading_days_stale'] !== null && (int)$stale['trading_days_stale'] > $maxStale) {
+            $recommendations = $this->buildNoTradeRecommendations($stale, $maxStale);
+        } else {
+            $recommendations = $this->alloc->buildActionPlan((array)($groups['top_picks'] ?? []), $dow ?: '', $capital);
+        }
 
         $meta = array_merge($grouped['meta'] ?? [], [
-            'generated_at' => Carbon::now(config('trade.clock.timezone', 'Asia/Jakarta'))->toIso8601String(),
+            'generated_at' => $generatedAt->toIso8601String(),
             'dow' => $dow,
             'market_regime' => 'neutral',
             'market_notes' => 'market_regime belum tersedia di build ini (default neutral).',
+            'data_status' => [
+                'eod_date' => $eodDate,
+                'today' => $today,
+                'trading_days_stale' => $stale['trading_days_stale'],
+                'missing_trading_dates' => $stale['missing_trading_dates'],
+                'max_allowed_trading_days_stale' => $maxStale,
+            ],
+            'warnings' => (
+                $stale['trading_days_stale'] !== null && (int) $stale['trading_days_stale'] > $maxStale
+            ) ? ['EOD_STALE'] : [],
         ]);
 
         return [
@@ -171,6 +197,83 @@ class WatchlistService
         } catch (\Throwable $e) {
             return '';
         }
+    }
+
+
+    /**
+     * Compute how stale the current EOD basis date is, measured in TRADING DAYS (not calendar days).
+     *
+     * trading_days_stale = number of trading days AFTER eod_date up to today (inclusive) according to market_calendar.
+     * missing_trading_dates = list of those trading dates (for UI/debug).
+     */
+    private function computeEodStaleness(?string $eodDate, string $today, string $tz): array
+    {
+        if (!$eodDate) {
+            return [
+                'trading_days_stale' => null,
+                'missing_trading_dates' => [],
+            ];
+        }
+
+        try {
+            $eod = Carbon::parse($eodDate, $tz)->toDateString();
+        } catch (\Throwable $e) {
+            return [
+                'trading_days_stale' => null,
+                'missing_trading_dates' => [],
+            ];
+        }
+
+        if ($today <= $eod) {
+            return [
+                'trading_days_stale' => 0,
+                'missing_trading_dates' => [],
+            ];
+        }
+
+        $from = Carbon::parse($eod, $tz)->addDay()->toDateString();
+        try {
+            $dates = $this->calRepo->tradingDatesBetween($from, $today);
+        } catch (\Throwable $e) {
+            $dates = [];
+        }
+
+        return [
+            'trading_days_stale' => count($dates),
+            'missing_trading_dates' => array_values($dates),
+        ];
+    }
+
+    /**
+     * Build NO_TRADE recommendations payload when EOD basis is too stale.
+     */
+    private function buildNoTradeRecommendations(array $stale, int $maxStale): array
+    {
+        $days = $stale['trading_days_stale'] ?? null;
+        $missing = $stale['missing_trading_dates'] ?? [];
+
+        return [
+            'mode' => 'NO_TRADE',
+            'positions' => 0,
+            'split_ratio' => '',
+            'selected_strategy_id' => null,
+            'strategies' => [],
+            'buy_plan' => [],
+
+            // defaults for UI (still present, but empty because trading is blocked)
+            'entry_windows_default' => [],
+            'avoid_windows_default' => [],
+            'timing_summary_default' => 'NO_TRADE karena data EOD terlalu basi untuk dipakai hari ini.',
+            'pre_buy_checklist_default' => [
+                'Pastikan market data EOD sudah ter-update sampai trading day terakhir.',
+                'Jangan entry berdasarkan data lama (hindari blind buy).',
+            ],
+
+            'reason' => 'EOD_STALE',
+            'stale_trading_days' => $days,
+            'max_allowed_trading_days_stale' => $maxStale,
+            'missing_trading_dates' => $missing,
+        ];
     }
 
     /**

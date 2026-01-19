@@ -152,6 +152,8 @@ return [
         'explain_verbose' => env('WATCHLIST_EXPLAIN_VERBOSE', false),
         'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),        
         'preopen_cache_seconds' => env('WATCHLIST_PREOPEN_CACHE_SECONDS', 15),
+        // Jika data EOD terakhir terlalu basi (diukur dalam trading days), jangan keluarkan rekomendasi BUY.
+        'max_stale_trading_days' => env('WATCHLIST_MAX_STALE_TRADING_DAYS', 1),
         'ranking_enabled' => env('WATCHLIST_RANKING_ENABLED', true),
         'ranking_penalty_plan_invalid' => env('WATCHLIST_RANKING_PENALTY_PLAN_INVALID', 30),
         'ranking_penalty_rr_below_min' => env('WATCHLIST_RANKING_PENALTY_RR_BELOW_MIN', 20),
