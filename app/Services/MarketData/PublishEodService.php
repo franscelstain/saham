@@ -1,8 +1,5 @@
 <?php
 
-# build_id: v2.2.49
-# tujuan: Periksa perubahan dan cari potensi bug/performance issue.
-
 namespace App\Services\MarketData;
 
 use App\Repositories\TickerOhlcDailyRepository;
