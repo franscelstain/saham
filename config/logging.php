@@ -62,6 +62,14 @@ return [
             'days' => 30,
         ],
 
+        // Domain log: Compute EOD (indikator/signal/decision)
+        'compute_eod' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/compute_eod.log'),
+            'level' => 'debug',
+            'days' => 30,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

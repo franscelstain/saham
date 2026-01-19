@@ -65,6 +65,10 @@ class ComputeEodService
     {
         $tz = TradeClock::tz();
 
+        // SRP_Performa: log hanya dari layer orchestration (service), bukan dari domain/pure logic.
+        // Channel ini juga dipakai untuk menandai data canonical yang ternyata invalid (agar akurasi tidak rusak diam-diam).
+        $log = logger()->channel('compute_eod');
+
         $requested = $tradeDate
             ? Carbon::parse($tradeDate, $tz)->toDateString()
             : null;
@@ -148,6 +152,7 @@ class ComputeEodService
 
         $processed = 0;
         $totalSkippedNoRow = 0;
+        $totalSkippedInvalid = 0;
 
         DB::disableQueryLog();
 
@@ -177,6 +182,7 @@ class ComputeEodService
             $sumVol20 = 0.0;
 
             $seenOnDate = [];
+            $invalidOnDate = [];
             $rowsBuffer = [];
 
             foreach ($cursor as $r) {
@@ -208,8 +214,33 @@ class ComputeEodService
                 $volSma20Prev = null;
                 if (count($lastVols20) >= 20) $volSma20Prev = ($sumVol20 / 20.0);
 
+                // --- Canonical data quality guard
+                // Jangan pernah menganggap null menjadi 0 karena itu merusak indikator secara drastis.
+                // Jika canonical ternyata invalid, skip bar tsb (dan jika itu bar pada $date, skip upsert untuk ticker tsb).
+                if (!$this->isValidBar($r)) {
+                    $rowDate = $this->toDateString($r->trade_date);
+
+                    if ($rowDate === $date) {
+                        $totalSkippedInvalid++;
+                        $invalidOnDate[$tid] = true;
+                        $log->warning('compute_eod.invalid_canonical_bar', [
+                            'trade_date' => $date,
+                            'ticker_id' => (int) $r->ticker_id,
+                            'open' => $r->open,
+                            'high' => $r->high,
+                            'low' => $r->low,
+                            'close' => $r->close,
+                            'adj_close' => $r->adj_close ?? null,
+                            'volume' => $r->volume,
+                        ]);
+                    }
+
+                    // Skip this bar entirely (tidak ikut warmup rolling metrics).
+                    continue;
+                }
+
                 // bar today (real market close)
-                $closeReal = $r->close !== null ? (float) $r->close : 0.0;
+                $closeReal = (float) $r->close;
                 $high  = (float) $r->high;
                 $low   = (float) $r->low;
                 $vol   = (float) $r->volume;
@@ -299,7 +330,8 @@ class ComputeEodService
                     'ma50' => $metrics['ma50'] !== null ? round($metrics['ma50'], 4) : null,
                     'ma200'=> $metrics['ma200'] !== null ? round($metrics['ma200'], 4) : null,
 
-                    'rsi14' => $metrics['rsi14'] !== null ? round($metrics['rsi14'], 4) : null,
+                    // kolom rsi14 di DB = decimal(6,2) -> round 2 supaya output stabil dan tidak bergantung rounding DB.
+                    'rsi14' => $metrics['rsi14'] !== null ? round($metrics['rsi14'], 2) : null,
                     'atr14' => $metrics['atr14'] !== null ? round($metrics['atr14'], 4) : null,
 
                     'support_20d' => $support20 !== null ? round($support20, 4) : null,
@@ -338,7 +370,7 @@ class ComputeEodService
             // diagnostic: harusnya 0 karena ids dipilih dari "having row on date"
             $skippedNoRow = 0;
             foreach ($ids as $tid) {
-                if (empty($seenOnDate[$tid])) $skippedNoRow++;
+                if (empty($seenOnDate[$tid]) && empty($invalidOnDate[$tid])) $skippedNoRow++;
             }
             $totalSkippedNoRow += $skippedNoRow;
         }
@@ -357,7 +389,33 @@ class ComputeEodService
 
             'processed' => $processed,
             'skipped_no_row' => $totalSkippedNoRow,
+            'skipped_invalid' => $totalSkippedInvalid,
         ];
+    }
+
+    /**
+     * Guard minimal untuk canonical OHLC.
+     * Null/0 akan merusak rolling MA/RSI/ATR dan membuat output mismatch besar.
+     */
+    private function isValidBar($r): bool
+    {
+        // required prices
+        if ($r->open === null || $r->high === null || $r->low === null || $r->close === null) return false;
+
+        $open = (float) $r->open;
+        $high = (float) $r->high;
+        $low  = (float) $r->low;
+        $close= (float) $r->close;
+
+        if ($open <= 0 || $high <= 0 || $low <= 0 || $close <= 0) return false;
+        if ($high < $low) return false;
+
+        // volume boleh 0 (jarang), tapi tidak boleh null/negatif
+        if ($r->volume === null) return false;
+        $vol = (float) $r->volume;
+        if ($vol < 0) return false;
+
+        return true;
     }
 
     private function toDateString($value): string
