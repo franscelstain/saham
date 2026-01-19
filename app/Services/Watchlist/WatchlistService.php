@@ -148,7 +148,6 @@ class WatchlistService
         $recommendations = $this->alloc->buildActionPlan((array)($groups['top_picks'] ?? []), $dow ?: '', $capital);
 
         $meta = array_merge($grouped['meta'] ?? [], [
-            'build_id' => (string) config('trade.build_id', 'v2.5.2'),
             'as_of_date' => $eodDate,
             'generated_at' => Carbon::now(config('trade.clock.timezone', 'Asia/Jakarta'))->toIso8601String(),
             'dow' => $dow,
