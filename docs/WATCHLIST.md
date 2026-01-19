@@ -1,6 +1,3 @@
-# build_id: v2.2.56
-# tujuan: Periksa fokus mengenai aturan rekomendasi buy yang tampil, bagaimana bila sudah hari ini belum tersedia eod kemarin, apakah tetap rekomendasi beli
-
 # TradeAxis Watchlist – Design Spec (EOD-driven)  
 File: `WATCHLIST.md`
 
@@ -25,6 +22,25 @@ Watchlist di bawah ini **berbasis data EOD** sebagai sumber utama, namun boleh m
 - `dow` (Mon/Tue/Wed/Thu/Fri)
 - `market_regime` (risk-on / neutral / risk-off)
 - `market_notes` (contoh: “IHSG down 5D”, “breadth lemah”)
+
+### 1.1.1 Data freshness gate (wajib)
+Watchlist ini **EOD-driven**. Karena itu, rekomendasi **NEW ENTRY** hanya boleh keluar jika data EOD **CANONICAL** untuk `trade_date` sudah tersedia.
+
+**Rule deterministik**
+1) Tentukan `trade_date` dari **effective date Market Data** (cutoff + trading day).
+2) Cek ketersediaan CANONICAL:
+   - `ticker_ohlc_daily` tersedia untuk `trade_date` (coverage lolos / publish sudah jalan), dan
+   - fitur `ticker_indicators_daily` tersedia untuk `trade_date`.
+3) Jika salah satu **tidak tersedia** (missing / held / incomplete window):
+   - Set output global: `trade_plan_mode = NO_TRADE` untuk **NEW ENTRY**,
+   - Semua ticker hanya boleh berstatus **watch-only** (`entry_style = No-trade`, `size_multiplier = 0.0`),
+   - Tambahkan `market_notes`: “EOD CANONICAL belum tersedia (atau held). Entry ditahan.”
+   - Wajib tulis reason code global: `EOD_NOT_READY`.
+
+**Catatan**
+- Policy `INTRADAY_LIGHT` boleh dipakai **hanya** jika snapshot intraday yang disyaratkan benar-benar ada (kalau tidak ada → tetap NO_TRADE).
+- `CARRY_ONLY` untuk posisi yang sudah ada tetap boleh tampil, tetapi **tanpa** membuka posisi baru.
+
 
 ### 1.2 Output per kandidat (per ticker)
 Minimal field yang harus ada dalam hasil watchlist:
