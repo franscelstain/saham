@@ -15,6 +15,21 @@
 - `trade_date` yang dihitung harus mengikuti **effective date** Market Data (aturan cutoff), bukan "today" sebelum cutoff.
 
 
+### Kontrak Rolling Window (Trading Days, bukan kalender)
+- Semua indikator berbasis window (MA/RSI/ATR/vol_sma20/vol_ratio) dihitung dari **N trading days yang valid**, bukan “mundur 20 tanggal kalender”.
+- Jika window tidak lengkap (kurang data canonical trading day), maka:
+  - indikator terkait boleh **NULL**
+  - **jangan** keluarkan decision yang mengesankan “Layak/Strong”
+  - wajib tulis warning ke log domain `compute_eod` (biar ketahuan kualitas data)
+
+### Corporate Actions (split) — aturan supaya indikator tidak palsu
+- Jika terdeteksi/ada event split (atau discontinuity suspected dari Market Data):
+  - canonical harus dibenahi/adjust dahulu (rebuild canonical)
+  - lalu recompute EOD untuk range terdampak
+- Compute EOD tidak boleh “menghaluskan” split diam-diam; lebih baik flag + stop rekomendasi.
+
+
+
 Compute EOD **TIDAK**:
 - melakukan beli / jual
 - menentukan entry intraday

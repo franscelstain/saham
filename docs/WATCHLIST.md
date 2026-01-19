@@ -62,6 +62,159 @@ Yang benar:
 - Setiap window harus punya **alasan** yang diturunkan dari metrik EOD + konteks market.
 - Watchlist harus bisa bilang: **“Tidak disarankan entry hari ini”** walau ada kandidat (NO TRADE).
 
+
+
+### 2.1 Strategy Policy itu apa (dan kenapa harus eksplisit)
+Watchlist punya beberapa **Strategy Policy**. Policy adalah paket aturan end-to-end yang deterministik:
+- horizon holding (berapa hari/minggu)
+- syarat data (EOD saja atau butuh snapshot intraday)
+- kandidat apa yang boleh dipilih
+- kapan entry (window) + kapan harus NO TRADE
+- exit template (SL/TP/BE/time-stop)
+- expiry rule (setup kadaluarsa kapan)
+
+> Prinsip SRP: Market Data = data, Compute EOD = feature/indikator, Watchlist = policy/seleksi/plan.
+
+### 2.2 Daftar Strategy Policy (resmi)
+| policy_code | Target | Holding | Data minimum | Kapan dipakai |
+|---|---|---|---|---|
+| `WEEKLY_SWING` | profit 2–5% mingguan dengan disiplin | 2–5 trading days | EOD canonical + indikator | default (paling sering) |
+| `DIVIDEND_SWING` | capture dividen + tetap risk-controlled | 3–10 trading days | EOD + calendar event (ex-date) | hanya saat ada event dividen yang valid |
+| `INTRADAY_LIGHT` | timing entry lebih presisi (tanpa full intraday system) | 0–2 trading days | EOD + *opening range snapshot* | opsional, kalau snapshot ada |
+| `POSITION_TRADE` | trend-follow 2–8 minggu | 10–40 trading days | EOD + trend quality | saat market risk-on & trend kuat |
+| `NO_TRADE` | proteksi modal | n/a | market regime + quality gate | saat data/market tidak mendukung |
+
+### 2.3 Policy: WEEKLY_SWING (default)
+**Tujuan:** ambil move mingguan yang realistis, bukan “tebak puncak”.
+
+**A. Data dependency (wajib):**
+- `ticker_ohlc_daily` canonical (trade_date = effective_end_date)
+- `ticker_indicators_daily`: MA20/50/200, RSI14, vol_sma20, vol_ratio, signal_code, signal_age_days
+- fitur murah: `atr14`, `atr_pct`, `gap_pct`, `dv20`, candle flags
+
+**B. Candidate gates (deterministik):**
+- Likuiditas: `dv20` minimal (mis. bucket A/B). Bucket C boleh masuk kandidat, tapi **bukan recommended**.
+- Volatilitas: `atr_pct` maksimal (saham terlalu liar → turunkan confidence / NO TRADE).
+- Data window lengkap: indikator inti tidak boleh NULL.
+- Corporate action suspected/unadjusted → skip.
+
+**C. Entry window (EOD → waktu eksekusi):**
+- Default: pakai engine di Bagian 8 (window + avoid windows).
+- Tambahan weekly swing:
+  - **Senin–Selasa:** boleh entry agresif (breakout confirm / pullback buy)
+  - **Rabu:** entry selektif; prefer pullback, hindari chasing
+  - **Kamis:** entry hanya kalau setup “sangat kuat” (High confidence) dan risk kecil
+  - **Jumat:** default NO NEW ENTRY (kecuali signal baru + risk rendah)
+
+**D. Expiry (setup kadaluarsa):**
+- Breakout/strong burst: valid maksimal 1–2 trading days setelah sinyal muncul.
+- Pullback/continuation: valid 2–4 trading days.
+- Aturan praktis: `signal_age_days > 3` → turun confidence; `> 5` → bukan recommended.
+
+**E. Exit template (minimal):**
+- SL: berbasis ATR/support (lihat Bagian 20)
+- TP1/TP2: berbasis RR + level teknikal
+- Time stop: kalau 3 hari tidak bergerak sesuai arah, keluar parsial/total (policy-level rule).
+
+**F. Algoritma ringkas (deterministik, step-by-step)**
+1) Tentukan `effective_trade_date` dari Market Data (cutoff-aware) → ini jadi `trade_date` watchlist.
+2) Ambil fitur per ticker untuk `trade_date` dari `ticker_indicators_daily` (plus fitur murah: atr/gap/dv20/candle).
+3) Jalankan **Hard Filters** (Bagian 5.1). Jika gagal → drop.
+4) Jalankan **Soft Filters** (Bagian 5.2). Jika kena → turunkan confidence/score.
+5) Hitung **watchlist_score** (Bagian 6). Wajib simpan breakdown reason codes.
+6) Tentukan `setup_type` (Bagian 7).
+7) Tentukan `entry_windows` & `avoid_windows` (Bagian 8) + day-of-week adjustment.
+8) Ranking: pilih Top Picks (Bagian 10).
+9) Tentukan `buy_mode` dan `% alloc` (Bagian 19).
+10) Untuk recommended pick: hitung `trade_plan` (Bagian 20) + sizing lots (Bagian 21).
+11) Simpan output ke tabel watchlist (Bagian 12) + log summary per hari.
+
+**G. Anti-bias penting:**
+- Jangan “memaksa” selalu ada BUY. Kalau market regime risk-off atau kualitas data jelek → `NO_TRADE`.
+- Kalau indikator window tidak lengkap (Compute EOD mengembalikan NULL), watchlist harus downgrade/skip.
+
+
+### 2.4 Policy: DIVIDEND_SWING (event-driven)
+**Tujuan:** dapat dividen tanpa bunuh diri karena gap risk.
+
+**A. Data tambahan yang dibutuhkan (kalau belum ada, lihat Bagian 11):**
+- `dividend_calendar` (ticker, ex_date, pay_date, dividend_amount, yield_est)
+- flag corporate action/split adjusted
+
+**B. Gates khusus:**
+- Wajib **likuid** (dv20 bucket A)
+- Hindari saham dengan `atr_pct` tinggi (gap risk besar)
+- Market regime minimal neutral (risk-off → NO TRADE)
+
+**C. Timing:**
+- Entry ideal: H-3 sampai H-1 ex-date (bukan H0). Hindari entry mepet close jika spread jelek.
+- Exit rule:
+  - Conservative: exit H-1 / H0 (sebelum ex-date) jika target tercapai.
+  - Hold-through: tahan sampai ex-date hanya jika trend kuat + risk rendah.
+
+**D. Algoritma ringkas (deterministik)**
+1) Ambil event `ex_date` untuk 7–14 hari ke depan.
+2) Filter ticker event:
+   - yield_est memadai (opsional) dan **likuid** (dv20 bucket A)
+   - atr_pct tidak liar
+3) Jika market regime risk-off → `NO_TRADE` (policy batal).
+4) Entry window default mengikuti Bagian 8, tapi tambah rule:
+   - hindari entry mepet close (match risk)
+   - hindari entry H0 (ex-date) kecuali super liquid + follow-through
+5) Buat trade plan:
+   - SL lebih ketat (gap risk)
+   - TP lebih konservatif (karena tujuan event-driven)
+6) Exit:
+   - default: exit H-1/H0 bila target tercapai
+   - hold-through hanya jika trend kualitas tinggi (MA alignment + signal continuation)
+
+**E. Catatan penting:** dividend policy butuh data event; tanpa itu jangan dipaksakan (lebih baik tidak aktif daripada salah).
+
+
+### 2.5 Policy: INTRADAY_LIGHT (opsional)
+**Tujuan:** memperbaiki timing entry untuk setup EOD kuat tanpa membangun sistem intraday penuh.
+
+**Syarat mutlak:** ada *opening range snapshot* (09:00–09:15/09:30) minimal berisi: open_range_high/low, volume_opening, gap_pct_real.
+
+**Rule ringkas:**
+- Setup dari EOD tetap sumber utama (breakout/pullback/continuation).
+- Intraday dipakai hanya untuk:
+  - konfirmasi breakout (break above opening range high)
+  - menghindari fake move (break lalu balik di bawah range)
+- Kalau snapshot tidak ada → policy ini **tidak boleh aktif**.
+
+**Algoritma ringkas (deterministik)**
+1) Pastikan snapshot tersedia untuk `trade_date` (kalau tidak → policy nonaktif).
+2) Dari EOD: pilih kandidat setup kuat (score tinggi) yang biasanya masuk top picks.
+3) Definisikan entry trigger intraday:
+   - Breakout: buy hanya jika harga break **di atas** `opening_range_high` dan tidak langsung gagal (OR fail).
+   - Pullback: buy hanya jika harga bertahan di atas OR mid / reclaim OR high (pilih 1 rule dan konsisten).
+4) SL intraday tetap mengacu ke level plan (ATR/support) dari EOD, bukan dibuat random.
+5) Jika tidak ada konfirmasi sampai akhir window → `NO_TRADE` untuk ticker itu.
+
+**Batasan:** policy ini bukan scalping. Ini hanya “konfirmasi entry” agar mengurangi fake breakout.
+
+
+### 2.6 Policy: POSITION_TRADE (2–8 minggu)
+**Tujuan:** ride trend besar, bukan trading mingguan.
+
+**Gates:**
+- Trend quality tinggi (MA alignment kuat + signal continuation)
+- Market regime risk-on
+- Exit lebih longgar (ATR-based, trailing)
+
+### 2.7 Urutan pemilihan policy (deterministik)
+Agar hasil watchlist konsisten:
+1) Jika market regime = risk-off → `NO_TRADE` (kecuali ada policy khusus hedge, kalau nanti ada)
+2) Jika ada event dividen valid + lulus gates → `DIVIDEND_SWING`
+3) Jika snapshot intraday tersedia + setup EOD kuat → `INTRADAY_LIGHT` (opsional)
+4) Default → `WEEKLY_SWING`
+5) Jika trend super kuat & kamu pilih mode long horizon → `POSITION_TRADE`
+
+> Ini urutan default. Kalau nanti kamu mau mengunci “mode” (mis. minggu ini hanya weekly swing), tinggal override di layer config/preset UI.
+
+
+
 ---
 
 ## 3) Data yang dibutuhkan (akurat & audit-able)
@@ -328,17 +481,64 @@ Selain ranking, watchlist harus memberi saran portofolio harian:
 
 ---
 
-## 11) Data yang mungkin “belum ada” tapi sebaiknya disediakan
-Untuk akurasi timing advice tanpa intraday:
-1) `atr14`, `atr_pct`
-2) `gap_pct` + `prev_close`
-3) `dv20` (close*volume rolling)
-4) candle metrics (wick/body)
-5) IHSG regime (ret_1d/ret_5d + MA)
-6) signal_age_days & signal_first_seen_date (streak)
 
-Opsional upgrade akurasi timing:
-- snapshot intraday ringan (opening range 15 menit) → bukan full intraday.
+## 11) Data yang mungkin “belum ada” tapi sebaiknya disediakan (supaya akurasi naik)
+Bagian ini menjelaskan **apa yang perlu ditambah** di Market Data / Compute EOD sebelum kamu “naik kelas” strategi.
+
+### 11.1 Wajib untuk akurasi EOD-only (WEEKLY_SWING default)
+> Semua di bawah ini bisa dihitung dari OHLC canonical (murah, tapi efeknya besar).
+1) `prev_close` + `gap_pct`
+2) `atr14` + `atr_pct`
+3) `dvalue = close*volume` + `dv20` + `liq_bucket`
+4) candle metrics (body/wick/inside/engulfing flags)
+5) market regime IHSG (ret_1d/ret_5d + MA20/MA50) + (opsional) breadth
+6) `signal_first_seen_date` + `signal_age_days`
+
+**Kalau poin 1–6 belum ada:**
+- yang paling tepat: dihitung di **Compute EOD** (feature layer) lalu disimpan ke `ticker_indicators_daily` (atau tabel feature harian lain).
+- watchlist hanya membaca, tidak menghitung ulang.
+
+### 11.2 Tambahan untuk DIVIDEND_SWING (event-driven)
+Butuh **calendar event**, bukan sekadar indikator:
+- `dividend_calendar` minimal: `ticker_id`, `ex_date`, `record_date` (opsional), `pay_date` (opsional), `cash_dividend` (opsional), `yield_est` (opsional)
+- flag corporate action adjusted (split/rights) agar yield tidak menipu
+
+**Kalau belum ada:**
+- ini bukan tugas Compute EOD. Ini tugas **Market Data (Corporate Actions / Events)**.
+
+### 11.3 Tambahan untuk INTRADAY_LIGHT (tanpa full intraday)
+Butuh 1 record per ticker per hari dari sesi awal:
+- `opening_range_high`, `opening_range_low` (09:00–09:15 atau 09:00–09:30)
+- `opening_range_volume`
+- `gap_pct_real` (gap pada open aktual)
+- opsional: `or_breakout_flag` (break above OR high?), `or_fail_flag` (break lalu balik?)
+
+**Kalau belum ada:**
+- ini bukan Market Data EOD. Buat modul kecil terpisah: **Intraday Snapshot (opening range)**.
+- watchlist policy `INTRADAY_LIGHT` harus otomatis nonaktif kalau data ini tidak tersedia.
+
+### 11.4 Tambahan untuk POSITION_TRADE (2–8 minggu)
+Butuh metrik trend yang lebih stabil:
+- slope proxy MA (mis. `ma20_slope`, `ma50_slope` dalam % per hari trading)
+- volatility filter jangka menengah (ATR% rata-rata 20–50 hari)
+- drawdown proxy (mis. distance from 20d high/low)
+
+**Kalau belum ada:**
+- tetap dihitung di **Compute EOD** (feature layer), karena turunannya dari OHLC.
+
+### 11.5 Penyesuaian yang “wajib kalau mau akurat” di Market Data & Compute EOD
+Ini bukan fitur mewah. Ini mencegah data “kelihatan jalan tapi salah”.
+
+**A. Market Data (wajib):**
+- CANONICAL gating: kalau coverage jelek / held, watchlist harus bisa `NO_TRADE`.
+- corporate action awareness: minimal flag split/discontinuity (ideal: adjusted canonical).
+- `trade_date` konsisten WIB + market_calendar.
+
+**B. Compute EOD (wajib):**
+- rolling window = **N trading days** (bukan kalender) untuk semua indikator.
+- jika window tidak lengkap → indikator NULL + downgrade decision + log warning.
+- tidak menghitung “strategi”; hanya feature/signal.
+
 
 ---
 
