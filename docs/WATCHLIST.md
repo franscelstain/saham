@@ -1,3 +1,6 @@
+# build_id: v2.2.56
+# tujuan: Periksa fokus mengenai aturan rekomendasi buy yang tampil, bagaimana bila sudah hari ini belum tersedia eod kemarin, apakah tetap rekomendasi beli
+
 # TradeAxis Watchlist – Design Spec (EOD-driven)  
 File: `WATCHLIST.md`
 
@@ -260,6 +263,14 @@ Minimal:
 - `dvalue = close * volume`
 - `dv20 = SMA20(dvalue)`
 - `liq_bucket` (A/B/C berdasarkan dv20)
+  - **Default bucket (IDR, bisa diubah via config):**
+    - **A (liquid):** `dv20 >= 20_000_000_000` (≥ 20B)
+    - **B (ok):** `5_000_000_000 <= dv20 < 20_000_000_000` (5B – <20B)
+    - **C (illiquid):** `dv20 < 5_000_000_000` (<5B)
+  - **Catatan wajib:**
+    - `dv20` dihitung dari **20 trading days** terakhir (exclude today) menggunakan **CANONICAL EOD**.
+    - Threshold harus berasal dari config (mis. `liq.dv20_a_min`, `liq.dv20_b_min`) dan boleh dituning setelah lihat distribusi pasar & constraints broker.
+
 
 ### 3.4 Konteks market wajib
 **market_calendar**
@@ -651,7 +662,7 @@ UI kamu (sesuai mockup) sudah tepat: **semua kandidat tetap punya kartu data** y
 
 **Market**
 - `rel_vol` (RelVol / vol_ratio)
-- `pos_pct` (Pos% / posisi close terhadap range atau terhadap MA—definisikan konsisten)
+- `pos_pct` (Pos% = posisi **close** dalam range hari itu, 0–100): `100*(close-low)/(high-low)` lalu clamp 0..100; jika `high==low` → `null`.
 - `eod_low` (low EOD / level risiko reference)
 - `price_ok` (boolean; lolos price filter)
 
