@@ -16,10 +16,13 @@ class WatchlistPipelineFactory
     public function makePreopen(): WatchlistPipeline
     {
         // Hard filter (syarat wajib)
+        $liqAllowed = (array) config('trade.watchlist.liq.allowed_candidate_buckets', ['A', 'B', 'C']);
+        $liqMinDv20 = (float) config('trade.watchlist.liq.dv20_candidate_min', 0);
+
         $filter = new WatchlistHardFilter(
             new TrendFilter(),
             new RsiFilter((float) config('trade.watchlist.rsi_max', 70)),
-            new LiquidityFilter((float) config('trade.watchlist.min_value_est', 1000000000))
+            new LiquidityFilter($liqMinDv20, $liqAllowed)
         );
 
         // Setup classifier (SETUP_OK / CONFIRM / dll)

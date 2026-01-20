@@ -492,10 +492,24 @@ class WatchlistService
         $tradePlan = $r['plan'] ?? ($r['trade_plan'] ?? null);
         if (!is_array($tradePlan)) $tradePlan = null;
 
+        $tickerCode = (string)($r['ticker'] ?? $r['code'] ?? '');
+
+        $reasonCodes = $r['reason_codes'] ?? ($r['reasons'] ?? []);
+        if (!is_array($reasonCodes)) $reasonCodes = [];
+
+        $liqBucket = $r['liq_bucket'] ?? ($r['liqBucket'] ?? null);
+        if (is_array($liqBucket)) $liqBucket = $liqBucket['bucket'] ?? $liqBucket['name'] ?? null;
+        $liqBucket = $liqBucket !== null ? (string) $liqBucket : '';
+
+        $riskNotes = $this->buildRiskNotes($r, $liqBucket);
+
         $row = [
             'rank' => $rank,
             'ticker_id' => (int)($r['ticker_id'] ?? $r['tickerId'] ?? 0),
-            'ticker' => (string)($r['ticker'] ?? $r['code'] ?? ''),
+            // Keep 'ticker' for backward compatibility (DB column),
+            // and provide explicit 'ticker_code' for UI.
+            'ticker' => $tickerCode,
+            'ticker_code' => $tickerCode,
             'company_name' => (string)($r['company_name'] ?? $r['name'] ?? ''),
 
             'trade_date' => (string)($r['trade_date'] ?? $r['tradeDate'] ?? ''),
@@ -507,6 +521,25 @@ class WatchlistService
             'volume' => $r['volume'] ?? null,
             'value_est' => $r['value_est'] ?? ($r['valueEst'] ?? null),
 
+            // previous candle (yesterday) — useful for gap/candle context
+            'prev_open' => $r['prev_open'] ?? ($r['prevOpen'] ?? null),
+            'prev_high' => $r['prev_high'] ?? ($r['prevHigh'] ?? null),
+            'prev_low'  => $r['prev_low'] ?? ($r['prevLow'] ?? null),
+            'prev_close' => $r['prev_close'] ?? ($r['prevClose'] ?? null),
+
+            // liquidity (dv20 + bucket)
+            'dv20' => $r['dv20'] ?? null,
+            'liq_bucket' => $liqBucket,
+
+            // candle structure flags (ratios 0..1)
+            'candle_body_pct' => $r['candle_body_pct'] ?? ($r['candleBodyPct'] ?? null),
+            'candle_upper_wick_pct' => $r['candle_upper_wick_pct'] ?? ($r['candleUpperWickPct'] ?? null),
+            'candle_lower_wick_pct' => $r['candle_lower_wick_pct'] ?? ($r['candleLowerWickPct'] ?? null),
+            'is_inside_day' => $r['is_inside_day'] ?? ($r['isInsideDay'] ?? null),
+            'engulfing_type' => $r['engulfing_type'] ?? ($r['engulfingType'] ?? null),
+            'is_long_upper_wick' => $r['is_long_upper_wick'] ?? ($r['isLongUpperWick'] ?? null),
+            'is_long_lower_wick' => $r['is_long_lower_wick'] ?? ($r['isLongLowerWick'] ?? null),
+
             'ma20' => $r['ma20'] ?? null,
             'ma50' => $r['ma50'] ?? null,
             'ma200' => $r['ma200'] ?? null,
@@ -514,7 +547,6 @@ class WatchlistService
 
             'vol_sma20' => $r['vol_sma20'] ?? null,
             'vol_ratio' => $r['vol_ratio'] ?? null,
-            'prev_close' => $r['prev_close'] ?? null,
             'gap_pct' => $r['gap_pct'] ?? null,
             'atr_pct' => $r['atr_pct'] ?? null,
             'range_pct' => $r['range_pct'] ?? null,
@@ -551,9 +583,12 @@ class WatchlistService
             'entry_style' => $r['entry_style'] ?? null,
             'size_multiplier' => $r['size_multiplier'] ?? null,
             'max_positions_today' => $r['max_positions_today'] ?? null,
-            'reason_codes' => $r['reason_codes'] ?? [],
+            'reason_codes' => $reasonCodes,
             'timing_summary' => $r['timing_summary'] ?? '',
             'pre_buy_checklist' => $r['pre_buy_checklist'] ?? [],
+
+            // short human notes for UI (non-authoritative)
+            'risk_notes' => $riskNotes,
 
             'trade_plan' => $tradePlan,
         ];
@@ -569,6 +604,41 @@ class WatchlistService
         }
 
         return $row;
+    }
+
+    /**
+     * Generate short, UI-friendly risk notes (not used for scoring).
+     */
+    private function buildRiskNotes(array $r, string $liqBucket): string
+    {
+        $notes = [];
+
+        $isExpired = (bool)($r['is_expired'] ?? ($r['isExpired'] ?? false));
+        if ($isExpired) {
+            $notes[] = 'Setup expired — avoid new entry.';
+        }
+
+        $gap = $r['gap_pct'] ?? null;
+        if (is_numeric($gap) && abs((float)$gap) >= 2.0) {
+            $notes[] = 'Gap besar (>=2%) — rawan slippage.';
+        }
+
+        $atr = $r['atr_pct'] ?? null;
+        if (is_numeric($atr) && (float)$atr >= 5.0) {
+            $notes[] = 'Volatilitas tinggi (ATR% >=5%).';
+        }
+
+        if ($liqBucket === 'C') {
+            $notes[] = 'Likuiditas bucket C — prioritas rendah untuk entry agresif.';
+        }
+
+        $upperWick = $r['is_long_upper_wick'] ?? ($r['isLongUpperWick'] ?? null);
+        if ($upperWick === true || $upperWick === 1) {
+            $notes[] = 'Upper wick panjang — potensi supply/penolakan.';
+        }
+
+        if (empty($notes)) return '';
+        return implode(' ', $notes);
     }
 
 }

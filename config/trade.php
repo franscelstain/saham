@@ -157,6 +157,12 @@ return [
             'dv20_a_min' => (float) env('WATCHLIST_DV20_A_MIN', 20000000000), // >= 20B
             'dv20_b_min' => (float) env('WATCHLIST_DV20_B_MIN', 5000000000),  // >= 5B
             'min_for_top_picks' => (string) env('WATCHLIST_LIQ_MIN_FOR_TOP_PICKS', 'B'), // A or B
+
+            // Candidate gate (Hard filter): allow A/B/C by default (U/unknown is rejected).
+            // Override via env as CSV, ex: "A,B".
+            'allowed_candidate_buckets' => array_values(array_filter(array_map('trim', explode(',', (string) env('WATCHLIST_LIQ_ALLOWED_CANDIDATE_BUCKETS', 'A,B,C'))))),
+            // Minimal dv20 to include as candidate (0 = allow all allowed buckets).
+            'dv20_candidate_min' => (float) env('WATCHLIST_DV20_CANDIDATE_MIN', 0),
         ],
 
         // Candle structure flags (computed from EOD candle + previous EOD candle)
