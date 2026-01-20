@@ -74,6 +74,10 @@ class WatchlistPresenter
             'dv20' => $c->dv20,
             'liq_bucket' => $c->liqBucket,
 
+            // corporate action gate (heuristic)
+            'corp_action_suspected' => (bool) $c->corpActionSuspected,
+            'corp_action_ratio' => $c->corpActionRatio,
+
             // previous candle
             'prev_open' => $c->prevOpen,
             'prev_high' => $c->prevHigh,

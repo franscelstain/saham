@@ -13,7 +13,7 @@ class WatchlistReasonCodeBuilder
      * @param CandidateInput $c
      * @param string $setupType
      * @param string $setupStatus
-     * @param array{gap_risk_high:bool,volatility_high:bool,liq_low:bool,market_risk_off:bool} $risk
+     * @param array{gap_risk_high:bool,volatility_high:bool,liq_low:bool,market_risk_off:bool,corp_action_suspected?:bool} $risk
      * @param string $dow
      * @return array{reason_codes:string[],timing_summary:string}
      */
@@ -56,6 +56,7 @@ class WatchlistReasonCodeBuilder
         if (!empty($risk['volatility_high'])) $codes[] = 'VOLATILITY_HIGH';
         if (!empty($risk['liq_low'])) $codes[] = 'LIQ_LOW_MATCH_RISK';
         if (!empty($risk['market_risk_off'])) $codes[] = 'MARKET_RISK_OFF';
+        if (!empty($risk['corp_action_suspected']) || !empty($c->corpActionSuspected)) $codes[] = 'CORP_ACTION_SUSPECTED';
 
         // Late week penalty
         if (in_array($dow, ['Thu', 'Fri'], true)) $codes[] = 'LATE_WEEK_ENTRY_PENALTY';
@@ -65,7 +66,9 @@ class WatchlistReasonCodeBuilder
 
         // Timing summary (1 kalimat)
         $parts = [];
-        if (!empty($risk['gap_risk_high']) || !empty($risk['volatility_high'])) {
+        if (!empty($risk['corp_action_suspected']) || !empty($c->corpActionSuspected)) {
+            $parts[] = 'Indikasi corporate action (split/reverse split); skip trade sampai data ternormalisasi.';
+        } elseif (!empty($risk['gap_risk_high']) || !empty($risk['volatility_high'])) {
             $parts[] = 'Hindari open karena gap/volatilitas tinggi; entry terbaik setelah 09:45 saat spread stabil.';
         } elseif (!empty($risk['liq_low'])) {
             $parts[] = 'Likuiditas rendah; entry lebih aman mulai 10:00 setelah antrian mereda.';

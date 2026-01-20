@@ -70,14 +70,21 @@ class WatchlistAdviceService
         $gapHigh = ($gapPct !== null && $gapPct >= 0.03);
         $volHigh = ($atrPct !== null && $atrPct >= 0.06);
 
-        // liquidity low: di atas hard filter, tapi masih low untuk match (proxy: valueEst)
-        $liqLow = ($c->valueEst < 2000000000);
+        // liquidity low: untuk match (bukan hard filter). Gunakan dv20 / liq_bucket, bukan valueEst harian.
+        $liqBucket = (string)($c->liqBucket ?? '');
+        $dv20 = $c->dv20;
+
+        // Default: bucket C dianggap low untuk match.
+        // Bucket B bisa dianggap low kalau dv20 di bawah ambang minimal match.
+        $dv20LowMin = (float) config('trade.watchlist.liq.dv20_low_match_min', (float) config('trade.watchlist.liq.dv20_b_min', 5000000000));
+        $liqLow = ($liqBucket === 'C') || ($liqBucket === 'B' && $dv20 !== null && $dv20 > 0 && $dv20 < $dv20LowMin);
 
         return [
             'gap_risk_high' => $gapHigh,
             'volatility_high' => $volHigh,
             'liq_low' => $liqLow,
             'market_risk_off' => ($marketRegime === 'risk_off'),
+            'corp_action_suspected' => (bool) $c->corpActionSuspected,
         ];
     }
 
@@ -95,6 +102,11 @@ class WatchlistAdviceService
             elseif ($c === 'Medium') $c = 'Low';
         }
 
+        // corporate action suspected = hard NO TRADE (confidence Low)
+        if (!empty($risk['corp_action_suspected'])) {
+            $c = 'Low';
+        }
+
         if ($setupType === 'Reversal') {
             if ($c === 'High') $c = 'Medium';
         }
@@ -109,6 +121,10 @@ class WatchlistAdviceService
             'Pastikan candle follow-through sesuai setup (jangan FOMO saat spike).',
             'Pasang SL otomatis sesuai plan (jangan ditunda).',
         ];
+
+        if (!empty($risk['corp_action_suspected'])) {
+            array_unshift($items, 'Corporate action suspected (split/reverse split) → SKIP trade sampai data ternormalisasi.');
+        }
 
         if ($setupType === 'Breakout') {
             $items[] = 'Tunggu close/hold di atas resistance intraday (minimal 5-10 menit).';

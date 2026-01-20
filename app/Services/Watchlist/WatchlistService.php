@@ -278,7 +278,8 @@ class WatchlistService
 
         $payload = [
             // keys utama untuk UI
-            'eod_date' => $eodDate,
+            // v2.5.14 BREAKING: trade_date menggantikan eod_date (consumer lama wajib update)
+            'trade_date' => $eodDate,
             'groups'   => $groups,
             'meta'     => $meta,
             'recommendations' => $recommendations,
@@ -531,6 +532,10 @@ class WatchlistService
             'dv20' => $r['dv20'] ?? null,
             'liq_bucket' => $liqBucket,
 
+            // corporate action gate (heuristic)
+            'corp_action_suspected' => $r['corp_action_suspected'] ?? ($r['corpActionSuspected'] ?? false),
+            'corp_action_ratio' => $r['corp_action_ratio'] ?? ($r['corpActionRatio'] ?? null),
+
             // candle structure flags (ratios 0..1)
             'candle_body_pct' => $r['candle_body_pct'] ?? ($r['candleBodyPct'] ?? null),
             'candle_upper_wick_pct' => $r['candle_upper_wick_pct'] ?? ($r['candleUpperWickPct'] ?? null),
@@ -616,6 +621,11 @@ class WatchlistService
         $isExpired = (bool)($r['is_expired'] ?? ($r['isExpired'] ?? false));
         if ($isExpired) {
             $notes[] = 'Setup expired — avoid new entry.';
+        }
+
+        $corp = (bool)($r['corp_action_suspected'] ?? ($r['corpActionSuspected'] ?? false));
+        if ($corp) {
+            $notes[] = 'Corporate action suspected (split/reverse split) — skip trade sampai data normal.';
         }
 
         $gap = $r['gap_pct'] ?? null;

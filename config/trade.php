@@ -156,6 +156,8 @@ return [
         'liq' => [
             'dv20_a_min' => (float) env('WATCHLIST_DV20_A_MIN', 20000000000), // >= 20B
             'dv20_b_min' => (float) env('WATCHLIST_DV20_B_MIN', 5000000000),  // >= 5B
+            // dv20 minimal agar bucket B dianggap cukup liquid untuk match (selain bucket C).
+            'dv20_low_match_min' => (float) env('WATCHLIST_DV20_LOW_MATCH_MIN', 5000000000),
             'min_for_top_picks' => (string) env('WATCHLIST_LIQ_MIN_FOR_TOP_PICKS', 'B'), // A or B
 
             // Candidate gate (Hard filter): allow A/B/C by default (U/unknown is rejected).
@@ -163,6 +165,13 @@ return [
             'allowed_candidate_buckets' => array_values(array_filter(array_map('trim', explode(',', (string) env('WATCHLIST_LIQ_ALLOWED_CANDIDATE_BUCKETS', 'A,B,C'))))),
             // Minimal dv20 to include as candidate (0 = allow all allowed buckets).
             'dv20_candidate_min' => (float) env('WATCHLIST_DV20_CANDIDATE_MIN', 0),
+        ],
+
+        // Corporate action gate (split/reverse split/unadjusted events) - heuristic
+        // Tujuan: cegah indikator palsu saat seri harga belum adj.
+        'corporate_action' => [
+            'suspect_ratio_min' => (float) env('WATCHLIST_CA_SUSPECT_RATIO_MIN', 0.55),
+            'suspect_ratio_max' => (float) env('WATCHLIST_CA_SUSPECT_RATIO_MAX', 1.80),
         ],
 
         // Candle structure flags (computed from EOD candle + previous EOD candle)

@@ -91,7 +91,8 @@ class WatchlistGrouper
                 'top_picks' => count($groups['top_picks'] ?? []),
                 'watch'     => count($groups['watch'] ?? []),
                 'avoid'     => count($groups['avoid'] ?? []),
-                'total'     => count($rows),
+                // v2.5.14 BREAKING: rename total -> total_count
+                'total_count' => count($rows),
             ],
             'quality' => [
                 'expired'      => $expired,

@@ -39,6 +39,10 @@ class CandidateInput
     public ?float $dv20 = null;     // SMA20(close*volume) over 20 prior trading days (exclude today)
     public ?string $liqBucket = null; // A/B/C/U
 
+    // corporate action gate (heuristic)
+    public bool $corpActionSuspected = false;
+    public ?float $corpActionRatio = null; // close/prevClose
+
     // decision / signal
     public int $decisionCode;
     public int $signalCode;
@@ -108,7 +112,32 @@ class CandidateInput
 
         $this->tradeDate = (string)($row['trade_date'] ?? '');
 
+        $this->computeCorporateActionGate();
+
         $this->computeCandleFlags();
+    }
+
+    private function computeCorporateActionGate(): void
+    {
+        // Heuristic: indikasi split/reverse split/unadjusted corporate action
+        // Jika harga berubah drastis (rasio) antar hari, indikator EOD berpotensi palsu.
+        if ($this->prevClose === null || $this->prevClose <= 0 || $this->close <= 0) return;
+
+        $ratio = $this->close / $this->prevClose;
+        $this->corpActionRatio = round($ratio, 6);
+
+        $min = (float) config('trade.watchlist.corporate_action.suspect_ratio_min', 0.55);
+        $max = (float) config('trade.watchlist.corporate_action.suspect_ratio_max', 1.80);
+
+        $suspect = ($ratio <= $min) || ($ratio >= $max);
+
+        // tambahan: gunakan open juga untuk menangkap perubahan struktural saat close belum ada (atau stale)
+        if (!$suspect && $this->open !== null && $this->open > 0) {
+            $openRatio = $this->open / $this->prevClose;
+            if ($openRatio <= $min || $openRatio >= $max) $suspect = true;
+        }
+
+        $this->corpActionSuspected = (bool) $suspect;
     }
 
     private function computeCandleFlags(): void

@@ -11,7 +11,7 @@ class WatchlistTimingEngine
     /**
      * @param string $dow Mon/Tue/Wed/Thu/Fri
      * @param string $setupType Breakout/Pullback/Continuation/Reversal/Base
-     * @param array{gap_risk_high:bool,volatility_high:bool,liq_low:bool,market_risk_off:bool} $risk
+     * @param array{gap_risk_high:bool,volatility_high:bool,liq_low:bool,market_risk_off:bool,corp_action_suspected?:bool} $risk
      * @return array{entry_windows:string[],avoid_windows:string[],entry_style:string,size_multiplier:float,max_positions_today:int}
      */
     public function advise(string $dow, string $setupType, array $risk): array
@@ -19,6 +19,17 @@ class WatchlistTimingEngine
         // Baseline (WATCHLIST.md 8.1)
         $entry = ['09:20-10:30', '13:35-14:30'];
         $avoid = ['09:00-09:15', '11:45-12:00', '15:50-close'];
+
+        // Hard NO TRADE: corporate action suspected (split/reverse split) -> indikator rawan palsu.
+        if (!empty($risk['corp_action_suspected'])) {
+            return [
+                'entry_windows' => [],
+                'avoid_windows' => array_values(array_unique(array_merge($avoid, ['all_day']))),
+                'entry_style' => 'No-trade',
+                'size_multiplier' => 0.0,
+                'max_positions_today' => 0,
+            ];
+        }
 
         // Day-of-week adjustment (WATCHLIST.md 8.2)
         $size = 1.0;
@@ -84,6 +95,17 @@ class WatchlistTimingEngine
             }
             $size = min($size, 0.8);
             $maxPos = min($maxPos, 1);
+        }
+
+        // Corporate action suspected: NO TRADE.
+        if (!empty($risk['corp_action_suspected'])) {
+            return [
+                'entry_windows' => [],
+                'avoid_windows' => ['ALL_DAY'],
+                'entry_style' => 'No-trade',
+                'size_multiplier' => 0.0,
+                'max_positions_today' => 0,
+            ];
         }
 
         $entry = array_values(array_unique($entry));

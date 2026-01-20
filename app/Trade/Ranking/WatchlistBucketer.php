@@ -20,6 +20,13 @@ class WatchlistBucketer
         $score = (float)($row['rankScore'] ?? 0);
         $isExpired = (bool)($row['isExpired'] ?? false);
 
+        // Gate keras: corporate action (split/reverse split) yang belum ternormalisasi bisa bikin indikator palsu.
+        // Tetap ditampilkan, tapi dipaksa AVOID (tidak boleh TOP/WATCH).
+        $corpAction = (bool)($row['corp_action_suspected'] ?? ($row['corporate_action_suspected'] ?? false));
+        if ($corpAction) {
+            return 'AVOID';
+        }
+
         $liqBucket = (string)($row['liq_bucket'] ?? '');
 
         // Rule keras: sinyal yang sudah EXPIRED tidak boleh masuk WATCH maupun TOP_PICKS.
