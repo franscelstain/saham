@@ -4,6 +4,27 @@ namespace App\Trade\Explain;
 
 class LabelCatalog
 {
+    /**
+     * Backward-compat aliases.
+     *
+     * Beberapa bagian code lama memanggil LabelCatalog::decision()/signal().
+     * Kita pertahankan sebagai alias supaya tidak pecah.
+     */
+    public static function decision(int $decisionCode): string
+    {
+        return self::decisionLabel($decisionCode);
+    }
+
+    public static function signal(int $signalCode): string
+    {
+        return self::signalLabel($signalCode);
+    }
+
+    public static function volume(int $volumeLabelCode): string
+    {
+        return self::volumeLabel($volumeLabelCode);
+    }
+
     public static function decisionLabel(int $decisionCode): string
     {
         $map = self::decisionMap();
