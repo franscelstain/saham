@@ -7,9 +7,12 @@ use Illuminate\Support\Facades\DB;
 
 class WatchlistRepository
 {
-    public function getEodCandidates(): array
+    public function getEodCandidates(?string $eodDate = null): array
     {
-        $eodDate = $this->getLatestEodDate();
+        if (!$eodDate) {
+            // Use the latest date where BOTH indicators and canonical OHLC are available.
+            $eodDate = $this->getLatestCommonEodDate();
+        }
 
         // previous trading day (for gap risk / prev_close)
         $prevDate = (string) (DB::table('market_calendar')
@@ -79,10 +82,57 @@ class WatchlistRepository
         return $rows->map(fn($r) => new CandidateInput((array) $r))->all();
     }
 
-    protected function getLatestEodDate(): string
+    /** Latest indicators date. */
+    public function getLatestIndicatorsEodDate(): string
     {
         return (string) DB::table('ticker_indicators_daily')
             ->where('is_deleted', 0)
             ->max('trade_date');
+    }
+
+    /** Latest canonical OHLC date. */
+    public function getLatestCanonicalEodDate(): string
+    {
+        return (string) DB::table('ticker_ohlc_daily')
+            ->where('is_deleted', 0)
+            ->max('trade_date');
+    }
+
+    /** Latest date where both indicators & canonical OHLC exist (simple min of max dates). */
+    public function getLatestCommonEodDate(): string
+    {
+        $ind = $this->getLatestIndicatorsEodDate();
+        $ohlc = $this->getLatestCanonicalEodDate();
+
+        if ($ind === '') return $ohlc;
+        if ($ohlc === '') return $ind;
+
+        return ($ohlc < $ind) ? $ohlc : $ind;
+    }
+
+    /** Coverage snapshot for a given date. */
+    public function coverageSnapshot(string $tradeDate): array
+    {
+        $total = (int) DB::table('tickers')->where('is_deleted', 0)->count();
+        $ind = (int) DB::table('ticker_indicators_daily')
+            ->where('is_deleted', 0)
+            ->where('trade_date', $tradeDate)
+            ->count();
+        $ohlc = (int) DB::table('ticker_ohlc_daily')
+            ->where('is_deleted', 0)
+            ->where('trade_date', $tradeDate)
+            ->count();
+
+        $indPct = ($total > 0) ? round(($ind / $total) * 100, 2) : null;
+        $ohlcPct = ($total > 0) ? round(($ohlc / $total) * 100, 2) : null;
+
+        return [
+            'trade_date' => $tradeDate,
+            'total_active_tickers' => $total,
+            'indicators_rows' => $ind,
+            'canonical_ohlc_rows' => $ohlc,
+            'indicators_coverage_pct' => $indPct,
+            'canonical_coverage_pct' => $ohlcPct,
+        ];
     }
 }

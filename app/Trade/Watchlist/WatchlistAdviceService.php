@@ -83,10 +83,11 @@ class WatchlistAdviceService
 
     private function confidence(float $score, array $risk, string $setupType): string
     {
-        // base from score
+        // base from score (docs/WATCHLIST.md)
+        // High >= 82, Medium 72-81, Low < 72
         $c = 'Low';
-        if ($score >= 70) $c = 'High';
-        elseif ($score >= 50) $c = 'Medium';
+        if ($score >= 82) $c = 'High';
+        elseif ($score >= 72) $c = 'Medium';
 
         // downgrade for obvious risk
         if (!empty($risk['market_risk_off']) || !empty($risk['gap_risk_high']) || !empty($risk['volatility_high'])) {

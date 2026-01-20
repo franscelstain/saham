@@ -155,6 +155,11 @@ return [
         // Jika data EOD terakhir terlalu basi (diukur dalam trading days), jangan keluarkan rekomendasi BUY.
         'max_stale_trading_days' => env('WATCHLIST_MAX_STALE_TRADING_DAYS', 1),
 
+        // Coverage gate: minimal coverage agar EOD dianggap "ready".
+        // Kalau coverage di bawah threshold, sistem akan emit NO_TRADE (EOD_NOT_READY).
+        'min_canonical_coverage_pct' => env('WATCHLIST_MIN_CANONICAL_COVERAGE_PCT', 85),
+        'min_indicator_coverage_pct' => env('WATCHLIST_MIN_INDICATOR_COVERAGE_PCT', 85),
+
         // Market context / regime (risk_on / neutral / risk_off)
         // Dipakai untuk gating rekomendasi saat breadth sedang risk_off.
         'market_regime_enabled' => env('WATCHLIST_MARKET_REGIME_ENABLED', true),

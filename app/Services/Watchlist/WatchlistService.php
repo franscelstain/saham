@@ -61,6 +61,9 @@ class WatchlistService
         }
 
         $pipe = $this->factory->makePreopen();
+
+        // Pull candidates from the latest date where BOTH indicators and canonical OHLC are available.
+        // This avoids emitting BUY recommendations on partial / non-canonical coverage.
         $raw = $this->watchRepo->getEodCandidates();
 
         $eodBasisDate = (!empty($raw) && is_object($raw[0]) && property_exists($raw[0], "tradeDate")) ? (string)$raw[0]->tradeDate : null;
@@ -203,11 +206,35 @@ class WatchlistService
         $stale = $this->computeEodStaleness($eodDate ? (string) $eodDate : null, $today, $tz);
         $maxStale = (int) config('trade.watchlist.max_stale_trading_days', 1);
 
+        // Coverage gate (canonical readiness)
+        $coverage = null;
+        $minCanonPct = (float) config('trade.watchlist.min_canonical_coverage_pct', 85);
+        $minIndPct = (float) config('trade.watchlist.min_indicator_coverage_pct', 85);
+        $isCoverageOk = true;
+        if ($eodDate) {
+            try {
+                $coverage = $this->watchRepo->coverageSnapshot((string) $eodDate);
+                $canonPct = (float) ($coverage['canonical_coverage_pct'] ?? 0);
+                $indPct = (float) ($coverage['indicators_coverage_pct'] ?? 0);
+
+                // must have enough canonical & indicator rows to be considered ready
+                if ($canonPct < $minCanonPct || $indPct < $minIndPct) {
+                    $isCoverageOk = false;
+                }
+            } catch (\Throwable $e) {
+                // if we cannot measure coverage, be conservative: block recommendations
+                $isCoverageOk = false;
+            }
+        }
+
         // recommendations = action plan (allocation + timing + slices + optional lots)
         // Guardrails:
         // - If EOD data is stale beyond threshold, do not emit BUY recommendations.
         // - If market_regime is risk_off, emit NO_TRADE (avoid forcing entries on bad breadth).
         $warnings = [];
+        if (!$isCoverageOk) {
+            $warnings[] = 'EOD_NOT_READY';
+        }
         if ($stale['trading_days_stale'] !== null && (int)$stale['trading_days_stale'] > $maxStale) {
             $warnings[] = 'EOD_STALE';
         }
@@ -216,7 +243,9 @@ class WatchlistService
             $warnings[] = 'MARKET_RISK_OFF';
         }
 
-        if ($stale['trading_days_stale'] !== null && (int)$stale['trading_days_stale'] > $maxStale) {
+        if (!$isCoverageOk) {
+            $recommendations = $this->buildNoTradeRecommendationsEodNotReady($coverage, $minCanonPct, $minIndPct);
+        } elseif ($stale['trading_days_stale'] !== null && (int)$stale['trading_days_stale'] > $maxStale) {
             $recommendations = $this->buildNoTradeRecommendations($stale, $maxStale);
         } elseif ($mrEnabled && $blockOnRiskOff && $marketRegime === 'risk_off') {
             $recommendations = $this->buildNoTradeRecommendationsMarketRiskOff($market);
@@ -236,6 +265,9 @@ class WatchlistService
                 'trading_days_stale' => $stale['trading_days_stale'],
                 'missing_trading_dates' => $stale['missing_trading_dates'],
                 'max_allowed_trading_days_stale' => $maxStale,
+                'coverage' => $coverage,
+                'min_canonical_coverage_pct' => $minCanonPct,
+                'min_indicator_coverage_pct' => $minIndPct,
             ],
             'warnings' => $warnings,
         ]);
@@ -333,6 +365,47 @@ class WatchlistService
             'stale_trading_days' => $days,
             'max_allowed_trading_days_stale' => $maxStale,
             'missing_trading_dates' => $missing,
+        ];
+    }
+
+    /**
+     * Build NO_TRADE recommendations payload when canonical EOD coverage is not ready.
+     * This prevents "blind buy" on partial market data.
+     */
+    private function buildNoTradeRecommendationsEodNotReady(?array $coverage, float $minCanonPct, float $minIndPct): array
+    {
+        $canonPct = $coverage['canonical_coverage_pct'] ?? null;
+        $indPct = $coverage['indicators_coverage_pct'] ?? null;
+        $tradeDate = $coverage['trade_date'] ?? null;
+
+        $msg = 'NO_TRADE karena data EOD canonical belum siap / coverage masih kurang.';
+        if ($tradeDate) {
+            $msg .= ' (basis ' . $tradeDate . ')';
+        }
+
+        return [
+            'mode' => 'NO_TRADE',
+            'positions' => 0,
+            'split_ratio' => '',
+            'selected_strategy_id' => null,
+            'strategies' => [],
+            'buy_plan' => [],
+
+            'entry_windows_default' => [],
+            'avoid_windows_default' => [],
+            'timing_summary_default' => $msg,
+            'pre_buy_checklist_default' => [
+                'Pastikan import EOD canonical (ticker_ohlc_daily) sudah lengkap untuk trading day terakhir.',
+                'Jika ada missing data: jalankan pipeline market-data/import dan compute-eod terlebih dulu.',
+                'Hindari entry berdasarkan sebagian data (blind buy).',
+            ],
+
+            'reason' => 'EOD_NOT_READY',
+            'coverage' => $coverage,
+            'min_canonical_coverage_pct' => $minCanonPct,
+            'min_indicator_coverage_pct' => $minIndPct,
+            'canonical_coverage_pct' => $canonPct,
+            'indicators_coverage_pct' => $indPct,
         ];
     }
 
