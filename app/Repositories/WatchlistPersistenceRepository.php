@@ -14,16 +14,63 @@ class WatchlistPersistenceRepository
     {
         $now = now();
 
-        $id = DB::table('watchlist_daily')->insertGetId([
-            'trade_date' => $tradeDate,
-            'source' => $source,
-            'generated_at' => $now,
-            'payload_json' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        return (int) $id;
+        // Idempotent per (trade_date, source). If a snapshot already exists,
+        // update it instead of inserting a new row.
+        $existing = DB::table('watchlist_daily')
+            ->select(['watchlist_daily_id'])
+            ->where('trade_date', $tradeDate)
+            ->where('source', $source)
+            ->orderByDesc('watchlist_daily_id')
+            ->first();
+
+        if ($existing && !empty($existing->watchlist_daily_id)) {
+            DB::table('watchlist_daily')
+                ->where('watchlist_daily_id', (int) $existing->watchlist_daily_id)
+                ->update([
+                    'generated_at' => $now,
+                    'payload_json' => $payloadJson,
+                    'updated_at' => $now,
+                ]);
+
+            return (int) $existing->watchlist_daily_id;
+        }
+
+        // Insert new snapshot. If two requests race, unique index will enforce
+        // single row; in that case we re-read and update.
+        try {
+            $id = DB::table('watchlist_daily')->insertGetId([
+                'trade_date' => $tradeDate,
+                'source' => $source,
+                'generated_at' => $now,
+                'payload_json' => $payloadJson,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            return (int) $id;
+        } catch (\Throwable $e) {
+            $existing = DB::table('watchlist_daily')
+                ->select(['watchlist_daily_id'])
+                ->where('trade_date', $tradeDate)
+                ->where('source', $source)
+                ->orderByDesc('watchlist_daily_id')
+                ->first();
+
+            if ($existing && !empty($existing->watchlist_daily_id)) {
+                DB::table('watchlist_daily')
+                    ->where('watchlist_daily_id', (int) $existing->watchlist_daily_id)
+                    ->update([
+                        'generated_at' => $now,
+                        'payload_json' => $payloadJson,
+                        'updated_at' => $now,
+                    ]);
+                return (int) $existing->watchlist_daily_id;
+            }
+
+            throw $e;
+        }
     }
 
     /**
@@ -34,6 +81,10 @@ class WatchlistPersistenceRepository
     {
         $now = now();
         $rows = [];
+
+        // Idempotent refresh: avoid duplicated candidate rows when endpoint is hit
+        // multiple times for the same daily snapshot.
+        DB::table('watchlist_candidates')->where('watchlist_daily_id', $dailyId)->delete();
 
         $mapBuckets = [
             'top_picks' => 'TOP_PICKS',
