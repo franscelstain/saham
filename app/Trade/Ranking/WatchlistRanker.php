@@ -67,6 +67,8 @@ class WatchlistRanker
         $rsi   = $this->f($row['rsi'] ?? ($row['rsi14'] ?? null));
         $volRatio = $this->f($row['vol_ratio'] ?? null);
         $valueEst = $this->f($row['valueEst'] ?? ($row['value_est'] ?? null));
+        $dv20     = $this->f($row['dv20'] ?? null);
+        $liqBucket = (string)($row['liq_bucket'] ?? '');
         $atrPct   = $this->f($row['atr_pct'] ?? null);
         $gapPct   = $this->f($row['gap_pct'] ?? null);
         $rangePct = $this->f($row['range_pct'] ?? null);
@@ -162,16 +164,28 @@ class WatchlistRanker
             $this->push($codes, $reasons, 'VOL_EARLY', 'pos', 2, $debug);
         }
 
-        if ($valueEst !== null) {
-            if ($valueEst >= 5000000000) {
-                $volume += 10;
-                $this->push($codes, $reasons, 'LIQ_GE_5B', 'pos', 10, $debug);
-            } elseif ($valueEst >= 2000000000) {
-                $volume += 7;
-                $this->push($codes, $reasons, 'LIQ_GE_2B', 'pos', 7, $debug);
-            } elseif ($valueEst >= 1000000000) {
-                $volume += 4;
-                $this->push($codes, $reasons, 'LIQ_GE_1B', 'pos', 4, $debug);
+        // Liquidity proxy: dv20 bucket (SMA20 of close*volume over prior 20 trading days, exclude today)
+        if ($liqBucket === 'A') {
+            $volume += 10;
+            $this->push($codes, $reasons, 'LIQ_DV20_A', 'pos', 10, $debug, ['dv20' => $dv20]);
+        } elseif ($liqBucket === 'B') {
+            $volume += 7;
+            $this->push($codes, $reasons, 'LIQ_DV20_B', 'pos', 7, $debug, ['dv20' => $dv20]);
+        } elseif ($liqBucket === 'C') {
+            $this->push($codes, $reasons, 'LIQ_DV20_C', 'warn', 0, $debug, ['dv20' => $dv20]);
+        } else {
+            // fallback legacy (single-day value_est) kalau dv20 belum tersedia
+            if ($valueEst !== null) {
+                if ($valueEst >= 5000000000) {
+                    $volume += 8;
+                    $this->push($codes, $reasons, 'LIQ_GE_5B', 'pos', 8, $debug);
+                } elseif ($valueEst >= 2000000000) {
+                    $volume += 5;
+                    $this->push($codes, $reasons, 'LIQ_GE_2B', 'pos', 5, $debug);
+                } elseif ($valueEst >= 1000000000) {
+                    $volume += 3;
+                    $this->push($codes, $reasons, 'LIQ_GE_1B', 'pos', 3, $debug);
+                }
             }
         }
         if ($volume > 20) $volume = 20;

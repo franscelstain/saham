@@ -14,11 +14,36 @@ class WatchlistRepository
             $eodDate = $this->getLatestCommonEodDate();
         }
 
-        // previous trading day (for gap risk / prev_close)
+        // previous trading day (for gap risk / prev candle)
         $prevDate = (string) (DB::table('market_calendar')
             ->where('is_trading_day', 1)
             ->where('cal_date', '<', $eodDate)
             ->max('cal_date') ?? '');
+
+        // dv20 dates: last 20 trading days BEFORE eodDate (exclude today)
+        $dv20Dates = DB::table('market_calendar')
+            ->where('is_trading_day', 1)
+            ->where('cal_date', '<', $eodDate)
+            ->orderByDesc('cal_date')
+            ->limit(20)
+            ->pluck('cal_date')
+            ->all();
+
+        $aMin = (float) config('trade.watchlist.liq.dv20_a_min', 20000000000);
+        $bMin = (float) config('trade.watchlist.liq.dv20_b_min', 5000000000);
+
+        // dv20 = avg(close*volume) for those dates
+        $dv20Sub = null;
+        if (!empty($dv20Dates)) {
+            $dv20Sub = DB::table('ticker_ohlc_daily')
+                ->select([
+                    'ticker_id',
+                    DB::raw('AVG(close * volume) as dv20'),
+                ])
+                ->where('is_deleted', 0)
+                ->whereIn('trade_date', $dv20Dates)
+                ->groupBy('ticker_id');
+        }
 
         $q = DB::table('ticker_indicators_daily as ti')
             ->join('tickers as t', function($join) {
@@ -31,53 +56,89 @@ class WatchlistRepository
                      ->where('od.is_deleted', 0)
                      ->where('od.trade_date', '=', $eodDate);
             })
-            // prev close (canonical)
+            // prev candle (canonical)
             ->leftJoin('ticker_ohlc_daily as od_prev', function($join) use ($prevDate) {
                 $join->on('ti.ticker_id', '=', 'od_prev.ticker_id')
                      ->where('od_prev.is_deleted', 0)
                      ->where('od_prev.trade_date', '=', $prevDate);
-            })
-            ->where('ti.is_deleted', 0)
+            });
+
+        if ($dv20Sub) {
+            $q = $q->leftJoinSub($dv20Sub, 'dv', function($join) {
+                $join->on('ti.ticker_id', '=', 'dv.ticker_id');
+            });
+        }
+
+        $liqCase = "CASE
+"
+            . " WHEN dv.dv20 IS NULL THEN 'U'
+"
+            . " WHEN dv.dv20 >= {$aMin} THEN 'A'
+"
+            . " WHEN dv.dv20 >= {$bMin} THEN 'B'
+"
+            . " WHEN dv.dv20 > 0 THEN 'C'
+"
+            . " ELSE 'U'
+"
+            . " END";
+
+        $select = [
+            't.ticker_id',
+            't.ticker_code',
+            't.company_name',
+
+            // OHLC (prefer canonical ticker_ohlc_daily)
+            DB::raw('COALESCE(od.open, ti.open) as open'),
+            DB::raw('COALESCE(od.high, ti.high) as high'),
+            DB::raw('COALESCE(od.low, ti.low) as low'),
+            DB::raw('COALESCE(od.close, ti.close) as close'),
+            DB::raw('COALESCE(od.volume, ti.volume) as volume'),
+
+            // prev candle
+            DB::raw('od_prev.open as prev_open'),
+            DB::raw('od_prev.high as prev_high'),
+            DB::raw('od_prev.low as prev_low'),
+            DB::raw('od_prev.close as prev_close'),
+
+            'ti.ma20',
+            'ti.ma50',
+            'ti.ma200',
+            'ti.rsi14',
+            'ti.vol_sma20',
+            'ti.vol_ratio',
+            'ti.atr14',
+            'ti.support_20d',
+            'ti.resistance_20d',
+
+            // decision/signal/volume label
+            'ti.score_total',
+            'ti.decision_code',
+            'ti.signal_code',
+            'ti.volume_label_code',
+
+            // expiry fields
+            'ti.signal_first_seen_date',
+            'ti.signal_age_days',
+
+            'ti.trade_date',
+
+            // old proxy (still useful)
+            DB::raw('(COALESCE(od.close, ti.close) * COALESCE(od.volume, ti.volume)) as value_est'),
+        ];
+
+        if ($dv20Sub) {
+            $select[] = DB::raw('dv.dv20 as dv20');
+            $select[] = DB::raw("{$liqCase} as liq_bucket");
+        } else {
+            $select[] = DB::raw('NULL as dv20');
+            $select[] = DB::raw("'U' as liq_bucket");
+        }
+
+        $rows = $q->where('ti.is_deleted', 0)
             ->where('ti.trade_date', $eodDate)
-            ->select([
-                't.ticker_id',
-                't.ticker_code',
-                't.company_name',
-
-                // OHLC (prefer canonical ticker_ohlc_daily)
-                DB::raw('COALESCE(od.open, ti.open) as open'),
-                DB::raw('COALESCE(od.high, ti.high) as high'),
-                DB::raw('COALESCE(od.low, ti.low) as low'),
-                DB::raw('COALESCE(od.close, ti.close) as close'),
-                DB::raw('COALESCE(od.volume, ti.volume) as volume'),
-
-                DB::raw('od_prev.close as prev_close'),
-
-                'ti.ma20',
-                'ti.ma50',
-                'ti.ma200',
-                'ti.rsi14',
-                'ti.vol_sma20',
-                'ti.vol_ratio',
-                'ti.atr14',
-                'ti.support_20d',
-                'ti.resistance_20d',
-
-                // decision/signal/volume label
-                'ti.score_total',
-                'ti.decision_code',
-                'ti.signal_code',
-                'ti.volume_label_code',
-
-                // expiry fields
-                'ti.signal_first_seen_date',
-                'ti.signal_age_days',
-
-                'ti.trade_date',
-                DB::raw('(COALESCE(od.close, ti.close) * COALESCE(od.volume, ti.volume)) as value_est'),
-            ]);
-
-        $rows = $q->get();
+            ->select($select)
+            ->get();
 
         return $rows->map(fn($r) => new CandidateInput((array) $r))->all();
     }

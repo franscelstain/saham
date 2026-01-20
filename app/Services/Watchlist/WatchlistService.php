@@ -6,6 +6,7 @@ use App\Repositories\WatchlistRepository;
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\MarketData\CandidateValidationRepository;
 use App\Repositories\MarketBreadthRepository;
+use App\Repositories\WatchlistPersistenceRepository;
 use App\Trade\Watchlist\WatchlistMarketContextService;
 use App\Services\Trade\TradePlanService;
 use App\Trade\Explain\ReasonCatalog;
@@ -24,6 +25,7 @@ class WatchlistService
     private WatchlistMarketContextService $marketCtx;
     private WatchlistAdviceService $advice;
     private WatchlistAllocationEngine $alloc;
+    private WatchlistPersistenceRepository $persistRepo;
 
     public function __construct(
         WatchlistRepository $watchRepo,
@@ -31,7 +33,8 @@ class WatchlistService
         TradePlanService $planService,
         WatchlistPipelineFactory $factory,
         CandidateValidationRepository $valRepo,
-        MarketBreadthRepository $breadthRepo
+        MarketBreadthRepository $breadthRepo,
+        WatchlistPersistenceRepository $persistRepo
     ) {
         $this->watchRepo = $watchRepo;
         $this->calRepo = $calRepo;
@@ -39,6 +42,7 @@ class WatchlistService
         $this->factory = $factory;
         $this->valRepo = $valRepo;
         $this->breadthRepo = $breadthRepo;
+        $this->persistRepo = $persistRepo;
         $this->marketCtx = new WatchlistMarketContextService();
 
         // instansiasi ringan, tidak ada IO
@@ -272,13 +276,33 @@ class WatchlistService
             'warnings' => $warnings,
         ]);
 
-        return [
+        $payload = [
             // keys utama untuk UI
             'eod_date' => $eodDate,
             'groups'   => $groups,
             'meta'     => $meta,
             'recommendations' => $recommendations,
         ];
+
+        // Persist snapshot + flattened candidates (optional; safe if migrations not yet run)
+        $persistEnabled = (bool) config('trade.watchlist.persistence.enabled', true);
+        if ($persistEnabled && $eodDate) {
+            try {
+                $dailyId = $this->persistRepo->saveDailySnapshot((string) $eodDate, $payload, 'pre_open');
+                $this->persistRepo->saveCandidates($dailyId, (string) $eodDate, (array) $groups);
+                $payload['meta']['persistence'] = [
+                    'enabled' => true,
+                    'watchlist_daily_id' => $dailyId,
+                ];
+            } catch (\Throwable $e) {
+                $payload['meta']['persistence'] = [
+                    'enabled' => true,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $payload;
     }
 
     private function dowFromDate(string $tradeDate): string

@@ -20,6 +20,8 @@ class WatchlistBucketer
         $score = (float)($row['rankScore'] ?? 0);
         $isExpired = (bool)($row['isExpired'] ?? false);
 
+        $liqBucket = (string)($row['liq_bucket'] ?? '');
+
         // Rule keras: sinyal yang sudah EXPIRED tidak boleh masuk WATCH maupun TOP_PICKS.
         // Ini mencegah output watchlist jadi noisy dan kontradiktif.
         if ($isExpired) {
@@ -31,7 +33,10 @@ class WatchlistBucketer
 
         $rrTp2 = (float)($row['plan']['rrTp2'] ?? 0);
 
-        if (!$hasErrors && $rrTp2 >= $this->rrMin && $score >= $this->topMin) {
+        // Liquidity gating: bucket C / unknown tidak boleh masuk TOP_PICKS (boleh tetap WATCH/AVOID).
+        $liqOkForTop = ($liqBucket === 'A' || $liqBucket === 'B');
+
+        if ($liqOkForTop && !$hasErrors && $rrTp2 >= $this->rrMin && $score >= $this->topMin) {
             return 'TOP_PICKS';
         }
 

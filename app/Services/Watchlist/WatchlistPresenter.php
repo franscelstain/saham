@@ -70,6 +70,24 @@ class WatchlistPresenter
             'value_est' => $c->valueEst,
             'trade_date' => $c->tradeDate,
 
+            // liquidity proxy (dv20)
+            'dv20' => $c->dv20,
+            'liq_bucket' => $c->liqBucket,
+
+            // previous candle
+            'prev_open' => $c->prevOpen,
+            'prev_high' => $c->prevHigh,
+            'prev_low' => $c->prevLow,
+
+            // candle structure flags (ratios 0..1)
+            'candle_body_pct' => $c->candleBodyPct,
+            'candle_upper_wick_pct' => $c->candleUpperWickPct,
+            'candle_lower_wick_pct' => $c->candleLowerWickPct,
+            'is_inside_day' => $c->isInsideDay,
+            'engulfing_type' => $c->engulfingType,
+            'is_long_upper_wick' => $c->isLongUpperWick,
+            'is_long_lower_wick' => $c->isLongLowerWick,
+
             // raw codes
             'decisionCode' => $c->decisionCode,
             'signalCode' => $c->signalCode,

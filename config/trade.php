@@ -151,6 +151,23 @@ return [
         'expiry_max_age_days' => env('WATCHLIST_EXPIRY_MAX_AGE_DAYS', 3), // max umur sinyal (hari). 0 = hari pertama muncul.
         'explain_verbose' => env('WATCHLIST_EXPLAIN_VERBOSE', false),
         'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),        
+
+        // Liquidity proxy (dv20 = SMA20 of close*volume over 20 prior trading days; exclude today)
+        'liq' => [
+            'dv20_a_min' => (float) env('WATCHLIST_DV20_A_MIN', 20000000000), // >= 20B
+            'dv20_b_min' => (float) env('WATCHLIST_DV20_B_MIN', 5000000000),  // >= 5B
+            'min_for_top_picks' => (string) env('WATCHLIST_LIQ_MIN_FOR_TOP_PICKS', 'B'), // A or B
+        ],
+
+        // Candle structure flags (computed from EOD candle + previous EOD candle)
+        'candle' => [
+            'long_wick_pct' => (float) env('WATCHLIST_CANDLE_LONG_WICK_PCT', 0.55),
+        ],
+
+        // Persistence (optional)
+        'persistence' => [
+            'enabled' => (bool) env('WATCHLIST_PERSISTENCE_ENABLED', true),
+        ],
         'preopen_cache_seconds' => env('WATCHLIST_PREOPEN_CACHE_SECONDS', 15),
         // Jika data EOD terakhir terlalu basi (diukur dalam trading days), jangan keluarkan rekomendasi BUY.
         'max_stale_trading_days' => env('WATCHLIST_MAX_STALE_TRADING_DAYS', 1),
