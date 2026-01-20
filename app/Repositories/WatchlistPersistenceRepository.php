@@ -10,13 +10,13 @@ class WatchlistPersistenceRepository
      * Save full preopen payload as daily snapshot.
      * Returns watchlist_daily_id.
      */
-    public function saveDailySnapshot(string $tradeDate, array $payload, string $policyCode = 'pre_open'): int
+    public function saveDailySnapshot(string $tradeDate, array $payload, string $source = 'preopen'): int
     {
         $now = now();
 
         $id = DB::table('watchlist_daily')->insertGetId([
             'trade_date' => $tradeDate,
-            'policy_code' => $policyCode,
+            'source' => $source,
             'generated_at' => $now,
             'payload_json' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             'created_at' => $now,
@@ -48,6 +48,15 @@ class WatchlistPersistenceRepository
             foreach ($list as $idx => $r) {
                 if (!is_array($r)) continue;
 
+                $rankScore = null;
+                if (isset($r['watchlist_score']) && is_numeric($r['watchlist_score'])) $rankScore = (float) $r['watchlist_score'];
+                elseif (isset($r['rankScore']) && is_numeric($r['rankScore'])) $rankScore = (float) $r['rankScore'];
+                elseif (isset($r['rank_score']) && is_numeric($r['rank_score'])) $rankScore = (float) $r['rank_score'];
+
+                $plan = $r['plan'] ?? ($r['trade_plan'] ?? null);
+                $rankReasonCodes = $r['rankReasonCodes'] ?? ($r['rank_reason_codes'] ?? null);
+                $rankBreakdown = $r['rank_breakdown'] ?? ($r['score_breakdown'] ?? null);
+
                 $rows[] = [
                     'watchlist_daily_id' => $dailyId,
                     'trade_date' => $tradeDate,
@@ -55,11 +64,16 @@ class WatchlistPersistenceRepository
                     'ticker' => (string)($r['ticker'] ?? ($r['code'] ?? '')),
                     'bucket' => $bucket,
                     'rank' => is_numeric($r['rank'] ?? null) ? (int)$r['rank'] : ($idx + 1),
-                    'score' => is_numeric($r['rankScore'] ?? ($r['rank_score'] ?? null)) ? (float)($r['rankScore'] ?? ($r['rank_score'] ?? 0)) : null,
+                    'watchlist_score' => $rankScore ?? 0,
+                    'confidence' => !empty($r['confidence']) ? (string) $r['confidence'] : null,
 
                     'decision_code' => (int)($r['decision_code'] ?? ($r['decisionCode'] ?? 0)),
                     'signal_code' => (int)($r['signal_code'] ?? ($r['signalCode'] ?? 0)),
                     'volume_label_code' => (int)($r['volume_label_code'] ?? ($r['volumeLabelCode'] ?? 0)),
+
+                    'decision_label' => !empty($r['decision_label']) ? (string) $r['decision_label'] : (!empty($r['decisionLabel']) ? (string) $r['decisionLabel'] : null),
+                    'signal_label' => !empty($r['signal_label']) ? (string) $r['signal_label'] : (!empty($r['signalLabel']) ? (string) $r['signalLabel'] : null),
+                    'volume_label' => !empty($r['volume_label']) ? (string) $r['volume_label'] : (!empty($r['volumeLabel']) ? (string) $r['volumeLabel'] : null),
 
                     'open' => isset($r['open']) && is_numeric($r['open']) ? (float)$r['open'] : null,
                     'high' => isset($r['high']) && is_numeric($r['high']) ? (float)$r['high'] : null,
@@ -67,7 +81,11 @@ class WatchlistPersistenceRepository
                     'close' => isset($r['close']) && is_numeric($r['close']) ? (float)$r['close'] : null,
                     'volume' => isset($r['volume']) && is_numeric($r['volume']) ? (int)$r['volume'] : null,
 
-                    'value_est' => isset($r['value_est']) && is_numeric($r['value_est']) ? (float)$r['value_est'] : (isset($r['valueEst']) && is_numeric($r['valueEst']) ? (float)$r['valueEst'] : null),
+                    'prev_open' => isset($r['prev_open']) && is_numeric($r['prev_open']) ? (float)$r['prev_open'] : (isset($r['prevOpen']) && is_numeric($r['prevOpen']) ? (float)$r['prevOpen'] : null),
+                    'prev_high' => isset($r['prev_high']) && is_numeric($r['prev_high']) ? (float)$r['prev_high'] : (isset($r['prevHigh']) && is_numeric($r['prevHigh']) ? (float)$r['prevHigh'] : null),
+                    'prev_low' => isset($r['prev_low']) && is_numeric($r['prev_low']) ? (float)$r['prev_low'] : (isset($r['prevLow']) && is_numeric($r['prevLow']) ? (float)$r['prevLow'] : null),
+                    'prev_close' => isset($r['prev_close']) && is_numeric($r['prev_close']) ? (float)$r['prev_close'] : (isset($r['prevClose']) && is_numeric($r['prevClose']) ? (float)$r['prevClose'] : null),
+
                     'dv20' => isset($r['dv20']) && is_numeric($r['dv20']) ? (float)$r['dv20'] : null,
                     'liq_bucket' => (string)($r['liq_bucket'] ?? ''),
 
@@ -79,8 +97,9 @@ class WatchlistPersistenceRepository
                     'is_long_upper_wick' => isset($r['is_long_upper_wick']) ? (int)((bool)$r['is_long_upper_wick']) : null,
                     'is_long_lower_wick' => isset($r['is_long_lower_wick']) ? (int)((bool)$r['is_long_lower_wick']) : null,
 
-                    'plan_json' => isset($r['plan']) ? json_encode($r['plan'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null,
-                    'reason_codes_json' => isset($r['rankReasonCodes']) ? json_encode($r['rankReasonCodes'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : (isset($r['rank_reason_codes']) ? json_encode($r['rank_reason_codes'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null),
+                    'plan' => is_array($plan) ? json_encode($plan, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : (is_string($plan) ? $plan : null),
+                    'rank_reason_codes' => is_array($rankReasonCodes) ? json_encode($rankReasonCodes, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : (is_string($rankReasonCodes) ? $rankReasonCodes : null),
+                    'rank_breakdown' => is_array($rankBreakdown) ? json_encode($rankBreakdown, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : (is_string($rankBreakdown) ? $rankBreakdown : null),
 
                     'created_at' => $now,
                     'updated_at' => $now,
