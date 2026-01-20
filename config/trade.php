@@ -154,6 +154,25 @@ return [
         'preopen_cache_seconds' => env('WATCHLIST_PREOPEN_CACHE_SECONDS', 15),
         // Jika data EOD terakhir terlalu basi (diukur dalam trading days), jangan keluarkan rekomendasi BUY.
         'max_stale_trading_days' => env('WATCHLIST_MAX_STALE_TRADING_DAYS', 1),
+
+        // Market context / regime (risk_on / neutral / risk_off)
+        // Dipakai untuk gating rekomendasi saat breadth sedang risk_off.
+        'market_regime_enabled' => env('WATCHLIST_MARKET_REGIME_ENABLED', true),
+        'market_regime_block_buy_on_risk_off' => env('WATCHLIST_MARKET_REGIME_BLOCK_BUY_ON_RISK_OFF', true),
+        'market_regime_thresholds' => [
+            // OK dari user: risk_on jika above>=55, align>=45, rsi>=50
+            'risk_on' => [
+                'above_ma200' => env('WATCHLIST_MR_RISK_ON_ABOVE_MA200', 55),
+                'ma_alignment' => env('WATCHLIST_MR_RISK_ON_MA_ALIGN', 45),
+                'avg_rsi14' => env('WATCHLIST_MR_RISK_ON_AVG_RSI', 50),
+            ],
+            // OK dari user: risk_off jika above<=40, align<=30, rsi<=45
+            'risk_off' => [
+                'above_ma200' => env('WATCHLIST_MR_RISK_OFF_ABOVE_MA200', 40),
+                'ma_alignment' => env('WATCHLIST_MR_RISK_OFF_MA_ALIGN', 30),
+                'avg_rsi14' => env('WATCHLIST_MR_RISK_OFF_AVG_RSI', 45),
+            ],
+        ],
         'ranking_enabled' => env('WATCHLIST_RANKING_ENABLED', true),
         'ranking_penalty_plan_invalid' => env('WATCHLIST_RANKING_PENALTY_PLAN_INVALID', 30),
         'ranking_penalty_rr_below_min' => env('WATCHLIST_RANKING_PENALTY_RR_BELOW_MIN', 20),

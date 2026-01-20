@@ -105,6 +105,12 @@ class WatchlistPresenter
         $row['rankScore'] = $rank['score'] ?? 0;
         $row['rankReasonCodes'] = $rank['codes'] ?? [];
 
+        // komponen skor (ringan) untuk UI/debug
+        if (isset($rank['breakdown'])) {
+            $row['scoreBreakdown'] = $rank['breakdown'];
+            $row['score_breakdown'] = $rank['breakdown'];
+        }
+
         if (!empty($rank['reasons']) && config('trade.watchlist.explain_verbose', false)) {
             $row['rankReasons'] = $rank['reasons'];
         }

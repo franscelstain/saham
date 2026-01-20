@@ -46,10 +46,14 @@ class WatchlistPipelineFactory
         $weights['penalty_rr_below_min'] = -abs((int) config('trade.watchlist.ranking_penalty_rr_below_min', 20));
         $rrMin = (float) config('trade.watchlist.ranking_rr_min', 1.2);
 
+        // Ranker v3 menerima opts (debug_reasons optional)
+        $opts = $weights;
+        $opts['debug_reasons'] = (bool) config('trade.watchlist.explain_verbose', false);
+
         $ranker = new WatchlistRanker(
             (bool) config('trade.watchlist.ranking_enabled', true),
             $rrMin,
-            $weights
+            $opts
         );
 
         $bucketer = new WatchlistBucketer(

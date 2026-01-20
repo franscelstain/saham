@@ -5,6 +5,8 @@ namespace App\Services\Watchlist;
 use App\Repositories\WatchlistRepository;
 use App\Repositories\MarketCalendarRepository;
 use App\Repositories\MarketData\CandidateValidationRepository;
+use App\Repositories\MarketBreadthRepository;
+use App\Trade\Watchlist\WatchlistMarketContextService;
 use App\Services\Trade\TradePlanService;
 use App\Trade\Explain\ReasonCatalog;
 use App\Trade\Watchlist\WatchlistAdviceService;
@@ -18,6 +20,8 @@ class WatchlistService
     private TradePlanService $planService;
     private WatchlistPipelineFactory $factory;
     private CandidateValidationRepository $valRepo;
+    private MarketBreadthRepository $breadthRepo;
+    private WatchlistMarketContextService $marketCtx;
     private WatchlistAdviceService $advice;
     private WatchlistAllocationEngine $alloc;
 
@@ -26,13 +30,16 @@ class WatchlistService
         MarketCalendarRepository $calRepo,
         TradePlanService $planService,
         WatchlistPipelineFactory $factory,
-        CandidateValidationRepository $valRepo
+        CandidateValidationRepository $valRepo,
+        MarketBreadthRepository $breadthRepo
     ) {
         $this->watchRepo = $watchRepo;
         $this->calRepo = $calRepo;
         $this->planService = $planService;
         $this->factory = $factory;
         $this->valRepo = $valRepo;
+        $this->breadthRepo = $breadthRepo;
+        $this->marketCtx = new WatchlistMarketContextService();
 
         // instansiasi ringan, tidak ada IO
         $this->advice = new WatchlistAdviceService();
@@ -55,6 +62,48 @@ class WatchlistService
 
         $pipe = $this->factory->makePreopen();
         $raw = $this->watchRepo->getEodCandidates();
+
+        $eodBasisDate = (!empty($raw) && is_object($raw[0]) && property_exists($raw[0], "tradeDate")) ? (string)$raw[0]->tradeDate : null;
+
+        // market breadth snapshot -> regime (risk_on / neutral / risk_off)
+        $mrEnabled = (bool) config('trade.watchlist.market_regime_enabled', true);
+        $mrThresholds = (array) config('trade.watchlist.market_regime_thresholds', []);
+        $riskOn = (array) ($mrThresholds['risk_on'] ?? []);
+        $riskOff = (array) ($mrThresholds['risk_off'] ?? []);
+
+        $marketSnapshot = [
+            'trade_date' => (string)($eodBasisDate ?: ''),
+            'sample_size' => 0,
+            'pct_above_ma200' => null,
+            'pct_ma_alignment' => null,
+            'avg_rsi14' => null,
+        ];
+
+        if ($mrEnabled && $eodBasisDate) {
+            try {
+                $marketSnapshot = $this->breadthRepo->snapshot($eodBasisDate);
+            } catch (\Throwable $e) {
+                // keep defaults
+            }
+        }
+
+        $marketRegime = 'neutral';
+        $marketNotes = $mrEnabled
+            ? 'Breadth snapshot tidak tersedia (fallback neutral).'
+            : 'Market regime disabled (forced neutral).';
+
+        if ($mrEnabled) {
+            $classified = $this->marketCtx->classify($marketSnapshot, $riskOn, $riskOff);
+            $marketRegime = (string)($classified['regime'] ?? 'neutral');
+            $marketNotes = (string)($classified['notes'] ?? '');
+        }
+
+        $market = [
+            'market_regime' => $marketRegime,
+            'market_notes' => $marketNotes,
+            'market_snapshot' => $marketSnapshot,
+        ];
+
         $selected = $pipe->selector->select($raw);
 
         $rows = [];
@@ -68,7 +117,7 @@ class WatchlistService
             $expiry = $pipe->expiry->evaluate($c);
 
             $row = $pipe->presenter->baseRow($c, $outcome, $setupStatus, $plan, $expiry);
-            $rank = $pipe->ranker->rank($row);
+            $rank = $pipe->ranker->rank($row, $marketRegime);
             $row = $pipe->presenter->attachRank($row, $rank);
 
             // alias score untuk spec
@@ -77,9 +126,8 @@ class WatchlistService
             $row['bucket'] = $pipe->bucketer->bucket($row);
 
             // enrich pre-open advice (timing/checklist/confidence)
-            // NOTE: market_regime belum ada datanya di build ini -> default neutral
             $dow = $this->dowFromDate($c->tradeDate);
-            $advice = $this->advice->advise($c, $outcome, $setupStatus, $row, $dow, 'neutral');
+            $advice = $this->advice->advise($c, $outcome, $setupStatus, $row, $dow, $marketRegime);
             $row = array_merge($row, $advice);
 
             // attach spec aliases for plan
@@ -156,9 +204,22 @@ class WatchlistService
         $maxStale = (int) config('trade.watchlist.max_stale_trading_days', 1);
 
         // recommendations = action plan (allocation + timing + slices + optional lots)
-        // If EOD data is stale beyond threshold, do not emit BUY recommendations (avoid misleading output).
+        // Guardrails:
+        // - If EOD data is stale beyond threshold, do not emit BUY recommendations.
+        // - If market_regime is risk_off, emit NO_TRADE (avoid forcing entries on bad breadth).
+        $warnings = [];
+        if ($stale['trading_days_stale'] !== null && (int)$stale['trading_days_stale'] > $maxStale) {
+            $warnings[] = 'EOD_STALE';
+        }
+        $blockOnRiskOff = (bool) config('trade.watchlist.market_regime_block_buy_on_risk_off', true);
+        if ($mrEnabled && $blockOnRiskOff && $marketRegime === 'risk_off') {
+            $warnings[] = 'MARKET_RISK_OFF';
+        }
+
         if ($stale['trading_days_stale'] !== null && (int)$stale['trading_days_stale'] > $maxStale) {
             $recommendations = $this->buildNoTradeRecommendations($stale, $maxStale);
+        } elseif ($mrEnabled && $blockOnRiskOff && $marketRegime === 'risk_off') {
+            $recommendations = $this->buildNoTradeRecommendationsMarketRiskOff($market);
         } else {
             $recommendations = $this->alloc->buildActionPlan((array)($groups['top_picks'] ?? []), $dow ?: '', $capital);
         }
@@ -166,8 +227,9 @@ class WatchlistService
         $meta = array_merge($grouped['meta'] ?? [], [
             'generated_at' => $generatedAt->toIso8601String(),
             'dow' => $dow,
-            'market_regime' => 'neutral',
-            'market_notes' => 'market_regime belum tersedia di build ini (default neutral).',
+            'market_regime' => $marketRegime,
+            'market_notes' => (string)($market['market_notes'] ?? ''),
+            'market_snapshot' => $market['market_snapshot'] ?? null,
             'data_status' => [
                 'eod_date' => $eodDate,
                 'today' => $today,
@@ -175,9 +237,7 @@ class WatchlistService
                 'missing_trading_dates' => $stale['missing_trading_dates'],
                 'max_allowed_trading_days_stale' => $maxStale,
             ],
-            'warnings' => (
-                $stale['trading_days_stale'] !== null && (int) $stale['trading_days_stale'] > $maxStale
-            ) ? ['EOD_STALE'] : [],
+            'warnings' => $warnings,
         ]);
 
         return [
@@ -277,6 +337,35 @@ class WatchlistService
     }
 
     /**
+     * Build NO_TRADE recommendations payload when market breadth is risk-off.
+     */
+    private function buildNoTradeRecommendationsMarketRiskOff(array $market): array
+    {
+        $snap = $market['market_snapshot'] ?? null;
+
+        return [
+            'mode' => 'NO_TRADE',
+            'positions' => 0,
+            'split_ratio' => '',
+            'selected_strategy_id' => null,
+            'strategies' => [],
+            'buy_plan' => [],
+
+            'entry_windows_default' => [],
+            'avoid_windows_default' => [],
+            'timing_summary_default' => 'NO_TRADE karena market breadth sedang risk-off (peluang follow-through rendah).',
+            'pre_buy_checklist_default' => [
+                'Cek kondisi index dan breadth (pct_above_ma200, ma alignment, avg_rsi14).',
+                'Tunggu market_regime kembali risk-on / setidaknya neutral sebelum entry.',
+                'Kalau tetap entry: kecilkan size dan wajib konfirmasi (break/hold). Hindari blind buy.',
+            ],
+
+            'reason' => 'MARKET_RISK_OFF',
+            'market_regime' => 'risk_off',
+            'market_snapshot' => $snap,
+        ];
+    }
+    /**
      * Normalize rows for JSON output: snake_case only, no redundant fields.
      * @param array<int,array> $rows
      * @return array<int,array>
@@ -353,6 +442,8 @@ class WatchlistService
             'watchlist_score' => $scoreUi,
             'rank_reason_codes' => $r['rankReasonCodes'] ?? [],
 
+            'score_breakdown' => $r['score_breakdown'] ?? ($r['scoreBreakdown'] ?? null),
+
             'bucket' => (string)($bucket ?? 'AVOID'),
 
             // advice fields
@@ -382,4 +473,5 @@ class WatchlistService
 
         return $row;
     }
+
 }
