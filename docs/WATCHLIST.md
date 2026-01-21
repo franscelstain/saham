@@ -1,5 +1,3 @@
-# build_id: watch_v1.6
-
 # TradeAxis Watchlist – Design Spec (EOD-driven)  
 File: `WATCHLIST.md`
 
@@ -1085,6 +1083,143 @@ Jika memungkinkan:
 Minimal:
 - flag “data discontinuity suspected” untuk outlier extreme.
 
+### 3.6 Data Dictionary & Derived Fields Contract (formal, engine-grade)
+
+Bagian ini adalah **kontrak definisi field**. Engine **wajib** pakai definisi ini, bukan “interpretasi”.
+Jika suatu field tidak bisa dipenuhi sesuai kontrak, output harus deterministik: **DROP / WATCH_ONLY / NO_TRADE** + reason code yang benar.
+
+#### 3.6.1 Aturan null/missing (wajib)
+- Field yang masuk **Hard filter** (di policy) jika `null/missing` → treat sebagai **FAIL**.
+- Field yang dipakai **Entry guard / Viability / Exit** jika `null/missing` → treat sebagai **fail-safe**:
+  - NEW ENTRY: **WATCH_ONLY / DISABLE_ENTRY_FOR_TODAY**
+  - posisi existing: **MANAGE CONSERVATIVE** (bias reduce/exit) jika rule butuh field itu
+- Field yang dipakai untuk **Soft filter / scoring** jika `null/missing` → **skip** (tidak menambah penalti), tapi boleh tulis debug note.
+
+#### 3.6.2 Field catalog (core)
+Format: `field` — **type** — *source* — **definisi/formula** — **notes & invariants**
+
+##### A) Global context
+- `generated_at` — datetime (WIB) — *system* — waktu JSON dibuat.
+- `trade_date` — date — *system* — tanggal EOD canonical yang dipakai untuk scoring/plan.
+- `as_of_trade_date` — date — *system* — trading day terakhir yang seharusnya sudah punya EOD canonical saat `generated_at` (lihat 1.1.1).
+- `dow` — enum(`Mon|Tue|Wed|Thu|Fri`) — *market_calendar* — hari dalam minggu untuk `trade_date`.
+- `is_trading_day` — bool — *market_calendar* — true jika `trade_date` hari bursa.
+- `market_regime` — enum(`risk-on|neutral|risk-off`) — *market_index_daily (+ breadth opsional)* — label regime market.
+
+##### B) OHLC canonical (per ticker, per trade_date)
+- `open` — float — *ticker_ohlc_daily.canonical* — harga open EOD.
+- `high` — float — *ticker_ohlc_daily.canonical* — harga high EOD.
+- `low` — float — *ticker_ohlc_daily.canonical* — harga low EOD.
+- `close` — float — *ticker_ohlc_daily.canonical* — harga close EOD.
+- `volume` — float/int — *ticker_ohlc_daily.canonical* — volume EOD.
+- `prev_close` — float — *ticker_ohlc_daily.canonical* atau derived — close hari bursa sebelumnya.
+- `prev_high` — float — derived — `high` pada trading day sebelumnya.
+- `prev_low` — float — derived — `low` pada trading day sebelumnya.
+
+**Invariant OHLC**
+- `low <= open <= high`
+- `low <= close <= high`
+- `high > 0`, `low > 0`, `close > 0`
+- `volume >= 0`
+
+##### C) Indicators (compute-eod output)
+- `ma20` — float — *ticker_indicators_daily* — SMA 20 trading days (exclude today).
+- `ma50` — float — *ticker_indicators_daily* — SMA 50 trading days.
+- `ma200` — float — *ticker_indicators_daily* — SMA 200 trading days.
+- `rsi14` — float — *ticker_indicators_daily* — RSI 14 trading days.
+- `vol_sma20` — float — *ticker_indicators_daily* — SMA20(volume).
+- `vol_ratio` — float — *ticker_indicators_daily* — `volume / vol_sma20` (jika vol_sma20==0 → null).
+- `signal_code` — string — *ticker_indicators_daily* — kode sinyal/setup (internal).
+- `signal_label` — string — *ticker_indicators_daily* — label yang readable (opsional).
+- `signal_first_seen_date` — date — *ticker_indicators_daily* — trading day pertama sinyal dianggap aktif.
+- `signal_age_days` — int — *ticker_indicators_daily* — jumlah **trading days** sejak `signal_first_seen_date` sampai `trade_date`.
+
+##### D) Features_cheap (derived dari OHLC/indicators; boleh disimpan di table feature harian)
+- `gap_pct` — float — derived — `(open - prev_close)/prev_close` (jika prev_close null/0 → null).
+- `tr` — float — derived — `max(high-low, abs(high-prev_close), abs(low-prev_close))`.
+- `atr14` — float — *compute-eod* — SMA/EMA 14 trading days dari `tr`.
+- `atr_pct` — float — derived — `atr14 / close` (jika close==0 → null).
+- `range_pct` — float — derived — `(high-low)/close` (jika close==0 → null).
+
+**Candle metrics**
+- `body_abs` — float — derived — `abs(close-open)`.
+- `range_abs` — float — derived — `high-low`.
+- `body_pct` — float — derived — `body_abs / range_abs` (jika range_abs==0 → null).
+- `upper_wick_pct` — float — derived — `(high - max(open,close)) / range_abs` (jika range_abs==0 → null).
+- `lower_wick_pct` — float — derived — `(min(open,close) - low) / range_abs` (jika range_abs==0 → null).
+- `is_long_upper_wick` — bool — derived — `upper_wick_pct >= 0.55` (default; kalau policy override, ikuti policy).
+- `is_long_lower_wick` — bool — derived — `lower_wick_pct >= 0.55` (default).
+- `is_inside_day` — bool — derived — `high <= prev_high AND low >= prev_low`.
+
+**HHV/LLV**
+- `hhv20` — float — *compute-eod/derived* — highest high 20 trading days (exclude today).
+- `llv20` — float — *compute-eod/derived* — lowest low 20 trading days (exclude today).
+
+##### E) Liquidity proxy
+- `dvalue` — float — derived — `close * volume`.
+- `dv20` — float — *compute-eod/derived* — SMA20(dvalue) (20 trading days, exclude today).
+- `liq_bucket` — enum(`A|B|C|U`) — derived — bucket dari `dv20`:
+  - A: `dv20 >= liq.dv20_a_min_idr`
+  - B: `liq.dv20_b_min_idr <= dv20 < liq.dv20_a_min_idr`
+  - C: `dv20 < liq.dv20_b_min_idr`
+  - U: dv20 null (unknown)
+
+##### F) Corporate action / data discontinuity
+- `corp_action_suspected` — bool — *market data normalization / compute-eod* — true jika ada indikasi split/rights/adjustment atau discontinuity yang membuat indikator “palsu”.
+  - Jika field ini **tidak tersedia** → untuk safety treat sebagai **true** di policy yang memblokir corporate action.
+
+##### G) Execution-time helpers (anti-chasing / gap guard)
+- `preopen_last_price` — float — *optional snapshot* — harga indikatif sebelum market buka (jika ada).
+- `open_or_last` — float|null — derived — `preopen_last_price ?? open ?? null`.
+  - Jika null: engine **tidak boleh** membuka NEW ENTRY (gap guard tidak bisa dinilai aman).
+
+##### H) Tick size & rounding
+- `tick_size` — float — *tick_size table / price band* — fraksi harga (IDX).
+- `round_to_tick(price, direction)` — function — *engine* — pembulatan ke tick:
+  - `UP`: ceil(price / tick_size) * tick_size
+  - `DOWN`: floor(price / tick_size) * tick_size
+  - Jika tick_size tidak ada → fallback `tick_size=1` (harus menambah reason code data-missing).
+
+---
+
+#### 3.6.3 Trade-plan derived fields (wajib bila policy memakainya)
+
+##### A) Trigger/zone fields
+- `breakout_trigger` — float — derived — `round_to_tick(max(prev_high, hhv20) + 1*tick_size, UP)`.
+- `pullback_value_zone_low` — float — derived — `round_to_tick(ma20 - 0.20*atr14, DOWN)` (default; policy boleh override).
+- `pullback_value_zone_high` — float — derived — `round_to_tick(ma20 + 0.30*atr14, UP)` (default; policy boleh override).
+
+##### B) Risk/Reward fields
+- `entry_price` — float — derived — tergantung `entry_type` (harus deterministik).
+- `stop_loss_price` — float — derived — dari plan engine (20.3) atau policy.
+- `tp1_price`, `tp2_price` — float — derived — dari plan engine/policy.
+- `rr_tp1` — float — derived — `(tp1_price - entry_price) / (entry_price - stop_loss_price)` untuk posisi long.
+  - Jika `entry_price <= stop_loss_price` → invalid (WATCH_ONLY + reason code).
+
+##### C) Fee & spread viability
+- `fee_buy` — float — *fee_config* — fee fraksi (contoh 0.0015).
+- `fee_sell` — float — *fee_config* — fee fraksi.
+- `avg_spread_pct` — float — *spread_proxy* — proxy spread (opsional).
+- `expected_net_tp1_pct` — float — derived — `gross_tp1_pct - fee_buy - fee_sell - (avg_spread_pct ?? 0)`.
+
+---
+
+#### 3.6.4 Portfolio context fields (wajib bila “manage posisi berjalan” aktif)
+- `has_position` — bool — *portfolio integration* — true jika ticker sedang dipegang.
+- `avg_price` — float — *portfolio* — average buy price.
+- `lots` — int — *portfolio* — lot yang sedang dipegang.
+- `entry_trade_date` — date — *portfolio* — tanggal entry (trading day).
+- `days_held` — int — derived — jumlah **trading days** sejak `entry_trade_date` sampai `trade_date`.
+- `tp1_not_hit` — bool — *portfolio/engine* — true jika TP1 belum pernah tersentuh.
+- `sl_is_be_or_trailing` — bool — *engine* — true jika SL sudah BE atau trailing.
+
+**R-based excursion (opsional tapi kalau dipakai harus presisi)**
+- Definisi `R` (long): `R = entry_price - stop_loss_price` (harus > 0).
+- `mfe_r` — float — derived — `(max_price_since_entry - entry_price) / R`.
+- `mae_r` — float — derived — `(entry_price - min_price_since_entry) / R`.
+- Jika R-metrics tidak tersedia tapi policy butuh time-stop berbasis R → policy harus punya fallback eksplisit (atau block/exit konservatif).
+
+
 ---
 
 ## 4) Pipeline pembuatan watchlist (konsep)
@@ -1192,24 +1327,19 @@ Output:
 
 > Ini baseline. Lalu watchlist menggeser window berdasarkan risk & setup.
 
-### 8.2 Day-of-week adjustment (weekly swing)
-- **Senin**: lebih banyak fake move → prefer entry sedikit lebih siang
-  - entry_windows: `["09:35-11:00", "13:35-14:30"]`
-  - max_positions_today: 1
-  - size_multiplier: 0.6–0.8
-- **Selasa**: window terbaik (sweet spot)
-  - entry_windows: `["09:20-10:30", "13:35-14:30"]`
-  - max_positions_today: 1–2
-  - size_multiplier: 1.0
-- **Rabu**: late entry → hanya yang sudah “jalan”
-  - entry_windows: `["09:30-10:45", "13:35-14:15"]`
-  - max_positions_today: 1
-  - size_multiplier: 0.7–0.9
-- **Kamis**: sangat selektif
-  - max_positions_today: 1
-  - size_multiplier: 0.4–0.6
-- **Jumat**: default NO TRADE, kecuali mode “carry” yang sangat ketat
-  - max_positions_today: 0 (atau 1 dengan size_multiplier 0.2–0.4 dan reason khusus)
+### 8.2 Day-of-week adjustment (single source of truth)
+
+Bagian ini **bukan tempat** untuk menyimpan angka/threshold policy (karena gampang drift).
+Untuk keputusan DOW, window, max positions, dan size multiplier:
+
+- `WEEKLY_SWING` → ikuti **Section 2.3.1 / entry_rules.day_of_week_rules**
+- Policy lain → ikuti `entry_rules` masing-masing policy.
+
+Di sini hanya prinsip umum (tanpa angka):
+- **Mon**: rawan fake move → bias lebih hati-hati.
+- **Tue**: entry day terbaik.
+- **Wed/Thu**: selektif; fokus manage posisi berjalan.
+- **Fri**: default **no new entry** kecuali policy mengizinkan secara eksplisit (bias exit/manage).
 
 ### 8.3 Risk-driven window shifting (berdasarkan metrik EOD)
 Gunakan rules berikut (contoh):
@@ -1252,27 +1382,60 @@ Gunakan rules berikut (contoh):
 Watchlist harus menyimpan teks/JSON yang ringkas tapi kaya makna.
 Tujuannya: kamu bisa lihat kembali kenapa watchlist menyarankan jam tertentu.
 
-### 9.1 Reason codes (contoh)
-- `TREND_STRONG`
-- `MA_ALIGN_BULL`
-- `VOL_RATIO_HIGH`
-- `BREAKOUT_CONF_BIAS`
-- `PULLBACK_ENTRY_BIAS`
-- `REVERSAL_RISK`
-- `GAP_RISK_HIGH`
-- `VOLATILITY_HIGH`
-- `LIQ_LOW_MATCH_RISK`
-- `MARKET_RISK_OFF`
-- `LATE_WEEK_ENTRY_PENALTY`
-- `GAP_UP_BLOCK`
-- `CHASE_BLOCK_DISTANCE_TOO_FAR`
-- `NO_FOLLOW_THROUGH`
-- `SETUP_EXPIRED`
-- `TIME_STOP_TRIGGERED`
-- `FRIDAY_EXIT_BIAS`
-- `WEEKEND_RISK_BLOCK`
-- `MIN_EDGE_FAIL`
-- `FEE_IMPACT_HIGH`
+### 9.1 Reason Code Namespace Rule (kontrak)
+
+Tujuan: output **tidak ambigu**. Reason code yang tampil di UI harus bisa langsung menjelaskan *kenapa* suatu keputusan terjadi dan **policy mana** yang mengeluarkannya.
+
+#### 9.1.1 Dua namespace: UI vs debug
+1) `reason_codes[]` (**UI / keputusan**)  
+- **Wajib** policy-prefixed: `<PREFIX>_*`  
+- Tidak boleh berisi kode generik tanpa prefix.
+
+2) `debug.rank_reason_codes[]` (**audit/scoring**, opsional)  
+- Boleh berisi kode generik seperti `TREND_STRONG`, `MA_ALIGN_BULL`, dll.  
+- Field ini tidak wajib dipublish ke UI.
+
+#### 9.1.2 Prefix resmi (wajib)
+- `WS_` = WEEKLY_SWING  
+- `DS_` = DIVIDEND_SWING  
+- `IL_` = INTRADAY_LIGHT  
+- `PT_` = POSITION_TRADE  
+- `NT_` = NO_TRADE  
+- `GL_` = Global gate / engine-level (contoh: `GL_EOD_NOT_READY`) — optional, tapi jika dipakai harus konsisten.
+
+> **Rule hard:** jika ada `reason_codes[]` tanpa prefix resmi → contract test **FAIL**.
+
+#### 9.1.3 Legacy mapping (generic lama → canonical)
+Jika sebelumnya UI memakai kode generik, harus dimigrasikan (mapping deterministik).
+Contoh mapping minimal (WEEKLY_SWING):
+
+| legacy (jangan dipublish ke UI) | canonical UI code |
+|---|---|
+| `GAP_UP_BLOCK` | `WS_GAP_UP_BLOCK` |
+| `CHASE_BLOCK_DISTANCE_TOO_FAR` | `WS_CHASE_BLOCK_DISTANCE_TOO_FAR` |
+| `MIN_EDGE_FAIL` | `WS_MIN_EDGE_FAIL` |
+| `TIME_STOP_TRIGGERED` | `WS_TIME_STOP_T2` *(atau T3 sesuai rule yang kena)* |
+| `TIME_STOP_T2` | `WS_TIME_STOP_T2` |
+| `TIME_STOP_T3` | `WS_TIME_STOP_T3` |
+| `FRIDAY_EXIT_BIAS` | `WS_FRIDAY_EXIT_BIAS` |
+| `WEEKEND_RISK_BLOCK` | `WS_WEEKEND_RISK_BLOCK` |
+| `VOLATILITY_HIGH` | `WS_VOLATILITY_HIGH_WARN` |
+| `FEE_IMPACT_HIGH` | `WS_FEE_EDGE_FAIL` |
+| `NO_FOLLOW_THROUGH` | `WS_TIME_STOP_T2` *(atau code follow-through lain jika ditambah di policy)* |
+| `SETUP_EXPIRED` | `WS_SIGNAL_STALE_WARN` *(atau drop code yang dipakai policy)* |
+
+Untuk policy lain, prinsipnya sama:
+- `DS_*` untuk DIVIDEND_SWING (mis. `DS_GAP_UP_BLOCK`, `DS_CHASE_BLOCK`, `DS_EXIT_ON_EXDATE`)
+- `IL_*` untuk INTRADAY_LIGHT
+- `PT_*` untuk POSITION_TRADE
+- `NT_*` untuk NO_TRADE / global gating
+
+#### 9.1.4 Migrasi aman (wajib)
+- Engine boleh sementara mengeluarkan:
+  - `reason_codes[]` = canonical prefixed
+  - `debug.legacy_reason_codes[]` = legacy (opsional, untuk audit)
+- UI **harus** membaca canonical codes. Legacy hanya untuk debugging sampai dihapus.
+
 
 ### 9.2 Saran jam & larangan jam (disimpan sebagai data)
 - `entry_windows` (array)
@@ -1679,32 +1842,32 @@ Gunakan tick rounding setiap kali menghasilkan harga.
 - Default: `WATCH_ONLY` sampai breakout trigger valid
 - Entry/SL/TP mengikuti breakout rule saat trigger terjadi
 
-### 20.4 Guards (anti-chasing, gap, viability) – default WEEKLY_SWING
-Guards ini membuat plan **boleh batal** walau setup bagus di EOD.
+### 20.4 Guards (single source of truth, tidak boleh duplikasi angka)
 
-**A) Gap-up guard (saat eksekusi)**
-- Jika open/last price > `prev_close * (1 + max_gap_up_pct)` → set `entry_type = WATCH_ONLY` untuk hari itu.
-- Default `max_gap_up_pct = min(2.5%, 1.0*atr_pct)`.
-- Reason codes: `GAP_UP_BLOCK`.
+Guard membuat plan **boleh batal** walau setup EOD bagus. Tapi angka/threshold guard **harus** berasal dari policy, bukan dari section generik ini.
 
-**B) No-chase guard (berbasis EOD, sebelum market buka)**
-- Jika `close > trigger + 0.5*ATR14` → jangan entry breakout (ubah ke pullback atau watch-only).
-- Reason codes: `CHASE_BLOCK_DISTANCE_TOO_FAR`.
+**Kontrak**
+- Untuk setiap `policy_code`, guard diambil dari blok eksekusi policy:
+  - `entry_rules` (gap / anti-chasing / min-edge)
+  - `min_trade_viability` (viability modal kecil + fee/spread)
+  - `exit_rules` (time-stop / max holding / trailing)
 
-**C) Minimum edge guard (biar weekly swing tidak buang-buang fee/spread)**
-- Jika `rr_tp1 < 1.0` → downgrade ke `WATCH_ONLY`.
-- Jika fee aktif dan `profit_tp1_net` terlalu kecil (mis. < 0.7%) → downgrade/disable.
-- Reason codes: `MIN_EDGE_FAIL`, `FEE_IMPACT_HIGH`.
+**Referensi**
+- `WEEKLY_SWING` → Section **2.3.1**
+  - `entry_rules.anti_chasing_and_gap_guards`
+  - `min_trade_viability`
+  - `exit_rules` (time_stop, friday_exit_bias, weekend_rule)
+- `DIVIDEND_SWING` → Section **2.4.1**
+- `INTRADAY_LIGHT` → Section **2.5.1**
+- `POSITION_TRADE` → Section **2.6.1**
+- `NO_TRADE` → Section **2.7.1**
 
-**D) Time-stop / follow-through guard (untuk posisi yang sudah entry)**
-- Jika setelah 2 trading days belum `+0.5R` → `REDUCE/EXIT` (sesuai policy di Bagian 2.3E).
-- Jika harga kembali close di bawah area breakout dan body besar → `EXIT`.
-- Reason codes: `NO_FOLLOW_THROUGH`, `TIME_STOP_TRIGGERED`.
+**Template guard (umum, tanpa angka)**
+- Gap guard: kalau harga indikatif terlalu jauh dari `prev_close` → disable entry hari itu.
+- No-chase guard: kalau harga sudah terlalu jauh dari trigger/zone (ATR-distance) → downgrade/watch-only.
+- Min-edge guard: kalau RR/edge tidak cukup (termasuk fee/spread kalau tersedia) → watch-only.
+- Time-stop: kalau setelah N trading days tidak ada follow-through → reduce/exit (sesuai policy).
 
-> Kandidat non-top pick tetap dibuatkan plan, tapi bisa diberi:
-> - `entry_type = WATCH_ONLY` atau
-> - `size_multiplier` kecil
-> agar tidak mendorong overtrading.
 
 ---
 
