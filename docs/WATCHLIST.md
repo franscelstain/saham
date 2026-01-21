@@ -129,155 +129,685 @@ Watchlist punya beberapa **Strategy Policy**. Policy adalah paket aturan end-to-
 ### 2.3 Policy: WEEKLY_SWING (default)
 **Tujuan:** ambil move mingguan yang realistis, bukan “tebak puncak”.
 
-**A. Data dependency (wajib):**
+> Catatan: bagian ini dibuat **policy-centric** (minim shared logic). Semua angka tegas dan bisa langsung dipindah ke config/engine.
+
+#### 2.3.1 Policy execution block (wajib, deterministik)
+```yaml
+policy_code: WEEKLY_SWING
+
+# 1) Data dependency (wajib/opsional)
+data_dependency:
+  required:
+    - ticker_ohlc_daily.canonical: [open, high, low, close, volume, prev_close]
+    - ticker_indicators_daily: [ma20, ma50, ma200, rsi14, vol_sma20, vol_ratio, signal_code, signal_age_days]
+    - features_cheap: [atr14, atr_pct, gap_pct, dv20, liq_bucket, candle_flags]
+    - market_context: [dow, market_regime]
+    - market_calendar: [is_trading_day]
+  optional:
+    - portfolio_context: [has_position, avg_price, lots, days_held]   # untuk CARRY_ONLY / manajemen posisi
+    - fee_config: [fee_buy, fee_sell]                                # untuk net-profit guard
+    - tick_size: [tick_size]                                         # rounding level harga
+
+# 2) Hard filters (angka tegas)
+hard_filters:
+  - id: WS_DATA_COMPLETE
+    expr: "all(required_columns_not_null)"
+    on_fail: DROP
+  - id: WS_LIQ_MIN
+    expr: "dv20 >= 5_000_000_000"      # minimal bucket B
+    on_fail: WATCH_ONLY                # boleh tampil, tapi tidak boleh recommended
+  - id: WS_ATR_MAX
+    expr: "atr_pct <= 0.10"
+    on_fail: DROP
+  - id: WS_CORP_ACTION
+    expr: "corp_action_suspected == false"
+    on_fail: DROP
+
+# 3) Soft filters + score weight override (angka tegas)
+soft_filters:
+  - id: WS_ATR_WARN
+    when: "0.07 < atr_pct <= 0.10"
+    effect:
+      score_penalty: 6
+      max_size_multiplier: 0.80
+      add_reason: [VOLATILITY_HIGH_WARN]
+  - id: WS_LONG_UPPER_WICK_WARN
+    when: "is_long_upper_wick == true"
+    effect:
+      score_penalty: 5
+      add_reason: [DISTRIBUTION_WICK_WARN]
+  - id: WS_RSI_OVERHEAT_WARN
+    when: "rsi14 >= 74"
+    effect:
+      score_penalty: 5
+      entry_style_override: PULLBACK_WAIT
+      add_reason: [RSI_OVERHEAT_WARN]
+  - id: WS_MARKET_NEUTRAL_PENALTY
+    when: "market_regime == neutral"
+    effect:
+      score_penalty: 3
+      add_reason: [MARKET_NEUTRAL]
+
+# score weight override (khusus WEEKLY_SWING)
+score_weight_override:
+  trend_quality: 0.30
+  momentum_candle: 0.20
+  volume_liquidity: 0.20
+  risk_quality: 0.20
+  market_alignment: 0.10
+
+# 4) Setup allowlist (setup_type yang boleh jadi recommended)
+setup_allowlist:
+  recommended: [Breakout, Pullback, Continuation, Reversal]
+  secondary_only: [Base]              # Base boleh tampil tapi tidak boleh recommended
+  forbidden: []                       # tidak ada forbidden setup khusus, selain hard filter
+
+# 5) Entry rules (termasuk anti-chasing/gap) — angka tegas
+entry_rules:
+  day_of_week_rules:
+    Mon:
+      allow_new_entry: true
+      max_positions_today: 1
+      base_size_multiplier: 0.70
+      entry_windows: ["09:35-11:00", "13:35-14:30"]
+      avoid_windows: ["09:00-09:20", "11:45-12:00", "15:50-close"]
+      add_reason: [MONDAY_FAKE_MOVE_BIAS]
+    Tue:
+      allow_new_entry: true
+      max_positions_today: 2
+      base_size_multiplier: 1.00
+      entry_windows: ["09:20-10:30", "13:35-14:30"]
+      avoid_windows: ["09:00-09:15", "11:45-12:00", "15:50-close"]
+    Wed:
+      allow_new_entry: true
+      max_positions_today: 1
+      base_size_multiplier: 0.85
+      entry_windows: ["09:30-10:45", "13:35-14:15"]
+      avoid_windows: ["09:00-09:20", "11:45-12:00", "15:50-close"]
+      add_reason: [MIDWEEK_SELECTIVE]
+    Thu:
+      allow_new_entry: true
+      max_positions_today: 1
+      base_size_multiplier: 0.55
+      entry_windows: ["09:35-10:30", "13:40-14:15"]
+      avoid_windows: ["09:00-09:25", "11:45-12:00", "15:35-close"]
+      add_reason: [LATE_WEEK_ENTRY_PENALTY]
+    Fri:
+      allow_new_entry: false           # default: NO NEW ENTRY
+      max_positions_today: 0
+      base_size_multiplier: 0.00
+      entry_windows: []
+      avoid_windows: ["09:00-close"]
+      add_reason: [FRIDAY_NO_ENTRY_DEFAULT]
+
+  anti_chasing_and_gap_guards:
+    - id: WS_GAP_UP_BLOCK
+      expr: "open_or_last > prev_close * (1 + min(0.025, 1.0*atr_pct))"
+      action: "DISABLE_ENTRY_FOR_TODAY"
+      add_reason: [GAP_UP_BLOCK]
+    - id: WS_NO_CHASE_BREAKOUT
+      expr: "setup_type == Breakout and close > (breakout_trigger + 0.5*atr14)"
+      action: "DOWNGRADE_TO_PULLBACK_OR_WATCH_ONLY"
+      add_reason: [CHASE_BLOCK_DISTANCE_TOO_FAR]
+    - id: WS_MIN_EDGE_GUARD
+      expr: "rr_tp1 < 1.0"
+      action: "DOWNGRADE_TO_WATCH_ONLY"
+      add_reason: [MIN_EDGE_FAIL]
+
+# 6) Exit rules (time stop / max holding / trailing) — angka tegas
+exit_rules:
+  time_stop:
+    t_plus_2_days:
+      condition: "mfe_r < 0.5"         # belum +0.5R dalam 2 trading days
+      action: "REDUCE_50_OR_EXIT"
+      add_reason: [TIME_STOP_T2]
+    t_plus_3_days:
+      condition: "mfe_r < 0.5"
+      action: "EXIT"
+      add_reason: [TIME_STOP_T3]
+  max_holding_days_by_setup:
+    Breakout: 3
+    Pullback: 5
+    Continuation: 5
+    Reversal: 4
+    Base: 0
+  trailing_rule:
+    after_tp1:
+      action: "MOVE_SL_TO_BE_OR_ENTRY_PLUS_0_2R"
+      add_reason: [MOVE_SL_TO_BE]
+  friday_exit_bias:
+    when: "dow == Fri and tp1_not_hit"
+    action: "PRIORITIZE_EXIT"
+    add_reason: [FRIDAY_EXIT_BIAS]
+  weekend_rule:
+    allow_carry_weekend_only_if:
+      condition: "confidence == High and sl_is_be_or_trailing == true and trend_quality_strong == true"
+    otherwise:
+      action: "BLOCK_CARRY_WEEKEND"
+      add_reason: [WEEKEND_RISK_BLOCK]
+
+# 7) Sizing defaults (risk per trade, max positions, multiplier) — angka tegas
+sizing_defaults:
+  risk_per_trade_pct_default: 0.010      # 1.0% modal per trade (weekly swing)
+  max_positions_total_default: 2         # total posisi baru dalam 1 hari (sebelum dipotong oleh posisi existing)
+  size_multiplier_caps:
+    High: 1.00
+    Med: 0.80
+    Low: 0.60
+  liq_bucket_caps:
+    A: 1.00
+    B: 0.80
+    C: 0.00
+
+# 8) Reason codes khusus policy (biar output tidak ambigu)
+policy_reason_codes:
+  prefix: WS_
+  codes:
+    - WS_DATA_COMPLETE_FAIL
+    - WS_LIQ_MIN_FAIL
+    - WS_ATR_MAX_FAIL
+    - WS_CORP_ACTION_BLOCK
+    - WS_GAP_UP_BLOCK
+    - WS_NO_CHASE_BREAKOUT
+    - WS_MIN_EDGE_GUARD
+    - WS_TIME_STOP_T2
+    - WS_TIME_STOP_T3
+    - WS_FRIDAY_NO_ENTRY_DEFAULT
+```
+
+#### 2.3.2 Penjelasan ringkas (tetap audit-able)
+**Data dependency (wajib):**
 - `ticker_ohlc_daily` canonical (trade_date = effective_end_date)
 - `ticker_indicators_daily`: MA20/50/200, RSI14, vol_sma20, vol_ratio, signal_code, signal_age_days
 - fitur murah: `atr14`, `atr_pct`, `gap_pct`, `dv20`, candle flags
 
-**B. Candidate gates (deterministik):**
-- Likuiditas: `dv20` minimal (mis. bucket A/B). Bucket C boleh masuk kandidat, tapi **bukan recommended**.
-- Volatilitas: `atr_pct` maksimal (saham terlalu liar → turunkan confidence / NO TRADE).
-  - **Default weekly swing (bisa di-config):**
-    - `atr_pct <= 0.07` → ok untuk recommended
-    - `0.07 < atr_pct <= 0.10` → kandidat boleh, **recommended turun** (size_multiplier max 0.8)
-    - `atr_pct > 0.10` → default `trade_disabled` (kecuali ada override manual)
-- Data window lengkap: indikator inti tidak boleh NULL.
-- Corporate action suspected/unadjusted → skip.
+**Candidate gates (deterministik):**
+- Likuiditas: bucket A/B boleh jadi recommended; bucket C boleh tampil tapi **bukan recommended**.
+- Volatilitas:
+  - `atr_pct <= 0.07` → ok untuk recommended
+  - `0.07 < atr_pct <= 0.10` → boleh, tapi `size_multiplier <= 0.8`
+  - `atr_pct > 0.10` → drop
+- `signal_age_days`: `> 3` turun confidence; `> 5` bukan recommended.
 
-**C. Entry window (EOD → waktu eksekusi):**
-- Default: pakai engine di Bagian 8 (window + avoid windows).
-- Tambahan weekly swing:
-  - **Senin–Selasa:** boleh entry agresif (breakout confirm / pullback buy)
-  - **Rabu:** entry selektif; prefer pullback, hindari chasing
-  - **Kamis:** entry hanya kalau setup “sangat kuat” (High confidence) dan risk kecil
-  - **Jumat:** default NO NEW ENTRY (kecuali signal baru + risk rendah)
+**Entry window:**
+- Mengikuti day-of-week rules di blok YAML + shifting dari risk (Bagian 8).
 
-
-**C.1 Anti-chasing & gap guard (WEEKLY_SWING wajib, deterministik)**
-Karena watchlist EOD-only, guard ini mencegah entry “ketinggalan kereta” dan jebakan gap.
-- **Gap-up block (pre-buy checklist + reason code):** jika saat eksekusi harga/open gap-up > `max_gap_up_pct` dari `prev_close` → **NO ENTRY**, tunggu pullback.
-  - Default: `max_gap_up_pct = min(0.025, 1.0*atr_pct)`.
-- **Distance-to-trigger block (berbasis EOD):** untuk breakout, jika `close > trigger + 0.5*ATR14` → jangan entry breakout; ubah jadi `PULLBACK_LIMIT` atau `WATCH_ONLY`.
-- **Late-week entry penalty:** Kamis/Jumat, kalau bukan High confidence → downgrade menjadi `WATCH_ONLY`.
-- Semua guard di atas harus memunculkan reason codes: `GAP_UP_BLOCK`, `CHASE_BLOCK_DISTANCE_TOO_FAR`, `LATE_WEEK_ENTRY_PENALTY`.
-
-**D. Expiry (setup kadaluarsa):**
-- Breakout/strong burst: valid maksimal 1–2 trading days setelah sinyal muncul.
-- Pullback/continuation: valid 2–4 trading days.
-- Aturan praktis: `signal_age_days > 3` → turun confidence; `> 5` → bukan recommended.
-
-**E. Exit & lifecycle rules (WEEKLY_SWING wajib, bukan opsional):**
-- **Hard SL:** selalu ada (ATR/support/MA). Saat entry terjadi, SL **tidak boleh NULL**. (lihat Bagian 20)
-- **Partial take:** default ambil parsial di TP1 (contoh 40%–60%), sisanya ke TP2/trailing.
-- **Break-even rule:** setelah TP1 hit, naikkan SL minimal ke `entry` (atau `entry + 0.2R` untuk cover fee).
-- **Time stop (deterministik):**
-  - Setelah **2 trading days** dari entry: jika belum mencapai `+0.5R` → `REDUCE 50%` atau `EXIT` (tergantung market regime).
-  - Setelah **3 trading days** dari entry: jika masih “flat” / gagal follow-through → `EXIT`.
-- **Max holding (deterministik):**
-  - Breakout/Strong burst: max **2–3** trading days.
-  - Pullback/Continuation: max **3–5** trading days.
-  - Reversal: max **2–4** trading days.
-- **Friday exit bias:** Jumat siang/sore default **prioritas exit** untuk posisi yang belum hit TP1 (hindari nyangkut). Reason: `FRIDAY_EXIT_BIAS`.
-- **Weekend rule:** default **hindari carry over weekend** kecuali `confidence=High` + trend kuat + SL sudah naik (BE/trailing). Reason: `WEEKEND_RISK_BLOCK`.
-
-**F. Algoritma ringkas (deterministik, step-by-step)**
-1) Tentukan `effective_trade_date` dari Market Data (cutoff-aware) → ini jadi `trade_date` watchlist.
-2) Ambil fitur per ticker untuk `trade_date` dari `ticker_indicators_daily` (plus fitur murah: atr/gap/dv20/candle).
-3) Jalankan **Hard Filters** (Bagian 5.1). Jika gagal → drop.
-4) Jalankan **Soft Filters** (Bagian 5.2). Jika kena → turunkan confidence/score.
-5) Hitung **watchlist_score** (Bagian 6). Wajib simpan breakdown reason codes.
-6) Tentukan `setup_type` (Bagian 7).
-7) Tentukan `entry_windows` & `avoid_windows` (Bagian 8) + day-of-week adjustment.
-8) Ranking: pilih Top Picks (Bagian 10).
-9) Tentukan `buy_mode` dan `% alloc` (Bagian 19).
-10) Untuk recommended pick: hitung `trade_plan` (Bagian 20) + sizing lots (Bagian 21).
-11) Simpan output ke tabel watchlist (Bagian 12) + log summary per hari.
-
-**G. Anti-bias penting:**
-- Jangan “memaksa” selalu ada BUY. Kalau market regime risk-off atau kualitas data jelek → `NO_TRADE`.
-- Kalau indikator window tidak lengkap (Compute EOD mengembalikan NULL), watchlist harus downgrade/skip.
-
+**Exit:**
+- Time-stop + max holding + friday/weekend rules wajib (lihat blok YAML).
 
 ### 2.4 Policy: DIVIDEND_SWING (event-driven)
-**Tujuan:** dapat dividen tanpa bunuh diri karena gap risk.
+**Tujuan:** capture dividen **tanpa** bunuh diri karena gap risk.
 
-**A. Data tambahan yang dibutuhkan (kalau belum ada, lihat Bagian 11):**
-- `dividend_calendar` (ticker, ex_date, pay_date, dividend_amount, yield_est)
-- flag corporate action/split adjusted
+> Policy ini **wajib** punya event (ex-date). Kalau data event tidak ada → policy nonaktif (fallback ke WEEKLY_SWING atau NO_TRADE).
 
-**B. Gates khusus:**
-- Wajib **likuid** (dv20 bucket A)
-- Hindari saham dengan `atr_pct` tinggi (gap risk besar)
-- Market regime minimal neutral (risk-off → NO TRADE)
+#### 2.4.1 Policy execution block (wajib, deterministik)
+```yaml
+policy_code: DIVIDEND_SWING
 
-**C. Timing:**
-- Entry ideal: H-3 sampai H-1 ex-date (bukan H0). Hindari entry mepet close jika spread jelek.
-- Exit rule:
-  - Conservative: exit H-1 / H0 (sebelum ex-date) jika target tercapai.
-  - Hold-through: tahan sampai ex-date hanya jika trend kuat + risk rendah.
+# 1) Data dependency (wajib/opsional)
+data_dependency:
+  required:
+    - ticker_ohlc_daily.canonical: [open, high, low, close, volume, prev_close]
+    - ticker_indicators_daily: [ma20, ma50, ma200, rsi14, vol_ratio, atr14, atr_pct, dv20, liq_bucket]
+    - market_context: [dow, market_regime]
+    - dividend_calendar: [ticker_id, ex_date, pay_date, cash_dividend, yield_est]
+  optional:
+    - corporate_actions: [is_adjusted, split_factor, rights_issue_flag]
+    - fee_config: [fee_buy, fee_sell]
+    - tick_size: [tick_size]
 
-**D. Algoritma ringkas (deterministik)**
-1) Ambil event `ex_date` untuk 7–14 hari ke depan.
-2) Filter ticker event:
-   - yield_est memadai (opsional) dan **likuid** (dv20 bucket A)
-   - atr_pct tidak liar
-3) Jika market regime risk-off → `NO_TRADE` (policy batal).
-4) Entry window default mengikuti Bagian 8, tapi tambah rule:
-   - hindari entry mepet close (match risk)
-   - hindari entry H0 (ex-date) kecuali super liquid + follow-through
-5) Buat trade plan:
-   - SL lebih ketat (gap risk)
-   - TP lebih konservatif (karena tujuan event-driven)
-6) Exit:
-   - default: exit H-1/H0 bila target tercapai
-   - hold-through hanya jika trend kualitas tinggi (MA alignment + signal continuation)
+# 2) Hard filters (angka tegas)
+hard_filters:
+  - id: DS_EVENT_PRESENT
+    expr: "has_dividend_event == true"
+    on_fail: POLICY_INACTIVE
+  - id: DS_EXDATE_WINDOW
+    expr: "ex_date in [trade_date+1 .. trade_date+3]"   # target entry H-3..H-1
+    on_fail: DROP
+  - id: DS_LIQ_A_ONLY
+    expr: "liq_bucket == 'A'"
+    on_fail: DROP
+  - id: DS_ATR_MAX_TIGHT
+    expr: "atr_pct <= 0.07"
+    on_fail: DROP
+  - id: DS_MARKET_NOT_RISK_OFF
+    expr: "market_regime != risk-off"
+    on_fail: NO_TRADE
+  - id: DS_CORP_ACTION
+    expr: "corp_action_suspected == false"
+    on_fail: DROP
 
-**E. Catatan penting:** dividend policy butuh data event; tanpa itu jangan dipaksakan (lebih baik tidak aktif daripada salah).
+# 3) Soft filters + score weight override (angka tegas)
+soft_filters:
+  - id: DS_RSI_OVERHEAT_WARN
+    when: "rsi14 >= 75"
+    effect:
+      score_penalty: 6
+      entry_style_override: PULLBACK_WAIT
+      add_reason: [RSI_OVERHEAT_WARN]
+  - id: DS_SPREAD_RISK_WARN
+    when: "liq_bucket == 'A' and dv20 < 25_000_000_000" # A bawah (lebih rawan spread melebar)
+    effect:
+      score_penalty: 3
+      add_reason: [SPREAD_RISK_WARN]
 
+# score weight override (lebih event-driven, lebih risk-aware)
+score_weight_override:
+  trend_quality: 0.25
+  momentum_candle: 0.10
+  volume_liquidity: 0.20
+  risk_quality: 0.30
+  market_alignment: 0.10
+  event_alignment: 0.05
+
+# 4) Setup allowlist (setup_type mana yang boleh jadi recommended)
+setup_allowlist:
+  recommended: [Pullback, Continuation]
+  secondary_only: [Breakout]     # breakout dekat ex-date sering gap risk; tampil tapi lebih hati-hati
+  forbidden: [Reversal, Base]    # hindari reversal/base untuk event trade
+
+# 5) Entry rules (termasuk anti-chasing/gap)
+entry_rules:
+  allowed_entry_days_relative_to_exdate: [-3, -2, -1]   # H-3..H-1
+  disallow_entry_on_exdate: true                        # default: jangan entry H0
+  entry_windows: ["09:35-11:00", "13:35-14:15"]         # hindari terlalu pagi & terlalu sore
+  avoid_windows: ["09:00-09:25", "15:00-close"]         # hindari late-day risk jelang ex-date
+  gap_guard:
+    expr: "open_or_last > prev_close * (1 + 0.015)"     # lebih ketat dari weekly swing
+    action: DISABLE_ENTRY_FOR_TODAY
+    add_reason: [DS_GAP_UP_BLOCK]
+  anti_chasing:
+    expr: "distance_to_entry_trigger > 0.35*atr14"
+    action: DOWNGRADE_TO_WATCH_ONLY
+    add_reason: [DS_CHASE_BLOCK]
+
+# 6) Exit rules (time stop / max holding / trailing) — event-driven
+exit_rules:
+  primary_exit_bias:
+    - when: "trade_date == ex_date - 1"
+      action: "TAKE_PROFIT_OR_EXIT_BY_AFTERNOON"
+      add_reason: [DS_EXIT_H_MINUS_1]
+    - when: "trade_date == ex_date"
+      action: "EXIT_EARLY_SESSION_IF_NOT_STRONG"
+      add_reason: [DS_EXIT_ON_EXDATE]
+  max_holding_days: 10
+  trailing_rule:
+    after_tp1:
+      action: "MOVE_SL_TO_BE"
+      add_reason: [MOVE_SL_TO_BE]
+  time_stop:
+    t_plus_3_days:
+      condition: "mfe_r < 0.5"
+      action: EXIT
+      add_reason: [DS_TIME_STOP_T3]
+
+# 7) Sizing defaults
+sizing_defaults:
+  risk_per_trade_pct_default: 0.0075     # 0.75% (lebih ketat karena gap risk)
+  max_positions_total_default: 1
+  size_multiplier_caps:
+    High: 0.90
+    Med: 0.70
+    Low: 0.50
+
+# 8) Reason codes khusus policy
+policy_reason_codes:
+  prefix: DS_
+  codes:
+    - DS_EVENT_PRESENT_FAIL
+    - DS_EXDATE_WINDOW_FAIL
+    - DS_LIQ_A_ONLY_FAIL
+    - DS_ATR_MAX_TIGHT_FAIL
+    - DS_MARKET_RISK_OFF_NO_TRADE
+    - DS_GAP_UP_BLOCK
+    - DS_CHASE_BLOCK
+    - DS_EXIT_H_MINUS_1
+    - DS_EXIT_ON_EXDATE
+    - DS_TIME_STOP_T3
+```
+
+#### 2.4.2 Catatan implementasi
+- Kalau `dividend_calendar` belum ada → policy **wajib** nonaktif (jangan “dipaksa” pakai indikator saja).
+- Target utama: risk control. Kalau ada gap up/down besar jelang ex-date, lebih baik keluar cepat daripada berharap “mean reversion”.
 
 ### 2.5 Policy: INTRADAY_LIGHT (opsional)
-**Tujuan:** memperbaiki timing entry untuk setup EOD kuat tanpa membangun sistem intraday penuh.
+**Tujuan:** memperbaiki timing entry untuk setup EOD kuat **tanpa** membangun sistem intraday penuh.
 
-**Syarat mutlak:** ada *opening range snapshot* (09:00–09:15/09:30) minimal berisi: open_range_high/low, volume_opening, gap_pct_real.
+**Syarat mutlak:** ada *opening range snapshot* (09:00–09:15 atau 09:00–09:30).
 
-**Rule ringkas:**
-- Setup dari EOD tetap sumber utama (breakout/pullback/continuation).
-- Intraday dipakai hanya untuk:
-  - konfirmasi breakout (break above opening range high)
-  - menghindari fake move (break lalu balik di bawah range)
-- Kalau snapshot tidak ada → policy ini **tidak boleh aktif**.
+#### 2.5.1 Policy execution block (wajib, deterministik)
+```yaml
+policy_code: INTRADAY_LIGHT
 
-**Algoritma ringkas (deterministik)**
-1) Pastikan snapshot tersedia untuk `trade_date` (kalau tidak → policy nonaktif).
-2) Dari EOD: pilih kandidat setup kuat (score tinggi) yang biasanya masuk top picks.
-3) Definisikan entry trigger intraday:
-   - Breakout: buy hanya jika harga break **di atas** `opening_range_high` dan tidak langsung gagal (OR fail).
-   - Pullback: buy hanya jika harga bertahan di atas OR mid / reclaim OR high (pilih 1 rule dan konsisten).
-4) SL intraday tetap mengacu ke level plan (ATR/support) dari EOD, bukan dibuat random.
-5) Jika tidak ada konfirmasi sampai akhir window → `NO_TRADE` untuk ticker itu.
+# 1) Data dependency (wajib/opsional)
+data_dependency:
+  required:
+    - ticker_ohlc_daily.canonical: [open, high, low, close, volume, prev_close]
+    - ticker_indicators_daily: [ma20, ma50, ma200, rsi14, vol_ratio, atr14, atr_pct, dv20, liq_bucket, setup_type]
+    - market_context: [dow, market_regime]
+    - intraday_opening_range_snapshot:
+        fields: [or_high, or_low, or_volume, gap_pct_real]
+        window: "09:00-09:15|09:00-09:30"
+  optional:
+    - tick_size: [tick_size]
+    - fee_config: [fee_buy, fee_sell]
 
-**Batasan:** policy ini bukan scalping. Ini hanya “konfirmasi entry” agar mengurangi fake breakout.
+# 2) Hard filters (angka tegas)
+hard_filters:
+  - id: IL_SNAPSHOT_PRESENT
+    expr: "opening_range_snapshot_available == true"
+    on_fail: POLICY_INACTIVE
+  - id: IL_LIQ_MIN
+    expr: "liq_bucket in ['A','B']"
+    on_fail: DROP
+  - id: IL_ATR_MAX
+    expr: "atr_pct <= 0.09"
+    on_fail: DROP
+  - id: IL_MARKET_NOT_RISK_OFF
+    expr: "market_regime != risk-off"
+    on_fail: NO_TRADE
 
+# 3) Soft filters + score weight override
+soft_filters:
+  - id: IL_GAP_REAL_WARN
+    when: "abs(gap_pct_real) >= 0.020"
+    effect:
+      score_penalty: 5
+      add_reason: [IL_GAP_REAL_WARN]
+  - id: IL_OR_RANGE_TOO_WIDE
+    when: "(or_high - or_low) / prev_close >= 0.020"
+    effect:
+      score_penalty: 4
+      add_reason: [IL_OPENING_RANGE_WIDE_WARN]
+
+score_weight_override:
+  trend_quality: 0.25
+  momentum_candle: 0.15
+  volume_liquidity: 0.20
+  risk_quality: 0.15
+  market_alignment: 0.10
+  intraday_confirmation: 0.15
+
+# 4) Setup allowlist
+setup_allowlist:
+  recommended: [Breakout, Pullback, Continuation]
+  secondary_only: [Reversal]
+  forbidden: [Base]
+
+# 5) Entry rules (intraday confirmation + anti fake) — angka tegas
+entry_rules:
+  base_entry_windows: ["09:20-10:30"]     # fokus sesi pagi setelah OR terbentuk
+  avoid_windows: ["09:00-09:20", "15:30-close"]
+  confirmation_rules:
+    Breakout:
+      trigger: "price_breaks_above(or_high + 1_tick)"
+      invalidation: "close_back_below(or_high) within 10m"
+      action_on_invalidation: NO_TRADE_FOR_TODAY
+      add_reason: [IL_OR_BREAKOUT_FAIL]
+    Pullback:
+      trigger: "reclaim(or_mid) then holds_above(or_mid) for 5m"
+      invalidation: "breaks_below(or_low)"
+      add_reason: [IL_PULLBACK_FAIL]
+    Continuation:
+      trigger: "holds_above(or_high) and vol_opening >= 0.8 * expected_opening_vol"
+      invalidation: "returns_inside(or_range)"
+      add_reason: [IL_CONT_FAIL]
+  gap_guard:
+    expr: "gap_pct_real > 0.025"
+    action: DISABLE_ENTRY_FOR_TODAY
+    add_reason: [IL_GAP_UP_BLOCK]
+  anti_chasing:
+    expr: "distance_from_or_high > 0.30*atr14"
+    action: WAIT_PULLBACK_ONLY
+    add_reason: [IL_CHASE_BLOCK]
+
+# 6) Exit rules
+exit_rules:
+  max_holding_days: 2
+  time_stop_intraday:
+    condition: "no_follow_through_by_11_00"
+    action: "EXIT_OR_REDUCE"
+    add_reason: [IL_NO_FOLLOW_THROUGH_MORNING]
+  trailing_rule:
+    after_tp1:
+      action: "MOVE_SL_TO_BE"
+      add_reason: [MOVE_SL_TO_BE]
+
+# 7) Sizing defaults
+sizing_defaults:
+  risk_per_trade_pct_default: 0.006       # 0.6% (lebih ketat karena entry cepat)
+  max_positions_total_default: 1
+  size_multiplier_caps:
+    High: 0.85
+    Med: 0.65
+    Low: 0.45
+
+# 8) Reason codes khusus policy
+policy_reason_codes:
+  prefix: IL_
+  codes:
+    - IL_SNAPSHOT_PRESENT_FAIL
+    - IL_GAP_REAL_WARN
+    - IL_OPENING_RANGE_WIDE_WARN
+    - IL_OR_BREAKOUT_FAIL
+    - IL_PULLBACK_FAIL
+    - IL_CONT_FAIL
+    - IL_GAP_UP_BLOCK
+    - IL_CHASE_BLOCK
+    - IL_NO_FOLLOW_THROUGH_MORNING
+```
+
+#### 2.5.2 Batasan keras
+- Ini **bukan scalping**. Kalau konfirmasi tidak kejadian di window → `NO_TRADE` untuk ticker itu.
+- Semua level SL/TP tetap mengacu ke plan EOD (Bagian 20), intraday hanya memutuskan *kapan* entry boleh dilakukan.
 
 ### 2.6 Policy: POSITION_TRADE (2–8 minggu)
-**Tujuan:** ride trend besar, bukan trading mingguan.
+**Tujuan:** ride trend besar (trend-follow), bukan trading mingguan.
 
-**Gates:**
-- Trend quality tinggi (MA alignment kuat + signal continuation)
-- Market regime risk-on
-- Exit lebih longgar (ATR-based, trailing)
+#### 2.6.1 Policy execution block (wajib, deterministik)
+```yaml
+policy_code: POSITION_TRADE
 
-### 2.7 Urutan pemilihan policy (deterministik)
-Agar hasil watchlist konsisten:
-1) Jika market regime = risk-off → `NO_TRADE` (kecuali ada policy khusus hedge, kalau nanti ada)
-2) Jika ada event dividen valid + lulus gates → `DIVIDEND_SWING`
-3) Jika snapshot intraday tersedia + setup EOD kuat → `INTRADAY_LIGHT` (opsional)
-4) Default → `WEEKLY_SWING`
-5) Jika trend super kuat & kamu pilih mode long horizon → `POSITION_TRADE`
+# 1) Data dependency
+data_dependency:
+  required:
+    - ticker_ohlc_daily.canonical: [open, high, low, close, volume, prev_close]
+    - ticker_indicators_daily: [ma20, ma50, ma200, rsi14, vol_ratio, atr14, atr_pct, dv20, liq_bucket]
+    - market_context: [dow, market_regime]
+    - trend_features: [ma20_slope, ma50_slope, distance_to_ma50, drawdown_from_20d_high]
+  optional:
+    - breadth: [adv_decl, new_high_20d, new_low_20d]
+    - portfolio_context: [has_position, days_held]
 
-> Ini urutan default. Kalau nanti kamu mau mengunci “mode” (mis. minggu ini hanya weekly swing), tinggal override di layer config/preset UI.
+# 2) Hard filters
+hard_filters:
+  - id: PT_MARKET_RISK_ON_ONLY
+    expr: "market_regime == risk-on"
+    on_fail: NO_TRADE
+  - id: PT_LIQ_MIN
+    expr: "liq_bucket in ['A','B']"
+    on_fail: DROP
+  - id: PT_TREND_ALIGN
+    expr: "ma20 > ma50 and ma50 > ma200"
+    on_fail: DROP
+  - id: PT_SLOPE_MIN
+    expr: "ma50_slope >= 0.0005"       # ≥ 0.05% per trading day (proxy)
+    on_fail: DROP
+  - id: PT_ATR_MAX
+    expr: "atr_pct <= 0.08"
+    on_fail: DROP
 
+# 3) Soft filters + score weight override
+soft_filters:
+  - id: PT_RSI_TOO_HIGH_WARN
+    when: "rsi14 >= 78"
+    effect:
+      score_penalty: 5
+      entry_style_override: PULLBACK_WAIT
+      add_reason: [RSI_OVERHEAT_WARN]
+  - id: PT_DRAWDOWN_WARN
+    when: "drawdown_from_20d_high <= -0.08"   # >8% dari high 20D
+    effect:
+      score_penalty: 4
+      add_reason: [PT_DRAWDOWN_WARN]
 
+score_weight_override:
+  trend_quality: 0.45
+  momentum_candle: 0.10
+  volume_liquidity: 0.15
+  risk_quality: 0.20
+  market_alignment: 0.10
+
+# 4) Setup allowlist
+setup_allowlist:
+  recommended: [Pullback, Continuation]
+  secondary_only: [Breakout]
+  forbidden: [Reversal, Base]
+
+# 5) Entry rules
+entry_rules:
+  allow_new_entry: true
+  preferred_days: [Mon, Tue, Wed]         # avoid late week entry untuk posisi trade
+  entry_windows: ["09:35-11:15", "13:35-14:30"]
+  avoid_windows: ["09:00-09:25", "15:30-close"]
+  anti_chasing:
+    expr: "distance_to_ma20 > 1.2*atr14"  # terlalu jauh dari mean
+    action: WAIT_PULLBACK_ONLY
+    add_reason: [PT_CHASE_BLOCK]
+  gap_guard:
+    expr: "gap_pct_real_or_open > 0.020"
+    action: DISABLE_ENTRY_FOR_TODAY
+    add_reason: [PT_GAP_UP_BLOCK]
+
+# 6) Exit rules (lebih longgar)
+exit_rules:
+  max_holding_days: 40
+  trailing_rule:
+    method: "ATR_TRAIL"
+    params:
+      trail_atr_mult: 2.0
+    add_reason: [PT_ATR_TRAIL]
+  time_stop:
+    t_plus_10_days:
+      condition: "mfe_r < 0.5"
+      action: "REDUCE_OR_EXIT"
+      add_reason: [PT_TIME_STOP_T10]
+
+# 7) Sizing defaults
+sizing_defaults:
+  risk_per_trade_pct_default: 0.0125      # 1.25% (lebih long-horizon, tapi tetap disiplin)
+  max_positions_total_default: 2
+  size_multiplier_caps:
+    High: 1.00
+    Med: 0.85
+    Low: 0.65
+
+# 8) Reason codes khusus policy
+policy_reason_codes:
+  prefix: PT_
+  codes:
+    - PT_MARKET_RISK_ON_ONLY_FAIL
+    - PT_TREND_ALIGN_FAIL
+    - PT_SLOPE_MIN_FAIL
+    - PT_CHASE_BLOCK
+    - PT_GAP_UP_BLOCK
+    - PT_ATR_TRAIL
+    - PT_TIME_STOP_T10
+    - PT_DRAWDOWN_WARN
+```
+
+#### 2.6.2 Catatan implementasi
+- Policy ini hanya aktif saat market jelas risk-on. Kalau tidak, jangan “maksa” jadi position trade.
+- Exit template default adalah trailing (bukan TP2 fixed) karena targetnya trend-follow.
+
+### 2.7 Policy: NO_TRADE (proteksi modal)
+**Tujuan:** proteksi modal. Policy ini **bukan** “tidak ada output”, tapi output deterministik yang memaksa sistem *tidak membuka posisi baru*.
+
+#### 2.7.1 Policy execution block (wajib, deterministik)
+```yaml
+policy_code: NO_TRADE
+
+# 1) Data dependency
+data_dependency:
+  required:
+    - market_context: [market_regime, dow]
+    - data_freshness_gate: [eod_canonical_ready, missing_trading_dates]
+  optional:
+    - portfolio_context: [has_position]   # untuk menentukan apakah mode = CARRY_ONLY
+
+# 2) Hard filters (trigger NO_TRADE) — angka tegas
+hard_triggers:
+  - id: NT_EOD_NOT_READY
+    expr: "eod_canonical_ready == false"
+    action: NO_TRADE
+    add_reason: [EOD_NOT_READY]
+  - id: NT_MARKET_RISK_OFF
+    expr: "market_regime == risk-off"
+    action: NO_TRADE
+    add_reason: [MARKET_RISK_OFF]
+  - id: NT_BREADTH_CRASH
+    expr: "breadth_new_low_20d >= 120 and breadth_adv_decl_ratio <= 0.40"  # jika breadth tersedia
+    action: NO_TRADE
+    add_reason: [BREADTH_RISK_OFF]
+
+# 3) Soft filters (di NO_TRADE tidak relevan untuk scoring) — tetap eksplisit
+soft_filters: []
+
+# 4) Setup allowlist
+setup_allowlist:
+  recommended: []
+  secondary_only: []
+  forbidden: [Breakout, Pullback, Continuation, Reversal, Base]
+
+# 5) Entry rules
+entry_rules:
+  allow_new_entry: false
+  entry_windows: []
+  avoid_windows: ["09:00-close"]
+  trade_disabled: true
+  size_multiplier: 0.0
+  max_positions_today: 0
+
+# 6) Exit rules (untuk posisi existing)
+exit_rules:
+  if_has_position:
+    action: "MANAGE_ONLY"
+    allowed_actions: [HOLD, REDUCE, EXIT, TRAIL_SL]
+    add_reason: [CARRY_ONLY_MANAGEMENT]
+
+# 7) Sizing defaults
+sizing_defaults:
+  risk_per_trade_pct_default: 0.0
+  max_positions_total_default: 0
+
+# 8) Reason codes khusus policy
+policy_reason_codes:
+  prefix: NT_
+  codes:
+    - NT_EOD_NOT_READY
+    - NT_MARKET_RISK_OFF
+    - NT_BREADTH_CRASH
+    - NT_CARRY_ONLY_MANAGEMENT
+```
+
+#### 2.7.2 Invariant output (wajib)
+Kalau policy aktif:
+- Semua kandidat harus `trade_disabled = true`
+- `entry_windows = []`, `avoid_windows = []` (atau `["09:00-close"]` secara global)
+- `size_multiplier = 0.0`, `max_positions_today = 0`
+- `entry_style = "No-trade"`
+
+### 2.8 Urutan pemilihan policy (deterministik)
+Agar hasil watchlist konsisten (dan tidak “campur aduk” antar policy), pemilihan policy harus **satu arah**:
+
+1) Jika `EOD CANONICAL` belum ready (freshness gate gagal) → **NO_TRADE** (atau `CARRY_ONLY` jika ada posisi existing).
+2) Jika `market_regime = risk-off` → **NO_TRADE**.
+3) Jika ada event dividen valid + lolos hard filters → **DIVIDEND_SWING**.
+4) Jika snapshot intraday tersedia + kandidat EOD kuat → **INTRADAY_LIGHT** (opsional).
+5) Jika market risk-on & trend quality tinggi → boleh override ke **POSITION_TRADE** (mode long horizon).
+6) Default → **WEEKLY_SWING**.
+
+> Ini urutan default. Kalau nanti mau “lock mode” (mis. minggu ini hanya weekly swing), override dilakukan di layer config/UI (bukan dengan memodifikasi rule internal policy).
 
 ---
 
