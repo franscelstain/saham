@@ -105,8 +105,10 @@ class WatchlistPersistenceRepository
                 elseif (isset($r['rank_score']) && is_numeric($r['rank_score'])) $rankScore = (float) $r['rank_score'];
 
                 $plan = $r['plan'] ?? ($r['trade_plan'] ?? null);
-                $rankReasonCodes = $r['rankReasonCodes'] ?? ($r['rank_reason_codes'] ?? null);
-                $rankBreakdown = $r['rank_breakdown'] ?? ($r['score_breakdown'] ?? null);
+                $debug = isset($r['debug']) && is_array($r['debug']) ? $r['debug'] : null;
+
+                $rankReasonCodes = $r['rankReasonCodes'] ?? ($r['rank_reason_codes'] ?? ($debug['rank_reason_codes'] ?? null));
+                $rankBreakdown = $r['rank_breakdown'] ?? ($r['score_breakdown'] ?? ($debug['score_breakdown'] ?? null));
 
                 $rows[] = [
                     'watchlist_daily_id' => $dailyId,

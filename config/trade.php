@@ -143,6 +143,10 @@ return [
         ],
     ],
     'watchlist' => [
+        // Strategy policy (explicit). Default = WEEKLY_SWING.
+        'policy_default' => env('WATCHLIST_POLICY_DEFAULT', 'WEEKLY_SWING'),
+        // Supported policies (CSV), ex: "WEEKLY_SWING,DIVIDEND_SWING"
+        'supported_policies' => array_values(array_filter(array_map('trim', explode(',', (string) env('WATCHLIST_SUPPORTED_POLICIES', 'WEEKLY_SWING'))))),
         'bucket_top_min_score' => env('WATCHLIST_BUCKET_TOP_MIN_SCORE', 60),
         'bucket_watch_min_score' => env('WATCHLIST_BUCKET_WATCH_MIN_SCORE', 35),
         'expiry_aging_from_days' => env('WATCHLIST_EXPIRY_AGING_FROM_DAYS', 2), // label banding umur (buat UI)

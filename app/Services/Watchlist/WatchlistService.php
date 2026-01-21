@@ -258,8 +258,26 @@ class WatchlistService
             $recommendations = $this->alloc->buildActionPlan((array)($groups['top_picks'] ?? []), $dow ?: '', $capital);
         }
 
-        $meta = array_merge($grouped['meta'] ?? [], [
+        
+        // Policy (explicit) — UI/audit can rely on this.
+        $policyCode = (string) config('trade.watchlist.policy_default', 'WEEKLY_SWING');
+        $supportedPolicies = (array) config('trade.watchlist.supported_policies', ['WEEKLY_SWING']);
+
+        // Global gate: when recommendations are NO_TRADE, lock per-ticker advice so UI is not contradictory.
+        $globalMode = (string) ($recommendations['mode'] ?? '');
+        if ($globalMode === 'NO_TRADE') {
+            $groups = $this->lockGroupsForNoTrade(
+                (array) $groups,
+                (string) ($recommendations['reason'] ?? 'NO_TRADE'),
+                (string) ($recommendations['timing_summary_default'] ?? ''),
+                (array) ($recommendations['pre_buy_checklist_default'] ?? [])
+            );
+        }
+
+$meta = array_merge($grouped['meta'] ?? [], [
             'generated_at' => $generatedAt->toIso8601String(),
+            'policy_code' => $policyCode,
+            'supported_policies' => array_values(array_unique(array_filter($supportedPolicies))),
             'dow' => $dow,
             'market_regime' => $marketRegime,
             'market_notes' => (string)($market['market_notes'] ?? ''),
@@ -527,6 +545,60 @@ class WatchlistService
         return $out;
     }
 
+
+    /**
+     * When global recommendations mode is NO_TRADE, we must avoid contradictory UI signals.
+     * Lock per-ticker advice into watch-only (no entry windows / no sizing).
+     *
+     * @param array $groups normalized groups (snake_case rows)
+     */
+    private function lockGroupsForNoTrade(array $groups, string $reason, string $timingSummary, array $checklist): array
+    {
+        $timingSummary = trim($timingSummary);
+        $checklist = array_values(array_filter($checklist, fn($x) => is_string($x) && trim($x) !== ''));
+
+        foreach (['top_picks', 'watch', 'avoid'] as $k) {
+            $items = $groups[$k] ?? [];
+            if (!is_array($items)) continue;
+
+            foreach ($items as $i => $row) {
+                if (!is_array($row)) continue;
+
+                $row['trade_disabled'] = true;
+                $row['trade_disabled_reason'] = $reason ?: 'NO_TRADE';
+
+                // Lock advice fields
+                $row['entry_windows'] = [];
+                $row['avoid_windows'] = [];
+                $row['entry_style'] = 'No-trade';
+                $row['size_multiplier'] = 0.0;
+                $row['max_positions_today'] = 0;
+
+                if ($timingSummary !== '') {
+                    $row['timing_summary'] = $timingSummary;
+                } else {
+                    $row['timing_summary'] = 'NO_TRADE (global gate).';
+                }
+
+                if (!empty($checklist)) {
+                    $row['pre_buy_checklist'] = $checklist;
+                } else {
+                    $row['pre_buy_checklist'] = [
+                        'NO_TRADE: jangan entry hari ini.',
+                        'Update EOD canonical terlebih dulu (hindari blind buy).',
+                    ];
+                }
+
+                // Make it explicit for UI
+                $row['plan_mode'] = 'NO_TRADE';
+
+                $groups[$k][$i] = $row;
+            }
+        }
+
+        return $groups;
+    }
+
     private function normalizeRow(array $r, int $rank): array
     {
         $rawScore = (float)($r['rankScore'] ?? 0);
@@ -621,11 +693,13 @@ class WatchlistService
 
             'rank_score' => $rawScore,
             'watchlist_score' => $scoreUi,
-            'rank_reason_codes' => $r['rankReasonCodes'] ?? [],
-
-            'score_breakdown' => $r['score_breakdown'] ?? ($r['scoreBreakdown'] ?? null),
 
             'bucket' => (string)($bucket ?? 'AVOID'),
+
+            // global trade gate (UI should respect this)
+            'trade_disabled' => (bool)($r['trade_disabled'] ?? false),
+            'trade_disabled_reason' => (string)($r['trade_disabled_reason'] ?? ''),
+            'plan_mode' => $r['plan_mode'] ?? null,
 
             // advice fields
             'setup_type' => $r['setup_type'] ?? null,
@@ -645,14 +719,40 @@ class WatchlistService
             'trade_plan' => $tradePlan,
         ];
 
-        // optional verbose reasons
-        if (isset($r['rankReasons'])) {
-            $row['rank_reasons'] = $r['rankReasons'];
-        }
+        $verboseExplain = (bool) config('trade.watchlist.explain_verbose', false);
 
-        // optional validator badge
-        if (isset($r['validator'])) {
-            $row['validator'] = $r['validator'];
+        $rankReasonCodes = $r['rank_reason_codes'] ?? ($r['rankReasonCodes'] ?? []);
+        if (!is_array($rankReasonCodes)) $rankReasonCodes = [];
+
+        $scoreBreakdown = $r['score_breakdown'] ?? ($r['scoreBreakdown'] ?? null);
+
+        if ($verboseExplain) {
+            $row['rank_reason_codes'] = $rankReasonCodes;
+            $row['score_breakdown'] = $scoreBreakdown;
+
+            // optional verbose reasons
+            if (isset($r['rankReasons'])) {
+                $row['rank_reasons'] = $r['rankReasons'];
+            }
+
+            // optional validator badge
+            if (isset($r['validator'])) {
+                $row['validator'] = $r['validator'];
+            }
+        } else {
+            $debug = [
+                'rank_reason_codes' => $rankReasonCodes,
+            ];
+            if ($scoreBreakdown !== null) {
+                $debug['score_breakdown'] = $scoreBreakdown;
+            }
+            if (isset($r['rankReasons'])) {
+                $debug['rank_reasons'] = $r['rankReasons'];
+            }
+            if (isset($r['validator'])) {
+                $debug['validator'] = $r['validator'];
+            }
+            $row['debug'] = $debug;
         }
 
         return $row;
@@ -694,7 +794,10 @@ class WatchlistService
             $notes[] = 'Upper wick panjang — potensi supply/penolakan.';
         }
 
-        if (empty($notes)) return '';
+        if (empty($notes)) {
+            // Always provide a short note for UI consistency.
+            return 'Risk normal; tetap konfirmasi spread & follow-through, dan disiplin SL.';
+        }
         return implode(' ', $notes);
     }
 
