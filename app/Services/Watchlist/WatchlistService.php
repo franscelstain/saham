@@ -66,6 +66,12 @@ class WatchlistService
 
         $pipe = $this->factory->makePreopen();
 
+        $tz = (string) config('trade.clock.timezone', 'Asia/Jakarta');
+        $generatedAt = Carbon::now($tz);
+        $today = $generatedAt->toDateString();
+        // DOW harus merepresentasikan hari eksekusi (hari ini), bukan trade_date basis EOD.
+        $execDow = $this->dowFromDate($today);
+
         // Pull candidates from the latest date where BOTH indicators and canonical OHLC are available.
         // This avoids emitting BUY recommendations on partial / non-canonical coverage.
         $raw = $this->watchRepo->getEodCandidates();
@@ -133,8 +139,7 @@ class WatchlistService
             $row['bucket'] = $pipe->bucketer->bucket($row);
 
             // enrich pre-open advice (timing/checklist/confidence)
-            $dow = $this->dowFromDate($c->tradeDate);
-            $advice = $this->advice->advise($c, $outcome, $setupStatus, $row, $dow, $marketRegime);
+            $advice = $this->advice->advise($c, $outcome, $setupStatus, $row, $execDow, $marketRegime);
             $row = array_merge($row, $advice);
 
             // attach spec aliases for plan
@@ -148,7 +153,7 @@ class WatchlistService
         
         $grouped = $pipe->grouper->group($rows);
         $eodDate = $rows[0]['trade_date'] ?? $rows[0]['tradeDate'] ?? null;
-        $dow = $eodDate ? $this->dowFromDate((string)$eodDate) : '';
+        $dow = $execDow;
 
         // Phase 7: attach cached validator result (EODHD) for recommended picks (top_picks).
         // No external API call here. Data is populated via market-data:validate-eod.
@@ -203,11 +208,7 @@ class WatchlistService
             'avoid'     => $this->normalizeRows((array)($groupsInternal['avoid'] ?? [])),
         ];
 
-        $tz = (string) config('trade.clock.timezone', 'Asia/Jakarta');
-        $generatedAt = Carbon::now($tz);
-        $today = $generatedAt->toDateString();
-
-        $stale = $this->computeEodStaleness($eodDate ? (string) $eodDate : null, $today, $tz);
+        $stale = $this->computeEodStaleness($eodDate ? (string) $eodDate : null, $generatedAt, $tz);
         $maxStale = (int) config('trade.watchlist.max_stale_trading_days', 1);
 
         // Coverage gate (canonical readiness)
@@ -266,6 +267,7 @@ class WatchlistService
             'data_status' => [
                 'eod_date' => $eodDate,
                 'today' => $today,
+                'as_of_trade_date' => $stale['as_of_trade_date'] ?? null,
                 'trading_days_stale' => $stale['trading_days_stale'],
                 'missing_trading_dates' => $stale['missing_trading_dates'],
                 'max_allowed_trading_days_stale' => $maxStale,
@@ -320,15 +322,16 @@ class WatchlistService
     /**
      * Compute how stale the current EOD basis date is, measured in TRADING DAYS (not calendar days).
      *
-     * trading_days_stale = number of trading days AFTER eod_date up to today (inclusive) according to market_calendar.
-     * missing_trading_dates = list of those trading dates (for UI/debug).
+     * trading_days_stale = number of trading days AFTER eod_date sampai last completed trading day (cutoff-aware).
+     * missing_trading_dates = list of trading dates yang belum ter-cover oleh EOD basis (for UI/debug).
      */
-    private function computeEodStaleness(?string $eodDate, string $today, string $tz): array
+    private function computeEodStaleness(?string $eodDate, Carbon $now, string $tz): array
     {
         if (!$eodDate) {
             return [
                 'trading_days_stale' => null,
                 'missing_trading_dates' => [],
+                'as_of_trade_date' => null,
             ];
         }
 
@@ -338,19 +341,27 @@ class WatchlistService
             return [
                 'trading_days_stale' => null,
                 'missing_trading_dates' => [],
+                'as_of_trade_date' => null,
             ];
         }
 
-        if ($today <= $eod) {
+        // cutoff-aware "as of" trade date:
+        // - before cutoff (pre-open / intraday): last completed trading day is previous trading day.
+        // - after cutoff: last completed trading day can be today (if today is trading day).
+        $today = $now->copy()->setTimezone($tz)->toDateString();
+        $asOf = $this->resolveAsOfTradeDate($now, $today, $tz);
+
+        if (!$asOf || $asOf <= $eod) {
             return [
                 'trading_days_stale' => 0,
                 'missing_trading_dates' => [],
+                'as_of_trade_date' => $asOf,
             ];
         }
 
         $from = Carbon::parse($eod, $tz)->addDay()->toDateString();
         try {
-            $dates = $this->calRepo->tradingDatesBetween($from, $today);
+            $dates = $this->calRepo->tradingDatesBetween($from, $asOf);
         } catch (\Throwable $e) {
             $dates = [];
         }
@@ -358,7 +369,43 @@ class WatchlistService
         return [
             'trading_days_stale' => count($dates),
             'missing_trading_dates' => array_values($dates),
+            'as_of_trade_date' => $asOf,
         ];
+    }
+
+    /**
+     * Resolve last completed trading day for staleness computation.
+     *
+     * @return string|null YYYY-MM-DD
+     */
+    private function resolveAsOfTradeDate(Carbon $now, string $today, string $tz): ?string
+    {
+        $now = $now->copy()->setTimezone($tz);
+
+        $h = (int) config('trade.clock.eod_cutoff.hour', 16);
+        $m = (int) config('trade.clock.eod_cutoff.min', 30);
+        $cutoff = Carbon::parse($today . sprintf(' %02d:%02d:00', $h, $m), $tz);
+
+        // after cutoff -> today might be completed if it's a trading day
+        if ($now->greaterThanOrEqualTo($cutoff)) {
+            try {
+                if ($this->calRepo->isTradingDay($today)) return $today;
+            } catch (\Throwable $e) {
+                // ignore
+            }
+            try {
+                return $this->calRepo->previousTradingDate($today);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        // before cutoff -> last completed trading day is previous trading day (handles weekends too)
+        try {
+            return $this->calRepo->previousTradingDate($today);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
