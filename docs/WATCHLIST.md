@@ -1,3 +1,5 @@
+# build_id: watch_v1.9
+
 # TradeAxis Watchlist – Design Spec (EOD-driven)  
 File: `WATCHLIST.md`
 
@@ -44,7 +46,7 @@ Watchlist ini **EOD-driven**. Karena itu, rekomendasi **NEW ENTRY** hanya boleh 
    - Set output global: `trade_plan_mode = NO_TRADE` untuk **NEW ENTRY**,
    - Semua ticker hanya boleh berstatus **watch-only** (`entry_style = No-trade`, `size_multiplier = 0.0`),
    - Tambahkan `market_notes`: “EOD CANONICAL belum tersedia (atau held). Entry ditahan.”
-   - Wajib tulis reason code global: `EOD_NOT_READY`.
+   - Wajib tulis reason code global: `GL_EOD_NOT_READY`.
 
 **Catatan**
 - Policy `INTRADAY_LIGHT` boleh dipakai **hanya** jika snapshot intraday yang disyaratkan benar-benar ada (kalau tidak ada → tetap NO_TRADE).
@@ -72,6 +74,9 @@ Minimal field yang harus ada dalam hasil watchlist:
 - `trade_disabled_reason` (ringkas; contoh: `EOD_STALE`, `EOD_NOT_READY`, `RISK_OFF`)
 - `risk_notes` (1–2 kalimat, bukan essay)
 
+- `preopen_guard` (`PENDING|PASS|FAIL|NA`) — status guard anti-chasing/gap untuk hari eksekusi.
+- `preopen_checks[]` (opsional) — daftar check pre-open yang harus dipenuhi (jika `preopen_guard=PENDING`).
+
 **D. Position context (kalau ticker sudah kamu pegang)**
 - `has_position` (boolean)
 - `position_avg_price`, `position_lots` (opsional jika ada input portfolio)
@@ -82,7 +87,7 @@ Minimal field yang harus ada dalam hasil watchlist:
 - `position_notes` (1 kalimat; contoh: “Naikkan SL ke BE karena TP1 tercapai; bias exit Jumat.”)
 
 **E. Disable reason (lebih detail, biar UI tidak ambigu)**
-- `trade_disabled_reason_codes[]` (array; contoh: `GAP_UP_BLOCK`, `CHASE_BLOCK_DISTANCE_TOO_FAR`, `WEEKEND_RISK_BLOCK`)
+- `trade_disabled_reason_codes[]` (array; contoh: `WS_GAP_UP_BLOCK`, `WS_CHASE_BLOCK_DISTANCE_TOO_FAR`, `WS_WEEKEND_RISK_BLOCK`)
 
 **C. “Checklist sebelum buy” (untuk meyakinkan)**
 Walau berbasis EOD, watchlist harus selalu memberi checklist minimal:
@@ -186,9 +191,10 @@ threshold_contract:
 
 # 3) Hard filters (angka tegas)
 hard_filters:
-  - id: WS_DATA_COMPLETE
+  - id: WS_DATA_COMPLETE_FAIL
     expr: "all(required_columns_not_null)"
     on_fail: DROP
+    add_reason: [WS_DATA_COMPLETE_FAIL]
 
   - id: WS_SIGNAL_STALENESS
     expr: "signal_age_days <= 5"
@@ -274,6 +280,30 @@ lifecycle:
       when: "exit_filled == true"
       add_reason: [WS_EXIT_FILLED]
 
+# 6b) Output mapping (wajib, supaya UI tidak ambigu)
+output_mapping:
+  # mapping lifecycle → field output kandidat/posisi
+  from_lifecycle_to_ui:
+    PENDING_ENTRY:
+      trade_disabled: false
+      position_state: null
+      preopen_guard_default: PENDING
+    LIVE:
+      position_state: HOLD
+    MANAGE:
+      # pilih salah satu berdasarkan driver yang aktif:
+      # - trail_update_needed → TRAIL_SL
+      # - reduce_needed → REDUCE
+      # - exit_triggered → EXIT (atau EXIT_QUEUED)
+      position_state_priority: [EXIT, REDUCE, TRAIL_SL, HOLD]
+    EXIT_QUEUED:
+      position_state: EXIT
+    EXITED:
+      position_state: EXIT
+
+  # trade_disabled_reason_codes[] harus policy-prefixed:
+  trade_disabled_reason_namespace: "WS_* (atau GL_* untuk global gate)"
+
 # 7) Entry rules (termasuk anti-chasing/gap) — angka tegas
 entry_rules:
   day_of_week_rules:
@@ -316,6 +346,11 @@ entry_rules:
   # - Gap guard: memblokir entry bila open/last (indikasi pre-open) terlalu jauh dari prev_close.
   # - No-chase breakout: memblokir entry bila close EOD sudah terlalu jauh dari trigger.
   anti_chasing_and_gap_guards:
+    - id: WS_PREOPEN_PRICE_MISSING
+      expr: "open_or_last is null"
+      action: "DISABLE_AUTOMATED_ENTRY"
+      add_reason: [WS_PREOPEN_PRICE_MISSING]
+
     - id: WS_GAP_UP_BLOCK
       expr: "open_or_last > prev_close * (1 + min(0.025, 1.00*atr_pct))"
       action: "DISABLE_ENTRY_FOR_TODAY"
@@ -345,11 +380,11 @@ entry_rules:
 exit_rules:
   time_stop:
     t_plus_2_days:
-      condition: "mfe_r < 0.5"
+      condition: "(mfe_r is not null and mfe_r < 0.5) or (mfe_r is null and ret_since_entry_pct is not null and ret_since_entry_pct < 0.010)"
       action: "REDUCE_50_OR_EXIT"
       add_reason: [WS_TIME_STOP_T2]
     t_plus_3_days:
-      condition: "mfe_r < 0.5"
+      condition: "(mfe_r is not null and mfe_r < 0.5) or (mfe_r is null and ret_since_entry_pct is not null and ret_since_entry_pct < 0.010)"
       action: "EXIT"
       add_reason: [WS_TIME_STOP_T3]
 
@@ -393,6 +428,9 @@ sizing_defaults:
 min_trade_viability:
   # Guard ini mencegah weekly swing modal kecil “buang-buang fee/spread”.
   # Jika gagal, action = WATCH_ONLY (atau NO_TRADE jika semua gagal).
+  # Kontrak evaluasi:
+  # - Jika `capital_total` tidak tersedia → skip semua rule viability dan tambahkan reason `WS_VIABILITY_NOT_EVAL_NO_CAPITAL`.
+  # - Jika sizing engine tidak dijalankan → `lots_recommended` dan `alloc_amount_idr` dianggap null dan rule yang membutuhkannya otomatis FAIL (WATCH_ONLY).
   - id: WS_MIN_LOTS_1
     expr: "lots_recommended >= 1"
     on_fail: WATCH_ONLY
@@ -468,6 +506,17 @@ policy_reason_codes:
     - WS_CHASE_BLOCK_DISTANCE_TOO_FAR
     - WS_CHASE_BLOCK_PULLBACK_TOO_HIGH
     - WS_MIN_EDGE_FAIL
+
+    - WS_PREOPEN_PRICE_MISSING
+    - WS_VIABILITY_NOT_EVAL_NO_CAPITAL
+    - WS_SETUP_BREAKOUT
+    - WS_SETUP_PULLBACK
+    - WS_SETUP_CONTINUATION
+    - WS_SETUP_REVERSAL
+    - WS_TREND_ALIGN_OK
+    - WS_VOLUME_OK
+    - WS_LIQ_OK
+    - WS_RR_OK
     - WS_FEE_EDGE_FAIL
     - WS_MIN_VIABLE_TRADE_FAIL
     - WS_MIN_ALLOC_TOO_SMALL
@@ -637,7 +686,7 @@ exit_rules:
       add_reason: [MOVE_SL_TO_BE]
   time_stop:
     t_plus_3_days:
-      condition: "mfe_r < 0.5"
+      condition: "(mfe_r is not null and mfe_r < 0.5) or (mfe_r is null and ret_since_entry_pct is not null and ret_since_entry_pct < 0.010)"
       action: EXIT
       add_reason: [DS_TIME_STOP_T3]
 
@@ -889,7 +938,7 @@ exit_rules:
     add_reason: [PT_ATR_TRAIL]
   time_stop:
     t_plus_10_days:
-      condition: "mfe_r < 0.5"
+      condition: "(mfe_r is not null and mfe_r < 0.5) or (mfe_r is null and ret_since_entry_pct is not null and ret_since_entry_pct < 0.010)"
       action: "REDUCE_OR_EXIT"
       add_reason: [PT_TIME_STOP_T10]
 
@@ -940,15 +989,15 @@ hard_triggers:
   - id: NT_EOD_NOT_READY
     expr: "eod_canonical_ready == false"
     action: NO_TRADE
-    add_reason: [EOD_NOT_READY]
+    add_reason: [NT_EOD_NOT_READY]
   - id: NT_MARKET_RISK_OFF
     expr: "market_regime == risk-off"
     action: NO_TRADE
-    add_reason: [MARKET_RISK_OFF]
+    add_reason: [NT_MARKET_RISK_OFF]
   - id: NT_BREADTH_CRASH
     expr: "breadth_new_low_20d >= 120 and breadth_adv_decl_ratio <= 0.40"  # jika breadth tersedia
     action: NO_TRADE
-    add_reason: [BREADTH_RISK_OFF]
+    add_reason: [NT_BREADTH_CRASH]
 
 # 3) Soft filters (di NO_TRADE tidak relevan untuk scoring) — tetap eksplisit
 soft_filters: []
@@ -973,7 +1022,7 @@ exit_rules:
   if_has_position:
     action: "MANAGE_ONLY"
     allowed_actions: [HOLD, REDUCE, EXIT, TRAIL_SL]
-    add_reason: [CARRY_ONLY_MANAGEMENT]
+    add_reason: [NT_CARRY_ONLY_MANAGEMENT]
 
 # 7) Sizing defaults
 sizing_defaults:
@@ -1169,11 +1218,18 @@ Format: `field` — **type** — *source* — **definisi/formula** — **notes &
   - Jika field ini **tidak tersedia** → untuk safety treat sebagai **true** di policy yang memblokir corporate action.
 
 ##### G) Execution-time helpers (anti-chasing / gap guard)
-- `preopen_last_price` — float — *optional snapshot* — harga indikatif sebelum market buka (jika ada).
-- `open_or_last` — float|null — derived — `preopen_last_price ?? open ?? null`.
-  - Jika null: engine **tidak boleh** membuka NEW ENTRY (gap guard tidak bisa dinilai aman).
+- `preopen_last_price` — float|null — *optional snapshot* — harga indikatif sebelum market buka pada **hari eksekusi entry** (T+1), jika ada.
+- `open_or_last` — float|null — derived — `preopen_last_price ?? null`.
+  - **Tidak boleh** fallback ke `open` EOD (karena `open` di dokumen ini adalah *EOD open pada trade_date*, bukan open hari entry).
+  - Jika `open_or_last` null: engine **tidak boleh** melakukan **automated NEW ENTRY**, tapi UI boleh tetap menampilkan plan dengan status `preopen_guard = PENDING` (lihat 1.2).
+
+- `preopen_guard` — enum(`PENDING|PASS|FAIL|NA`) — *engine/UI* — status gap/anti-chasing guard di pre-open.
+  - `PENDING` jika `open_or_last` belum ada.
+  - `PASS/FAIL` jika snapshot ada dan guard dievaluasi.
+  - `NA` jika policy tidak butuh preopen guard.
 
 ##### H) Tick size & rounding
+
 - `tick_size` — float — *tick_size table / price band* — fraksi harga (IDX).
 - `round_to_tick(price, direction)` — function — *engine* — pembulatan ke tick:
   - `UP`: ceil(price / tick_size) * tick_size
@@ -1210,6 +1266,7 @@ Format: `field` — **type** — *source* — **definisi/formula** — **notes &
 - `lots` — int — *portfolio* — lot yang sedang dipegang.
 - `entry_trade_date` — date — *portfolio* — tanggal entry (trading day).
 - `days_held` — int — derived — jumlah **trading days** sejak `entry_trade_date` sampai `trade_date`.
+- `ret_since_entry_pct` — float — derived — `(close - avg_price) / avg_price` (jika avg_price null/0 → null).
 - `tp1_not_hit` — bool — *portfolio/engine* — true jika TP1 belum pernah tersentuh.
 - `sl_is_be_or_trailing` — bool — *engine* — true jika SL sudah BE atau trailing.
 
@@ -1289,7 +1346,7 @@ Total 100 poin:
 - Market alignment (0–10)
   - IHSG regime, breadth
 
-> Setiap komponen harus menghasilkan “reason code” saat memberi atau mengurangi poin.
+> Setiap komponen harus menghasilkan **debug reason code** (mis. di `debug.rank_reason_codes[]`) saat memberi atau mengurangi poin. `reason_codes[]` untuk UI harus tetap **policy-prefixed** (lihat Section 9).
 
 ### 6.2 Confidence mapping
 - High: score ≥ 82 dan tidak kena red-flag risk
@@ -1349,13 +1406,13 @@ Gunakan rules berikut (contoh):
 - Aksi:
   - tambah avoid: `["pre-open", "09:00-09:30"]`
   - entry_windows geser lebih siang: `["09:45-11:15", "13:45-14:30"]`
-- Reason codes: `GAP_RISK_HIGH`, `VOLATILITY_HIGH`
+- Debug codes (untuk `debug.rank_reason_codes`): `GAP_RISK_HIGH`, `VOLATILITY_HIGH`
 
 **Rule: Likuiditas rendah (dv20 kecil)**
 - Aksi:
   - hindari open & mendekati close (spread/antrian)
   - entry_windows: `["10:00-11:30", "13:45-14:30"]`
-- Reason: `LIQ_LOW_MATCH_RISK`
+- Debug code: `LIQ_LOW_MATCH_RISK`
 
 **Rule: Breakout kuat**
 - Aksi:
@@ -1363,17 +1420,17 @@ Gunakan rules berikut (contoh):
   - checklist menekankan follow-through + guard anti-chasing:
     - Jika open/last price gap-up > `max_gap_up_pct` dari close kemarin → NO ENTRY (tunggu pullback)
     - Jika harga sudah jauh di atas trigger (> 0.5*ATR14) → NO CHASE
-- Reason: `BREAKOUT_SETUP`
+- Debug code: `BREAKOUT_SETUP`
 
 **Rule: Pullback**
 - Aksi:
   - entry window lebih fleksibel, tunggu stabil: `["09:35-11:00", "13:35-14:45"]`
-- Reason: `PULLBACK_SETUP`
+- Debug code: `PULLBACK_SETUP`
 
 **Rule: Reversal**
 - Aksi:
   - hindari pagi awal; butuh konfirmasi: `["10:00-11:30", "13:45-14:30"]`
-- Reason: `REVERSAL_CONFIRM`
+- Debug code: `REVERSAL_CONFIRM`
 
 ---
 
@@ -1561,8 +1618,17 @@ Index penting:
 - entry_windows: ["09:20-10:15", "13:35-14:15"]
 - avoid_windows: ["09:00-09:15", "15:50-close"]
 - size_multiplier: 1.0 (Selasa)
-- reason_codes:
-  - TREND_STRONG, MA_ALIGN_BULL, VOL_RATIO_HIGH, BREAKOUT_CONF_BIAS
+- reason_codes (UI, policy-prefixed):
+  - WS_SETUP_BREAKOUT
+  - WS_TREND_ALIGN_OK
+  - WS_VOLUME_OK
+  - WS_LIQ_OK
+  - WS_RR_OK
+- debug.rank_reason_codes (audit/scoring, opsional):
+  - TREND_STRONG
+  - MA_ALIGN_BULL
+  - VOL_RATIO_HIGH
+  - BREAKOUT_CONF_BIAS
 - timing_summary:
   - “Breakout kuat; hindari open untuk mengurangi spike risk. Entry terbaik setelah 09:20 saat spread stabil.”
 - checklist:
@@ -1573,6 +1639,7 @@ Index penting:
 ---
 
 ## 14) Quality assurance (QA) & audit
+ Quality assurance (QA) & audit
 
 Bagian ini adalah “aturan kerja” supaya watchlist **stabil, bisa diaudit, dan gampang di-upgrade** tanpa merusak hasil yang sudah ada.
 
@@ -1748,7 +1815,7 @@ Bagian ini mengubah “Top 3 pick” menjadi **keputusan portofolio harian** yan
 
 ### 19.0 Prioritas posisi existing (weekly swing yang realistis)
 Jika ada posisi open di portfolio, watchlist **harus** memprioritaskan manajemen posisi dulu, baru entry baru.
-- Jika ada posisi yang kena rule `EXIT` / `TIME_STOP_TRIGGERED` / `FRIDAY_EXIT_BIAS` → mode harian minimal `CARRY_ONLY` (no new entry) sampai selesai dieksekusi.
+- Jika ada posisi yang kena rule `EXIT` / `WS_TIME_STOP_T2|WS_TIME_STOP_T3` / `WS_FRIDAY_EXIT_BIAS` → mode harian minimal `CARRY_ONLY` (no new entry) sampai selesai dieksekusi.
 - Jika ada posisi yang valid untuk di-hold (trend lanjut, SL sudah naik) → boleh tetap `BUY_1/BUY_2`, tapi `max_positions_today` dipotong 1.
 - Definisi `CARRY_ONLY`: watchlist **hanya** memberi aksi `HOLD/REDUCE/EXIT/TRAIL_SL` untuk posisi existing; `allocations[]` untuk NEW ENTRY harus kosong.
 
