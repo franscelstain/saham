@@ -72,6 +72,18 @@ Minimal field yang harus ada dalam hasil watchlist:
 - `trade_disabled_reason` (ringkas; contoh: `EOD_STALE`, `EOD_NOT_READY`, `RISK_OFF`)
 - `risk_notes` (1–2 kalimat, bukan essay)
 
+**D. Position context (kalau ticker sudah kamu pegang)**
+- `has_position` (boolean)
+- `position_avg_price`, `position_lots` (opsional jika ada input portfolio)
+- `days_held` (trading days)
+- `position_state`: `HOLD | REDUCE | EXIT | TRAIL_SL`
+- `action_window[]` (jam eksekusi untuk aksi di atas; terutama exit/trim)
+- `updated_stop_loss_price` (jika rule trailing/BE mengubah SL)
+- `position_notes` (1 kalimat; contoh: “Naikkan SL ke BE karena TP1 tercapai; bias exit Jumat.”)
+
+**E. Disable reason (lebih detail, biar UI tidak ambigu)**
+- `trade_disabled_reason_codes[]` (array; contoh: `GAP_UP_BLOCK`, `CHASE_BLOCK_DISTANCE_TOO_FAR`, `WEEKEND_RISK_BLOCK`)
+
 **C. “Checklist sebelum buy” (untuk meyakinkan)**
 Walau berbasis EOD, watchlist harus selalu memberi checklist minimal:
 - `pre_buy_checklist[]` contoh:
@@ -125,6 +137,10 @@ Watchlist punya beberapa **Strategy Policy**. Policy adalah paket aturan end-to-
 **B. Candidate gates (deterministik):**
 - Likuiditas: `dv20` minimal (mis. bucket A/B). Bucket C boleh masuk kandidat, tapi **bukan recommended**.
 - Volatilitas: `atr_pct` maksimal (saham terlalu liar → turunkan confidence / NO TRADE).
+  - **Default weekly swing (bisa di-config):**
+    - `atr_pct <= 0.07` → ok untuk recommended
+    - `0.07 < atr_pct <= 0.10` → kandidat boleh, **recommended turun** (size_multiplier max 0.8)
+    - `atr_pct > 0.10` → default `trade_disabled` (kecuali ada override manual)
 - Data window lengkap: indikator inti tidak boleh NULL.
 - Corporate action suspected/unadjusted → skip.
 
@@ -136,15 +152,33 @@ Watchlist punya beberapa **Strategy Policy**. Policy adalah paket aturan end-to-
   - **Kamis:** entry hanya kalau setup “sangat kuat” (High confidence) dan risk kecil
   - **Jumat:** default NO NEW ENTRY (kecuali signal baru + risk rendah)
 
+
+**C.1 Anti-chasing & gap guard (WEEKLY_SWING wajib, deterministik)**
+Karena watchlist EOD-only, guard ini mencegah entry “ketinggalan kereta” dan jebakan gap.
+- **Gap-up block (pre-buy checklist + reason code):** jika saat eksekusi harga/open gap-up > `max_gap_up_pct` dari `prev_close` → **NO ENTRY**, tunggu pullback.
+  - Default: `max_gap_up_pct = min(0.025, 1.0*atr_pct)`.
+- **Distance-to-trigger block (berbasis EOD):** untuk breakout, jika `close > trigger + 0.5*ATR14` → jangan entry breakout; ubah jadi `PULLBACK_LIMIT` atau `WATCH_ONLY`.
+- **Late-week entry penalty:** Kamis/Jumat, kalau bukan High confidence → downgrade menjadi `WATCH_ONLY`.
+- Semua guard di atas harus memunculkan reason codes: `GAP_UP_BLOCK`, `CHASE_BLOCK_DISTANCE_TOO_FAR`, `LATE_WEEK_ENTRY_PENALTY`.
+
 **D. Expiry (setup kadaluarsa):**
 - Breakout/strong burst: valid maksimal 1–2 trading days setelah sinyal muncul.
 - Pullback/continuation: valid 2–4 trading days.
 - Aturan praktis: `signal_age_days > 3` → turun confidence; `> 5` → bukan recommended.
 
-**E. Exit template (minimal):**
-- SL: berbasis ATR/support (lihat Bagian 20)
-- TP1/TP2: berbasis RR + level teknikal
-- Time stop: kalau 3 hari tidak bergerak sesuai arah, keluar parsial/total (policy-level rule).
+**E. Exit & lifecycle rules (WEEKLY_SWING wajib, bukan opsional):**
+- **Hard SL:** selalu ada (ATR/support/MA). Saat entry terjadi, SL **tidak boleh NULL**. (lihat Bagian 20)
+- **Partial take:** default ambil parsial di TP1 (contoh 40%–60%), sisanya ke TP2/trailing.
+- **Break-even rule:** setelah TP1 hit, naikkan SL minimal ke `entry` (atau `entry + 0.2R` untuk cover fee).
+- **Time stop (deterministik):**
+  - Setelah **2 trading days** dari entry: jika belum mencapai `+0.5R` → `REDUCE 50%` atau `EXIT` (tergantung market regime).
+  - Setelah **3 trading days** dari entry: jika masih “flat” / gagal follow-through → `EXIT`.
+- **Max holding (deterministik):**
+  - Breakout/Strong burst: max **2–3** trading days.
+  - Pullback/Continuation: max **3–5** trading days.
+  - Reversal: max **2–4** trading days.
+- **Friday exit bias:** Jumat siang/sore default **prioritas exit** untuk posisi yang belum hit TP1 (hindari nyangkut). Reason: `FRIDAY_EXIT_BIAS`.
+- **Weekend rule:** default **hindari carry over weekend** kecuali `confidence=High` + trend kuat + SL sudah naik (BE/trailing). Reason: `WEEKEND_RISK_BLOCK`.
 
 **F. Algoritma ringkas (deterministik, step-by-step)**
 1) Tentukan `effective_trade_date` dari Market Data (cutoff-aware) → ini jadi `trade_date` watchlist.
@@ -363,6 +397,7 @@ Output:
 Contoh:
 - Data tidak lengkap untuk indikator (ma/vol_sma/atr)
 - Likuiditas terlalu rendah: `dv20 < threshold` (mis. bucket C) → bisa “watch only”
+- Volatilitas ekstrem: `atr_pct > 0.10` → default drop (weekly swing), kecuali override manual
 - Harga ekstrem / outlier yang terindikasi corporate action belum adjusted → skip
 
 ### 5.2 Soft filters (boleh lolos tapi confidence turun)
@@ -463,7 +498,9 @@ Gunakan rules berikut (contoh):
 **Rule: Breakout kuat**
 - Aksi:
   - entry window tetap pagi setelah tenang: `["09:20-10:15"]`
-  - checklist menekankan follow-through & tidak gap-up jauh
+  - checklist menekankan follow-through + guard anti-chasing:
+    - Jika open/last price gap-up > `max_gap_up_pct` dari close kemarin → NO ENTRY (tunggu pullback)
+    - Jika harga sudah jauh di atas trigger (> 0.5*ATR14) → NO CHASE
 - Reason: `BREAKOUT_SETUP`
 
 **Rule: Pullback**
@@ -495,6 +532,15 @@ Tujuannya: kamu bisa lihat kembali kenapa watchlist menyarankan jam tertentu.
 - `LIQ_LOW_MATCH_RISK`
 - `MARKET_RISK_OFF`
 - `LATE_WEEK_ENTRY_PENALTY`
+- `GAP_UP_BLOCK`
+- `CHASE_BLOCK_DISTANCE_TOO_FAR`
+- `NO_FOLLOW_THROUGH`
+- `SETUP_EXPIRED`
+- `TIME_STOP_TRIGGERED`
+- `FRIDAY_EXIT_BIAS`
+- `WEEKEND_RISK_BLOCK`
+- `MIN_EDGE_FAIL`
+- `FEE_IMPACT_HIGH`
 
 ### 9.2 Saran jam & larangan jam (disimpan sebagai data)
 - `entry_windows` (array)
@@ -805,6 +851,12 @@ Bagian ini mengubah “Top 3 pick” menjadi **keputusan portofolio harian** yan
 - beli 1 saja, atau beli 2 split, atau tidak beli sama sekali.
 - outputnya juga mengatur “size multiplier” berdasar hari (Mon/Tue/Wed/Thu/Fri) dan kondisi market.
 
+### 19.0 Prioritas posisi existing (weekly swing yang realistis)
+Jika ada posisi open di portfolio, watchlist **harus** memprioritaskan manajemen posisi dulu, baru entry baru.
+- Jika ada posisi yang kena rule `EXIT` / `TIME_STOP_TRIGGERED` / `FRIDAY_EXIT_BIAS` → mode harian minimal `CARRY_ONLY` (no new entry) sampai selesai dieksekusi.
+- Jika ada posisi yang valid untuk di-hold (trend lanjut, SL sudah naik) → boleh tetap `BUY_1/BUY_2`, tapi `max_positions_today` dipotong 1.
+- Definisi `CARRY_ONLY`: watchlist **hanya** memberi aksi `HOLD/REDUCE/EXIT/TRAIL_SL` untuk posisi existing; `allocations[]` untuk NEW ENTRY harus kosong.
+
 ### 19.1 Output yang disimpan (per hari)
 - `trade_plan_mode`: `NO_TRADE | BUY_1 | BUY_2_SPLIT | BUY_3_SMALL | CARRY_ONLY`
 - `max_positions_today`
@@ -894,6 +946,28 @@ Gunakan tick rounding setiap kali menghasilkan harga.
 **D) Base / Sideways**
 - Default: `WATCH_ONLY` sampai breakout trigger valid
 - Entry/SL/TP mengikuti breakout rule saat trigger terjadi
+
+### 20.4 Guards (anti-chasing, gap, viability) – default WEEKLY_SWING
+Guards ini membuat plan **boleh batal** walau setup bagus di EOD.
+
+**A) Gap-up guard (saat eksekusi)**
+- Jika open/last price > `prev_close * (1 + max_gap_up_pct)` → set `entry_type = WATCH_ONLY` untuk hari itu.
+- Default `max_gap_up_pct = min(2.5%, 1.0*atr_pct)`.
+- Reason codes: `GAP_UP_BLOCK`.
+
+**B) No-chase guard (berbasis EOD, sebelum market buka)**
+- Jika `close > trigger + 0.5*ATR14` → jangan entry breakout (ubah ke pullback atau watch-only).
+- Reason codes: `CHASE_BLOCK_DISTANCE_TOO_FAR`.
+
+**C) Minimum edge guard (biar weekly swing tidak buang-buang fee/spread)**
+- Jika `rr_tp1 < 1.0` → downgrade ke `WATCH_ONLY`.
+- Jika fee aktif dan `profit_tp1_net` terlalu kecil (mis. < 0.7%) → downgrade/disable.
+- Reason codes: `MIN_EDGE_FAIL`, `FEE_IMPACT_HIGH`.
+
+**D) Time-stop / follow-through guard (untuk posisi yang sudah entry)**
+- Jika setelah 2 trading days belum `+0.5R` → `REDUCE/EXIT` (sesuai policy di Bagian 2.3E).
+- Jika harga kembali close di bawah area breakout dan body besar → `EXIT`.
+- Reason codes: `NO_FOLLOW_THROUGH`, `TIME_STOP_TRIGGERED`.
 
 > Kandidat non-top pick tetap dibuatkan plan, tapi bisa diberi:
 > - `entry_type = WATCH_ONLY` atau
