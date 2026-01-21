@@ -1,3 +1,5 @@
+# build_id: watch_v1.6
+
 # TradeAxis Watchlist – Design Spec (EOD-driven)  
 File: `WATCHLIST.md`
 
