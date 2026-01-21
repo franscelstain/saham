@@ -28,6 +28,15 @@ Watchlist ini **EOD-driven**. Karena itu, rekomendasi **NEW ENTRY** hanya boleh 
 
 **Rule deterministik**
 1) Tentukan `trade_date` dari **effective date Market Data** (cutoff + trading day).
+
+**Definisi waktu (wajib konsisten)**
+- `generated_at`: waktu JSON dibuat.
+- `trade_date`: tanggal EOD yang dipakai untuk scoring/plan (basis data canonical).
+- `as_of_trade_date`: *trading day terakhir yang seharusnya sudah punya EOD canonical pada saat `generated_at`*.
+  - Jika **sebelum cutoff EOD** (pre-open / pagi hari) → `as_of_trade_date` = trading day **kemarin**.
+  - Jika **sesudah cutoff + publish sukses** → `as_of_trade_date` = trading day **hari ini**.
+- `missing_trading_dates`: daftar trading day dari (`trade_date` .. `as_of_trade_date`) yang belum punya canonical. **Jangan pernah** memasukkan “today” sebelum cutoff.
+
 2) Cek ketersediaan CANONICAL:
    - `ticker_ohlc_daily` tersedia untuk `trade_date` (coverage lolos / publish sudah jalan), dan
    - fitur `ticker_indicators_daily` tersedia untuk `trade_date`.
@@ -59,6 +68,8 @@ Minimal field yang harus ada dalam hasil watchlist:
 - `entry_style` (Breakout-confirm / Pullback-wait / Reversal-confirm / No-trade)
 - `size_multiplier` (1.0 / 0.8 / 0.6 / 0.3)
 - `max_positions_today` (1 atau 2, bergantung hari)
+- `trade_disabled` (boolean; **true** jika global mode = `NO_TRADE` atau policy melarang entry)
+- `trade_disabled_reason` (ringkas; contoh: `EOD_STALE`, `EOD_NOT_READY`, `RISK_OFF`)
 - `risk_notes` (1–2 kalimat, bukan essay)
 
 **C. “Checklist sebelum buy” (untuk meyakinkan)**
@@ -621,14 +632,85 @@ Index penting:
 ---
 
 ## 14) Quality assurance (QA) & audit
-Agar watchlist bisa dipercaya:
-- Simpan input snapshot untuk kandidat top picks (opsional):
-  - nilai indikator utama di hari itu (ma, rsi, vol_ratio, atr_pct, dv20)
-- Log reason codes dan scoring breakdown
-- Buat laporan mingguan:
-  - berapa pick yang “jadi bergerak sesuai rencana”
-  - berapa yang “false breakout”
-  - apakah timing windows perlu disetel ulang
+
+Bagian ini adalah “aturan kerja” supaya watchlist **stabil, bisa diaudit, dan gampang di-upgrade** tanpa merusak hasil yang sudah ada.
+
+### 14.1 Contract test (JSON schema) – wajib
+Watchlist adalah **API contract**. Setiap build harus lulus test yang memvalidasi:
+- Root keys: `trade_date`, `groups`, `meta`, `recommendations`
+- `meta.counts.total_count` konsisten dengan jumlah kandidat yang tampil
+- Semua kode di `reason_codes[]` dan `rank_reason_codes[]` harus terdaftar di katalog (`meta.rank_reason_catalog`) jika katalog disertakan
+- Tipe data stabil (angka tetap angka; array tetap array)
+
+**Aturan kompatibilitas**
+- Kalau ada rename field (breaking) → wajib dicatat di `MANIFEST.md` + bump build_id.
+- Kalau ingin aman untuk UI lama → gunakan alias (field lama tetap ada sementara) sebelum benar-benar dihapus.
+
+### 14.2 Invariants – harus true setiap waktu
+Ini bukan “best practice”, ini **aturan hard** yang kalau gagal berarti output tidak valid.
+
+**A. Global gating lock**
+- Jika `recommendations.mode = NO_TRADE`:
+  - semua ticker wajib `trade_disabled = true`
+  - `entry_windows = []`, `avoid_windows = []`
+  - `size_multiplier = 0.0`, `max_positions_today = 0`
+  - `entry_style = "No-trade"`
+  - `timing_summary` dan `pre_buy_checklist` boleh pakai default global
+
+**B. Top picks quality**
+- `groups.top_picks[]` tidak boleh punya `liq_bucket in ('C','U')`
+- `passes_hard_filter` harus true
+- `trade_plan.errors` harus kosong untuk ticker yang direkomendasikan BUY (kalau mode BUY)
+
+**C. Data consistency**
+- `signal_age_days` konsisten dengan `signal_first_seen_date` + kalender bursa
+- `corp_action_suspected = true` → ticker **tidak boleh** direkomendasikan BUY
+- Nilai `dv20` dan `liq_bucket` harus konsisten (dv20 menentukan bucket)
+
+### 14.3 Reason code governance (biar tidak liar)
+Tambah reason code baru **wajib** memenuhi:
+- Punya definisi singkat (1 kalimat) + severity (`info|warn|block`)
+- Deterministik (tidak bergantung “perasaan”)
+- Sumber datanya jelas (kolom indikator/fitur apa)
+- Masuk katalog (`meta.rank_reason_catalog` / label catalog) dan test “unknown code → fail”
+
+**Rekomendasi:** pisahkan alasan menjadi:
+- `reason_codes` = untuk UI (ringkas & actionable)
+- `rank_reason_codes` = untuk audit/scoring (boleh verbose), bisa dipindah ke `debug.*`
+
+### 14.4 Snapshot strategy (compute vs serve)
+Untuk hasil maksimal dan stabil:
+- Default endpoint **serve-from-snapshot** bila snapshot untuk (`trade_date`, `source`) sudah ada.
+- Compute hanya jika:
+  - snapshot belum ada, atau
+  - `force=1`, atau
+  - ada perubahan policy version yang memang ingin regenerate.
+
+Ini membuat:
+- output konsisten (hit endpoint berulang hasilnya sama),
+- beban DB lebih ringan,
+- evaluasi mingguan lebih gampang.
+
+### 14.5 Calibration loop (supaya makin akurat, bukan teori)
+Minimal tiap minggu/bulan, buat laporan:
+- hit-rate TP1/TP2 (1D/3D/5D)
+- MFE/MAE sederhana (maks profit vs maks drawdown setelah entry)
+- frekuensi false breakout untuk setup tertentu
+
+Dari sini update:
+- bobot score (trend/momentum/volume/risk/market),
+- threshold (vol_ratio, atr_pct, dv20 bucket),
+- expiry rule (`signal_age_days`).
+
+**Aturan:** perubahan threshold harus tercatat di dokumen (dan idealnya `policy_version`).
+
+### 14.6 Post-mortem wajib (supaya WATCHLIST.md makin baru)
+Simpan minimal untuk top picks/recommended:
+- snapshot indikator + reason codes saat rekomendasi dibuat
+- outcome ringkas (TP/SL/time-stop)
+- catatan eksekusi: spread melebar? gap? follow-through?
+
+Tujuannya: WATCHLIST.md tidak jadi “dokumen teori”, tapi terus di-upgrade berdasarkan data nyata.
 
 ---
 
