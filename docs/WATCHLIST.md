@@ -135,60 +135,105 @@ Watchlist punya beberapa **Strategy Policy**. Policy adalah paket aturan end-to-
 ```yaml
 policy_code: WEEKLY_SWING
 
+# 0) Policy identity (kontrak)
+policy_version: "1.1"                 # bump jika threshold/logic berubah
+horizon:
+  target_holding_days: [2, 5]         # trading days
+  max_holding_days_hard_cap: 5         # hard cap (override hanya untuk carry-rule weekend)
+
 # 1) Data dependency (wajib/opsional)
+# NOTE: WEEKLY_SWING butuh "posisi berjalan" sebagai input bila engine dipakai untuk manage posisi existing.
 data_dependency:
   required:
     - ticker_ohlc_daily.canonical: [open, high, low, close, volume, prev_close]
     - ticker_indicators_daily: [ma20, ma50, ma200, rsi14, vol_sma20, vol_ratio, signal_code, signal_age_days]
-    - features_cheap: [atr14, atr_pct, gap_pct, dv20, liq_bucket, candle_flags]
+    - features_cheap: [atr14, atr_pct, gap_pct, dv20, liq_bucket, candle_flags, hhv20, llv20]
     - market_context: [dow, market_regime]
     - market_calendar: [is_trading_day]
+  required_when_portfolio_enabled:
+    - portfolio_context:
+        fields_minimum: [has_position, avg_price, lots, entry_trade_date, days_held]
+        fields_for_r_based_rules: [mfe_r, mae_r]     # wajib bila mau time-stop berbasis R secara presisi
   optional:
-    - portfolio_context: [has_position, avg_price, lots, days_held]   # untuk CARRY_ONLY / manajemen posisi
-    - fee_config: [fee_buy, fee_sell]                                # untuk net-profit guard
-    - tick_size: [tick_size]                                         # rounding level harga
+    - fee_config: [fee_buy, fee_sell]               # untuk net-edge guard & minimum viability
+    - tick_size: [tick_size]                        # rounding level harga
+    - spread_proxy: [avg_spread_pct]                # jika ada (opsional), untuk viability small-capital
 
-# 2) Hard filters (angka tegas)
+# 2) Threshold contract (angka tegas, bukan “contoh”)
+# Semua threshold ini dianggap kontrak. Jika mau diubah, ubah di config dan bump policy_version.
+threshold_contract:
+  liq:
+    dv20_b_min_idr: 5000000000          # 5B → bucket B minimal untuk eligible recommended
+    dv20_a_min_idr: 20000000000         # 20B → bucket A
+  risk:
+    atr_pct_max_drop: 0.10              # >10% drop (terlalu liar untuk weekly swing)
+    atr_pct_warn_hi: 0.07               # >7% warning, sizing diturunkan
+    rsi_overheat_warn: 74
+    max_gap_up_pct_cap: 0.025           # 2.5% cap
+    gap_up_atr_mult: 1.00               # gap cap = min(2.5%, 1.0*atr_pct)
+  signal:
+    max_signal_age_recommended: 3
+    max_signal_age_watch_only: 5
+  edge:
+    rr_tp1_min: 1.00                    # minimum edge untuk jadi recommended
+  holding:
+    max_holding_by_setup:
+      Breakout: 3
+      Pullback: 5
+      Continuation: 5
+      Reversal: 4
+      Base: 0
+
+# 3) Hard filters (angka tegas)
 hard_filters:
   - id: WS_DATA_COMPLETE
     expr: "all(required_columns_not_null)"
     on_fail: DROP
-  - id: WS_LIQ_MIN
-    expr: "dv20 >= 5_000_000_000"      # minimal bucket B
-    on_fail: WATCH_ONLY                # boleh tampil, tapi tidak boleh recommended
+
+  - id: WS_SIGNAL_STALENESS
+    expr: "signal_age_days <= 5"
+    on_fail: DROP
+
+  - id: WS_LIQ_MIN_FOR_RECOMMENDED
+    expr: "dv20 >= 5000000000"
+    on_fail: WATCH_ONLY                 # masih boleh tampil, tapi tidak boleh recommended
+
   - id: WS_ATR_MAX
     expr: "atr_pct <= 0.10"
     on_fail: DROP
-  - id: WS_CORP_ACTION
+
+  - id: WS_CORP_ACTION_BLOCK
     expr: "corp_action_suspected == false"
     on_fail: DROP
 
-# 3) Soft filters + score weight override (angka tegas)
+# 4) Soft filters + score weight override (angka tegas)
 soft_filters:
   - id: WS_ATR_WARN
-    when: "0.07 < atr_pct <= 0.10"
+    when: "0.07 < atr_pct and atr_pct <= 0.10"
     effect:
       score_penalty: 6
       max_size_multiplier: 0.80
-      add_reason: [VOLATILITY_HIGH_WARN]
+      add_reason: [WS_VOLATILITY_HIGH_WARN]
+
   - id: WS_LONG_UPPER_WICK_WARN
     when: "is_long_upper_wick == true"
     effect:
       score_penalty: 5
-      add_reason: [DISTRIBUTION_WICK_WARN]
+      add_reason: [WS_DISTRIBUTION_WICK_WARN]
+
   - id: WS_RSI_OVERHEAT_WARN
     when: "rsi14 >= 74"
     effect:
       score_penalty: 5
       entry_style_override: PULLBACK_WAIT
-      add_reason: [RSI_OVERHEAT_WARN]
+      add_reason: [WS_RSI_OVERHEAT_WARN]
+
   - id: WS_MARKET_NEUTRAL_PENALTY
     when: "market_regime == neutral"
     effect:
       score_penalty: 3
-      add_reason: [MARKET_NEUTRAL]
+      add_reason: [WS_MARKET_NEUTRAL]
 
-# score weight override (khusus WEEKLY_SWING)
 score_weight_override:
   trend_quality: 0.30
   momentum_candle: 0.20
@@ -196,13 +241,40 @@ score_weight_override:
   risk_quality: 0.20
   market_alignment: 0.10
 
-# 4) Setup allowlist (setup_type yang boleh jadi recommended)
+# 5) Setup allowlist (setup_type yang boleh jadi recommended)
 setup_allowlist:
   recommended: [Breakout, Pullback, Continuation, Reversal]
-  secondary_only: [Base]              # Base boleh tampil tapi tidak boleh recommended
-  forbidden: []                       # tidak ada forbidden setup khusus, selain hard filter
+  secondary_only: [Base]               # Base boleh tampil tapi tidak boleh recommended
+  forbidden: []
 
-# 5) Entry rules (termasuk anti-chasing/gap) — angka tegas
+# 6) Lifecycle & position state machine (tegas)
+# Ini yang bikin weekly swing punya karakter sendiri (bukan sekadar exit rules).
+lifecycle:
+  states:
+    - PENDING_ENTRY         # kandidat recommended tapi belum entry (menunggu window/guard)
+    - LIVE                  # posisi sudah entry dan sedang berjalan
+    - MANAGE                # posisi butuh aksi (TRAIL/REDUCE/EXIT) hari ini
+    - EXIT_QUEUED           # sudah memenuhi syarat exit; eksekusi di window yang ditentukan
+    - EXITED                # posisi selesai
+  transitions:
+    - from: PENDING_ENTRY
+      to: LIVE
+      when: "entry_filled == true"
+      add_reason: [WS_ENTRY_FILLED]
+    - from: LIVE
+      to: MANAGE
+      when: "any(exit_triggered, trail_update_needed, reduce_needed, review_due)"
+      add_reason: [WS_MANAGE_SIGNAL]
+    - from: MANAGE
+      to: EXIT_QUEUED
+      when: "exit_triggered == true"
+      add_reason: [WS_EXIT_SIGNAL]
+    - from: EXIT_QUEUED
+      to: EXITED
+      when: "exit_filled == true"
+      add_reason: [WS_EXIT_FILLED]
+
+# 7) Entry rules (termasuk anti-chasing/gap) — angka tegas
 entry_rules:
   day_of_week_rules:
     Mon:
@@ -211,7 +283,7 @@ entry_rules:
       base_size_multiplier: 0.70
       entry_windows: ["09:35-11:00", "13:35-14:30"]
       avoid_windows: ["09:00-09:20", "11:45-12:00", "15:50-close"]
-      add_reason: [MONDAY_FAKE_MOVE_BIAS]
+      add_reason: [WS_MONDAY_FAKE_MOVE_BIAS]
     Tue:
       allow_new_entry: true
       max_positions_today: 2
@@ -224,72 +296,91 @@ entry_rules:
       base_size_multiplier: 0.85
       entry_windows: ["09:30-10:45", "13:35-14:15"]
       avoid_windows: ["09:00-09:20", "11:45-12:00", "15:50-close"]
-      add_reason: [MIDWEEK_SELECTIVE]
+      add_reason: [WS_MIDWEEK_SELECTIVE]
     Thu:
       allow_new_entry: true
       max_positions_today: 1
       base_size_multiplier: 0.55
       entry_windows: ["09:35-10:30", "13:40-14:15"]
       avoid_windows: ["09:00-09:25", "11:45-12:00", "15:35-close"]
-      add_reason: [LATE_WEEK_ENTRY_PENALTY]
+      add_reason: [WS_LATE_WEEK_ENTRY_PENALTY]
     Fri:
-      allow_new_entry: false           # default: NO NEW ENTRY
+      allow_new_entry: false
       max_positions_today: 0
       base_size_multiplier: 0.00
       entry_windows: []
       avoid_windows: ["09:00-close"]
-      add_reason: [FRIDAY_NO_ENTRY_DEFAULT]
+      add_reason: [WS_FRIDAY_NO_ENTRY_DEFAULT]
 
+  # Anti-chasing/gap guard berbasis EOD (pre-open decision)
+  # - Gap guard: memblokir entry bila open/last (indikasi pre-open) terlalu jauh dari prev_close.
+  # - No-chase breakout: memblokir entry bila close EOD sudah terlalu jauh dari trigger.
   anti_chasing_and_gap_guards:
     - id: WS_GAP_UP_BLOCK
-      expr: "open_or_last > prev_close * (1 + min(0.025, 1.0*atr_pct))"
+      expr: "open_or_last > prev_close * (1 + min(0.025, 1.00*atr_pct))"
       action: "DISABLE_ENTRY_FOR_TODAY"
-      add_reason: [GAP_UP_BLOCK]
-    - id: WS_NO_CHASE_BREAKOUT
-      expr: "setup_type == Breakout and close > (breakout_trigger + 0.5*atr14)"
-      action: "DOWNGRADE_TO_PULLBACK_OR_WATCH_ONLY"
-      add_reason: [CHASE_BLOCK_DISTANCE_TOO_FAR]
-    - id: WS_MIN_EDGE_GUARD
-      expr: "rr_tp1 < 1.0"
-      action: "DOWNGRADE_TO_WATCH_ONLY"
-      add_reason: [MIN_EDGE_FAIL]
+      add_reason: [WS_GAP_UP_BLOCK]
 
-# 6) Exit rules (time stop / max holding / trailing) — angka tegas
+    - id: WS_NO_CHASE_BREAKOUT
+      expr: "setup_type == Breakout and close > (breakout_trigger + 0.50*atr14)"
+      action: "DOWNGRADE_TO_PULLBACK_OR_WATCH_ONLY"
+      add_reason: [WS_CHASE_BLOCK_DISTANCE_TOO_FAR]
+
+    - id: WS_CHASE_PULLBACK_TOO_HIGH
+      expr: "setup_type == Pullback and close > (pullback_value_zone_high + 0.35*atr14)"
+      action: "WATCH_ONLY"
+      add_reason: [WS_CHASE_BLOCK_PULLBACK_TOO_HIGH]
+
+    - id: WS_MIN_EDGE_GUARD
+      expr: "rr_tp1 < 1.00"
+      action: "WATCH_ONLY"
+      add_reason: [WS_MIN_EDGE_FAIL]
+
+    - id: WS_STALE_SIGNAL_DOWNGRADE
+      expr: "signal_age_days > 3"
+      action: "DOWNGRADE_CONFIDENCE_AND_SIZE"
+      add_reason: [WS_SIGNAL_STALE_WARN]
+
+# 8) Exit rules (time stop / max holding / trailing) — angka tegas
 exit_rules:
   time_stop:
     t_plus_2_days:
-      condition: "mfe_r < 0.5"         # belum +0.5R dalam 2 trading days
+      condition: "mfe_r < 0.5"
       action: "REDUCE_50_OR_EXIT"
-      add_reason: [TIME_STOP_T2]
+      add_reason: [WS_TIME_STOP_T2]
     t_plus_3_days:
       condition: "mfe_r < 0.5"
       action: "EXIT"
-      add_reason: [TIME_STOP_T3]
+      add_reason: [WS_TIME_STOP_T3]
+
   max_holding_days_by_setup:
     Breakout: 3
     Pullback: 5
     Continuation: 5
     Reversal: 4
     Base: 0
+
   trailing_rule:
     after_tp1:
       action: "MOVE_SL_TO_BE_OR_ENTRY_PLUS_0_2R"
-      add_reason: [MOVE_SL_TO_BE]
+      add_reason: [WS_MOVE_SL_TO_BE]
+
   friday_exit_bias:
     when: "dow == Fri and tp1_not_hit"
     action: "PRIORITIZE_EXIT"
-    add_reason: [FRIDAY_EXIT_BIAS]
+    add_reason: [WS_FRIDAY_EXIT_BIAS]
+
   weekend_rule:
     allow_carry_weekend_only_if:
       condition: "confidence == High and sl_is_be_or_trailing == true and trend_quality_strong == true"
     otherwise:
       action: "BLOCK_CARRY_WEEKEND"
-      add_reason: [WEEKEND_RISK_BLOCK]
+      add_reason: [WS_WEEKEND_RISK_BLOCK]
 
-# 7) Sizing defaults (risk per trade, max positions, multiplier) — angka tegas
+# 9) Sizing defaults + minimum trade viability (weekly swing modal kecil) — angka tegas
 sizing_defaults:
-  risk_per_trade_pct_default: 0.010      # 1.0% modal per trade (weekly swing)
-  max_positions_total_default: 2         # total posisi baru dalam 1 hari (sebelum dipotong oleh posisi existing)
+  risk_per_trade_pct_default: 0.010      # 1.0% modal per trade
+  max_positions_total_default: 2
   size_multiplier_caps:
     High: 1.00
     Med: 0.80
@@ -299,41 +390,150 @@ sizing_defaults:
     B: 0.80
     C: 0.00
 
-# 8) Reason codes khusus policy (biar output tidak ambigu)
+min_trade_viability:
+  # Guard ini mencegah weekly swing modal kecil “buang-buang fee/spread”.
+  # Jika gagal, action = WATCH_ONLY (atau NO_TRADE jika semua gagal).
+  - id: WS_MIN_LOTS_1
+    expr: "lots_recommended >= 1"
+    on_fail: WATCH_ONLY
+    add_reason: [WS_MIN_VIABLE_TRADE_FAIL]
+
+  - id: WS_MIN_ALLOC_AMOUNT
+    expr: "alloc_amount_idr >= 300000"          # default 300k (ubah via config)
+    on_fail: WATCH_ONLY
+    add_reason: [WS_MIN_ALLOC_TOO_SMALL]
+
+  - id: WS_MIN_NET_EDGE_AFTER_FEE
+    expr: "fee_config_present == false or expected_net_tp1_pct >= 0.0075"
+    on_fail: WATCH_ONLY
+    add_reason: [WS_FEE_EDGE_FAIL]
+
+  - id: WS_MAX_SPREAD_GUARD
+    expr: "avg_spread_pct is null or avg_spread_pct <= 0.004"   # <=0.40% jika tersedia
+    on_fail: WATCH_ONLY
+    add_reason: [WS_SPREAD_TOO_WIDE_WARN]
+
+# 10) “Kapan review” (SOP) weekly swing — wajib
+review_sop:
+  # Review ini menghasilkan flag di output: review_due=true + review_reason_codes[].
+  # Kalau portfolio_context tidak ada, review SOP tetap jalan untuk kandidat (PENDING_ENTRY) dan posisi (jika bisa).
+  intraday_review_windows:
+    - window: "10:30-10:45"
+      purpose: "cek follow-through & gap/spread (human checklist)"
+    - window: "14:25-14:40"
+      purpose: "cek late-session reversal risk; siapkan exit jika sinyal jelek"
+  eod_review:
+    when: "after_market_close"
+    actions:
+      - "recompute_position_state"
+      - "apply_time_stop"
+      - "apply_trailing_update"
+      - "flag_review_due_if_rules_hit"
+  triggers:
+    - id: WS_REVIEW_DUE_TPLUS2_NO_PROGRESS
+      when: "days_held >= 2 and mfe_r < 0.5"
+      flag: review_due
+      add_reason: [WS_REVIEW_DUE_TIME_STOP_T2]
+    - id: WS_REVIEW_DUE_WED_SELECTIVE
+      when: "dow == Wed and has_position == true and tp1_not_hit == true"
+      flag: review_due
+      add_reason: [WS_REVIEW_DUE_MIDWEEK]
+    - id: WS_REVIEW_DUE_THU_WEEKEND_RISK
+      when: "dow == Thu and has_position == true and sl_is_be_or_trailing == false"
+      flag: review_due
+      add_reason: [WS_REVIEW_DUE_WEEKEND_RISK]
+    - id: WS_REVIEW_DUE_FRI_EXIT_BIAS
+      when: "dow == Fri and has_position == true"
+      flag: review_due
+      add_reason: [WS_REVIEW_DUE_FRIDAY]
+
+# 11) Reason codes khusus policy (biar output tidak ambigu)
 policy_reason_codes:
   prefix: WS_
-  codes:
+  catalog:
+    # Data / gating
     - WS_DATA_COMPLETE_FAIL
-    - WS_LIQ_MIN_FAIL
-    - WS_ATR_MAX_FAIL
+    - WS_SIGNAL_STALE_WARN
     - WS_CORP_ACTION_BLOCK
+
+    # Liquidity / risk
+    - WS_LIQ_MIN_FAIL
+    - WS_VOLATILITY_HIGH_WARN
+    - WS_RSI_OVERHEAT_WARN
+    - WS_DISTRIBUTION_WICK_WARN
+    - WS_SPREAD_TOO_WIDE_WARN
+
+    # Entry guards
     - WS_GAP_UP_BLOCK
-    - WS_NO_CHASE_BREAKOUT
-    - WS_MIN_EDGE_GUARD
+    - WS_CHASE_BLOCK_DISTANCE_TOO_FAR
+    - WS_CHASE_BLOCK_PULLBACK_TOO_HIGH
+    - WS_MIN_EDGE_FAIL
+    - WS_FEE_EDGE_FAIL
+    - WS_MIN_VIABLE_TRADE_FAIL
+    - WS_MIN_ALLOC_TOO_SMALL
+
+    # Lifecycle / management
+    - WS_ENTRY_FILLED
+    - WS_MANAGE_SIGNAL
+    - WS_TRAIL_UPDATE
+    - WS_EXIT_SIGNAL
+    - WS_EXIT_FILLED
+    - WS_CARRY_ONLY_ACTIVE
+    - WS_MAX_POSITIONS_CUT_BY_EXISTING
+
+    # Exit / lifecycle drivers
     - WS_TIME_STOP_T2
     - WS_TIME_STOP_T3
+    - WS_MOVE_SL_TO_BE
     - WS_FRIDAY_NO_ENTRY_DEFAULT
+    - WS_FRIDAY_EXIT_BIAS
+    - WS_WEEKEND_RISK_BLOCK
+    - WS_MAX_HOLDING_REACHED
+
+    # Review SOP
+    - WS_REVIEW_DUE_TIME_STOP_T2
+    - WS_REVIEW_DUE_MIDWEEK
+    - WS_REVIEW_DUE_WEEKEND_RISK
+    - WS_REVIEW_DUE_FRIDAY
 ```
 
-#### 2.3.2 Penjelasan ringkas (tetap audit-able)
-**Data dependency (wajib):**
-- `ticker_ohlc_daily` canonical (trade_date = effective_end_date)
-- `ticker_indicators_daily`: MA20/50/200, RSI14, vol_sma20, vol_ratio, signal_code, signal_age_days
-- fitur murah: `atr14`, `atr_pct`, `gap_pct`, `dv20`, candle flags
+#### 2.3.2 Kontrak operasional WEEKLY_SWING (yang wajib dipatuhi engine & UI)
 
-**Candidate gates (deterministik):**
-- Likuiditas: bucket A/B boleh jadi recommended; bucket C boleh tampil tapi **bukan recommended**.
-- Volatilitas:
-  - `atr_pct <= 0.07` → ok untuk recommended
-  - `0.07 < atr_pct <= 0.10` → boleh, tapi `size_multiplier <= 0.8`
-  - `atr_pct > 0.10` → drop
-- `signal_age_days`: `> 3` turun confidence; `> 5` bukan recommended.
+Bagian YAML di atas adalah “mesin keputusan” WEEKLY_SWING. Poin penting yang membedakan dari policy lain:
 
-**Entry window:**
-- Mengikuti day-of-week rules di blok YAML + shifting dari risk (Bagian 8).
+1) **Exit & lifecycle tegas**
+- WEEKLY_SWING punya **state machine** (`PENDING_ENTRY → LIVE → MANAGE → EXIT_QUEUED → EXITED`) dan setiap transisi wajib memunculkan reason code lifecycle (`WS_ENTRY_FILLED`, `WS_EXIT_SIGNAL`, dll).
+- Exit tidak cuma “aturan”, tapi **mengubah `position_state`** dan **menghasilkan action window** (terutama Jumat dan menjelang weekend).
 
-**Exit:**
-- Time-stop + max holding + friday/weekend rules wajib (lihat blok YAML).
+2) **Entry plan anti-chasing berbasis EOD**
+- Guard gap-up pre-open (`WS_GAP_UP_BLOCK`) memblokir entry bila open/last terlalu jauh dari `prev_close` (cap 2.5% atau 1.0×ATR%).
+- Guard “no chase breakout” (`WS_CHASE_BLOCK_DISTANCE_TOO_FAR`) memblokir entry bila close EOD sudah terlalu jauh di atas trigger (>0.5×ATR14).
+- Pullback juga punya chase guard (`WS_CHASE_BLOCK_PULLBACK_TOO_HIGH`) supaya tidak entry “setelah sudah jalan”.
+
+3) **Threshold jadi kontrak**
+- Semua angka penting dipindahkan ke `threshold_contract` (bukan “contoh”).
+- Perubahan threshold **wajib** bump `policy_version` agar hasil mudah diaudit lintas build.
+
+4) **Portfolio context wajib untuk “posisi berjalan”**
+- Jika portfolio integration diaktifkan, input minimal wajib ada: `avg_price`, `lots`, `entry_trade_date`, `days_held`.
+- Jika ingin time-stop yang presisi berbasis R, `mfe_r/mae_r` harus tersedia (atau engine harus fallback ke proxy non-R dan menambah reason `WS_DATA_COMPLETE_FAIL` untuk field R).
+
+5) **Lot sizing + minimum trade viability (modal kecil)**
+- WEEKLY_SWING tidak boleh menyarankan trade kalau `lots_recommended < 1` atau alokasi terlalu kecil (default 300k).
+- Jika fee config tersedia, harus lolos `expected_net_tp1_pct >= 0.75%` (default) agar tidak habis oleh fee/spread.
+- Jika ada spread proxy, spread terlalu lebar akan downgrade ke watch-only.
+
+6) **SOP “kapan review”**
+- Ada review windows (10:30–10:45 dan 14:25–14:40) sebagai SOP checklist.
+- Ada trigger review_due deterministik: T+2 no progress, Rabu midweek, Kamis weekend risk, Jumat exit bias.
+
+7) **Reason codes khusus WEEKLY_SWING**
+- Reason codes dipisahkan dari policy lain dengan prefix `WS_` dan katalog diperluas untuk:
+  - data/gating, entry guard, viability guard,
+  - lifecycle/management,
+  - exit drivers dan review SOP.
+
+> Output JSON/UI yang benar: WEEKLY_SWING harus bisa menampilkan **status** yang tidak ambigu (mis. `trade_disabled`, `position_state`, `review_due`) plus reason codes yang menjelaskan *kenapa*, bukan cuma “skor”.
 
 ### 2.4 Policy: DIVIDEND_SWING (event-driven)
 **Tujuan:** capture dividen **tanpa** bunuh diri karena gap risk.
