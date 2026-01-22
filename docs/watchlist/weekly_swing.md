@@ -1,4 +1,4 @@
-# Policy: WEEKLY_SWING
+﻿# Policy: WEEKLY_SWING
 
 Dokumen ini adalah **single source of truth** untuk policy **WEEKLY_SWING**.
 Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.
@@ -8,8 +8,8 @@ Dependensi lintas policy (Data Dictionary, output schema, namespace reason codes
 ---
 
 ## 0) Intent & scope
-Target: swing **mingguan** (holding 2–7 trading days), entry utama Selasa–Rabu, exit disiplin sebelum risiko weekend bila perlu.
-Policy ini **tidak memaksa** harus BUY. Jika guard/viability gagal → WATCH_ONLY.
+Target: swing **mingguan** (holding 2â€“7 trading days), entry utama Selasaâ€“Rabu, exit disiplin sebelum risiko weekend bila perlu.
+Policy ini **tidak memaksa** harus BUY. Jika guard/viability gagal â†’ WATCH_ONLY.
 
 ---
 
@@ -21,7 +21,7 @@ Policy ini **tidak memaksa** harus BUY. Jika guard/viability gagal → WATCH_ONL
 - Candle derived: `candle_body_pct`, `upper_wick_pct`, `lower_wick_pct`, `close_near_high (bool)`
 
 ### 1.2 Opsional (kalau ada, dipakai untuk guard eksekusi)
-- `preopen_last_price` → `open_or_last_exec` (lihat Data Dictionary di watchlist.md)
+- `preopen_last_price` â†’ `open_or_last_exec` (lihat Data Dictionary di watchlist.md)
 
 ### 1.3 Portfolio context (opsional; dipakai untuk manage posisi berjalan)
 Untuk tiap position yang sedang berjalan:
@@ -31,10 +31,10 @@ Untuk tiap position yang sedang berjalan:
 ---
 
 ## 2) Hard filters (angka tegas)
-Jika gagal → DROP (kandidat tidak ditampilkan sebagai kandidat entry).
+Jika gagal â†’ DROP (kandidat tidak ditampilkan sebagai kandidat entry).
 
 ### 2.1 Data complete gate
-- Required fields non-null. Jika ada indikator NULL → DROP.
+- Required fields non-null. Jika ada indikator NULL â†’ DROP.
 - reason: `WS_DATA_INCOMPLETE`
 
 ### 2.2 Liquidity gate
@@ -46,11 +46,11 @@ Jika gagal → DROP (kandidat tidak ditampilkan sebagai kandidat entry).
 - reason: `WS_VOL_TOO_HIGH`
 
 ### 2.4 Setup freshness gate
-- `signal_age_days <= 5` (untuk setup yang “event-driven”; jika tidak punya signal_age, skip gate ini)
+- `signal_age_days <= 5` (untuk setup yang â€œevent-drivenâ€; jika tidak punya signal_age, skip gate ini)
 - reason: `WS_SIGNAL_STALE`
 
 ### 2.5 Price sanity gate (tick/CA outlier)
-- Jika ada deteksi outlier (mis. sudden jump > 40% tanpa volume memadai / corporate action belum adjusted) → DROP.
+- Jika ada deteksi outlier (mis. sudden jump > 40% tanpa volume memadai / corporate action belum adjusted) â†’ DROP.
 - reason: `WS_PRICE_OUTLIER_CA_RISK`
 
 ---
@@ -59,19 +59,19 @@ Jika gagal → DROP (kandidat tidak ditampilkan sebagai kandidat entry).
 Soft filter tidak DROP, tapi menurunkan confidence atau memaksa entry_style.
 
 ### 3.1 RSI overheating
-- Jika `rsi14 >= 75` → entry_style wajib `Pullback-wait`, score -6, size_multiplier * 0.8
+- Jika `rsi14 >= 75` â†’ entry_style wajib `Pullback-wait`, score -6, size_multiplier * 0.8
 - reason: `WS_RSI_OVERHEAT`
 
 ### 3.2 Distribution candle
-- Jika `upper_wick_pct >= 0.55` dan `close_near_high == false` → score -8
+- Jika `upper_wick_pct >= 0.55` dan `close_near_high == false` â†’ score -8
 - reason: `WS_WICK_DISTRIBUTION`
 
 ### 3.3 Volatility tinggi tapi masih lolos hard gate
-- Jika `0.08 < atr_pct <= 0.10` → score -5, size_multiplier * 0.8
+- Jika `0.08 < atr_pct <= 0.10` â†’ score -5, size_multiplier * 0.8
 - reason: `WS_VOL_HIGH`
 
 ### 3.4 Gap risk (EOD)
-- Jika `gap_pct >= 0.04` → score -6, entry_windows geser (hindari open)
+- Jika `gap_pct >= 0.04` â†’ score -6, entry_windows geser (hindari open)
 - reason: `WS_GAP_RISK_EOD`
 
 ---
@@ -83,7 +83,7 @@ Hanya setup berikut yang boleh jadi **recommended** (top picks):
 - `Continuation`
 - `Reversal` (hanya jika trend tidak bearish)
 
-Jika setup lain (Base/Sideways) → kandidat boleh tampil tetapi default WATCH_ONLY.
+Jika setup lain (Base/Sideways) â†’ kandidat boleh tampil tetapi default WATCH_ONLY.
 - reason: `WS_SETUP_NOT_ALLOWED`
 
 ---
@@ -105,17 +105,17 @@ Jika setup lain (Base/Sideways) → kandidat boleh tampil tetapi default WATCH_O
 ### 5.3 Anti-chasing guard (berbasis EOD)
 Kontrak: jangan beli jauh di atas basis EOD.
 - `max_chase_from_close_pct = 0.02`
-- Jika `est_exec_price > close * (1 + 0.02)` → WATCH_ONLY hari itu.
+- Jika `est_exec_price > close * (1 + 0.02)` â†’ WATCH_ONLY hari itu.
 - reason: `WS_CHASE_BLOCK_DISTANCE_TOO_FAR`
 
 `est_exec_price` ditentukan:
-- jika `open_or_last_exec` ada → gunakan itu
-- jika tidak ada → `preopen_guard = PENDING` dan automated NEW ENTRY ditahan
+- jika `open_or_last_exec` ada â†’ gunakan itu
+- jika tidak ada â†’ `preopen_guard = PENDING` dan automated NEW ENTRY ditahan
 - reason: `WS_PREOPEN_PRICE_MISSING`
 
 ### 5.4 Gap-up guard (hari eksekusi)
 - `max_gap_up_pct = 0.03` (vs `prev_close`)
-- Jika `est_exec_price > prev_close * (1 + 0.03)` → WATCH_ONLY hari itu
+- Jika `est_exec_price > prev_close * (1 + 0.03)` â†’ WATCH_ONLY hari itu
 - reason: `WS_GAP_UP_BLOCK`
 
 ### 5.5 Setup-specific entry style
@@ -141,7 +141,7 @@ UI reason codes positif (opsional):
 
 ### 6.2 Max holding
 - `max_holding_days = 7` trading days
-- Jika `days_held >= 7` → wajib exit (kecuali policy override manual)
+- Jika `days_held >= 7` â†’ wajib exit (kecuali policy override manual)
 - reason: `WS_MAX_HOLDING_REACHED`
 
 ### 6.3 Friday risk control
@@ -153,7 +153,7 @@ UI reason codes positif (opsional):
 ### 6.4 Trailing stop (ATR-based; angka tegas)
 - `trail_atr_mult = 2.0`
 - `trail_sl = max(trail_sl, highest_close_since_entry - 2.0 * atr14)`
-- Jika close menembus trailing SL → exit
+- Jika close menembus trailing SL â†’ exit
 - reason: `WS_TRAIL_STOP_HIT`
 
 ---
@@ -165,13 +165,13 @@ UI reason codes positif (opsional):
 - `max_positions_today = 2` (Selasa/Rabu), 1 (Kamis), 0 (Jumat/Senin)
 
 ### 7.2 Minimum trade viability (modal kecil; angka tegas)
-Guard ini mencegah trade “habis fee/spread”.
+Guard ini mencegah trade â€œhabis fee/spreadâ€.
 - `min_alloc_idr = 500_000`
 - `min_lots = 1`
 - `min_net_edge_pct = 0.008` (0.8% setelah estimasi fee+spread)
 Kontrak:
-- jika `capital_total` tidak tersedia → skip evaluasi viability + reason `WS_VIABILITY_NOT_EVAL_NO_CAPITAL`
-- jika sizing engine menghasilkan `lots_recommended < 1` → WATCH_ONLY
+- jika `capital_total` tidak tersedia â†’ skip evaluasi viability + reason `WS_VIABILITY_NOT_EVAL_NO_CAPITAL`
+- jika sizing engine menghasilkan `lots_recommended < 1` â†’ WATCH_ONLY
 - reason: `WS_MIN_TRADE_VIABILITY_FAIL`
 
 ---
@@ -215,8 +215,9 @@ Kontrak:
 ## 9) Review SOP (wajib; kapan review)
 - **Setiap hari setelah EOD ready (malam):** generate watchlist + catat top picks + plan.
 - **Hari eksekusi (Selasa/Rabu):**
-  - 09:00–09:15: no entry (avoid window)
-  - 09:20–10:30: eksekusi jika guard PASS
-  - 13:35–14:30: second window jika masih valid
+  - 09:00â€“09:15: no entry (avoid window)
+  - 09:20â€“10:30: eksekusi jika guard PASS
+  - 13:35â€“14:30: second window jika masih valid
 - **Rabu sore:** evaluasi posisi T+2 untuk time-stop
-- **Jumat 14:30–close:** enforce Friday bias (exit/trim) sesuai rule di atas
+- **Jumat 14:30â€“close:** enforce Friday bias (exit/trim) sesuai rule di atas
+

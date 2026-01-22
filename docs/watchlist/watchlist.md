@@ -1,7 +1,7 @@
-# TradeAxis Watchlist — Cross-Policy Contract (EOD-driven)
+﻿# TradeAxis Watchlist â€” Cross-Policy Contract (EOD-driven)
 File: `watchlist.md`\
 
-Watchlist di TradeAxis **bukan “penentu beli”**. Watchlist adalah:
+Watchlist di TradeAxis **bukan â€œpenentu beliâ€**. Watchlist adalah:
 - Selektor kandidat (ranking) berbasis data.
 - Penyaji rencana eksekusi yang realistis (timing berbentuk **window**, bukan jam absolut).
 - Penghasil alasan yang bisa diaudit (**reason codes** deterministik).
@@ -25,8 +25,8 @@ Dokumen ini adalah **kontrak lintas-policy**: schema output, data dictionary, go
 - `as_of_trade_date` (YYYY-MM-DD): trading day terakhir yang **seharusnya** sudah punya EOD canonical pada saat `generated_at`.
 
 Definisi `as_of_trade_date`:
-- Jika `generated_at` **sebelum cutoff EOD** (pagi/pre-open) → `as_of_trade_date` = trading day **kemarin**.
-- Jika **sesudah cutoff + publish sukses** → `as_of_trade_date` = trading day **hari ini**.
+- Jika `generated_at` **sebelum cutoff EOD** (pagi/pre-open) â†’ `as_of_trade_date` = trading day **kemarin**.
+- Jika **sesudah cutoff + publish sukses** â†’ `as_of_trade_date` = trading day **hari ini**.
 
 ### 1.2 Data freshness gate (wajib)
 Watchlist ini EOD-driven. Rekomendasi **NEW ENTRY** hanya boleh keluar jika data EOD **CANONICAL** untuk `trade_date` tersedia.
@@ -88,8 +88,8 @@ Jika ada input portfolio, watchlist boleh menambahkan konteks posisi:
 - `position.entry_trade_date` (YYYY-MM-DD), `position.days_held` (trading days)
 
 **Input alias compatibility (untuk backward compatibility):**
-- Jika input portfolio memakai `avg_price`, mapping → `position_avg_price`
-- Jika input portfolio memakai `lots`, mapping → `position_lots`
+- Jika input portfolio memakai `avg_price`, mapping â†’ `position_avg_price`
+- Jika input portfolio memakai `lots`, mapping â†’ `position_lots`
 
 Policy docs wajib mengacu ke canonical fields. Alias hanya untuk normalisasi input.
 
@@ -102,15 +102,15 @@ Untuk guard anti-gap/anti-chasing yang dievaluasi **hari eksekusi**:
 
 ## 3) Tick size & rounding (wajib lintas-policy)
 
-### 3.1 Tabel fraksi (IDX equities — Reguler/Tunai)
+### 3.1 Tabel fraksi (IDX equities â€” Reguler/Tunai)
 Gunakan `last_price`/harga referensi terbaru untuk menentukan tick:
 
 | Range harga (Rp) | Tick (Rp) |
 |---|---:|
 | `< 200` | 1 |
-| `200 – < 500` | 2 |
-| `500 – < 2.000` | 5 |
-| `2.000 – < 5.000` | 10 |
+| `200 â€“ < 500` | 2 |
+| `500 â€“ < 2.000` | 5 |
+| `2.000 â€“ < 5.000` | 10 |
 | `>= 5.000` | 25 |
 
 Catatan:
@@ -123,7 +123,7 @@ Semua harga plan (entry/SL/TP/trigger) **wajib** di-round ke tick.
 `round_to_tick(price, tick, mode)`:
 - mode `DOWN`  : floor ke tick
 - mode `UP`    : ceil ke tick
-- mode `NEAREST`: round terdekat (tie → UP)
+- mode `NEAREST`: round terdekat (tie â†’ UP)
 
 Default yang disarankan (kontrak lintas-policy; policy boleh override jika perlu):
 - Entry trigger (breakout): `UP`
@@ -132,7 +132,7 @@ Default yang disarankan (kontrak lintas-policy; policy boleh override jika perlu
 - Take profit: `DOWN` (lebih realistis untuk eksekusi)
 - Break-even / trailing SL: `DOWN`
 
-Jika policy butuh “+1 tick”:
+Jika policy butuh â€œ+1 tickâ€:
 - pakai `price + tick` (bukan +1 rupiah), lalu round lagi sesuai mode.
 
 ---
@@ -145,7 +145,7 @@ Jika policy butuh “+1 tick”:
 
 ### 4.2 Kontrak sizing minimum
 - Lots **harus integer >= 0**.
-- Jika hasil sizing < 1 lot → watchlist **tidak boleh** memaksa BUY, harus turun menjadi `WATCH_ONLY` (policy menentukan reason code-nya).
+- Jika hasil sizing < 1 lot â†’ watchlist **tidak boleh** memaksa BUY, harus turun menjadi `WATCH_ONLY` (policy menentukan reason code-nya).
 
 ### 4.3 Pembulatan lots
 Kontrak default:
@@ -215,8 +215,8 @@ Global gate codes yang dianggap **umum** (dipakai lintas policy) dan sebaiknya d
 
 ### 6.3 Legacy mapping (wajib kalau masih ada output lama)
 Jika ada kode generik lama, engine wajib mapping ke policy prefix:
-- `GAP_UP_BLOCK` → `WS_GAP_UP_BLOCK` / `IL_GAP_UP_BLOCK` / dst (sesuai policy aktif)
-- `MARKET_RISK_OFF` → `GL_MARKET_RISK_OFF` (atau `NT_MARKET_RISK_OFF` jika dianggap spesifik NO_TRADE)
+- `GAP_UP_BLOCK` â†’ `WS_GAP_UP_BLOCK` / `IL_GAP_UP_BLOCK` / dst (sesuai policy aktif)
+- `MARKET_RISK_OFF` â†’ `GL_MARKET_RISK_OFF` (atau `NT_MARKET_RISK_OFF` jika dianggap spesifik NO_TRADE)
 
 ---
 
@@ -353,7 +353,7 @@ Jika `recommendations.mode == "CARRY_ONLY"`:
 
 ### 8.3 Reason codes validity
 - Semua `reason_codes[]` harus memenuhi rule namespace di Section 6.
-- Jika ada unknown/invalid prefix → output dianggap **invalid** (contract test harus fail).
+- Jika ada unknown/invalid prefix â†’ output dianggap **invalid** (contract test harus fail).
 
 ---
 
@@ -362,13 +362,13 @@ Jika `recommendations.mode == "CARRY_ONLY"`:
 Ini aturan default pemilihan policy agar hasil deterministik dan tidak campur aduk.
 Urutan ini **umum** (lintas-policy) dan tidak boleh diduplikasi di policy docs.
 
-1) Jika `meta.eod_canonical_ready == false` → `NO_TRADE`.
-   - Jika `position.has_position == true` di portfolio → boleh set `recommendations.mode = CARRY_ONLY` (manage posisi saja).
-2) Jika `meta.market_regime == risk-off` → `NO_TRADE` (reason: `GL_MARKET_RISK_OFF`).
-3) Jika ada event dividen valid + lolos hard filters → `DIVIDEND_SWING`.
-4) Jika snapshot intraday tersedia + kandidat EOD kuat → `INTRADAY_LIGHT` (opsional).
-5) Jika market risk-on & trend quality tinggi → `POSITION_TRADE` (lebih long horizon).
-6) Default → `WEEKLY_SWING`.
+1) Jika `meta.eod_canonical_ready == false` â†’ `NO_TRADE`.
+   - Jika `position.has_position == true` di portfolio â†’ boleh set `recommendations.mode = CARRY_ONLY` (manage posisi saja).
+2) Jika `meta.market_regime == risk-off` â†’ `NO_TRADE` (reason: `GL_MARKET_RISK_OFF`).
+3) Jika ada event dividen valid + lolos hard filters â†’ `DIVIDEND_SWING`.
+4) Jika snapshot intraday tersedia + kandidat EOD kuat â†’ `INTRADAY_LIGHT` (opsional).
+5) Jika market risk-on & trend quality tinggi â†’ `POSITION_TRADE` (lebih long horizon).
+6) Default â†’ `WEEKLY_SWING`.
 
 ## 10) Policy doc loading & failure behavior
 
@@ -382,7 +382,7 @@ Read order (wajib):
 
 Jika salah satu policy doc yang dibutuhkan tidak bisa diload:
 - set `recommendations.mode = "NO_TRADE"` untuk NEW ENTRY,
-- `meta.notes` tambahkan “Policy doc missing”,
+- `meta.notes` tambahkan â€œPolicy doc missingâ€,
 - reason code global: `GL_POLICY_DOC_MISSING`.
 
 ---
@@ -394,4 +394,4 @@ Contoh ringkas (WEEKLY_SWING):
 - `debug.rank_reason_codes`: `["TREND_STRONG","VOL_RATIO_HIGH","BREAKOUT_BIAS"]`
 
 Tidak boleh:
-- `reason_codes`: `["TREND_STRONG","MA_ALIGN_BULL"]`  ❌ (harus prefixed policy)
+- `reason_codes`: `["TREND_STRONG","MA_ALIGN_BULL"]`  âŒ (harus prefixed policy)

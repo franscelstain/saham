@@ -1,4 +1,4 @@
-# Policy: POSITION_TRADE
+﻿# Policy: POSITION_TRADE
 
 Dokumen ini adalah **single source of truth** untuk policy **POSITION_TRADE**.
 Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.
@@ -8,7 +8,7 @@ Dependensi lintas policy (Data Dictionary, output schema, namespace reason codes
 ---
 
 ## 0) Intent & scope
-Trend-follow 2–8 minggu. Lebih sedikit trade, lebih fokus kualitas trend dan risk control.
+Trend-follow 2â€“8 minggu. Lebih sedikit trade, lebih fokus kualitas trend dan risk control.
 
 ---
 
@@ -19,17 +19,17 @@ Trend-follow 2–8 minggu. Lebih sedikit trade, lebih fokus kualitas trend dan r
 ---
 
 ## 2) Hard filters
-- `liq_bucket` harus `A` atau `B` → `PT_LIQ_TOO_LOW`
+- `liq_bucket` harus `A` atau `B` â†’ `PT_LIQ_TOO_LOW`
 - Trend gate:
-  - `close > ma200` dan `ma50 > ma200` → `PT_TREND_NOT_OK`
+  - `close > ma200` dan `ma50 > ma200` â†’ `PT_TREND_NOT_OK`
 - Volatility gate:
-  - `atr_pct <= 0.07` → `PT_VOL_TOO_HIGH`
+  - `atr_pct <= 0.07` â†’ `PT_VOL_TOO_HIGH`
 
 ---
 
 ## 3) Soft filters + scoring
-- RSI terlalu tinggi (`rsi14 >= 78`) → score -6 → `PT_RSI_OVERHEAT`
-- Candle distribusi kuat → score -6 → `PT_WICK_DISTRIBUTION`
+- RSI terlalu tinggi (`rsi14 >= 78`) â†’ score -6 â†’ `PT_RSI_OVERHEAT`
+- Candle distribusi kuat â†’ score -6 â†’ `PT_WICK_DISTRIBUTION`
 
 ---
 
@@ -43,14 +43,14 @@ Trend-follow 2–8 minggu. Lebih sedikit trade, lebih fokus kualitas trend dan r
 ## 5) Entry rules
 - Entry windows default: ["09:20-10:30", "13:35-14:30"]
 - Anti-chasing:
-  - `max_chase_from_close_pct = 0.02` → `PT_CHASE_BLOCK_DISTANCE_TOO_FAR`
+  - `max_chase_from_close_pct = 0.02` â†’ `PT_CHASE_BLOCK_DISTANCE_TOO_FAR`
 
 ---
 
 ## 6) Exit rules
-- Max holding: `max_holding_days = 40` trading days → `PT_MAX_HOLDING_REACHED`
+- Max holding: `max_holding_days = 40` trading days â†’ `PT_MAX_HOLDING_REACHED`
 - Trailing stop:
-  - `trail_atr_mult = 2.5` → `PT_TRAIL_STOP_HIT`
+  - `trail_atr_mult = 2.5` â†’ `PT_TRAIL_STOP_HIT`
 
 ---
 
@@ -60,7 +60,7 @@ Trend-follow 2–8 minggu. Lebih sedikit trade, lebih fokus kualitas trend dan r
 - Viability:
   - `min_alloc_idr = 1_000_000`
   - `min_lots = 1`
-  - `min_net_edge_pct = 0.012` → `PT_MIN_TRADE_VIABILITY_FAIL`
+  - `min_net_edge_pct = 0.012` â†’ `PT_MIN_TRADE_VIABILITY_FAIL`
 
 ---
 
@@ -74,3 +74,4 @@ Trend-follow 2–8 minggu. Lebih sedikit trade, lebih fokus kualitas trend dan r
 - `PT_MAX_HOLDING_REACHED`
 - `PT_TRAIL_STOP_HIT`
 - `PT_MIN_TRADE_VIABILITY_FAIL`
+
