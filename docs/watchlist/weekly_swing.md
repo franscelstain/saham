@@ -46,7 +46,11 @@ Jika gagal → DROP (kandidat tidak ditampilkan sebagai kandidat entry).
 - reason: `WS_VOL_TOO_HIGH`
 
 ### 2.4 Setup freshness gate
-- `signal_age_days <= 5` (untuk setup yang “event-driven”; jika tidak punya signal_age, skip gate ini)
+- Untuk setup yang bersifat event-driven (Breakout / Continuation / Reversal): `signal_age_days <= 5`.
+  - Jika `signal_age_days` NULL untuk setup event-driven → default **WATCH_ONLY** (bukan DROP) karena freshness tidak bisa dipastikan.
+  - reason: `WS_SIGNAL_AGE_UNKNOWN`
+- Untuk setup non event-driven (Pullback): gate ini tidak digunakan.
+- Jika `signal_age_days > 5` → DROP.
 - reason: `WS_SIGNAL_STALE`
 
 ### 2.5 Price sanity gate (tick/CA outlier)
@@ -110,13 +114,15 @@ Kontrak: jangan beli jauh di atas basis EOD.
 
 `open_or_last_exec` ditentukan:
 - jika `open_or_last_exec` ada → gunakan itu
-- jika tidak ada → `preopen_guard = PENDING` dan automated NEW ENTRY ditahan
+- jika tidak ada → status guard internal = PENDING dan automated NEW ENTRY ditahan
 - reason: `WS_PREOPEN_PRICE_MISSING`
 
 ### 5.4 Gap-up guard (hari eksekusi)
 - `max_gap_up_pct = 0.03` (vs `close`)
 - Jika `open_or_last_exec > close * (1 + 0.03)` → WATCH_ONLY hari itu
 - reason: `WS_GAP_UP_BLOCK`
+
+Catatan: `WS_GAP_RISK_EOD` adalah penalti/adjust timing dari EOD; `WS_GAP_UP_BLOCK` adalah guard keras pada hari eksekusi.
 
 ### 5.5 Setup-specific entry style
 - Breakout: `Breakout-confirm` (tunggu follow-through; jangan entry di 09:00-09:15)
@@ -128,6 +134,46 @@ UI reason codes positif (opsional):
 - `WS_SETUP_BREAKOUT`, `WS_SETUP_PULLBACK`, `WS_SETUP_CONTINUATION`, `WS_SETUP_REVERSAL`
 
 ---
+
+
+## 5.6 Final selection & grouping (mechanism)
+
+Bagian ini mengunci **mekanisme seleksi kandidat beli** agar implementasi deterministik.
+
+### 5.6.1 Base score & penalties
+- `base_score = 100`
+- Mulai dari 100, lalu kurangi penalti dari soft filters (Section 3) dan guard lain yang menurunkan score.
+- Score minimum = 0 (floor).
+
+### 5.6.2 Eligibility untuk NEW ENTRY (hard)
+Kandidat masuk jalur NEW ENTRY hanya jika:
+- Lolos semua **Hard filters** (Section 2) dan setup_type termasuk allowlist (Section 4), dan
+- `timing.trade_disabled == false`, dan
+- `max_positions_today > 0`, dan
+- Tidak terkena guard hari eksekusi:
+  - `WS_DOW_NO_ENTRY`, `WS_PREOPEN_PRICE_MISSING`, `WS_CHASE_BLOCK_DISTANCE_TOO_FAR`, `WS_GAP_UP_BLOCK`.
+
+Jika salah satu gagal → kandidat wajib `WATCH_ONLY`.
+
+### 5.6.3 Mapping score → group
+Untuk kandidat yang eligible NEW ENTRY (lolos 5.6.2):
+
+- `top_picks`:
+  - `score >= 80`, lalu ambil **maksimal `max_positions_today`** kandidat teratas berdasarkan ordering deterministik (lihat 5.6.4).
+- `secondary`:
+  - `65 <= score < 80`
+- `watch_only`:
+  - `score < 65`
+
+### 5.6.4 Ordering deterministik (tie-breaker)
+Sort kandidat eligible berdasarkan:
+1) `score desc`
+2) `watchlist_score desc` (jika tersedia)
+3) `ticker_code asc`
+
+Catatan:
+- Jika `top_picks` sudah penuh (sesuai `max_positions_today`), kandidat score tinggi berikutnya masuk `secondary`.
+
 
 ## 6) Exit rules (time stop / max holding / trailing)
 ### 6.1 Time stop (disiplin; angka tegas)
@@ -209,6 +255,30 @@ Kontrak:
 - `WS_VOLUME_OK`
 - `WS_LIQ_OK`
 - `WS_RR_OK`
+
+
+### 8.3 Trigger untuk reason codes positif (optional; clarity UI)
+
+Reason codes positif **tidak mempengaruhi eligibility** secara langsung, tapi membantu UI menjelaskan “kenapa ini bagus”.
+
+- `WS_SETUP_BREAKOUT` / `WS_SETUP_PULLBACK` / `WS_SETUP_CONTINUATION` / `WS_SETUP_REVERSAL`:
+  - Emit sesuai `setup_type`.
+
+- `WS_TREND_ALIGN_OK`:
+  - Kondisi minimum: `close > ma20` dan `ma20 > ma50`.
+  - Bonus (opsional): `ma50 > ma200`.
+
+- `WS_VOLUME_OK`:
+  - `vol_ratio >= 1.5` (vs `vol_sma20`).
+
+- `WS_LIQ_OK`:
+  - `liq_bucket == "A"` (lebih ketat dari gate A/B).
+
+- `WS_RR_OK`:
+  - Jika `levels.entry_trigger_price`, `levels.stop_loss_price`, `levels.tp1_price` tersedia:
+    - `rr = (tp1 - entry) / max(entry - sl, tick_size)`
+    - Emit jika `rr >= 2.0`.
+
 
 ---
 
