@@ -101,7 +101,7 @@ Minimal yang umum dipakai lintas policy:
 - `meta.market_regime`: `risk-on | neutral | risk-off`
 
 Opsional (kalau tersedia):
-- breadth: `advancers`, `decliners`, `new_high_20d`, `new_low_20d`, ratio.
+- breadth: `breadth_advancers`, `breadth_decliners`, `breadth_new_high_20d`, `breadth_new_low_20d`, `breadth_adv_decl_ratio`.
 
 ### 2.4 Portfolio context (opsional input; wajib jika ingin output manage-mode)
 Jika ada input portfolio, watchlist boleh menambahkan konteks posisi:
@@ -117,8 +117,9 @@ Policy docs wajib mengacu ke canonical fields. Alias hanya untuk normalisasi inp
 
 ### 2.5 Execution snapshot (opsional)
 Untuk guard anti-gap/anti-chasing yang dievaluasi **hari eksekusi**:
-- `preopen_last_price` (float|null): harga indikatif sebelum market buka pada hari eksekusi.
-- `open_or_last_exec` (float|null): derived = `preopen_last_price` (watchlist **tidak boleh** fallback ke `open` EOD).
+- `preopen_last_price` (int|null): harga indikatif sebelum market buka pada hari eksekusi (IDR, integer).
+- `intraday_last_price` (int|null): last price intraday pada hari eksekusi (IDR, integer), jika snapshot tersedia.
+- `open_or_last_exec` (int|null): derived = first non-null dari `preopen_last_price`, lalu `intraday_last_price`. Watchlist **tidak boleh** fallback ke `open` EOD.
 
 ---
 

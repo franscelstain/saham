@@ -24,18 +24,18 @@ Target: mengambil peluang dividen + swing pendek tanpa bunuh diri karena gap/eve
 ---
 
 ## 2) Hard filters (angka tegas)
-- `liq_bucket` harus `A` atau `B` â†’ `DS_LIQ_TOO_LOW`
-- `atr_pct <= 0.08` â†’ `DS_VOL_TOO_HIGH`
+- `liq_bucket` harus `A` atau `B` → `DS_LIQ_TOO_LOW`
+- `atr_pct <= 0.08` → `DS_VOL_TOO_HIGH`
 - Event gate:
-  - `cum_date` harus dalam `3..12` trading days ke depan (window entry) â†’ `DS_EVENT_WINDOW_OUTSIDE`
+  - `cum_date` harus dalam `3..12` trading days ke depan (window entry) → `DS_EVENT_WINDOW_OUTSIDE`
 - Yield sanity:
-  - `dividend_yield_est >= 0.020` (â‰¥2%) â†’ kalau tidak, tetap boleh tapi confidence turun (lihat soft) atau DROP jika kamu mau ketat.
+  - `dividend_yield_est >= 0.020` (≥2%) → kalau tidak, tetap boleh tapi confidence turun (lihat soft) atau DROP jika kamu mau ketat.
 
 ---
 
 ## 3) Soft filters + score override
-- Jika `rsi14 >= 75` â†’ score -6, entry_style `Pullback-wait` â†’ `DS_RSI_OVERHEAT`
-- Jika gap risk tinggi (gap_pct >= 0.04) â†’ score -6 â†’ `DS_GAP_RISK_EOD`
+- Jika `rsi14 >= 75` → score -6, entry_style `Pullback-wait` → `DS_RSI_OVERHEAT`
+- Jika gap risk tinggi (gap_pct >= 0.04) → score -6 → `DS_GAP_RISK_EOD`
 
 ---
 
@@ -47,21 +47,21 @@ Target: mengambil peluang dividen + swing pendek tanpa bunuh diri karena gap/eve
 ---
 
 ## 5) Entry rules (anti-chasing/gap)
-- DOW bias: entry ideal Selasaâ€“Rabu, Hindari entry Jumat.
+- DOW bias: entry ideal Selasa–Rabu, Hindari entry Jumat.
 - Entry window default: ["09:20-10:30", "13:35-14:30"]
 - Anti-chasing:
-  - `max_chase_from_close_pct = 0.015` â†’ `DS_CHASE_BLOCK_DISTANCE_TOO_FAR`
+  - `max_chase_from_close_pct = 0.015` → `DS_CHASE_BLOCK_DISTANCE_TOO_FAR`
 - Gap-up guard:
-  - `max_gap_up_pct = 0.02` â†’ `DS_GAP_UP_BLOCK`
+  - `max_gap_up_pct = 0.02` → `DS_GAP_UP_BLOCK`
 
 ---
 
 ## 6) Exit rules
 - Default: exit **sebelum** ex_date jika tujuan utama yield+safe (kecuali strategi hold ex-date memang diaktifkan).
 - Time stop:
-  - T+2 jika `ret_since_entry_pct < 0.008` â†’ `DS_TIME_STOP_T2`
+  - T+2 jika `ret_since_entry_pct < 0.008` → `DS_TIME_STOP_T2`
 - Max holding:
-  - `max_holding_days = 6` â†’ `DS_MAX_HOLDING_REACHED`
+  - `max_holding_days = 6` → `DS_MAX_HOLDING_REACHED`
 
 ---
 
@@ -71,7 +71,7 @@ Target: mengambil peluang dividen + swing pendek tanpa bunuh diri karena gap/eve
 - Viability:
   - `min_alloc_idr = 750_000`
   - `min_lots = 1`
-  - `min_net_edge_pct = 0.010` â†’ `DS_MIN_TRADE_VIABILITY_FAIL`
+  - `min_net_edge_pct = 0.010` → `DS_MIN_TRADE_VIABILITY_FAIL`
 
 ---
 

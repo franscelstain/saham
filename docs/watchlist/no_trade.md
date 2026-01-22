@@ -7,7 +7,7 @@ Dependensi lintas policy (Data Dictionary, schema output, namespace reason codes
 
 ---
 
-**Tujuan:** proteksi modal. Policy ini **bukan** â€œtidak ada outputâ€, tapi output deterministik yang memaksa sistem *tidak membuka posisi baru*.
+**Tujuan:** proteksi modal. Policy ini **bukan** “tidak ada output”, tapi output deterministik yang memaksa sistem *tidak membuka posisi baru*.
 
 #### 2.7.1 Policy execution block (wajib, deterministik)
 ```yaml
@@ -21,7 +21,7 @@ data_dependency:
   optional:
     - portfolio_context: [has_position]   # untuk menentukan apakah mode = CARRY_ONLY
 
-# 2) Hard filters (trigger NO_TRADE) â€” angka tegas
+# 2) Hard filters (trigger NO_TRADE) — angka tegas
 hard_triggers:
   - id: GL_EOD_NOT_READY
     expr: "eod_canonical_ready == false"
@@ -36,7 +36,7 @@ hard_triggers:
     action: NO_TRADE
     add_reason: [GL_BREADTH_CRASH]
 
-# 3) Soft filters (di NO_TRADE tidak relevan untuk scoring) â€” tetap eksplisit
+# 3) Soft filters (di NO_TRADE tidak relevan untuk scoring) — tetap eksplisit
 soft_filters: []
 
 # 4) Setup allowlist
@@ -78,18 +78,3 @@ policy_reason_codes:
 
 #### 2.7.2 Invariant output (wajib)
 Invariant output mengikuti kontrak di `watchlist.md` (lihat Section 8: Invariants).
-
-
-### 2.8 Urutan pemilihan policy (deterministik)
-Agar hasil watchlist konsisten (dan tidak â€œcampur adukâ€ antar policy), pemilihan policy harus **satu arah**:
-
-1) Jika `EOD CANONICAL` belum ready (freshness gate gagal) â†’ **NO_TRADE** (atau `CARRY_ONLY` jika ada posisi existing).
-2) Jika `market_regime = risk-off` â†’ **NO_TRADE**.
-3) Jika ada event dividen valid + lolos hard filters â†’ **DIVIDEND_SWING**.
-4) Jika snapshot intraday tersedia + kandidat EOD kuat â†’ **INTRADAY_LIGHT** (opsional).
-5) Jika market risk-on & trend quality tinggi â†’ boleh override ke **POSITION_TRADE** (mode long horizon).
-6) Default â†’ **WEEKLY_SWING**.
-
-> Ini urutan default. Kalau nanti mau â€œlock modeâ€ (mis. minggu ini hanya weekly swing), override dilakukan di layer config/UI (bukan dengan memodifikasi rule internal policy).
-
----
