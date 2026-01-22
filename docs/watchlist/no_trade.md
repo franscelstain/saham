@@ -97,6 +97,7 @@ Invariant output mengikuti kontrak di `watchlist.md` (lihat Section 8: Invariant
   - `recommendations.allocations = []`
   - `groups.top_picks = []`
   - Kandidat boleh tetap dipublish sebagai monitoring (`groups.watch_only`) **tetapi** setiap kandidat wajib:
+    - `levels.entry_type = "WATCH_ONLY"`
     - `timing.trade_disabled = true`
-    - `levels.entry_style = "No-trade"` (atau style yang disepakati di kontrak)
-    - `sizing.size_multiplier = 0.0`
+    - `timing.entry_style = "No-trade"` (enum value sudah didefinisikan di schema watchlist.md)
+    - `timing.size_multiplier = 0.0`
