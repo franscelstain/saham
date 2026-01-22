@@ -3,7 +3,7 @@
 Dokumen ini adalah **single source of truth** untuk policy **NO_TRADE** (global gate/override).
 Ketika aktif, policy ini **menonaktifkan NEW ENTRY** dan (jika ada posisi) mengubah mode menjadi **CARRY_ONLY** untuk posisi yang sedang berjalan.
 
-Kontrak lintas-policy (Data Dictionary, schema output, invariants output, window format, rounding/fee model, governance reason codes) ada di `watchlist.md`.
+Kontrak lintas-policy (Data Dictionary, schema output, invariants output, window format, rounding & biaya transaksi, governance reason codes) ada di `watchlist.md`.
 
 ---
 

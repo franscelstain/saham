@@ -73,7 +73,7 @@ Kandidat eligible NEW ENTRY hanya jika:
 
 Jika salah satu gagal → kandidat wajib `WATCH_ONLY`.
 
-### 5.6.2 Trade viability (minimum RR, tanpa fee model)
+### 5.6.2 Trade viability (minimum RR, tanpa komponen biaya transaksi)
 Untuk kandidat eligible NEW ENTRY:
 - Jika `levels.entry_trigger_price`, `levels.stop_loss_price`, dan `levels.tp1_price` tersedia:
   - `rr = (tp1 - entry) / max(entry - sl, 1e-9)`

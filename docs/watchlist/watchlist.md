@@ -45,12 +45,12 @@ Kontrak minimal:
 Jika `meta.eod_canonical_ready == false`:
 - `recommendations.mode` wajib `NO_TRADE` (NEW ENTRY diblok).
 - Kandidat tetap boleh ditampilkan sebagai **watch-only** (untuk monitoring), tetapi:
-  - `trade_disabled = true`
-  - `entry_style = "No-trade"`
-  - `size_multiplier = 0.0`
-  - `max_positions_today = 0`
-  - `entry_windows = []`
-  - `avoid_windows = ["09:00-close"]`
+  - `timing.trade_disabled = true`
+  - `timing.entry_style = "No-trade"`
+  - `timing.size_multiplier = 0.0`
+  - `recommendations.max_positions_today = 0`
+  - `timing.entry_windows = []`
+  - `timing.avoid_windows = ["09:00-close"]`
 - Tambahkan reason code global: `GL_EOD_NOT_READY`.
 
 Catatan: manajemen posisi existing boleh tetap berjalan (lihat `no_trade.md`).
@@ -328,7 +328,7 @@ Kontrak output (opsional, tapi kalau ada harus konsisten):
 
 ### 6.3 Legacy mapping (wajib kalau masih ada output lama)
 Jika ada kode generik lama, engine wajib mapping ke policy prefix:
-- `GAP_UP_BLOCK` → `WS_GAP_UP_BLOCK` / `IL_GAP_UP_BLOCK` / dst (sesuai policy aktif)
+- `GAP_UP_BLOCK` → `{policy_prefix}_GAP_UP_BLOCK` (sesuai policy aktif)
 - `MARKET_RISK_OFF` → `GL_MARKET_RISK_OFF` (atau `NT_MARKET_RISK_OFF` jika dianggap spesifik NO_TRADE)
 
 ---
