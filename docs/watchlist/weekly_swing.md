@@ -1,4 +1,4 @@
-﻿# Policy: WEEKLY_SWING
+# Policy: WEEKLY_SWING
 
 Dokumen ini adalah **single source of truth** untuk policy **WEEKLY_SWING**.
 Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.

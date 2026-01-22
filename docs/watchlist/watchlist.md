@@ -1,4 +1,4 @@
-﻿# TradeAxis Watchlist — Cross-Policy Contract (EOD-driven)
+# TradeAxis Watchlist — Cross-Policy Contract (EOD-driven)
 File: `watchlist.md`
 
 Watchlist di TradeAxis **bukan “penentu beli”**. Watchlist adalah:
@@ -351,26 +351,24 @@ Jika `recommendations.mode == "CARRY_ONLY"`:
 
 ## 9) Policy selection precedence (default)
 
-Tujuan bagian ini hanya memastikan pemilihan policy **deterministik** dan tidak saling bertabrakan.
+Bagian ini hanya memastikan pemilihan policy **deterministik** dan tidak saling bertabrakan.
 
-Yang **wajib** ada di sini (lintas-policy):
-1) **Global gates** (berlaku untuk semua policy):
+Yang boleh ada di sini (lintas-policy):
+1) **Global gates**:
    - Jika `meta.eod_canonical_ready == false` → `NO_TRADE`.
      - Jika `position.has_position == true` → boleh set `recommendations.mode = "CARRY_ONLY"` (manage posisi saja).
    - Jika `meta.market_regime == "risk-off"` → `NO_TRADE` (reason: `GL_MARKET_RISK_OFF`).
 
-2) **Urutan prioritas** (siapa menang kalau lebih dari 1 policy eligible pada hari yang sama):
+2) **Urutan prioritas** (jika >1 policy eligible pada hari yang sama):
    1. `DIVIDEND_SWING`
    2. `INTRADAY_LIGHT`
    3. `POSITION_TRADE`
    4. `WEEKLY_SWING`
 
-Yang **tidak boleh** ada di `watchlist.md`:
-- definisi “eligible / tidak eligible” untuk tiap policy (contoh: kriteria dividen valid, kriteria intraday snapshot, trend quality, scoring thresholds, dll).
+Yang tidak boleh ada di sini:
+- definisi eligibility / threshold / scoring / timing spesifik policy.
 
-Semua kriteria eligibility harus ditulis di dokumen policy masing-masing, atau di doc khusus router bila kamu membuatnya (`policy_router.md`).
-
----
+Eligibility rules harus ditulis di dokumen policy masing-masing (atau doc router khusus bila dibuat).
 
 ## 10) Policy doc loading & failure behavior
 
@@ -397,3 +395,4 @@ Contoh ringkas (WEEKLY_SWING):
 
 Tidak boleh:
 - `reason_codes`: `["TREND_STRONG","MA_ALIGN_BULL"]`  ❌ (harus prefixed policy)
+

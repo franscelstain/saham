@@ -1,4 +1,4 @@
-﻿# Policy: INTRADAY_LIGHT
+# Policy: INTRADAY_LIGHT
 
 Dokumen ini adalah **single source of truth** untuk policy **INTRADAY_LIGHT**.
 Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.

@@ -1,4 +1,4 @@
-﻿# Policy: POSITION_TRADE
+# Policy: POSITION_TRADE
 
 Dokumen ini adalah **single source of truth** untuk policy **POSITION_TRADE**.
 Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.

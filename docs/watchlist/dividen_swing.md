@@ -1,4 +1,4 @@
-﻿# Policy: DIVIDEND_SWING
+# Policy: DIVIDEND_SWING
 
 Dokumen ini adalah **single source of truth** untuk policy **DIVIDEND_SWING**.
 Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.

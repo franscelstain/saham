@@ -1,4 +1,4 @@
-﻿# Policy: NO_TRADE
+# Policy: NO_TRADE
 
 Dokumen ini adalah **single source of truth** untuk policy NO_TRADE (global gate/override).
 Ketika aktif, policy ini **menonaktifkan NEW ENTRY** dan (jika ada posisi) mengubah mode menjadi **CARRY_ONLY** untuk posisi yang sedang berjalan.
