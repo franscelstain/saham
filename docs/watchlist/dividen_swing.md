@@ -18,9 +18,9 @@ Target: mengambil peluang dividen + swing pendek tanpa bunuh diri karena gap/eve
 - Calendar event dividen (minimal):
   - `ex_date`, `cum_date` (atau `record_date`), `cash_dividend`, `dividend_yield_est`
 
-### 1.2 Opsional
-- Preopen snapshot untuk gap guard hari eksekusi (lihat watchlist.md)
-
+### 1.2 Opsional (input)
+- Preopen snapshot untuk gap guard hari eksekusi (lihat watchlist.md).
+  - Jika **tidak tersedia**, aturan deterministik ada di Section 5.3: NEW ENTRY wajib `WATCH_ONLY` (`DS_PREOPEN_PRICE_MISSING`).
 ---
 
 ## 2) Hard filters (angka tegas)
