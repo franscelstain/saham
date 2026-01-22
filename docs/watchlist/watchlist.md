@@ -35,23 +35,6 @@ Catatan:
 - `trade_date` = basis EOD untuk scoring/level.
 - `exec_trade_date` = basis **jam sesi** (`open/close`) untuk time-window eksekusi.
 
-### 1.3 Kontrak resolusi token `open` / `close` (lintas-policy)
-
-Token `open` dan `close` pada `entry_windows[]` / `avoid_windows[]` **wajib** di-resolve menggunakan jam sesi untuk `exec_trade_date`.
-
-Kontrak minimal (wajib di `meta.session`):
-- `meta.session.open_time`  (HH:MM, WIB)
-- `meta.session.close_time` (HH:MM, WIB)
-- (opsional) `meta.session.breaks[]` (array string, format `HH:MM-HH:MM`)
-
-Aturan:
-- `open` → `meta.session.open_time`
-- `close` → `meta.session.close_time`
-- Jika ada `breaks[]`, engine wajib mengurangi `entry_windows` yang overlap dengan break (atau memecah window).
-
-Sumber jam sesi harus berasal dari kalender bursa (bisa berubah pada hari tertentu), **bukan hardcode** di policy.
-
-
 ### 1.2 Data freshness gate (wajib)
 Watchlist ini EOD-driven. Rekomendasi **NEW ENTRY** hanya boleh keluar jika data EOD **CANONICAL** untuk `trade_date` tersedia.
 
@@ -73,6 +56,23 @@ Jika `meta.eod_canonical_ready == false`:
 Catatan: manajemen posisi existing boleh tetap berjalan (lihat `no_trade.md`).
 
 ---
+
+
+### 1.3 Kontrak resolusi token `open` / `close` (lintas-policy)
+
+Token `open` dan `close` pada `entry_windows[]` / `avoid_windows[]` **wajib** di-resolve menggunakan jam sesi untuk `exec_trade_date`.
+
+Kontrak minimal (wajib di `meta.session`):
+- `meta.session.open_time`  (HH:MM, WIB)
+- `meta.session.close_time` (HH:MM, WIB)
+- (opsional) `meta.session.breaks[]` (array string, format `HH:MM-HH:MM`)
+
+Aturan:
+- `open` → `meta.session.open_time`
+- `close` → `meta.session.close_time`
+- Jika ada `breaks[]`, engine wajib mengurangi `entry_windows` yang overlap dengan break (atau memecah window).
+
+Sumber jam sesi harus berasal dari kalender bursa (bisa berubah pada hari tertentu), **bukan hardcode** di policy.
 
 ## 2) Data dictionary (lintas-policy)
 
@@ -123,6 +123,22 @@ Untuk guard anti-gap/anti-chasing yang dievaluasi **hari eksekusi**:
 
 ---
 
+### 2.5.1 Derived metrics lintas-policy (wajib definisi)
+
+Beberapa policy memakai metrik turunan berikut. Definisi harus konsisten:
+
+- `gap_pct` (float|null):
+  - Definisi: `(open_or_last_exec / close) - 1`
+  - `close` adalah close canonical pada `trade_date` (EOD basis).
+  - Jika `open_or_last_exec` null → `gap_pct = null` (policy yang butuh gap guard harus treat sebagai “unknown”).
+
+- `ret_since_entry_pct` (float|null) untuk posisi berjalan:
+  - Definisi EOD basis: `(close / position.position_avg_price) - 1` (menggunakan `close` pada `trade_date`)
+  - Jika ingin versi eksekusi intraday, gunakan `(open_or_last_exec / position.position_avg_price) - 1` ketika snapshot tersedia, tapi ini harus dinyatakan eksplisit oleh engine (jangan diam-diam).
+
+- `close_near_high` (bool):
+  - Definisi: `((high - close) / max(high - low, 1)) <= 0.25`
+  - Menggunakan OHLC canonical pada `trade_date`.
 
 ### 2.6 Ticker tradeability & special notations (lintas-policy)
 
@@ -181,22 +197,12 @@ Catatan:
 
 
 
-### 2.5.1 Derived metrics lintas-policy (wajib definisi)
 
-Beberapa policy memakai metrik turunan berikut. Definisi harus konsisten:
 
-- `gap_pct` (float|null):
-  - Definisi: `(open_or_last_exec / close) - 1`
-  - `close` adalah close canonical pada `trade_date` (EOD basis).
-  - Jika `open_or_last_exec` null → `gap_pct = null` (policy yang butuh gap guard harus treat sebagai “unknown”).
+### 2.6.4 Base eligibility lintas-policy vs policy-specific
 
-- `ret_since_entry_pct` (float|null) untuk posisi berjalan:
-  - Definisi EOD basis: `(close / position.position_avg_price) - 1` (menggunakan `close` pada `trade_date`)
-  - Jika ingin versi eksekusi intraday, gunakan `(open_or_last_exec / position.position_avg_price) - 1` ketika snapshot tersedia, tapi ini harus dinyatakan eksplisit oleh engine (jangan diam-diam).
-
-- `close_near_high` (bool):
-  - Definisi: `((high - close) / max(high - low, 1)) <= 0.25`
-  - Menggunakan OHLC canonical pada `trade_date`.
+Kontrak lintas-policy hanya mengunci **tradeability** (suspension/FCA/X, window eksekusi, readiness data).
+Kriteria seleksi kandidat yang bersifat strategi (contoh: threshold trend/volume/RSI, liquidity minimum, scoring weights) adalah domain **policy docs** dan tidak boleh “dipindah-diam-diam” ke `watchlist.md`.
 
 
 ## 3) Tick size & rounding (wajib lintas-policy)
@@ -420,6 +426,25 @@ Aturan:
 Jika mode `NO_TRADE` atau `CARRY_ONLY` → `allocations` wajib `[]`.
 
 
+
+### 7.2.1 `watchlist_score` & `confidence` (lintas-policy)
+
+- `watchlist_score` adalah skor ranking internal watchlist untuk mengurutkan kandidat dalam policy yang dipilih.
+- Kontrak tipe & arah:
+  - Tipe: number (float atau int).
+  - Range yang disarankan: `0..100` (semakin besar semakin baik).
+  - Tidak boleh `NaN/Infinity`.
+
+- `confidence` adalah label kualitatif berbasis **percentile** dari `watchlist_score` dalam universe kandidat policy pada `trade_date`.
+  - `High` : top 20% (percentile >= 80)
+  - `Med`  : percentile 40–79
+  - `Low`  : percentile < 40
+
+Kontrak:
+- Engine wajib menghitung `confidence` dari ranking score (bukan manual/acak).
+- Policy boleh mengubah mapping percentile, tapi **tidak boleh** mengubah key/enum value (`High|Med|Low`).
+
+
 ### 7.2 Candidate object (wajib minimal)
 Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
 
@@ -613,6 +638,37 @@ Untuk memastikan output deterministik dan tidak “lompat-lompat”:
 
 Jika engine membutuhkan tiebreaker (mis. rank dihitung ulang):
 - tiebreaker order: `watchlist_score desc`, lalu `ticker_code asc`.
+
+
+
+### 8.8 Konsistensi matematika `allocations` (lintas-policy)
+
+Jika `recommendations.allocations[]` tidak kosong, aturan berikut wajib dipenuhi:
+
+**Uniqueness & linking**
+- `ticker_code` unik di `allocations[]`.
+- Setiap `ticker_code` di `allocations[]` harus ada di `groups.top_picks[]`.
+
+**Model alokasi (jangan campur)**
+- Gunakan salah satu model secara konsisten untuk seluruh item:
+  - **Percent model**: semua item punya `alloc_pct` (dan `alloc_budget` boleh diisi sebagai hasil hitung), atau
+  - **Budget model** : semua item punya `alloc_budget` (dan `alloc_pct` boleh diisi sebagai hasil turunan).
+- Tidak boleh sebagian item hanya `alloc_pct` dan sebagian hanya `alloc_budget`.
+
+**Aturan sum**
+- Jika menggunakan `alloc_pct`:
+  - `sum(alloc_pct) == 1.0` untuk mode `BUY_*` (toleransi floating: ±0.0001).
+- Jika menggunakan `alloc_budget` dan `capital_total` non-null:
+  - `sum(alloc_budget) <= capital_total`.
+
+**Aturan cost**
+Untuk setiap allocation:
+- `estimated_cost == lots_recommended * lot_size * entry_price_ref`
+- `estimated_cost <= alloc_budget`
+- `remaining_cash == alloc_budget - estimated_cost`
+- Semua nilai uang wajib integer IDR dan mengikuti kontrak rounding (Section 3.3).
+
+Jika ada pelanggaran → output dianggap invalid (contract test harus fail).
 
 
 ## 9) Policy selection precedence (default)
