@@ -98,6 +98,44 @@ Untuk guard anti-gap/anti-chasing yang dievaluasi **hari eksekusi**:
 
 ---
 
+
+### 2.6 Ticker tradeability & special notations (lintas-policy)
+
+Watchlist wajib mengunci **kondisi ticker** yang membuat eksekusi berbeda/berisiko secara mekanisme.
+
+#### 2.6.1 Field (wajib jika data tersedia)
+Tambahkan object berikut di setiap kandidat:
+
+- `ticker_flags.special_notations[]` (array string; contoh: `["E","X"]`)
+- `ticker_flags.is_suspended` (boolean)
+- `ticker_flags.trading_mechanism` (string):
+  - `REGULAR` (default)
+  - `FULL_CALL_AUCTION` (mis. papan pemantauan khusus / kondisi tertentu)
+
+Jika data tidak tersedia, set nilai default aman:
+- `special_notations = []`, `is_suspended = false`, `trading_mechanism = "REGULAR"`.
+
+#### 2.6.2 Global gating (wajib)
+Aturan lintas-policy berikut harus selalu berlaku:
+
+- Jika `ticker_flags.is_suspended == true`:
+  - `timing.trade_disabled = true`
+  - `levels.entry_type = "WATCH_ONLY"`
+  - reason codes: `GL_SUSPENDED`
+
+- Jika `ticker_flags.trading_mechanism == "FULL_CALL_AUCTION"` **atau** `ticker_flags.special_notations` mengandung `"X"`:
+  - Default kontrak: **block NEW ENTRY** (karena mekanisme FCA beda dari regular)
+  - `timing.trade_disabled = true`
+  - `levels.entry_type = "WATCH_ONLY"`
+  - reason codes: `GL_SPECIAL_NOTATION_X` dan/atau `GL_MECHANISM_FCA`
+
+- Jika `ticker_flags.special_notations` mengandung `"E"`:
+  - Tidak auto-block oleh kontrak, tapi wajib **warning** di UI
+  - reason code: `GL_SPECIAL_NOTATION_E`
+
+Catatan:
+- Kalau suatu hari kamu menambah policy yang mendukung FCA, policy itu harus eksplisit men-declare dukung FCA dan kontrak ini perlu revisi (jangan diam-diam).
+
 ## 3) Tick size & rounding (wajib lintas-policy)
 
 ### 3.1 Tabel fraksi (IDX equities — Reguler/Tunai)
@@ -134,6 +172,20 @@ Jika policy butuh “+1 tick”:
 - pakai `price + tick` (bukan +1 rupiah), lalu round lagi sesuai mode.
 
 ---
+
+
+### 3.3 Price typing & rounding output (lintas-policy)
+
+Untuk konsistensi lintas-policy dan menghindari bug float:
+
+- Semua field `*_price` di output (`entry_*`, `stop_loss_price`, `tp*`, `be_price`, dll) wajib bertipe **integer IDR** (tanpa desimal).
+- Semua harga wajib sudah melalui tick rounding (lihat Section 3.2).
+- Field uang hasil hitung (contoh: `estimated_cost`, `remaining_cash`, `buy_fee`, `sell_fee`, `slip_cost`, `net_pnl`) juga wajib integer IDR.
+
+Kontrak pembulatan (deterministik):
+- Biaya/cost (`estimated_cost`, fee, slippage) → **ceil ke Rupiah** (konservatif, tidak meng-underestimate biaya).
+- PnL (`net_pnl`) → **floor ke Rupiah** (konservatif, tidak meng-overestimate cuan).
+- `remaining_cash = alloc_budget - estimated_cost` setelah pembulatan cost.
 
 ## 4) Lot sizing & rounding (wajib lintas-policy)
 
@@ -269,6 +321,12 @@ Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
     "rank_reason_codes": ["TREND_STRONG"]
   },
 
+  "ticker_flags": {
+    "special_notations": [],
+    "is_suspended": false,
+    "trading_mechanism": "REGULAR"
+  },
+
   "timing": {
     "entry_windows": ["09:20-10:30"],
     "avoid_windows": ["09:00-09:15"],
@@ -324,6 +382,28 @@ Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
 
 ---
 
+
+
+### 7.4 Kontrak format time window (lintas-policy)
+
+Semua `entry_windows[]` dan `avoid_windows[]` wajib menggunakan format string yang konsisten:
+
+- Format dasar: `HH:MM-HH:MM` (24h, tanpa detik, WIB).
+- Endpoint khusus yang diizinkan:
+  - `open` (pembukaan sesi reguler)
+  - `close` (penutupan sesi reguler)
+  Contoh valid: `open-09:15`, `13:30-close`, `open-close`.
+
+Aturan validasi:
+- Start < end (setelah resolve `open/close` ke jam nyata sesuai kalender bursa).
+- Windows harus diurutkan naik berdasarkan start time.
+- Tidak boleh ada overlap duplikat; kalau overlap terjadi, engine wajib normalisasi/merge.
+
+Aturan konflik:
+- `avoid_windows` **menang** atas `entry_windows`.
+- Engine wajib melakukan `effective_entry_windows = entry_windows - avoid_windows`.
+- Jika hasil `effective_entry_windows` kosong → kandidat harus menjadi `WATCH_ONLY` (`timing.trade_disabled = true`), reason `GL_NO_EXEC_WINDOW`.
+
 ## 8) Invariants (hard rules)
 
 ### 8.1 Global gating lock (NO_TRADE)
@@ -348,6 +428,23 @@ Jika `recommendations.mode == "CARRY_ONLY"`:
 - Jika ada unknown/invalid prefix → output dianggap **invalid** (contract test harus fail).
 
 ---
+
+
+
+### 8.4 Ticker tradeability lock (lintas-policy)
+
+Jika kandidat memenuhi salah satu kondisi berikut:
+- `ticker_flags.is_suspended == true`, atau
+- `ticker_flags.trading_mechanism == "FULL_CALL_AUCTION"`, atau
+- `ticker_flags.special_notations` mengandung `"X"`,
+
+maka kandidat wajib:
+- `timing.trade_disabled = true`
+- `levels.entry_type = "WATCH_ONLY"`
+- `timing.entry_windows = []`
+- `timing.avoid_windows = ["open-close"]`
+- reason codes sesuai Section 2.6 (`GL_SUSPENDED`, `GL_MECHANISM_FCA`, `GL_SPECIAL_NOTATION_X`)
+
 
 ## 9) Policy selection precedence (default)
 
@@ -395,4 +492,3 @@ Contoh ringkas (WEEKLY_SWING):
 
 Tidak boleh:
 - `reason_codes`: `["TREND_STRONG","MA_ALIGN_BULL"]`  ❌ (harus prefixed policy)
-
