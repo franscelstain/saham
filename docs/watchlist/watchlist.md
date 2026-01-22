@@ -445,6 +445,22 @@ Kontrak:
 - Policy boleh mengubah mapping percentile, tapi **tidak boleh** mengubah key/enum value (`High|Med|Low`).
 
 
+
+### 7.2.2 `slices` & `slice_pct` (lintas-policy)
+
+Untuk membantu user memilih kandidat selain rekomendasi dan tetap sizing rapi, setiap kandidat wajib menyediakan:
+
+- `sizing.slices` (int): jumlah pembagian modal per posisi jika user ingin “beli bertahap” atau memilih lebih banyak ticker. Default `1`.
+- `sizing.slice_pct` (float): porsi per-slice terhadap `capital_total` (atau terhadap modal kerja policy). Default `1.0`.
+
+Kontrak:
+- `slices >= 1`
+- `0 < slice_pct <= 1`
+- Default mapping: `slice_pct = 1 / slices` (toleransi floating ±0.0001)
+- `slices/slice_pct` adalah **helper UI/manual**, tidak mengubah rekomendasi engine kecuali user memilih memakai mode manual.
+
+Jika `recommendations.capital_total` null, `slice_pct` tetap dihitung dari `slices` (tanpa konversi ke rupiah).
+
 ### 7.2 Candidate object (wajib minimal)
 Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
 
@@ -492,6 +508,8 @@ Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
 
   "sizing": {
     "lot_size": 100,
+    "slices": 1,
+    "slice_pct": 1.0,
     "lots_recommended": null,
     "estimated_cost": null,
     "remaining_cash": null,
@@ -670,6 +688,21 @@ Untuk setiap allocation:
 
 Jika ada pelanggaran → output dianggap invalid (contract test harus fail).
 
+
+
+### 8.9 Konsistensi `slices` & `slice_pct` (lintas-policy)
+
+Untuk setiap kandidat:
+- `sizing.slices` wajib integer `>= 1`.
+- `sizing.slice_pct` wajib memenuhi `0 < slice_pct <= 1`.
+- Default rule: `abs(slice_pct - (1 / slices)) <= 0.0001`.
+
+Jika tidak memenuhi → output invalid (contract test harus fail).
+
+Catatan:
+- Jika user memilih mode manual dan memilih `k` ticker dari grup (mis. bukan hanya top_picks),
+  UI dapat menggunakan `slice_pct` untuk menghitung `alloc_budget_manual = capital_total * slice_pct`
+  lalu sizing lots mengikuti kontrak lot sizing (Section 4) dan fee/rounding (Section 3 & 5).
 
 ## 9) Policy selection precedence (default)
 
