@@ -28,6 +28,30 @@ Definisi `as_of_trade_date`:
 - Jika `generated_at` **sebelum cutoff EOD** (pagi/pre-open) → `as_of_trade_date` = trading day **kemarin**.
 - Jika **sesudah cutoff + publish sukses** → `as_of_trade_date` = trading day **hari ini**.
 
+
+- `exec_trade_date` (YYYY-MM-DD): tanggal trading **target eksekusi** untuk rencana entry/exit (biasanya **next trading day** setelah `trade_date`).
+
+Catatan:
+- `trade_date` = basis EOD untuk scoring/level.
+- `exec_trade_date` = basis **jam sesi** (`open/close`) untuk time-window eksekusi.
+
+### 1.3 Kontrak resolusi token `open` / `close` (lintas-policy)
+
+Token `open` dan `close` pada `entry_windows[]` / `avoid_windows[]` **wajib** di-resolve menggunakan jam sesi untuk `exec_trade_date`.
+
+Kontrak minimal (wajib di `meta.session`):
+- `meta.session.open_time`  (HH:MM, WIB)
+- `meta.session.close_time` (HH:MM, WIB)
+- (opsional) `meta.session.breaks[]` (array string, format `HH:MM-HH:MM`)
+
+Aturan:
+- `open` → `meta.session.open_time`
+- `close` → `meta.session.close_time`
+- Jika ada `breaks[]`, engine wajib mengurangi `entry_windows` yang overlap dengan break (atau memecah window).
+
+Sumber jam sesi harus berasal dari kalender bursa (bisa berubah pada hari tertentu), **bukan hardcode** di policy.
+
+
 ### 1.2 Data freshness gate (wajib)
 Watchlist ini EOD-driven. Rekomendasi **NEW ENTRY** hanya boleh keluar jika data EOD **CANONICAL** untuk `trade_date` tersedia.
 
@@ -108,6 +132,9 @@ Tambahkan object berikut di setiap kandidat:
 
 - `ticker_flags.special_notations[]` (array string; contoh: `["E","X"]`)
 - `ticker_flags.is_suspended` (boolean)
+- `ticker_flags.status_quality` (string): `OK|STALE|UNKNOWN`
+- `ticker_flags.status_asof_trade_date` (YYYY-MM-DD|null): tanggal status yang dipakai untuk `special_notations/is_suspended/trading_mechanism`.
+
 - `ticker_flags.trading_mechanism` (string):
   - `REGULAR` (default)
   - `FULL_CALL_AUCTION` (mis. papan pemantauan khusus / kondisi tertentu)
@@ -135,6 +162,21 @@ Aturan lintas-policy berikut harus selalu berlaku:
 
 Catatan:
 - Kalau suatu hari kamu menambah policy yang mendukung FCA, policy itu harus eksplisit men-declare dukung FCA dan kontrak ini perlu revisi (jangan diam-diam).
+
+
+
+#### 2.6.3 Status feed quality (wajib)
+
+Karena notasi/suspensi bisa berubah, engine wajib menandai kualitas data status:
+
+- Jika data status untuk `exec_trade_date` tersedia → `status_quality = "OK"`, `status_asof_trade_date = exec_trade_date`.
+- Jika yang dipakai adalah last-known (tanggal < `exec_trade_date`) → `status_quality = "STALE"`, `status_asof_trade_date = <tanggal last-known>`, tambahkan reason code `GL_TICKER_STATUS_STALE`.
+- Jika data status tidak tersedia sama sekali (atau tidak bisa dipastikan) → `status_quality = "UNKNOWN"`, `status_asof_trade_date = null`, tambahkan reason code `GL_TICKER_STATUS_UNKNOWN`.
+
+Catatan:
+- `STALE/UNKNOWN` tidak otomatis memblokir trade oleh kontrak, kecuali juga memenuhi gating Section 2.6.2 (suspension/FCA/X).
+- Policy boleh memperketat (mis. block jika STALE) tetapi harus ditulis di policy doc.
+
 
 ## 3) Tick size & rounding (wajib lintas-policy)
 
@@ -271,6 +313,7 @@ Jika ada kode generik lama, engine wajib mapping ke policy prefix:
 {
   "schema_version": "watchlist.v1",
   "trade_date": "YYYY-MM-DD",
+  "exec_trade_date": "YYYY-MM-DD",
   "generated_at": "RFC3339",
   "policy": {
     "selected": "WEEKLY_SWING|DIVIDEND_SWING|INTRADAY_LIGHT|POSITION_TRADE|NO_TRADE",
@@ -288,7 +331,12 @@ Jika ada kode generik lama, engine wajib mapping ke policy prefix:
       "secondary": 0,
       "watch_only": 0
     },
-    "notes": []
+    "notes": [],
+    "session": {
+      "open_time": "HH:MM",
+      "close_time": "HH:MM",
+      "breaks": []
+    }
   },
   "recommendations": {
     "mode": "NO_TRADE|CARRY_ONLY|BUY_1|BUY_2_SPLIT|BUY_3_SMALL",
@@ -304,6 +352,35 @@ Jika ada kode generik lama, engine wajib mapping ke policy prefix:
   }
 }
 ```
+
+
+### 7.0 Schema `recommendations.allocations[]` (lintas-policy)
+
+Jika `recommendations.allocations[]` digunakan, setiap item wajib mengikuti schema berikut (minimum):
+
+```json
+{
+  "ticker_code": "ABCD",
+  "alloc_pct": 0.25,
+  "alloc_budget": 12500000,
+  "entry_price_ref": 1230,
+  "lots_recommended": 10,
+  "estimated_cost": 1230000,
+  "remaining_cash": 20000,
+  "reason_codes": ["WS_ALLOC_BALANCED"]
+}
+```
+
+Aturan:
+- `ticker_code` wajib ada dan harus cocok dengan kandidat di `groups.*[]`.
+- Minimal salah satu ada: `alloc_pct` atau `alloc_budget`.
+- `entry_price_ref` wajib integer IDR dan sudah tick-rounded (Section 3).
+- `lots_recommended` wajib integer >= 0 (Section 4).
+- `estimated_cost`/`remaining_cash` wajib integer IDR dan mengikuti kontrak rounding (Section 3.3 bila ada di dokumen ini).
+- `reason_codes[]` optional, tapi jika ada harus mengikuti governance prefix (Section 6).
+
+Jika mode `NO_TRADE` atau `CARRY_ONLY` → `allocations` wajib `[]`.
+
 
 ### 7.2 Candidate object (wajib minimal)
 Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
@@ -324,6 +401,8 @@ Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
   "ticker_flags": {
     "special_notations": [],
     "is_suspended": false,
+    "status_quality": "OK",
+    "status_asof_trade_date": null,
     "trading_mechanism": "REGULAR"
   },
 
