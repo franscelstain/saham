@@ -356,6 +356,24 @@ Jika ada kode generik lama, engine wajib mapping ke policy prefix:
 
 ### 7.0 Schema `recommendations.allocations[]` (lintas-policy)
 
+
+### 7.1.1 Arti `risk_per_trade_pct` dan `capital_total` (lintas-policy)
+
+- `capital_total` adalah input/angka referensi modal yang digunakan engine untuk menghitung `alloc_budget` dan `lots_recommended`.
+- `risk_per_trade_pct` adalah parameter risiko per posisi (mis. 0.5%–2% dari `capital_total`) yang digunakan untuk mengukur sizing berbasis stop-loss (jika policy menerapkan risk-based sizing).
+
+Kontrak:
+- Keduanya boleh `null` jika sizing menggunakan metode lain (mis. fixed-alloc tanpa risk model).
+- Jika `recommendations.allocations[]` diisi dan `alloc_budget` dihitung dari modal:
+  - `capital_total` harus non-null.
+- Jika policy menggunakan risk-based sizing (`risk_pct` / risk model di output):
+  - `risk_per_trade_pct` harus non-null.
+
+Jika saat ini belum dipakai penuh:
+- Field tetap boleh ada sebagai “reserved”, tetapi aturan di atas menjadi target implementasi dan contract test bisa memilih untuk hanya memvalidasi tipe (`null|number`) sampai engine memakai sepenuhnya.
+
+
+
 Jika `recommendations.allocations[]` digunakan, setiap item wajib mengikuti schema berikut (minimum):
 
 ```json
@@ -523,6 +541,58 @@ maka kandidat wajib:
 - `timing.entry_windows = []`
 - `timing.avoid_windows = ["open-close"]`
 - reason codes sesuai Section 2.6 (`GL_SUSPENDED`, `GL_MECHANISM_FCA`, `GL_SPECIAL_NOTATION_X`)
+
+
+
+### 8.5 Konsistensi `recommendations.mode` vs `allocations` vs `groups` (lintas-policy)
+
+Aturan ini wajib untuk mencegah output yang “nggak nyambung” antara mode, sizing, dan daftar kandidat:
+
+- Jika `recommendations.mode == "BUY_1"`:
+  - `recommendations.max_positions_today == 1`
+  - `recommendations.allocations.length == 1`
+- Jika `recommendations.mode == "BUY_2_SPLIT"`:
+  - `recommendations.max_positions_today == 2`
+  - `recommendations.allocations.length == 2`
+- Jika `recommendations.mode == "BUY_3_SMALL"`:
+  - `recommendations.max_positions_today == 3`
+  - `recommendations.allocations.length == 3`
+- Jika `recommendations.mode in ["NO_TRADE","CARRY_ONLY"]`:
+  - `recommendations.allocations == []`
+  - `groups.top_picks == []` (tidak boleh ada NEW ENTRY picks)
+
+Linking rule:
+- Setiap item `recommendations.allocations[]` wajib menunjuk ke kandidat yang ada di `groups.top_picks[]` (match `ticker_code`).
+- Kandidat yang tidak ada di `groups.top_picks[]` **tidak boleh** muncul di `allocations[]`.
+
+
+
+### 8.6 Konsistensi `meta.counts` vs isi `groups` (lintas-policy)
+
+Jika `meta.counts` disediakan, nilainya wajib konsisten:
+
+- `meta.counts.top_picks == len(groups.top_picks)`
+- `meta.counts.secondary == len(groups.secondary)`
+- `meta.counts.watch_only == len(groups.watch_only)`
+- `meta.counts.total == meta.counts.top_picks + meta.counts.secondary + meta.counts.watch_only`
+
+Jika terjadi mismatch → output dianggap invalid (contract test harus fail).
+
+
+
+### 8.7 Ordering & uniqueness (lintas-policy)
+
+Untuk memastikan output deterministik dan tidak “lompat-lompat”:
+
+- `ticker_code` harus unik di seluruh `groups.*[]` (tidak boleh muncul dua kali di group berbeda).
+- `rank` harus unik per kandidat dan berada pada range `1..N` (tanpa duplikat).
+- Ordering wajib:
+  - `groups.top_picks` diurutkan berdasarkan `rank` ascending.
+  - `groups.secondary` diurutkan berdasarkan `rank` ascending.
+  - `groups.watch_only` diurutkan berdasarkan `rank` ascending.
+
+Jika engine membutuhkan tiebreaker (mis. rank dihitung ulang):
+- tiebreaker order: `watchlist_score desc`, lalu `ticker_code asc`.
 
 
 ## 9) Policy selection precedence (default)
