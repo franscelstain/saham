@@ -1,43 +1,88 @@
 # Policy: DIVIDEND_SWING
 
-Dokumen ini adalah **single source of truth** untuk policy ini.
-Semua angka/threshold dan reason codes UI untuk policy ini harus berasal dari dokumen ini.
+Dokumen ini adalah **single source of truth** untuk policy **DIVIDEND_SWING**.
+Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.
 
-Dependensi lintas policy (Data Dictionary, schema output, namespace reason codes, tick rounding) ada di `WATCHLIST.md`.
+Dependensi lintas policy (Data Dictionary, output schema, namespace reason codes, tick rounding) ada di `watchlist.md`.
 
 ---
 
-**Tujuan:** dapat dividen tanpa bunuh diri karena gap risk.
+## 0) Intent & scope
+Target: mengambil peluang dividen + swing pendek tanpa bunuh diri karena gap/event risk.
 
-**A. Data tambahan yang dibutuhkan (kalau belum ada, lihat Bagian 11):**
-- `dividend_calendar` (ticker, ex_date, pay_date, dividend_amount, yield_est)
-- flag corporate action/split adjusted
+---
 
-**B. Gates khusus:**
-- Wajib **likuid** (dv20 bucket A)
-- Hindari saham dengan `atr_pct` tinggi (gap risk besar)
-- Market regime minimal neutral (risk-off → NO TRADE)
+## 1) Data dependency
+### 1.1 Wajib
+- Canonical EOD + indikator minimal (MA, RSI, ATR, dv20, liq_bucket)
+- Calendar event dividen (minimal):
+  - `ex_date`, `cum_date` (atau `record_date`), `cash_dividend`, `dividend_yield_est`
 
-**C. Timing:**
-- Entry ideal: H-3 sampai H-1 ex-date (bukan H0). Hindari entry mepet close jika spread jelek.
-- Exit rule:
-  - Conservative: exit H-1 / H0 (sebelum ex-date) jika target tercapai.
-  - Hold-through: tahan sampai ex-date hanya jika trend kuat + risk rendah.
+### 1.2 Opsional
+- Preopen snapshot untuk gap guard hari eksekusi (lihat watchlist.md)
 
-**D. Algoritma ringkas (deterministik)**
-1) Ambil event `ex_date` untuk 7–14 hari ke depan.
-2) Filter ticker event:
-   - yield_est memadai (opsional) dan **likuid** (dv20 bucket A)
-   - atr_pct tidak liar
-3) Jika market regime risk-off → `NO_TRADE` (policy batal).
-4) Entry window default mengikuti Bagian 8, tapi tambah rule:
-   - hindari entry mepet close (match risk)
-   - hindari entry H0 (ex-date) kecuali super liquid + follow-through
-5) Buat trade plan:
-   - SL lebih ketat (gap risk)
-   - TP lebih konservatif (karena tujuan event-driven)
-6) Exit:
-   - default: exit H-1/H0 bila target tercapai
-   - hold-through hanya jika trend kualitas tinggi (MA alignment + signal continuation)
+---
 
-**E. Catatan penting:** dividend policy butuh data event; tanpa itu jangan dipaksakan (lebih baik tidak aktif daripada salah).
+## 2) Hard filters (angka tegas)
+- `liq_bucket` harus `A` atau `B` → `DS_LIQ_TOO_LOW`
+- `atr_pct <= 0.08` → `DS_VOL_TOO_HIGH`
+- Event gate:
+  - `cum_date` harus dalam `3..12` trading days ke depan (window entry) → `DS_EVENT_WINDOW_OUTSIDE`
+- Yield sanity:
+  - `dividend_yield_est >= 0.020` (≥2%) → kalau tidak, tetap boleh tapi confidence turun (lihat soft) atau DROP jika kamu mau ketat.
+
+---
+
+## 3) Soft filters + score override
+- Jika `rsi14 >= 75` → score -6, entry_style `Pullback-wait` → `DS_RSI_OVERHEAT`
+- Jika gap risk tinggi (gap_pct >= 0.04) → score -6 → `DS_GAP_RISK_EOD`
+
+---
+
+## 4) Setup allowlist
+- `Pullback` atau `Continuation` lebih diutamakan.
+- `Breakout` boleh jika bukan late-cycle menjelang cum_date.
+- `Reversal` hanya jika trend tidak bearish.
+
+---
+
+## 5) Entry rules (anti-chasing/gap)
+- DOW bias: entry ideal Selasa–Rabu, Hindari entry Jumat.
+- Entry window default: ["09:20-10:30", "13:35-14:30"]
+- Anti-chasing:
+  - `max_chase_from_close_pct = 0.015` → `DS_CHASE_BLOCK_DISTANCE_TOO_FAR`
+- Gap-up guard:
+  - `max_gap_up_pct = 0.02` → `DS_GAP_UP_BLOCK`
+
+---
+
+## 6) Exit rules
+- Default: exit **sebelum** ex_date jika tujuan utama yield+safe (kecuali strategi hold ex-date memang diaktifkan).
+- Time stop:
+  - T+2 jika `ret_since_entry_pct < 0.008` → `DS_TIME_STOP_T2`
+- Max holding:
+  - `max_holding_days = 6` → `DS_MAX_HOLDING_REACHED`
+
+---
+
+## 7) Sizing defaults
+- `risk_per_trade_pct = 0.006` (0.60%)
+- `max_positions = 2`
+- Viability:
+  - `min_alloc_idr = 750_000`
+  - `min_lots = 1`
+  - `min_net_edge_pct = 0.010` → `DS_MIN_TRADE_VIABILITY_FAIL`
+
+---
+
+## 8) Reason codes (UI)
+- `DS_LIQ_TOO_LOW`
+- `DS_VOL_TOO_HIGH`
+- `DS_EVENT_WINDOW_OUTSIDE`
+- `DS_RSI_OVERHEAT`
+- `DS_GAP_RISK_EOD`
+- `DS_CHASE_BLOCK_DISTANCE_TOO_FAR`
+- `DS_GAP_UP_BLOCK`
+- `DS_TIME_STOP_T2`
+- `DS_MAX_HOLDING_REACHED`
+- `DS_MIN_TRADE_VIABILITY_FAIL`

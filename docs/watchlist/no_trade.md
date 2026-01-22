@@ -23,14 +23,14 @@ data_dependency:
 
 # 2) Hard filters (trigger NO_TRADE) — angka tegas
 hard_triggers:
-  - id: NT_EOD_NOT_READY
+  - id: NT_GL_EOD_NOT_READY
     expr: "eod_canonical_ready == false"
     action: NO_TRADE
-    add_reason: [NT_EOD_NOT_READY]
-  - id: NT_MARKET_RISK_OFF
+    add_reason: [NT_GL_EOD_NOT_READY]
+  - id: NT_NT_MARKET_RISK_OFF
     expr: "market_regime == risk-off"
     action: NO_TRADE
-    add_reason: [NT_MARKET_RISK_OFF]
+    add_reason: [NT_NT_MARKET_RISK_OFF]
   - id: NT_BREADTH_CRASH
     expr: "breadth_new_low_20d >= 120 and breadth_adv_decl_ratio <= 0.40"  # jika breadth tersedia
     action: NO_TRADE
@@ -70,8 +70,8 @@ sizing_defaults:
 policy_reason_codes:
   prefix: NT_
   codes:
-    - NT_EOD_NOT_READY
-    - NT_MARKET_RISK_OFF
+    - NT_GL_EOD_NOT_READY
+    - NT_NT_MARKET_RISK_OFF
     - NT_BREADTH_CRASH
     - NT_CARRY_ONLY_MANAGEMENT
 ```
