@@ -1,6 +1,5 @@
 # TradeAxis Watchlist — Cross-Policy Contract (EOD-driven)
-File: `watchlist.md`  
-Build: `w1.0`
+File: `watchlist.md`\
 
 Watchlist di TradeAxis **bukan “penentu beli”**. Watchlist adalah:
 - Selektor kandidat (ranking) berbasis data.
@@ -82,12 +81,17 @@ Opsional (kalau tersedia):
 
 ### 2.4 Portfolio context (opsional input; wajib jika ingin output manage-mode)
 Jika ada input portfolio, watchlist boleh menambahkan konteks posisi:
-- `has_position` (bool)
-- `position_avg_price` (float), `position_lots` (int)
-- `entry_trade_date` (YYYY-MM-DD), `days_held` (trading days)
-- `position_state`: `HOLD | REDUCE | EXIT | TRAIL_SL`
-- `action_windows[]` (window eksekusi untuk aksi posisi)
-- `updated_stop_loss_price` (jika trailing/BE mengubah SL)
+
+**Canonical output fields (harus dipakai oleh engine/UI):**
+- `position.has_position` (bool)
+- `position.position_avg_price` (float), `position.position_lots` (int)
+- `position.entry_trade_date` (YYYY-MM-DD), `position.days_held` (trading days)
+
+**Input alias compatibility (untuk backward compatibility):**
+- Jika input portfolio memakai `avg_price`, mapping → `position_avg_price`
+- Jika input portfolio memakai `lots`, mapping → `position_lots`
+
+Policy docs wajib mengacu ke canonical fields. Alias hanya untuk normalisasi input.
 
 ### 2.5 Execution snapshot (opsional)
 Untuk guard anti-gap/anti-chasing yang dievaluasi **hari eksekusi**:
@@ -197,6 +201,12 @@ Kontrak output (opsional, tapi kalau ada harus konsisten):
 - POSITION_TRADE: `PT_*`
 - NO_TRADE: `NT_*`
 - Global gate lintas-policy: `GL_*` (contoh: `GL_EOD_NOT_READY`, `GL_POLICY_DOC_MISSING`)
+
+Global gate codes yang dianggap **umum** (dipakai lintas policy) dan sebaiknya distandardisasi:
+- `GL_EOD_NOT_READY`
+- `GL_POLICY_DOC_MISSING`
+- `GL_MARKET_RISK_OFF`
+- `GL_BREADTH_CRASH`
 
 ### 6.2 Debug vs UI
 - `reason_codes[]` (UI): **tidak boleh** pakai kode generik seperti `TREND_STRONG`.
@@ -347,7 +357,20 @@ Jika `recommendations.mode == "CARRY_ONLY"`:
 
 ---
 
-## 9) Policy doc loading & failure behavior
+## 9) Policy selection precedence (default)
+
+Ini aturan default pemilihan policy agar hasil deterministik dan tidak campur aduk.
+Urutan ini **umum** (lintas-policy) dan tidak boleh diduplikasi di policy docs.
+
+1) Jika `meta.eod_canonical_ready == false` → `NO_TRADE`.
+   - Jika `position.has_position == true` di portfolio → boleh set `recommendations.mode = CARRY_ONLY` (manage posisi saja).
+2) Jika `meta.market_regime == risk-off` → `NO_TRADE` (reason: `GL_MARKET_RISK_OFF`).
+3) Jika ada event dividen valid + lolos hard filters → `DIVIDEND_SWING`.
+4) Jika snapshot intraday tersedia + kandidat EOD kuat → `INTRADAY_LIGHT` (opsional).
+5) Jika market risk-on & trend quality tinggi → `POSITION_TRADE` (lebih long horizon).
+6) Default → `WEEKLY_SWING`.
+
+## 10) Policy doc loading & failure behavior
 
 Read order (wajib):
 1) `watchlist.md` (dokumen ini)
@@ -364,7 +387,7 @@ Jika salah satu policy doc yang dibutuhkan tidak bisa diload:
 
 ---
 
-## 10) Contoh reason codes (sesuai governance)
+## 11) Contoh reason codes (sesuai governance)
 
 Contoh ringkas (WEEKLY_SWING):
 - `reason_codes`: `["WS_TREND_ALIGN_OK","WS_VOLUME_OK","WS_SETUP_BREAKOUT"]`

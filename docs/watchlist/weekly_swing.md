@@ -23,9 +23,9 @@ Policy ini **tidak memaksa** harus BUY. Jika guard/viability gagal → WATCH_ONL
 ### 1.2 Opsional (kalau ada, dipakai untuk guard eksekusi)
 - `preopen_last_price` → `open_or_last_exec` (lihat Data Dictionary di watchlist.md)
 
-### 1.3 Portfolio context (wajib untuk mode MANAGE)
+### 1.3 Portfolio context (opsional; dipakai untuk manage posisi berjalan)
 Untuk tiap position yang sedang berjalan:
-- `has_position`, `avg_price`, `lots`, `entry_trade_date`, `days_held`
+- `position.has_position`, `position.position_avg_price`, `position.position_lots`, `position.entry_trade_date`, `position.days_held`
 - `atr14`, `r_multiple` (jika tersedia), `mfe_r` (opsional), `ret_since_entry_pct` (derived)
 
 ---

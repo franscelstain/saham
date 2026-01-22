@@ -1,9 +1,9 @@
 # Policy: NO_TRADE
 
 Dokumen ini adalah **single source of truth** untuk policy NO_TRADE (global gate/override).
-Ketika aktif, policy ini **menonaktifkan NEW ENTRY** dan mengubah mode menjadi **manage-only** untuk posisi yang sedang berjalan.
+Ketika aktif, policy ini **menonaktifkan NEW ENTRY** dan (jika ada posisi) mengubah mode menjadi **CARRY_ONLY** untuk posisi yang sedang berjalan.
 
-Dependensi lintas policy (Data Dictionary, schema output, namespace reason codes) ada di `WATCHLIST.md`.
+Dependensi lintas policy (Data Dictionary, schema output, namespace reason codes) ada di `watchlist.md`.
 
 ---
 
@@ -23,18 +23,18 @@ data_dependency:
 
 # 2) Hard filters (trigger NO_TRADE) — angka tegas
 hard_triggers:
-  - id: NT_GL_EOD_NOT_READY
+  - id: GL_EOD_NOT_READY
     expr: "eod_canonical_ready == false"
     action: NO_TRADE
-    add_reason: [NT_GL_EOD_NOT_READY]
-  - id: NT_NT_MARKET_RISK_OFF
+    add_reason: [GL_EOD_NOT_READY]
+  - id: GL_MARKET_RISK_OFF
     expr: "market_regime == risk-off"
     action: NO_TRADE
-    add_reason: [NT_NT_MARKET_RISK_OFF]
-  - id: NT_BREADTH_CRASH
+    add_reason: [GL_MARKET_RISK_OFF]
+  - id: GL_BREADTH_CRASH
     expr: "breadth_new_low_20d >= 120 and breadth_adv_decl_ratio <= 0.40"  # jika breadth tersedia
     action: NO_TRADE
-    add_reason: [NT_BREADTH_CRASH]
+    add_reason: [GL_BREADTH_CRASH]
 
 # 3) Soft filters (di NO_TRADE tidak relevan untuk scoring) — tetap eksplisit
 soft_filters: []
@@ -57,7 +57,7 @@ entry_rules:
 # 6) Exit rules (untuk posisi existing)
 exit_rules:
   if_has_position:
-    action: "MANAGE_ONLY"
+    action: "CARRY_ONLY"
     allowed_actions: [HOLD, REDUCE, EXIT, TRAIL_SL]
     add_reason: [NT_CARRY_ONLY_MANAGEMENT]
 
@@ -70,18 +70,15 @@ sizing_defaults:
 policy_reason_codes:
   prefix: NT_
   codes:
-    - NT_GL_EOD_NOT_READY
-    - NT_NT_MARKET_RISK_OFF
-    - NT_BREADTH_CRASH
+    - GL_EOD_NOT_READY
+    - GL_MARKET_RISK_OFF
+    - GL_BREADTH_CRASH
     - NT_CARRY_ONLY_MANAGEMENT
 ```
 
 #### 2.7.2 Invariant output (wajib)
-Kalau policy aktif:
-- Semua kandidat harus `trade_disabled = true`
-- `entry_windows = []`, `avoid_windows = []` (atau `["09:00-close"]` secara global)
-- `size_multiplier = 0.0`, `max_positions_today = 0`
-- `entry_style = "No-trade"`
+Invariant output mengikuti kontrak di `watchlist.md` (lihat Section 8: Invariants).
+
 
 ### 2.8 Urutan pemilihan policy (deterministik)
 Agar hasil watchlist konsisten (dan tidak “campur aduk” antar policy), pemilihan policy harus **satu arah**:

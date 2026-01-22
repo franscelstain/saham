@@ -14,7 +14,7 @@ Trend-follow 2–8 minggu. Lebih sedikit trade, lebih fokus kualitas trend dan r
 
 ## 1) Data dependency
 - Canonical EOD + indikator lengkap (MA20/50/200, RSI, ATR, dv20, liq_bucket)
-- Portfolio context untuk mode MANAGE (posisi berjalan)
+- Portfolio context untuk manage posisi berjalan (lihat field canonical di `watchlist.md`)
 
 ---
 
