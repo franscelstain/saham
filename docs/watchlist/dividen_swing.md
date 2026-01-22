@@ -35,7 +35,7 @@ Target: mengambil peluang dividen + swing pendek tanpa bunuh diri karena gap/eve
 
 ## 3) Soft filters + score override
 - Jika `rsi14 >= 75` → score -6, entry_style `Pullback-wait` → `DS_RSI_OVERHEAT`
-- Jika gap risk tinggi (gap_pct >= 0.04) → score -6 → `DS_GAP_RISK_EOD`
+- Jika gap risk tinggi (`gap_pct >= 0.04`, definisi lihat `watchlist.md` Section 2.5.1) → score -6 → `DS_GAP_RISK_EOD`
 
 ---
 

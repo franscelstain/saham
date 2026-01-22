@@ -25,7 +25,7 @@ Policy ini **tidak memaksa** harus BUY. Jika guard/viability gagal → WATCH_ONL
 
 ### 1.3 Portfolio context (opsional; dipakai untuk manage posisi berjalan)
 Untuk tiap position yang sedang berjalan:
-- `position.has_position`, `position.position_avg_price`, `position.position_lots`, `position.days_held`, `position.days_held`
+- `position.has_position`, `position.position_avg_price`, `position.position_lots`, `position.days_held`
 - `atr14`, r_multiple (jika tersedia), mfe_r (opsional), ret_since_entry_pct (derived)
 
 ---

@@ -179,6 +179,26 @@ Catatan:
 - Policy boleh memperketat (mis. block jika STALE) tetapi harus ditulis di policy doc.
 
 
+
+
+### 2.5.1 Derived metrics lintas-policy (wajib definisi)
+
+Beberapa policy memakai metrik turunan berikut. Definisi harus konsisten:
+
+- `gap_pct` (float|null):
+  - Definisi: `(open_or_last_exec / close) - 1`
+  - `close` adalah close canonical pada `trade_date` (EOD basis).
+  - Jika `open_or_last_exec` null → `gap_pct = null` (policy yang butuh gap guard harus treat sebagai “unknown”).
+
+- `ret_since_entry_pct` (float|null) untuk posisi berjalan:
+  - Definisi EOD basis: `(close / position.position_avg_price) - 1` (menggunakan `close` pada `trade_date`)
+  - Jika ingin versi eksekusi intraday, gunakan `(open_or_last_exec / position.position_avg_price) - 1` ketika snapshot tersedia, tapi ini harus dinyatakan eksplisit oleh engine (jangan diam-diam).
+
+- `close_near_high` (bool):
+  - Definisi: `((high - close) / max(high - low, 1)) <= 0.25`
+  - Menggunakan OHLC canonical pada `trade_date`.
+
+
 ## 3) Tick size & rounding (wajib lintas-policy)
 
 ### 3.1 Tabel fraksi (IDX equities — Reguler/Tunai)
@@ -312,7 +332,6 @@ Jika ada kode generik lama, engine wajib mapping ke policy prefix:
 ### 7.1 Root schema (wajib)
 ```json
 {
-  "schema_version": "watchlist.v1",
   "trade_date": "YYYY-MM-DD",
   "exec_trade_date": "YYYY-MM-DD",
   "generated_at": "RFC3339",
