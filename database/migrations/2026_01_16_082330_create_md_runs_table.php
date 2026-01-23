@@ -29,6 +29,8 @@ class CreateMdRunsTable extends Migration
 
             $table->unsignedInteger('target_tickers')->default(0);
             $table->unsignedInteger('target_days')->default(0);
+            $table->unsignedBigInteger('expected_points')->default(0);
+            $table->unsignedBigInteger('canonical_points')->default(0);
 
             $table->string('status', 30)->default('RUNNING'); 
             // RUNNING | SUCCESS | CANONICAL_HELD | FAILED
