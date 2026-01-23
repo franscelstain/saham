@@ -327,12 +327,45 @@ Kontrak output (opsional, tapi kalau ada harus konsisten):
   - `debug.rank_reason_codes[]` (opsional).
 
 ### 6.3 Legacy mapping (wajib kalau masih ada output lama)
-Jika ada kode generik lama, engine wajib mapping ke policy prefix:
-- `GAP_UP_BLOCK` → `{policy_prefix}_GAP_UP_BLOCK` (sesuai policy aktif)
-- `MARKET_RISK_OFF` → `GL_MARKET_RISK_OFF` (atau `NT_MARKET_RISK_OFF` jika dianggap spesifik NO_TRADE)
+Jika sebelumnya engine/UI pernah memakai kode **generik** (tanpa prefix policy), maka:
+
+**Rule hard (contract):**
+- `reason_codes[]` **tidak boleh** berisi kode tanpa prefix resmi (`WS_ / DS_ / IL_ / PT_ / NT_ / GL_`).
+- Kode generik lama **wajib dimigrasikan** secara deterministik ke canonical UI code.
+- Kode generik boleh disimpan untuk audit/scoring **hanya** di `debug.rank_reason_codes[]` (bukan di `reason_codes[]`).
+
+#### Mapping minimal (generic lama → canonical UI code)
+
+> Prinsip: map ke `{policy_prefix}_*` berdasarkan policy aktif; untuk gate global pakai `GL_*`.
+
+| legacy (jangan dipublish ke UI) | canonical UI code (publish) |
+|---|---|
+| `GAP_UP_BLOCK` | `{policy_prefix}_GAP_UP_BLOCK` |
+| `CHASE_BLOCK_DISTANCE_TOO_FAR` | `{policy_prefix}_CHASE_BLOCK_DISTANCE_TOO_FAR` |
+| `MIN_EDGE_FAIL` | `{policy_prefix}_MIN_TRADE_VIABILITY_FAIL` *(atau code edge/viability yang dipakai policy)* |
+| `TIME_STOP_TRIGGERED` | `{policy_prefix}_TIME_STOP_T2` *(atau T3 sesuai rule yang kena)* |
+| `TIME_STOP_T2` | `{policy_prefix}_TIME_STOP_T2` |
+| `TIME_STOP_T3` | `{policy_prefix}_TIME_STOP_T3` |
+| `FRIDAY_EXIT_BIAS` | `{policy_prefix}_FRIDAY_EXIT_BIAS` |
+| `WEEKEND_RISK_BLOCK` | `{policy_prefix}_FRIDAY_EXIT_BIAS` *(fallback jika policy tidak punya code weekend spesifik)* |
+| `VOLATILITY_HIGH` | `{policy_prefix}_VOL_HIGH` *(atau code volatility yang dipakai policy)* |
+| `FEE_IMPACT_HIGH` | `{policy_prefix}_MIN_TRADE_VIABILITY_FAIL` *(fee/edge gagal)* |
+| `NO_FOLLOW_THROUGH` | `{policy_prefix}_TIME_STOP_T2` *(fallback; atau buat code follow-through spesifik di policy)* |
+| `SETUP_EXPIRED` | `{policy_prefix}_SIGNAL_STALE` *(atau code stale yang dipakai policy)* |
+
+Mapping global (lintas-policy):
+- `EOD_NOT_READY` → `GL_EOD_NOT_READY`
+- `EOD_STALE` → `GL_EOD_STALE`
+- `MARKET_RISK_OFF` → `GL_MARKET_RISK_OFF`
+- `POLICY_INACTIVE` → `GL_POLICY_INACTIVE`
+
+Catatan implementasi:
+- `{policy_prefix}` adalah salah satu: `WS`, `DS`, `IL`, `PT`, `NT`.
+- Kalau ada legacy code yang **tidak dikenal**, engine wajib:
+  - taruh di `debug.rank_reason_codes[]`, dan
+  - tambahkan `GL_LEGACY_CODE_UNMAPPED` ke `reason_codes[]` (agar mudah diaudit).
 
 ---
-
 ## 7) Output JSON schema (final)
 
 ### 7.1 Root schema (wajib)
@@ -564,6 +597,33 @@ Aturan konflik:
 - Engine wajib melakukan `effective_entry_windows = entry_windows - avoid_windows`.
 - Jika hasil `effective_entry_windows` kosong → kandidat harus menjadi `WATCH_ONLY` (`timing.trade_disabled = true`), reason `GL_NO_EXEC_WINDOW`.
 
+### 7.5 Output compatibility mapping (legacy keys)
+
+Dokumen lama (`WATCHLIST_check1.md`) menyebut beberapa key di level root. Kontrak final memakai struktur root+`meta`.
+
+Jika engine/UI masih memakai key lama, lakukan mapping deterministik berikut (tanpa mengubah makna):
+
+| legacy key | canonical key |
+|---|---|
+| `dow` | `meta.dow` |
+| `market_regime` | `meta.market_regime` |
+| `market_notes` / `notes` | `meta.notes[]` |
+| `market_open` | `meta.session.open_time` |
+| `market_close` | `meta.session.close_time` |
+| `market_breaks` | `meta.session.breaks[]` |
+
+Untuk per-ticker:
+- `ticker` → `ticker_code`
+- `score` → `watchlist_score`
+- `reasons[]` → `reason_codes[]` (wajib prefixed)
+- `buy_window[]` → `timing.entry_windows[]`
+- `avoid_window[]` → `timing.avoid_windows[]`
+
+Catatan:
+- Ini hanya untuk kompatibilitas migrasi. Semua pengembangan baru harus menulis canonical schema.
+
+---
+
 ## 8) Invariants (hard rules)
 
 ### 8.1 Global gating lock (NO_TRADE)
@@ -750,3 +810,28 @@ Contoh ringkas (WEEKLY_SWING):
 
 Tidak boleh:
 - `reason_codes`: `["TREND_STRONG","MA_ALIGN_BULL"]`  ❌ (harus prefixed policy)
+
+
+## 12) Persistence & post-mortem (wajib)
+
+Agar watchlist bisa dievaluasi ulang (post-mortem), output JSON **wajib disimpan** setiap trade date.
+
+Kontrak minimal:
+- Simpan 1 file JSON per `trade_date` + `policy.selected`.
+- Nama file deterministik (contoh): `watchlist_{trade_date}_{policy.selected}.json`.
+- Jika engine menghasilkan mode `NO_TRADE`, file tetap disimpan (supaya terlihat kenapa tidak trade).
+
+Field yang wajib sudah cukup untuk audit:
+- `trade_date`, `exec_trade_date`, `generated_at`
+- `policy.selected`, `policy.policy_version`
+- `meta.eod_canonical_ready`, `meta.market_regime`, `meta.notes[]`
+- per kandidat: `reason_codes[]`, `timing.*`, `levels.*`, `sizing.*`
+
+Opsional tapi sangat disarankan (kalau nanti ada tempat penyimpanan DB):
+- `meta.run_id` (angka/uuid)
+- `meta.source_snapshot` (ringkas: canonical run id, coverage, dsb)
+
+Kalau `meta.run_id` ditambahkan:
+- jangan ubah struktur kandidat; cukup menambah field baru di `meta` agar backward-compatible.
+
+

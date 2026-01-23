@@ -57,11 +57,11 @@ setup_allowlist:
 # 5) Entry rules (NEW ENTRY dimatikan)
 entry_rules:
   allow_new_entry: false
-  entry_windows: []
-  avoid_windows: ["09:00-close"]     # format window mengikuti kontrak di watchlist.md
-  trade_disabled: true
-  size_multiplier: 0.0
-  max_positions_today: 0
+  timing.entry_windows: []
+  timing.avoid_windows: ["09:00-close"]     # format window mengikuti kontrak di watchlist.md
+  timing.trade_disabled: true
+  timing.size_multiplier: 0.0
+  recommendations.max_positions_today: 0
 
 # 6) Exit rules (untuk posisi existing)
 exit_rules:
