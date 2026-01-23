@@ -1,4 +1,4 @@
-# PORTFOLIO.md (TradeAxis) — build_id: v2.2.52+portfolio_policy
+# PORTFOLIO.md (TradeAxis)
 
 Dokumen ini mendefinisikan **aturan Portfolio** yang **kompatibel** dengan:
 - `SRP_Performa.md` (aturan tertinggi: SRP, performa, logging, deterministik)
