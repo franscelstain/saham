@@ -13,6 +13,12 @@
 - Compute EOD membaca OHLC dari **CANONICAL output Market Data** (lihat MARKET_DATA.md bagian RAW vs CANONICAL), bukan dari RAW.
 - Compute EOD hanya memproses tanggal yang dianggap **trading day** (berdasarkan market calendar).
 - `trade_date` yang dihitung harus mengikuti **effective date** Market Data (aturan cutoff), bukan "today" sebelum cutoff.
+- Compute EOD **tidak boleh mengarang data**: jika pada `trade_date` tidak ada bar canonical di `ticker_ohlc_daily`, status harus `skipped_no_row` (atau ekuivalen) dan tidak menghasilkan indikator untuk tanggal itu.
+- Downstream yang butuh “tanggal acuan” (Watchlist/Portfolio) wajib memakai tanggal trading yang **benar-benar punya canonical**:
+  - Jika tanggal D bukan trading day → gunakan `previousTradingDate(D)`.
+  - Jika canonical untuk D ditahan (`CANONICAL_HELD/FAILED`) → fallback ke `last_good_trade_date` (lihat kontrak query di MARKET_DATA.md).
+
+
 
 
 ### Kontrak Rolling Window (Trading Days, bukan kalender)
@@ -103,6 +109,14 @@ Catatan:
 - Skor (`score_*`) boleh diisi belakangan (tidak wajib untuk kontrak ComputeEOD v1.0), tapi kolomnya sudah tersedia.
 
 ---
+
+### 3.2.1 Kontrak Tanggal Acuan Portfolio (harga EOD)
+Portfolio (valuasi/snapshot) **wajib konsisten** dengan data canonical:
+- Harga acuan = `close` dari `ticker_ohlc_daily` pada **trade_date acuan**.
+- Trade_date acuan ditentukan dengan aturan:
+  1) Jika tanggal yang diminta bukan trading day → pakai `previousTradingDate()`.
+  2) Jika tanggal trading tapi canonical tidak tersedia/ditahan → pakai `last_good_trade_date`.
+- Jangan pakai “tanggal kalender” untuk valuasi. Selalu trading day.
 
 ### 3.3 Price Basis Policy (konsisten lintas domain)
 

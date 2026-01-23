@@ -20,6 +20,10 @@ Dokumen ini adalah playbook operasional. Saat Market Data bermasalah, ini jadi p
 Prinsip global tentang SRP, shared/public, config policy, dan logging mengikuti `SRP_Performa.md`.
 Cutoff dan aturan run-tanpa-tanggal mengikuti `MARKET_DATA.md` (Bagian 3).
 
+**Wajib sebelum melakukan apa pun:** tentukan *last good trade_date* (run `SUCCESS`) sebagai baseline. Kalau run terbaru `CANONICAL_HELD/FAILED`, semua downstream harus tetap memakai tanggal baseline ini (lihat query standar di `MARKET_DATA.md`).
+
+
+
 1) **Lebih baik tidak update canonical daripada update salah.**
 2) **Setiap fallback/missing/disagreement/reject harus terlihat di health summary run.**
 3) **Semua keputusan yang mengubah canonical harus punya jejak alasan (audit-able).**
@@ -46,12 +50,68 @@ Aksi: retry terarah, verifikasi, canonical aman.
 - disagreement major melonjak
 Aksi: fallback massal / tahan canonical / rerun saat stabil.
 
+
+Tambahan verifikasi cepat (khusus S2 — disagreement major melonjak tapi kamu ragu ini data glitch atau market move):
+- Jalankan validator untuk subset kandidat:
+  - `php artisan market-data:validate-eod --date=YYYY-MM-DD --max=20`
+  - Atau spesifik ticker: `php artisan market-data:validate-eod --date=YYYY-MM-DD --tickers=BBCA,BBRI`
+- Jika validator konsisten dengan canonical → masalah di provider lain / mapping.
+- Jika validator juga mismatch besar → treat sebagai **S3** (freeze + rebuild range) karena indikasi data tercemar.
+
 ### S3 — Critical
 - canonical tercemar partial day
 - timezone shift (tanggal geser)
 - quality gate bocor (invalid masuk canonical)
 - symbol mapping salah (ticker tertukar)
 Aksi: freeze canonical, rollback/rebuild, audit dampak.
+
+
+## 1.1 Perintah cepat (mapping S1/S2/S3 → artisan)
+
+Tujuan bagian ini: operator tidak perlu menebak “jalanin apa” saat incident.
+
+### S1 — Minor (umumnya retry + verifikasi)
+1) Pastikan tanggal yang diproses sudah **effective_end_date** (cutoff 16:30 WIB) dan `market_calendar.is_trading_day=1`.
+2) Rerun import untuk range kecil:
+   - `php artisan market-data:import-eod --from=YYYY-MM-DD --to=YYYY-MM-DD --chunk=200`
+3) Kalau run status **SUCCESS**:
+   - `php artisan market-data:publish-eod --run_id=RUN_ID`
+   - `php artisan trade:compute-eod --from=YYYY-MM-DD --to=YYYY-MM-DD --chunk=200`
+
+**Yang dicek:**
+- `md_runs.coverage_pct` ≥ threshold
+- `hard_rejects` rendah / normal
+- tidak ada gejala partial day / timezone shift
+
+### S2 — Major (provider bermasalah / missing ticker besar)
+1) Jangan publish kalau status `CANONICAL_HELD`.
+2) Ulangi import setelah kondisi provider stabil (atau ganti prioritas provider sesuai kebijakan), lalu jalankan ulang:
+   - `php artisan market-data:import-eod --from=YYYY-MM-DD --to=YYYY-MM-DD --chunk=200`
+3) Kalau sudah **SUCCESS** baru publish + compute seperti S1.
+
+**Yang dicek:**
+- `fallback_pct` dan `disagreement_major` (kalau tinggi, jangan paksakan publish)
+- coverage kembali normal untuk universe ticker aktif
+
+### S3 — Critical (partial day/timezone shift/mapping error/CA masif)
+**Prinsip:** freeze/hold, jangan menyebarkan data salah.
+
+1) Pastikan canonical **tidak dipublish** untuk tanggal yang tercemar (jaga `CANONICAL_HELD`).
+2) Tentukan perbaikan RAW:
+   - kalau masalahnya “data provider salah / mapping salah / timezone shift” → lakukan **refetch/import** ulang dulu (Phase import).
+3) Setelah RAW sudah benar (atau kalau RAW sudah benar dan hanya canonical selection yang perlu diulang), jalankan rebuild canonical **tanpa refetch**:
+   - `php artisan market-data:rebuild-canonical --from=YYYY-MM-DD --to=YYYY-MM-DD`
+   - (opsional) pakai RAW run tertentu: `--source_run=RUN_ID`
+4) Publish canonical hasil rebuild:
+   - `php artisan market-data:publish-eod --run_id=RUN_ID_HASIL_REBUILD`
+5) Rerun compute-eod:
+   - `php artisan trade:compute-eod --from=YYYY-MM-DD --to=YYYY-MM-DD --chunk=200`
+
+**Yang dicek:**
+- `coverage_pct` normal, dan range trade_date tidak “geser”
+- tidak ada candle “today” sebelum cutoff (partial day)
+- jika ada `ca_hint/ca_event` massal, lakukan rebuild range yang terdampak + re-check indikator
+
 
 ---
 

@@ -64,6 +64,7 @@ Semua key di bawah **sudah dipakai di aplikasi** (lihat `config/trade.php`) dan 
 | `TRADE_MD_VALIDATOR_ENABLED` | `true` | Aktif/nonaktif validator (quality cross-check). |
 | `TRADE_MD_VALIDATOR_PROVIDER` | `eodhd` | Provider validator (misal EODHD) untuk sampling kandidat. |
 | `TRADE_MD_VALIDATOR_MAX_TICKERS` | `20` | Maksimal ticker yang divalidasi per hari (hemat kuota). |
+| `TRADE_EODHD_DAILY_CALL_LIMIT` | `20` | Batas panggilan API EODHD per hari (ops/kuota). Validator harus tunduk pada ini. |
 | `TRADE_MD_VALIDATOR_DISAGREE_PCT` | `1.50` | Threshold mismatch validator (badges/flags). |
 
 Catatan:
@@ -150,8 +151,19 @@ Pisahkan tanggung jawab. Minimal peran konseptual berikut harus jelas:
 - membuat telemetry ringkasan run
 
 ### 4.5 Canonical Selector
-- memilih 1 bar resmi dari RAW
-- bekerja dari data yang sudah dinormalisasi dan divalidasi
+Tugas: memilih **1 bar resmi** per `(ticker_id, trade_date)` dari kandidat multi-source yang sudah dinormalisasi + divalidasi.
+
+**Aturan deterministik (sesuai implementasi `CanonicalSelector`):**
+- Input: `candidatesBySource[source] = { bar, val }`
+- Ambil urutan prioritas dari `providers_priority` (contoh default: `['yahoo']`).
+- Iterasi sesuai urutan prioritas, pilih kandidat pertama dengan `val.hardValid = true`.
+  - Jika sumber yang menang = prioritas pertama → `reason = PRIORITY_WIN`
+  - Jika sumber yang menang bukan prioritas pertama → `reason = FALLBACK_USED`
+- `flags` dari validator ikut dibawa agar alasan bisa diaudit.
+- Jika **tidak ada** kandidat yang `hardValid`, maka canonical untuk ticker+date itu **tidak dibuat** (mengurangi `canonical_points` dan mempengaruhi `coverage_pct`).
+
+> Canonical selector tidak “mengakali” data. Kalau kandidat tidak valid, lebih baik kosong daripada salah.
+
 
 ### 4.6 Audit / Telemetry
 - bukti & jejak untuk investigasi
@@ -178,6 +190,38 @@ Kolom kunci:
 
 **Kontrak penting untuk downstream (ComputeEOD/Watchlist/Portfolio):**
 - Jika status terakhir untuk `effective_end_date` adalah `CANONICAL_HELD` / `FAILED`, downstream **tidak boleh** pakai tanggal itu; harus fallback ke *last good trade_date*.
+**Kontrak `last_good_trade_date` (wajib konsisten lintas modul):**
+- Definisi: tanggal trading terbaru yang punya run `md_runs.status = SUCCESS` untuk job `import_eod`.
+- Downstream (ComputeEOD/Watchlist/Portfolio) **wajib** menggunakan query standar berikut (atau ekuivalen), bukan asumsi:
+
+```sql
+-- last good untuk hari ini (global)
+SELECT effective_end_date
+FROM md_runs
+WHERE job = 'import_eod' AND status = 'SUCCESS'
+ORDER BY effective_end_date DESC, run_id DESC
+LIMIT 1;
+
+-- last good untuk target tanggal D (fallback saat HELD/FAILED)
+SELECT effective_end_date
+FROM md_runs
+WHERE job = 'import_eod' AND status = 'SUCCESS'
+  AND effective_end_date <= :D
+ORDER BY effective_end_date DESC, run_id DESC
+LIMIT 1;
+```
+
+**Kontrak Coverage (`coverage_pct`) — sumber utama keputusan `CANONICAL_HELD`:**
+- `target_tickers` = jumlah ticker aktif dari tabel `tickers` (`is_deleted = 0`) setelah filter opsi `--ticker` (jika ada).
+- `target_days` = jumlah **trading days** dari `market_calendar` dalam range `effective_start_date..effective_end_date` (inclusive).
+- `expected_points = target_tickers * target_days`
+- `canonical_points = total canonical picks yang berhasil dibuat`
+- `coverage_pct = (canonical_points / expected_points) * 100`
+- `fallback_pct = (fallback_picks / canonical_points) * 100`
+
+Run dianggap **HELD** jika `coverage_pct < TRADE_MD_COVERAGE_MIN`.
+
+
 
 #### B) `md_raw_eod` — bukti mentah multi-source
 Kontrak:
@@ -193,6 +237,26 @@ Kontrak:
 - kolom: `open, high, low, close, adj_close, volume`
 - `price_basis` = `close | adj_close` (basis yang dipilih saat publish canonical)
 - corporate action hints: `ca_hint`, `ca_event` (jika ada indikasi split/discontinuity)
+- `ca_hint` / `ca_event` adalah **guardrail** untuk mencegah indikator & watchlist “palsu” saat ada discontinuity.
+
+**Nilai yang diproduksi implementasi (`CorporateActionHintService`):**
+- `ca_event`:
+  - `SPLIT`
+  - `REVERSE_SPLIT`
+  - `UNKNOWN` (indikasi CA lain / beda adj_close ekstrem)
+- `ca_hint` (bisa gabungan dengan `|`):
+  - `SPLIT_2_FOR_1`, `SPLIT_3_FOR_1`, `SPLIT_4_FOR_1`, `SPLIT_5_FOR_1`, `SPLIT_10_FOR_1`
+  - `RSPLIT_1_FOR_2`, `RSPLIT_1_FOR_3`, `RSPLIT_1_FOR_4`, `RSPLIT_1_FOR_5`, `RSPLIT_1_FOR_10`
+  - `CA_ADJ_DIFF` (jika `abs(adj_close-close)/close >= 15%`)
+
+**Cara terbentuk (ringkas):**
+- Bandingkan `close_today / prev_close` dengan rasio split umum (toleransi relatif default ±3%).
+- Jika provider memberi `adj_close` dan beda jauh dari `close` → hint `CA_ADJ_DIFF`.
+
+Kontrak downstream:
+- Jika pada trade_date ada `ca_hint`/`ca_event` → ComputeEOD **tetap boleh menghitung**, tapi watchlist **wajib** downgrade / STOP rekomendasi agresif (lihat `compute_eod.md` guardrails).
+
+
 - `source` = sumber canonical yang dipilih (mis. `yahoo`, `stooq`, `eodhd`, dll)
 - `run_id` opsional untuk tracing run
 
@@ -487,3 +551,68 @@ Cara pakai:
 - Endpoint watchlist akan attach field `validator` untuk item di grup `top_picks` (jika data tersedia).
 
 ---
+
+## 17) Bootstrap/Backfill Data (Wajib sebelum Watchlist dipakai serius)
+
+---
+
+## 18) Jadwal Operasional (minimal)
+
+Dokumen ini tidak memaksa pakai Laravel Scheduler; yang penting urutannya konsisten.
+
+- **Hari trading (sesudah 16:30 WIB):**
+  1) `market-data:import-eod` untuk tanggal efektif (hari ini)
+  2) `market-data:publish-eod`
+  3) `trade:compute-eod`
+  4) (opsional) `market-data:validate-eod` untuk subset top picks
+
+- **Kalau dijalankan sebelum 16:30 WIB:** sistem harus memproses **previous trading day** (lihat `effective_end_date`).
+
+
+
+Watchlist bergantung pada `ticker_ohlc_daily` + `ticker_indicators_daily`. Kalau history terlalu pendek, indikator banyak NULL dan sinyal jadi noise.
+
+**Target minimal history (mengacu config default):**
+- `TRADE_LOOKBACK_DAYS = 260`
+- `TRADE_EOD_WARMUP_EXTRA_TRADING_DAYS = 60`
+- Minimal backfill ≈ **320 trading days** (lebih aman 400–500 trading days untuk ticker likuid rendah).
+
+**Urutan eksekusi (chronological, batch per rentang):**
+1) Import (RAW + canonical picks + gating):
+   - `php artisan market-data:import-eod --from=YYYY-MM-DD --to=YYYY-MM-DD --chunk=200`
+2) Jika `status=SUCCESS`, publish ke canonical OHLC:
+   - `php artisan market-data:publish-eod --run_id=RUN_ID`
+3) Compute indikator untuk range yang sama:
+   - `php artisan trade:compute-eod --from=YYYY-MM-DD --to=YYYY-MM-DD --chunk=200`
+
+**Acceptance check (minimal):**
+- `md_runs.coverage_pct >= TRADE_MD_COVERAGE_MIN`
+- `ticker_ohlc_daily` terisi untuk range trading days (tidak bolong besar)
+- `ticker_indicators_daily` terisi dan indikator kunci (MA/RSI/ATR/vol_sma20) tidak didominasi NULL
+
+Jika `status=CANONICAL_HELD`, **jangan publish**. Ikuti playbook S1/S2/S3.
+
+### Phase 6 — Rebuild Canonical (tanpa refetch)
+
+Dipakai saat **S3 (Critical)** atau saat perlu audit ulang canonical **tanpa** mengambil data provider lagi (RAW sudah ada).
+Perintah ini membuat `md_canonical_eod` baru (run baru) dari `md_raw_eod` sebagai **audit trail**, lalu kamu bisa publish ulang ke `ticker_ohlc_daily`.
+
+**Command:**
+- Range:
+  - `php artisan market-data:rebuild-canonical --from=YYYY-MM-DD --to=YYYY-MM-DD`
+- Single date:
+  - `php artisan market-data:rebuild-canonical --date=YYYY-MM-DD`
+- Filter ticker (opsional):
+  - `php artisan market-data:rebuild-canonical --date=YYYY-MM-DD --ticker=BBCA`
+- Pakai RAW run tertentu (opsional, default: latest SUCCESS import run yang cover end date):
+  - `php artisan market-data:rebuild-canonical --source_run=RUN_ID --from=YYYY-MM-DD --to=YYYY-MM-DD`
+
+**Sesudah rebuild:**
+1) Pastikan status rebuild **SUCCESS** dan `coverage_pct` aman.
+2) Publish canonical baru:
+   - `php artisan market-data:publish-eod --run_id=RUN_ID_HASIL_REBUILD`
+3) Rerun compute-eod untuk tanggal/range yang sama:
+   - `php artisan trade:compute-eod --from=YYYY-MM-DD --to=YYYY-MM-DD`
+
+Catatan: rebuild ini **tidak** memperbaiki masalah di RAW (mis. mapping/provider error). Kalau RAW salah, kamu harus **refetch/import** ulang lebih dulu (lihat playbook S2/S3).
+
