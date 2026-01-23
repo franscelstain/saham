@@ -6,6 +6,26 @@ use Illuminate\Support\Facades\DB;
 
 class RunRepository
 {
+    public function findLatestImportRun(): ?object
+    {
+        return DB::table('md_runs')
+            ->where('job', 'import_eod')
+            ->orderByDesc('run_id')
+            ->first();
+    }
+
+    public function getLatestSuccessEffectiveEndDate(): ?string
+    {
+        $row = DB::table('md_runs')
+            ->select('effective_end_date')
+            ->where('job', 'import_eod')
+            ->where('status', 'SUCCESS')
+            ->orderByDesc('run_id')
+            ->first();
+
+        return $row && isset($row->effective_end_date) ? (string) $row->effective_end_date : null;
+    }
+
     public function createRun(array $row): int
     {
         $id = DB::table('md_runs')->insertGetId($row);
@@ -16,6 +36,23 @@ class RunRepository
     {
         $patch['finished_at'] = $patch['finished_at'] ?? now();
         $patch['updated_at'] = $patch['updated_at'] ?? now();
+
+        // Keep last_good_trade_date consistent with MARKET_DATA.md contract.
+        // - If this run SUCCESS: last_good_trade_date = effective_end_date
+        // - Else: last_good_trade_date = latest SUCCESS effective_end_date (nullable)
+        try {
+            $row = $this->find($runId);
+            if ($row) {
+                $newStatus = isset($patch['status']) ? (string) $patch['status'] : (string) ($row->status ?? '');
+                if ($newStatus === 'SUCCESS') {
+                    $patch['last_good_trade_date'] = (string) ($row->effective_end_date ?? $patch['effective_end_date'] ?? null);
+                } else {
+                    $patch['last_good_trade_date'] = $this->getLatestSuccessEffectiveEndDate();
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore (column may not exist yet during migrations in some environments)
+        }
 
         DB::table('md_runs')
             ->where('run_id', $runId)

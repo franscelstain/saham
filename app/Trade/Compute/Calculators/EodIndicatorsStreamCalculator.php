@@ -174,9 +174,75 @@ final class EodIndicatorsStreamCalculator
                             'low' => $r->low,
                             'close' => $r->close,
                             'adj_close' => $r->adj_close ?? null,
+                            'price_basis' => property_exists($r, 'price_basis') ? ($r->price_basis ?? null) : null,
                             'volume' => $r->volume,
                         ]);
                     }
+
+                    // Contract: skip/flag invalid bar. For target_date we still emit a neutral row
+                    // so downstream knows this ticker is unusable on this date.
+                    $signalCode = 0;
+                    $volumeLabelCode = 1;
+                    $decisionCode = 2;
+
+                    $prevSnap = $prevSnaps[$tid] ?? null;
+                    $age = $this->age->computeFromPrev($tid, $tradeDate, $signalCode, $prevSnap);
+
+                    $adj = isset($r->adj_close) && $r->adj_close !== null ? (float) $r->adj_close : null;
+                    $caEvent = property_exists($r, 'ca_event') ? ($r->ca_event ?? null) : null;
+                    $caHint  = property_exists($r, 'ca_hint')  ? ($r->ca_hint  ?? null) : null;
+
+                    $row = [
+                        'ticker_id' => $tid,
+                        'trade_date' => $tradeDate,
+
+                        'open' => $r->open !== null ? (float) $r->open : null,
+                        'high' => $r->high !== null ? (float) $r->high : null,
+                        'low'  => $r->low !== null ? (float) $r->low  : null,
+                        'close' => $r->close !== null ? (float) $r->close : null,
+                        'adj_close' => $adj,
+                        'ca_hint' => $caHint,
+                        'ca_event' => $caEvent,
+
+                        'basis_used' => PriceBasisPolicy::BASIS_CLOSE,
+                        'price_used' => $r->close !== null ? (float) $r->close : null,
+                        'volume' => $r->volume !== null ? (int) $r->volume : null,
+
+                        'ma20' => null,
+                        'ma50' => null,
+                        'ma200' => null,
+                        'rsi14' => null,
+                        'atr14' => null,
+                        'support_20d' => null,
+                        'resistance_20d' => null,
+                        'vol_sma20' => null,
+                        'vol_ratio' => null,
+
+                        'decision_code' => $decisionCode,
+                        'signal_code' => $signalCode,
+                        'volume_label_code' => $volumeLabelCode,
+
+                        'signal_first_seen_date' => $age['signal_first_seen_date'],
+                        'signal_age_days' => $age['signal_age_days'],
+
+                        // scoring (neutral)
+                        'score_total' => 0,
+                        'score_trend' => 0,
+                        'score_momentum' => 0,
+                        'score_volume' => 0,
+                        'score_breakout' => 0,
+                        'score_risk' => 0,
+
+                        'is_valid' => 0,
+                        'invalid_reason' => 'INVALID_BAR',
+
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+
+                    $this->seenOnTradeDate[$tid] = true;
+                    $this->processed++;
+                    yield $row;
                 }
 
                 // Skip this bar entirely (tidak ikut warmup rolling metrics).
@@ -189,9 +255,10 @@ final class EodIndicatorsStreamCalculator
             $low   = (float) $r->low;
             $vol   = (float) $r->volume;
 
-            // Phase 5: price basis for indicators
+            // Phase 5: price basis for indicators (contract: honor price_basis)
             $adj = isset($r->adj_close) && $r->adj_close !== null ? (float) $r->adj_close : null;
-            $pick = $this->basisPolicy->pickForIndicators($closeReal, $adj);
+            $priceBasis = property_exists($r, 'price_basis') ? ($r->price_basis ?? null) : null;
+            $pick = $this->basisPolicy->pickForIndicators($priceBasis, $closeReal, $adj);
 
             $priceUsed = (float) $pick['price'];
             $basisUsed = (string) $pick['basis'];
@@ -257,9 +324,13 @@ final class EodIndicatorsStreamCalculator
                     'high' => $high,
                     'low' => $low,
                     'close' => $closeReal,
+                    'adj_close' => $adj,
                     'basis_used' => PriceBasisPolicy::BASIS_CLOSE,
                     'price_used' => $closeReal,
                     'volume' => (int) $r->volume,
+
+                    'ca_hint' => $caHint,
+                    'ca_event' => $caEvent,
 
                     'ma20' => null,
                     'ma50' => null,
@@ -270,6 +341,20 @@ final class EodIndicatorsStreamCalculator
                     'resistance_20d' => null,
                     'vol_sma20' => null,
                     'vol_ratio' => null,
+
+                    // scoring (neutral)
+                    'score_total' => 0,
+                    'score_trend' => 0,
+                    'score_momentum' => 0,
+                    'score_volume' => 0,
+                    'score_breakout' => 0,
+                    'score_risk' => 0,
+
+                    // CA guard = data valid, but indicators are intentionally neutralized.
+                    // Keep semantics consistent:
+                    // invalid_reason != null => is_valid = 0.
+                    'is_valid' => 0,
+                    'invalid_reason' => 'CA_GUARD',
 
                     'decision_code' => $decisionCode,
                     'signal_code' => $signalCode,
@@ -369,9 +454,13 @@ final class EodIndicatorsStreamCalculator
                 'high' => $high,
                 'low' => $low,
                 'close' => $closeReal,
+                'adj_close' => $adj,
                 'basis_used' => $basisUsed,
                 'price_used' => $priceUsed,
                 'volume' => (int) $r->volume,
+
+                'ca_hint' => $caHint,
+                'ca_event' => $caEvent,
 
                 'ma20' => $metrics['ma20'] !== null ? round($metrics['ma20'], 4) : null,
                 'ma50' => $metrics['ma50'] !== null ? round($metrics['ma50'], 4) : null,
@@ -394,9 +483,29 @@ final class EodIndicatorsStreamCalculator
                 'signal_first_seen_date' => $age['signal_first_seen_date'],
                 'signal_age_days' => $age['signal_age_days'],
 
+                // scoring
+                'score_total' => 0,
+                'score_trend' => 0,
+                'score_momentum' => 0,
+                'score_volume' => 0,
+                'score_breakout' => 0,
+                'score_risk' => 0,
+
+                'is_valid' => 1,
+                'invalid_reason' => null,
+
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
+
+            // compute score only if the row is not neutralized
+            $scores = $this->computeScores($metrics, $signalCode, $volumeLabelCode, $decisionCode);
+            $row['score_total'] = $scores['score_total'];
+            $row['score_trend'] = $scores['score_trend'];
+            $row['score_momentum'] = $scores['score_momentum'];
+            $row['score_volume'] = $scores['score_volume'];
+            $row['score_breakout'] = $scores['score_breakout'];
+            $row['score_risk'] = $scores['score_risk'];
 
             $this->seenOnTradeDate[$tid] = true;
             $this->processed++;
@@ -423,6 +532,119 @@ final class EodIndicatorsStreamCalculator
     public function invalidOnTradeDateMap(): array
     {
         return $this->invalidOnTradeDate;
+    }
+
+    /**
+     * Simple scoring model (kept deterministic + lightweight).
+     *
+     * Tujuan:
+     * - Menghindari kolom score_* jadi "kosong" (over/unused).
+     * - Memberi ranking sederhana untuk Watchlist tanpa mengubah decision_code.
+     *
+     * Skala kecil (approx): -5 .. +10.
+     * Downstream boleh pakai score_total untuk sorting saja.
+     *
+     * @return array{score_total:int,score_trend:int,score_momentum:int,score_volume:int,score_breakout:int,score_risk:int}
+     */
+    private function computeScores(array $m, int $signalCode, int $volumeLabelCode, int $decisionCode): array
+    {
+        // For neutralized rows (invalid/CA guard), caller should keep scores at 0.
+        if ($decisionCode <= 0) {
+            return [
+                'score_total' => 0,
+                'score_trend' => 0,
+                'score_momentum' => 0,
+                'score_volume' => 0,
+                'score_breakout' => 0,
+                'score_risk' => 0,
+            ];
+        }
+
+        $close = isset($m['close']) ? (float) $m['close'] : 0.0;
+        if ($close <= 0) {
+            return [
+                'score_total' => 0,
+                'score_trend' => 0,
+                'score_momentum' => 0,
+                'score_volume' => 0,
+                'score_breakout' => 0,
+                'score_risk' => 0,
+            ];
+        }
+
+        $ma20  = $m['ma20']  !== null ? (float) $m['ma20']  : null;
+        $ma50  = $m['ma50']  !== null ? (float) $m['ma50']  : null;
+        $ma200 = $m['ma200'] !== null ? (float) $m['ma200'] : null;
+        $rsi   = $m['rsi14'] !== null ? (float) $m['rsi14'] : null;
+        $atr   = $m['atr14'] !== null ? (float) $m['atr14'] : null;
+        $volRatio = $m['vol_ratio'] !== null ? (float) $m['vol_ratio'] : null;
+        $res  = $m['resistance_20d'] !== null ? (float) $m['resistance_20d'] : null;
+
+        // Trend: close>ma20, ma20>=ma50, ma50>=ma200
+        $trend = 0;
+        if ($ma20 !== null && $close > $ma20) $trend += 1;
+        if ($ma20 !== null && $ma50 !== null && $ma20 >= $ma50) $trend += 1;
+        if ($ma50 !== null && $ma200 !== null && $ma50 >= $ma200) $trend += 1;
+
+        // Momentum: prefer RSI 55-68, penalize extremes
+        $mom = 0;
+        if ($rsi !== null) {
+            if ($rsi >= 55 && $rsi <= 68) $mom += 2;
+            elseif (($rsi >= 50 && $rsi < 55) || ($rsi > 68 && $rsi <= 72)) $mom += 1;
+            elseif ($rsi < 40 || $rsi > 75) $mom -= 1;
+        }
+
+        // Volume: use ratio if available, otherwise approximate by label
+        $vol = 0;
+        if ($volRatio !== null) {
+            if ($volRatio >= 2.0) $vol += 2;
+            elseif ($volRatio >= 1.3) $vol += 1;
+            elseif ($volRatio < 0.9) $vol -= 1;
+        } else {
+            if ($volumeLabelCode >= 7) $vol += 2;
+            elseif ($volumeLabelCode >= 6) $vol += 1;
+        }
+
+        // Breakout: above resistance or strong breakout signal
+        $br = 0;
+        if ($res !== null) {
+            if ($close > $res) $br += 2;
+            elseif ($res > 0 && ($close / $res) >= 0.99) $br += 1;
+        }
+        if (in_array($signalCode, [4, 5, 6, 7], true)) $br += 1;
+
+        // Risk: penalize ATR% if too high
+        $risk = 0;
+        if ($atr !== null && $atr > 0) {
+            $atrPct = ($atr / $close) * 100.0;
+            if ($atrPct > 6.0) $risk -= 2;
+            elseif ($atrPct > 4.0) $risk -= 1;
+        }
+
+        // Decision bias (small) so Layak/Confirm tends to float to top, but does not dominate.
+        $bias = 0;
+        if ($decisionCode === 5) $bias = 1;
+        elseif ($decisionCode === 4) $bias = 0;
+        elseif ($decisionCode <= 2) $bias = -1;
+
+        $total = $trend + $mom + $vol + $br + $risk + $bias;
+
+        return [
+            'score_total' => (int) $this->clampInt($total, -20, 20),
+            'score_trend' => (int) $this->clampInt($trend, -10, 10),
+            'score_momentum' => (int) $this->clampInt($mom, -10, 10),
+            'score_volume' => (int) $this->clampInt($vol, -10, 10),
+            'score_breakout' => (int) $this->clampInt($br, -10, 10),
+            'score_risk' => (int) $this->clampInt($risk, -10, 10),
+        ];
+    }
+
+    private function clampInt($v, int $min, int $max): int
+    {
+        $i = (int) round((float) $v);
+        if ($i < $min) return $min;
+        if ($i > $max) return $max;
+        return $i;
     }
 
     /**

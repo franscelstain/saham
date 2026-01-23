@@ -25,6 +25,7 @@ class CreateMdRunsTable extends Migration
             $table->string('cutoff', 10); // "16:30"
             $table->date('effective_start_date');
             $table->date('effective_end_date');
+            $table->date('last_good_trade_date')->nullable();
 
             $table->unsignedInteger('target_tickers')->default(0);
             $table->unsignedInteger('target_days')->default(0);

@@ -25,6 +25,9 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->decimal('high', 18, 4)->nullable();
             $table->decimal('low', 18, 4)->nullable();
             $table->decimal('close', 18, 4)->nullable();
+            $table->decimal('adj_close', 18, 4)->nullable();
+            $table->string('ca_hint', 32)->nullable();
+            $table->string('ca_event', 32)->nullable();
             $table->enum('basis_used', ['close', 'adj_close'])->nullable();
             $table->decimal('price_used', 18, 4)->nullable();
             $table->unsignedBigInteger('volume')->nullable();
@@ -50,6 +53,8 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->unsignedTinyInteger('decision_code')->default(1); // 1..5
             $table->unsignedTinyInteger('signal_code')->nullable(); // 1..10
             $table->unsignedTinyInteger('volume_label_code')->nullable(); // 1..8
+            $table->boolean('is_valid')->default(true);
+            $table->string('invalid_reason', 64)->nullable();
 
             // Tanggal pertama kali sinyal ini muncul (streak start)
             $table->date('signal_first_seen_date')->nullable();

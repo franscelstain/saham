@@ -18,9 +18,14 @@ final class PriceBasisPolicy
      *
      * @return array{basis:string, price:float}
      */
-    public function pickForIndicators(?float $close, ?float $adjClose): array
+    public function pickForIndicators(?string $priceBasis, ?float $close, ?float $adjClose): array
     {
-        if ($adjClose !== null && $adjClose > 0) {
+        $pb = $priceBasis !== null ? strtolower(trim($priceBasis)) : null;
+
+        // Contract (compute_eod.md):
+        // - Use adj_close ONLY if price_basis == 'adj_close' AND adj_close is available.
+        // - Otherwise use real close.
+        if ($pb === self::BASIS_ADJ_CLOSE && $adjClose !== null && $adjClose > 0) {
             return ['basis' => self::BASIS_ADJ_CLOSE, 'price' => (float) $adjClose];
         }
 

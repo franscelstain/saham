@@ -43,6 +43,7 @@ class TickerOhlcDailyRepository
                 'od.low',
                 'od.close',
                 'od.adj_close',
+                'od.price_basis',
                 'od.volume',
                 'od.ca_event',
                 'od.ca_hint',
