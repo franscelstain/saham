@@ -25,8 +25,8 @@ Minimal kolom yang dipakai watchlist:
 - `close`, `adj_close`, `price_used`
 - `ma20`, `ma50`, `ma200`
 - `rsi14`, `atr14`
-- `vol_sma20_prev`, `vol_ratio` (lihat §6)
-- `support20`, `resistance20` (lihat §6)
+- `vol_sma20`, `vol_ratio` (lihat §6)
+- `support_20d`, `resistance_20d` (lihat §6)
 - `ca_hint`, `ca_event` (copy dari canonical)
 - `is_valid` / `invalid_reason` (jika ada)
 
@@ -39,9 +39,11 @@ Jika data historis tidak cukup untuk indikator tertentu:
 - catat log/flag (opsional) untuk audit
 
 ## 6) Definisi yang sering salah (dikunci)
-- **vol_sma20_prev**: SMA volume 20 trading days **sebelum hari ini** (exclude today).
-- **vol_ratio**: `today_volume / vol_sma20_prev` (jika `vol_sma20_prev` NULL/0 ➜ NULL).
-- **support20 / resistance20**: min(low) / max(high) dari 20 trading days **sebelum hari ini** (exclude today).
+> Catatan: kolom DB bernama `vol_sma20`, namun maknanya adalah `vol_sma20_prev` (exclude today).
+
+- **vol_sma20**: SMA volume 20 trading days **sebelum hari ini** (exclude today).
+- **vol_ratio**: `today_volume / vol_sma20` (jika `vol_sma20` NULL/0 ➜ NULL).
+- **support_20d / resistance_20d**: min(low) / max(high) dari 20 trading days **sebelum hari ini** (exclude today).
 
 ## 7) Guardrails kualitas data
 - Jika bar hari ini invalid (OHLC tidak masuk akal, volume negatif, dll) ➜ skip/flag.
@@ -82,6 +84,14 @@ Nilai berikut harus konsisten di UI dan proses downstream.
   - 3 Hati-hati
   - 4 Perlu Konfirmasi
   - 5 Layak Beli
+
+## 7.2) Score Columns (ranking only)
+`score_total` dan breakdown (`score_trend`, `score_momentum`, `score_volume`, `score_breakout`, `score_risk`) dipakai **hanya untuk ranking/sorting** kandidat (mis. watchlist).
+
+Rules:
+- Tidak boleh mengubah `decision_code`.
+- Untuk bar `INVALID_BAR` atau `CA_GUARD` ➜ score harus netral (0).
+- Skala kecil dan deterministic; tidak boleh mengandalkan data selain indikator yang sudah dihitung pada hari itu.
 
 ## 8) Command
 - Single date:
