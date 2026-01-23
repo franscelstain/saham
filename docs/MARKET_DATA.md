@@ -19,7 +19,7 @@ Dokumen ini mengunci **pipeline Market Data**: RAW ➜ CANONICAL ➜ dipakai ole
 ## 3) Tabel & Kontrak Data
 ### 3.1 md_runs (telemetry run)
 Minimal kolom yang harus ada/terisi per run:
-- `run_id`, `status`, `range_from`, `range_to`, `effective_end_date`
+- `run_id`, `status`, `effective_start_date`, `effective_end_date`
 - `expected_points`, `canonical_points`, `coverage_pct`, `fallback_pct`
 - `hard_rejects`, `soft_flags`, `notes`
 - `last_good_trade_date` (lihat §4)
@@ -32,7 +32,25 @@ Status:
 ### 3.2 md_raw_eod
 - Menyimpan hasil fetch per provider (apa adanya) + metadata.
 
-### 3.3 ticker_ohlc_daily (CANONICAL OHLC)
+
+### 3.3 md_canonical_eod (CANONICAL staging)
+Tujuan: staging hasil seleksi canonical per run, sebelum dipublish ke `ticker_ohlc_daily`.
+
+Kontrak:
+- Unik per `(run_id, ticker_id, trade_date)`.
+- Isi sudah dinormalisasi (OHLC, volume, adj_close) + metadata minimal:
+  - `chosen_source` (provider yang menang)
+  - `reason` (mis. `PRIORITY_WIN` / `FALLBACK_USED` / `ONLY_SOURCE`)
+  - `flags` (opsional, ringkas)
+  - Catatan: `price_basis` diturunkan saat publish ke `ticker_ohlc_daily` (mis. `ADJ_CLOSE` jika `adj_close` ada, else `CLOSE`).
+- Downstream **tidak** memakai tabel ini untuk analisis; tabel ini untuk audit/debug & sumber publish saja.
+
+Alur:
+- `market-data:import-eod` ➜ build canonical ke `md_canonical_eod`
+- `market-data:publish-eod` ➜ publish dari `md_canonical_eod` ke `ticker_ohlc_daily`
+
+
+### 3.4 ticker_ohlc_daily (CANONICAL OHLC)
 Kontrak:
 - **unik** per `(ticker_id, trade_date)`.
 - Minimal kolom downstream:
@@ -68,12 +86,53 @@ Aturan downstream:
 Gunakan universe yang konsisten:
 - `total_active_tickers = count(tickers where is_deleted=0)` (atau policy internal kamu yang setara).
 
-Rumus minimal (per 1 trading date):
-- `expected_points = total_active_tickers`
-- `canonical_points = count(ticker_ohlc_daily where trade_date = effective_end_date)`
+Rumus minimal (per run):
+- `expected_points = target_tickers * target_days`
+- `canonical_points = count(md_canonical_eod where run_id = run_id)`
 - `coverage_pct = canonical_points / expected_points * 100`
 
 Jika `coverage_pct < TRADE_MD_COVERAGE_MIN` ➜ status `CANONICAL_HELD`.
+
+Selain gate `coverage_pct`, implementasi juga bisa menahan canonical (`CANONICAL_HELD`) untuk alasan kualitas berikut (semuanya akan tercatat di `md_runs.notes` sebagai `held_reason=...`):
+- `disagree_major`: mismatch antar provider terlalu banyak. Gate: `disagree_major_ratio >= hold_disagree_ratio_min` ATAU `disagree_major >= hold_disagree_count_min`.
+- `missing_trading_day`: ada tanggal trading (dari `market_calendar`) yang tidak punya data canonical yang cukup.
+- `low_coverage_days`: ada >= `hold_low_coverage_days_min` hari dalam range yang coverage hariannya < `min_day_coverage_ratio`.
+- `soft_quality`: aturan soft-quality (outlier/gap) memutuskan hold.
+
+Konfigurasi (config `trade.market_data.*` / env):
+
+**Gating & range**
+- `TRADE_MD_COVERAGE_MIN` (default 95): minimal coverage run. Jika `coverage_pct < min` ➜ `CANONICAL_HELD`.
+- `TRADE_MD_LOOKBACK_TRADING_DAYS` (default 7): dipakai jika `--from` tidak diisi. `fromEff = lookbackStartDate(toEff, lookback)`.
+
+**Additional HOLD gates (selain coverage)**
+- `TRADE_MD_HOLD_DISAGREE_RATIO_MIN` (default 0.01)
+- `TRADE_MD_HOLD_DISAGREE_COUNT_MIN` (default 20)
+- `TRADE_MD_MIN_DAY_COVERAGE_RATIO` (default 0.60)
+- `TRADE_MD_MIN_POINTS_PER_DAY` (default 5)
+- `TRADE_MD_HOLD_LOW_COVERAGE_DAYS_MIN` (default 2)
+
+**Quality rules (dipakai untuk reject/outlier & disagree scoring)**
+- `TRADE_MD_TOL` (default 0.0001): toleransi “price in range” (guard basic sanity).
+- `TRADE_MD_DISAGREE_PCT` (default 2.0): threshold mismatch antar provider yang dihitung sebagai `disagree_major`.
+- `TRADE_MD_GAP_EXTREME_PCT` (default 20.0): gap ekstrem yang memicu outlier/soft-quality (dan bisa memicu hold via `soft_quality`).
+
+**Validator policy (hanya untuk Phase 7 validate-eod; tidak mempengaruhi import coverage)**
+- `TRADE_MD_VALIDATOR_MAX_TICKERS` (default 20): batas ticker yang boleh divalidasi per run.
+- `TRADE_MD_VALIDATOR_DISAGREE_PCT` (default 1.5): threshold disagree untuk badge/peringatan (validator).
+
+**Provider config (ops)**
+- Yahoo (import): `TRADE_YAHOO_BASE_URL`, `TRADE_YAHOO_SUFFIX`, `TRADE_YAHOO_TIMEOUT`, `TRADE_YAHOO_RETRY`, `TRADE_YAHOO_RETRY_SLEEP_MS`, `TRADE_YAHOO_UA`.
+- EODHD (validator): `TRADE_EODHD_BASE_URL`, `TRADE_EODHD_SUFFIX`, `TRADE_EODHD_API_TOKEN`, `TRADE_EODHD_TIMEOUT`, `TRADE_EODHD_RETRY`, `TRADE_EODHD_RETRY_SLEEP_MS`, `TRADE_EODHD_DAILY_CALL_LIMIT`.
+
+> Cutoff time masih dikunci di dokumen ini (16:30 WIB). Override teknis bila dibutuhkan: `TRADE_EOD_CUTOFF_HOUR`, `TRADE_EOD_CUTOFF_MIN`, `TRADE_EOD_TZ`.
+
+
+
+Catatan publish:
+- Setelah `market-data:publish-eod`, sistem akan menulis `published_ohlc_rows=...` pada `md_runs.notes`.
+- Jika `canonical_points` tinggi tapi `ticker_ohlc_daily` kosong/kurang, investigasi publish (`published_ohlc_rows`, error DB, unique constraint).
+
 
 ## 6) Corporate Action Hint/Event (CA guard)
 Tujuan: **mencegah indikator palsu** (split/reverse split/adjustment abnormal).
@@ -108,19 +167,54 @@ Ini bukan “teori”; ini sumber error paling sering dan harus dijaga konsisten
 - **Holiday vs missing**: bedakan “no data expected” (non‑trading day) vs “missing data” (trading day tapi kosong).
 
 
-## 7) Command Operasional (minimal)
-### 7.1 Import RAW
+## 7) Command Operasional (minimal + convenience)
+### 7.1 Import RAW ➜ build CANONICAL staging
+Minimal (range):
 - `php artisan market-data:import-eod --from=YYYY-MM-DD --to=YYYY-MM-DD`
 
-### 7.2 Publish CANONICAL
+Convenience flags (ops):
+- `--date=YYYY-MM-DD` ➜ shortcut untuk single date (setara `--from=DATE --to=DATE`). **Jika `--date` diisi, `--from/--to` diabaikan.**
+- `--ticker=BBCA` ➜ batasi ke 1 ticker (buat debugging cepat).
+- `--chunk=200` ➜ ukuran chunk ticker saat fetch (tuning performa / rate‑limit; default 200).
+
+Output penting yang harus dibaca:
+- `status`, `effective_start..effective_end`, `expected_points`, `canonical_points`, `coverage_pct`, `hard_rejects`, `notes`.
+
+### 7.2 Publish CANONICAL staging ➜ ticker_ohlc_daily
+Minimal:
 - `php artisan market-data:publish-eod --run=RUN_ID`
 
-### 7.3 Validator (opsional, untuk badge/cek disagreement)
-- `php artisan market-data:validate-eod --date=YYYY-MM-DD`
-Catatan: dibatasi kuota harian `TRADE_EODHD_DAILY_CALL_LIMIT` (kalau dipakai).
+Convenience flags (ops):
+- `--batch=2000` ➜ ukuran batch publish dari `md_canonical_eod` (tuning performa; default 2000).
 
-### 7.4 Rebuild CANONICAL (insiden S3/CA)
+Catatan:
+- Publish menulis `published_ohlc_rows=...` ke `md_runs.notes`.
+- `canonical_points` itu *jumlah staging* (`md_canonical_eod`). Kalau `published_ohlc_rows` jauh lebih kecil, berarti publish bermasalah (DB error / constraint / filter).
+
+### 7.3 Validator (opsional, subset; untuk badge/cek disagreement)
+Minimal:
+- `php artisan market-data:validate-eod --date=YYYY-MM-DD`
+
+Optional flags (ops helper):
+- `--tickers=BBCA,BBRI` ➜ batasi ticker yang divalidasi.
+- `--max=20` ➜ override jumlah maksimal (tetap dibatasi config/provider).
+- `--run_id=RUN_ID` ➜ override canonical run yang diverifikasi (default: latest SUCCESS yang cover date).
+- `--save=1` ➜ simpan hasil ke `md_candidate_validations` **jika tabel ada** (default 1). Pakai `--save=0` kalau hanya ingin output CLI.
+
+Convenience behaviour (tanpa input manual):
+- Jika `--tickers` **tidak** diberikan ➜ sistem otomatis ambil ticker dari **watchlist `top_picks`** (`WatchlistService->preopenRaw()`).
+- Jika `--date` kosong dan auto‑tickers dipakai ➜ `--date` akan ikut default ke `watchlist.eod_date`.
+
+Catatan: dibatasi kuota harian `TRADE_EODHD_DAILY_CALL_LIMIT` (kalau validator provider dipakai).
+
+### 7.4 Rebuild CANONICAL (insiden S3/CA; tanpa refetch)
+Minimal (range):
 - `php artisan market-data:rebuild-canonical --from=YYYY-MM-DD --to=YYYY-MM-DD [--ticker=CODE]`
+
+Convenience flags (ops):
+- `--date=YYYY-MM-DD` ➜ shortcut single date.
+- `--source_run=RUN_ID` ➜ pakai RAW run_id tertentu sebagai sumber rebuild (default: latest SUCCESS import run yang menutupi end date).
+
 Setelah rebuild: **publish** lalu **compute-eod** untuk range terdampak.
 
 ## 8) Bootstrap/Backfill (agar indikator stabil)
