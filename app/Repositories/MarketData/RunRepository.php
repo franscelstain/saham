@@ -54,9 +54,20 @@ class RunRepository
             // ignore (column may not exist yet during migrations in some environments)
         }
 
-        DB::table('md_runs')
-            ->where('run_id', $runId)
-            ->update($patch);
+        // During rolling deployments, some environments might not have new columns yet.
+        // Be defensive: retry without newly-introduced telemetry columns if update fails.
+        try {
+            DB::table('md_runs')
+                ->where('run_id', $runId)
+                ->update($patch);
+        } catch (\Throwable $e) {
+            $retry = $patch;
+            unset($retry['expected_points'], $retry['canonical_points']);
+
+            DB::table('md_runs')
+                ->where('run_id', $runId)
+                ->update($retry);
+        }
     }
 
     public function find(int $runId): ?object

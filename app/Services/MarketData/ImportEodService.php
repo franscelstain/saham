@@ -382,19 +382,13 @@ final class ImportEodService
             $rawRowsBuf = [];
         }
 
-        // Gating: coverage
+        // Telemetry dasar
         $expected = $targetTickers * $targetDays;
-        $coveragePct = $expected > 0 ? ($totalPicks * 100.0 / $expected) : 0.0;
+        // fallbackPct berbasis selector attempt (bukan row count canonical) agar tetap informatif.
         $fallbackPct = $totalPicks > 0 ? ($fallbackPicks * 100.0 / $totalPicks) : 0.0;
 
         $status = 'SUCCESS';
         $notes = [];
-
-        if ($coveragePct < $this->policy->coverageMinPct()) {
-            $status = 'CANONICAL_HELD';
-            $notes[] = 'Coverage below threshold: ' . number_format($coveragePct, 2) .
-                '% < ' . number_format($this->policy->coverageMinPct(), 2) . '%';
-        }
 
         if ($provErr) {
             $parts = [];
@@ -417,9 +411,22 @@ final class ImportEodService
         }
 
         // Flush remaining CANONICAL (kalau ada sisa buffer)
-        if ($status === 'SUCCESS' && $canRowsBuf) {
+        // Catatan: staging canonical tetap disimpan walau nanti status berubah jadi HELD.
+        // Publish hanya boleh untuk run SUCCESS (lihat PublishEodService assertSuccess),
+        // jadi menyimpan staging untuk forensik tidak membahayakan downstream.
+        if ($canRowsBuf) {
             $this->canRepo->upsertMany($canRowsBuf, $batchUpsert);
             $canRowsBuf = [];
+        }
+
+        // coveragePct harus merefleksikan staging CANONICAL yang benar-benar tersimpan (MARKET_DATA.md)
+        $canonicalPointsStored = $this->canRepo->countByRunId($runId);
+        $coveragePct = $expected > 0 ? ($canonicalPointsStored * 100.0 / $expected) : 0.0;
+
+        if ($coveragePct < $this->policy->coverageMinPct()) {
+            $status = 'CANONICAL_HELD';
+            $notes[] = 'Coverage below threshold: ' . number_format($coveragePct, 2) .
+                '% < ' . number_format($this->policy->coverageMinPct(), 2) . '%';
         }
         
         // Phase 2: Disagreement Major (multi-source)
@@ -449,11 +456,14 @@ final class ImportEodService
                     $notes[] = 'disagree_samples=' . implode(',', $parts);
                 }
 
-                $shouldHold = ($ratio >= 0.01) || ($disagreeMajor >= 20);
+                $holdDisagreeRatio = (float) config('trade.market_data.quality.hold_disagree_ratio_min', 0.01);
+                $holdDisagreeCount = (int) config('trade.market_data.quality.hold_disagree_count_min', 20);
+
+                $shouldHold = ($ratio >= $holdDisagreeRatio) || ($disagreeMajor >= $holdDisagreeCount);
                 if ($shouldHold) {
                     $status = 'CANONICAL_HELD';
                     $notes[] = 'held_reason=disagree_major';
-                    $notes[] = 'held_rule=ratio>=1% OR count>=20';
+                    $notes[] = 'held_rule=ratio>=' . number_format($holdDisagreeRatio * 100.0, 2) . '% OR count>=' . $holdDisagreeCount;
                 }
             }
         }
@@ -461,13 +471,16 @@ final class ImportEodService
         $missingTradingDay = 0;
 
         if ($status === 'SUCCESS') {
+            $minDayCoverageRatio = (float) config('trade.market_data.quality.min_day_coverage_ratio', 0.60);
+            $minPointsPerDay = (int) config('trade.market_data.quality.min_points_per_day', 5);
+
             $mt = $this->missingSvc->compute(
                 $runId,
                 $fromEff,
                 $toEff,
                 $targetTickers,
-                0.60, // 60% minimal per day
-                5
+                $minDayCoverageRatio,
+                $minPointsPerDay
             );
 
             $missingTradingDay = (int) ($mt['missing_days'] ?? 0);
@@ -479,10 +492,13 @@ final class ImportEodService
                 $notes[] = 'held_reason=missing_trading_day';
             } else {
                 $lowDays = (int) ($mt['low_coverage_days'] ?? 0);
-                if ($lowDays >= 2) {
+                $holdLowCoverageDaysMin = (int) config('trade.market_data.quality.hold_low_coverage_days_min', 2);
+
+                if ($lowDays >= $holdLowCoverageDaysMin) {
                     $notes[] = 'low_coverage_days=' . $lowDays;
                     $status = 'CANONICAL_HELD';
                     $notes[] = 'held_reason=low_coverage_days';
+                    $notes[] = 'held_rule=low_days>=' . $holdLowCoverageDaysMin;
                 }
             }
         }
@@ -509,16 +525,21 @@ final class ImportEodService
         }
 
 
-        // Kalau HELD -> hapus semua canonical yg terlanjur ke-upsert di batch sebelumnya
+        // Kalau HELD -> staging canonical tetap disimpan untuk audit/debug.
+        // Downstream tidak pernah membaca md_canonical_eod, dan publish menolak run non-SUCCESS.
         if ($status === 'CANONICAL_HELD') {
-            $this->canRepo->deleteByRunId($runId);
-            $notes[] = 'held_deleted_canonical: run_id=' . $runId;
+            $notes[] = 'held_kept_canonical: run_id=' . $runId;
         }
 
         $softFlagsTotal = (int) ($softFlags + $softFlagsGate);
 
+        // canonical_points sudah dihitung lebih awal (row count staging CANONICAL)
+
         $this->runs->finishRun($runId, [
             'status' => $status,
+            // MARKET_DATA.md telemetry
+            'expected_points' => (int) $expected,
+            'canonical_points' => (int) $canonicalPointsStored,
             'coverage_pct' => round($coveragePct, 2),
             'fallback_pct' => round($fallbackPct, 2),
             'hard_rejects' => (int) $hardRejects,
@@ -536,7 +557,7 @@ final class ImportEodService
             'target_tickers' => $targetTickers,
             'target_days' => $targetDays,
             'expected_points' => $expected,
-            'canonical_points' => $totalPicks,
+            'canonical_points' => (int) $canonicalPointsStored,
             'coverage_pct' => round($coveragePct, 2),
             'fallback_pct' => round($fallbackPct, 2),
             'hard_rejects' => (int) $hardRejects,

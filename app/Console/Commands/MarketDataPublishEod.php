@@ -8,7 +8,7 @@ use App\Services\MarketData\PublishEodService;
 final class MarketDataPublishEod extends Command
 {
     protected $signature = 'market-data:publish-eod
-        {--run_id= : Canonical run_id to publish (required)}
+        {--run= : Canonical run_id to publish (required)}
         {--batch=2000 : Batch size for chunking canonical rows}
     ';
 
@@ -25,11 +25,13 @@ final class MarketDataPublishEod extends Command
 
     public function handle(): int
     {
-        $runId = $this->option('run_id') !== null ? (int) $this->option('run_id') : 0;
+        $run = $this->option('run');
+
+        $runId = $run !== null ? (int) $run : 0;
         $batch = $this->option('batch') !== null ? (int) $this->option('batch') : 2000;
 
         if ($runId <= 0) {
-            $this->error('Missing/invalid --run_id');
+            $this->error('Missing/invalid --run');
             return 1;
         }
 

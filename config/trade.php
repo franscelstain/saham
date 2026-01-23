@@ -48,15 +48,11 @@ return [
         ],
     ],
     'market_data' => [
-        'default_provider' => env('TRADE_MD_PROVIDER', 'yahoo'),
         'eod' => [
             'lookback_trading_days' => env('TRADE_MD_LOOKBACK_TRADING_DAYS', 7),
         ],
         'gating' => [
             'coverage_min_pct' => env('TRADE_MD_COVERAGE_MIN', 95),
-        ],
-        'ohlc_eod' => [
-            'chunk_rows' => env('TRADE_MD_CHUNK_ROWS', 500),
         ],
         'providers' => [
             'yahoo' => [
@@ -86,12 +82,16 @@ return [
             'price_in_range_tolerance' => env('TRADE_MD_TOL', 0.0001),
             'disagree_major_pct' => env('TRADE_MD_DISAGREE_PCT', 2.0),
             'gap_extreme_pct' => env('TRADE_MD_GAP_EXTREME_PCT', 20.0),
+            // Additional HOLD gates (beyond simple coverage_pct) — see docs/MARKET_DATA.md
+            'hold_disagree_ratio_min' => env('TRADE_MD_HOLD_DISAGREE_RATIO_MIN', 0.01), // 0.01 = 1%
+            'hold_disagree_count_min' => env('TRADE_MD_HOLD_DISAGREE_COUNT_MIN', 20),
+            'min_day_coverage_ratio' => env('TRADE_MD_MIN_DAY_COVERAGE_RATIO', 0.60),
+            'min_points_per_day' => env('TRADE_MD_MIN_POINTS_PER_DAY', 5),
+            'hold_low_coverage_days_min' => env('TRADE_MD_HOLD_LOW_COVERAGE_DAYS_MIN', 2),
         ],
 
         // Validator settings (post-screener / post-candidate) - does NOT affect import coverage.
         'validator' => [
-            'enabled' => env('TRADE_MD_VALIDATOR_ENABLED', true),
-            'provider' => env('TRADE_MD_VALIDATOR_PROVIDER', 'eodhd'),
             'max_tickers' => env('TRADE_MD_VALIDATOR_MAX_TICKERS', 20),
             // Disagree threshold yang dipakai untuk badge/peringatan di UI.
             'disagree_major_pct' => env('TRADE_MD_VALIDATOR_DISAGREE_PCT', 1.5),
