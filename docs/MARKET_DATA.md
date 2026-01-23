@@ -45,6 +45,32 @@ Wajib bisa menjawab:
 
 ## 2) Reuse & Config Policy (aturan global)
 
+### 2.1 Konfigurasi `.env` yang dianggap “kontrak” (jangan diubah sembarangan)
+
+Dokumen ini sengaja menyebut **nama env key** supaya perilaku sistem tidak “berubah diam-diam”.
+Semua key di bawah **sudah dipakai di aplikasi** (lihat `config/trade.php`) dan sebaiknya diperlakukan sebagai kontrak.
+
+| Key | Default | Makna |
+|---|---:|---|
+| `TRADE_EOD_TZ` | `Asia/Jakarta` | Timezone tunggal untuk menentukan `trade_date` internal (WIB). |
+| `TRADE_EOD_CUTOFF_HOUR` / `TRADE_EOD_CUTOFF_MIN` | `16` / `30` | Cutoff EOD WIB. Menentukan `effective_end_date`. |
+| `TRADE_MD_PROVIDER` | `auto` | Mode provider utama (auto / yahoo / stooq / eodhd). |
+| `TRADE_MD_LOOKBACK_TRADING_DAYS` | `7` | Default range saat “run tanpa tanggal” (mundur N trading days). |
+| `TRADE_MD_COVERAGE_MIN` | `95.00` | Coverage minimal canonical (dalam %). Jika di bawah ini → `CANONICAL_HELD`. |
+| `TRADE_MD_TOL` | `0.002` | Toleransi perbandingan harga (misal 0.2%). Dipakai untuk disagreement check. |
+| `TRADE_MD_DISAGREE_PCT` | `1.50` | Threshold disagreement major antar sumber (dalam %). |
+| `TRADE_MD_GAP_EXTREME_PCT` | `30.00` | Threshold gap ekstrem (indikasi glitch/CA) untuk flag. |
+| `TRADE_MD_CHUNK_ROWS` | `5000` | Chunk size saat proses publish canonical (jaga performa). |
+| `TRADE_MD_VALIDATOR_ENABLED` | `true` | Aktif/nonaktif validator (quality cross-check). |
+| `TRADE_MD_VALIDATOR_PROVIDER` | `eodhd` | Provider validator (misal EODHD) untuk sampling kandidat. |
+| `TRADE_MD_VALIDATOR_MAX_TICKERS` | `20` | Maksimal ticker yang divalidasi per hari (hemat kuota). |
+| `TRADE_MD_VALIDATOR_DISAGREE_PCT` | `1.50` | Threshold mismatch validator (badges/flags). |
+
+Catatan:
+- Provider HTTP tuning (`TRADE_HTTP_*`, `TRADE_YAHOO_*`, `TRADE_EODHD_*`) adalah ops/performa; boleh diubah, tapi jangan mengubah definisi `trade_date`/cutoff.
+- `TRADE_MD_COVERAGE_MIN` adalah “saklar keselamatan”: lebih baik **hold** daripada publish salah.
+
+
 Aturan **reuse lintas modul** dan **kebijakan config lintas modul** adalah aturan global TradeAxis.
 
 - Referensi: `SRP_Performa.md` (bagian *Shared/Public Component* + *Config Policy*).
@@ -136,6 +162,45 @@ Pisahkan tanggung jawab. Minimal peran konseptual berikut harus jelas:
 ## 5) RAW vs CANONICAL (Kunci supaya tidak mudah rusak)
 
 ### 5.1 RAW = bukti mentah dari semua sumber
+
+### 5.0 Kontrak Storage (tabel & status) — supaya downstream tidak salah baca
+
+Implementasi Market Data menyimpan jejak run, RAW, dan CANONICAL ke tabel berikut:
+
+#### A) `md_runs` — satu baris = satu run (telemetry minimal)
+Kolom kunci:
+- `run_id` (PK), `job` (default `import_eod`), `run_mode` (`FETCH` / `PUBLISH`), `timezone`, `cutoff`
+- `effective_start_date`, `effective_end_date`
+- target: `target_tickers`, `target_days`
+- status: `RUNNING | SUCCESS | CANONICAL_HELD | FAILED`
+- metrik ringkas: `coverage_pct`, `fallback_pct`, `hard_rejects`, `soft_flags`, `disagree_major`, `missing_trading_day`
+- `notes` untuk ringkasan masalah dominan
+
+**Kontrak penting untuk downstream (ComputeEOD/Watchlist/Portfolio):**
+- Jika status terakhir untuk `effective_end_date` adalah `CANONICAL_HELD` / `FAILED`, downstream **tidak boleh** pakai tanggal itu; harus fallback ke *last good trade_date*.
+
+#### B) `md_raw_eod` — bukti mentah multi-source
+Kontrak:
+- unik: `(run_id, ticker_id, trade_date, source)`
+- kolom kualitas: `hard_valid` + `flags` + `error_code/error_msg`
+- `source_ts` disimpan untuk audit timezone/shift
+
+RAW boleh “kotor”; itulah tujuannya. RAW adalah log bukti.
+
+#### C) `ticker_ohlc_daily` — CANONICAL OHLC harian (satu kebenaran)
+Kontrak:
+- unik: `(ticker_id, trade_date)` (index `uq_ohlc_daily_ticker_date`)
+- kolom: `open, high, low, close, adj_close, volume`
+- `price_basis` = `close | adj_close` (basis yang dipilih saat publish canonical)
+- corporate action hints: `ca_hint`, `ca_event` (jika ada indikasi split/discontinuity)
+- `source` = sumber canonical yang dipilih (mis. `yahoo`, `stooq`, `eodhd`, dll)
+- `run_id` opsional untuk tracing run
+
+Downstream membaca **hanya** `ticker_ohlc_daily` untuk OHLC harian.
+
+> Kenapa kontrak ini perlu ditulis di dokumen?
+> Karena bug paling sering bukan di perhitungan indikator, tapi di *salah baca tabel*, *tanggal*, atau *run yang belum valid*.
+
 RAW disimpan walau:
 - invalid,
 - disagreement,
@@ -270,6 +335,34 @@ Prinsip:
 ---
 
 ## 11) Observability: supaya tidak rusak diam-diam
+
+### 11.1 Run Summary minimal (wajib tercatat setelah setiap run)
+
+Setelah setiap run, sistem **wajib** dapat menghasilkan ringkasan seperti berikut (minimal):
+
+- `run_id`
+- `effective_start_date .. effective_end_date`
+- `status` (SUCCESS / CANONICAL_HELD / FAILED)
+- `coverage_pct`, `fallback_pct`
+- `hard_rejects`, `soft_flags`, `disagree_major`, `missing_trading_day`
+- `notes` (alasan dominan)
+
+Contoh ringkas (human readable):
+
+```
+run_id: 16
+status: CANONICAL_HELD
+range: 2026-01-19 .. 2026-01-19
+target_tickers: 901, target_days: 1
+coverage_pct: 88.01, fallback_pct: 0.00
+hard_rejects: 0, soft_flags: 0, disagree_major: 0, missing_trading_day: 0
+notes: Coverage below threshold: 88.01% < 95.00%
+```
+
+**Kontrak ops:**
+- `CANONICAL_HELD` berarti: RAW boleh lengkap, tapi CANONICAL **tidak dipublish** untuk tanggal itu.
+- Downstream wajib menahan diri: gunakan tanggal terakhir yang `SUCCESS`.
+
 
 Health summary minimal per run:
 - effective date range (cutoff result)

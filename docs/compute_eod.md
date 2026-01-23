@@ -76,6 +76,134 @@ Indikator adalah **alat ukur**, bukan sinyal beli.
 
 ---
 
+### 3.2 Kontrak Output (tabel `ticker_indicators_daily`) — dipakai Watchlist & Portfolio
+
+Compute EOD menulis **1 baris per (ticker_id, trade_date)** ke tabel `ticker_indicators_daily` (unik `uq_ind_daily_ticker_date`).
+
+Kolom yang paling penting (ringkas):
+
+**Snapshot EOD (untuk audit/debug)**
+- `open, high, low, close` = harga real close hari itu (dari canonical).
+- `basis_used` = `close | adj_close` (basis yang dipakai untuk indikator).
+- `price_used` = harga yang dipakai untuk MA/RSI (hasil basis policy).
+- `volume` = volume canonical (unit internal).
+
+**Indikator**
+- `ma20, ma50, ma200` (rolling SMA, basis: `price_used`)
+- `rsi14` (Wilder RSI 14, basis: `price_used`)
+- `atr14` (Wilder ATR 14, basis: **real** high/low/close)
+- `support_20d`, `resistance_20d` (rolling 20D, **exclude today**)
+- `vol_sma20`, `vol_ratio` (exclude today)
+
+**Klasifikasi**
+- `signal_code`, `volume_label_code`, `decision_code`
+- `signal_first_seen_date`, `signal_age_days` (streak / umur sinyal)
+
+Catatan:
+- Skor (`score_*`) boleh diisi belakangan (tidak wajib untuk kontrak ComputeEOD v1.0), tapi kolomnya sudah tersedia.
+
+---
+
+### 3.3 Price Basis Policy (konsisten lintas domain)
+
+Tujuan: indikator tidak “palsu” saat ada corporate action (split/discontinuity) dan tetap audit-able.
+
+Aturan yang dipakai aplikasi (`PriceBasisPolicy`):
+- Untuk indikator (MA/RSI):  
+  - kalau `adj_close` tersedia dan > 0 → pakai `adj_close` (`basis_used = adj_close`, `price_used = adj_close`)
+  - kalau tidak → pakai `close` (`basis_used = close`, `price_used = close`)
+- Untuk trading/portfolio valuation harian: **selalu pakai `close` real** (bukan `adj_close`), kecuali kamu memang menerapkan *fully-adjusted valuation* (tidak disarankan sebelum CA pipeline matang).
+
+---
+
+### 3.4 Definisi Perhitungan (yang harus sama persis supaya hasil tidak mismatch)
+
+#### A) Rolling window = trading days
+- Lookback untuk ambil data canonical harus berbasis **trading days** (market calendar), bukan kalender.
+- Konfigurasi yang mengendalikan ini:
+  - `TRADE_LOOKBACK_DAYS` (default 260)
+  - `TRADE_EOD_WARMUP_EXTRA_TRADING_DAYS` (default 60)
+
+#### B) SMA (MA20/50/200)
+- SMA N dihitung dari **N trading bars terakhir** dari `price_used`.
+- Rounding output: `round(., 4)`.
+
+#### C) RSI Wilder 14
+- RSI memakai metode **Wilder smoothing** (bukan simple average).
+- Input harga: `price_used`.
+- Rounding output: `round(., 2)` (sesuai tipe kolom DB `decimal(6,2)`).
+
+#### D) ATR Wilder 14
+- ATR memakai metode **Wilder**.
+- Input: **real** `high, low, close` (bukan `adj_close`).
+- Rounding output: `round(., 4)`.
+
+#### E) Support/Resistance 20D (exclude today)
+- `support_20d` = **min(low)** dari **20 trading days sebelum trade_date**.
+- `resistance_20d` = **max(high)** dari **20 trading days sebelum trade_date**.
+- “Exclude today” itu wajib supaya levelnya tidak bias oleh candle hari ini.
+
+#### F) Volume SMA20 & Volume Ratio (exclude today)
+- `vol_sma20` = rata-rata volume dari **20 trading days sebelum trade_date**.
+- `vol_ratio` = `today_volume / vol_sma20` (dibulatkan `round(., 4)`).
+- Jika `vol_sma20` belum tersedia → `vol_ratio = NULL`.
+
+---
+
+### 3.5 Guardrails kualitas data (wajib agar output tidak menipu)
+
+#### A) Invalid bar pada trade_date → skip / flag
+Jika canonical bar untuk `trade_date` invalid (harga null/<=0, high<low, volume null/negatif), bar **tidak boleh ikut rolling**.
+
+#### B) Insufficient window → indikator NULL + keputusan dipaksa aman
+Jika ada indikator penting yang masih NULL karena history kurang:
+- emit warning ke log domain `compute_eod`
+- dan keputusan **tidak boleh terlihat “Layak/Perlu Konfirmasi”**  
+  Implementasi memaksa:
+  - jika `decision_code >= 4` → set jadi `decision_code = 2 (Hindari)`
+
+#### C) Corporate action hint/event pada trade_date → STOP rekomendasi
+Jika canonical menyertakan `ca_event` atau `ca_hint` pada `trade_date`:
+- output bar netral: indikator NULL
+- `decision_code = 2 (Hindari)`
+- action yang benar: **rebuild canonical range** dulu, lalu rerun compute-eod untuk range itu.
+
+---
+
+### 3.6 Mapping Code (supaya UI & downstream tidak salah tafsir)
+
+#### Signal Code (`signal_code`)
+0 Unknown  
+1 Base / Sideways  
+2 Early Uptrend  
+3 Accumulation  
+4 Breakout  
+5 Strong Breakout  
+6 Breakout Retest  
+7 Pullback Healthy  
+8 Distribution  
+9 Climax / Euphoria  
+10 False Breakout  
+
+#### Volume Label Code (`volume_label_code`)
+1 Dormant  
+2 Ultra Dry  
+3 Quiet  
+4 Normal  
+5 Early Interest  
+6 Volume Burst / Accumulation  
+7 Strong Burst / Breakout  
+8 Climax / Euphoria  
+
+#### Decision Code (`decision_code`)
+1 False Breakout / Batal  
+2 Hindari  
+3 Hati-hati  
+4 Perlu Konfirmasi  
+5 Layak Beli  
+
+> Kontrak penting: Decision sudah mengandung override anti-kontradiksi (mis. false breakout, climax).
+
 ## 4. Signal (Signal Code)
 
 ### Apa itu Signal?

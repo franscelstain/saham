@@ -57,6 +57,21 @@ Aksi: freeze canonical, rollback/rebuild, audit dampak.
 
 ## 2) Sinyal Deteksi (wajib dicek setelah setiap run)
 
+### Output yang dicek operator (sumber kebenaran)
+
+Sinyal deteksi diambil dari 2 tempat:
+
+1) `md_runs` (telemetry ringkas run)  
+   - status: `RUNNING | SUCCESS | CANONICAL_HELD | FAILED`
+   - metrik: `coverage_pct`, `fallback_pct`, `hard_rejects`, `soft_flags`, `disagree_major`, `missing_trading_day`
+   - `notes` = ringkasan masalah dominan
+
+2) `md_raw_eod` (bukti mentah) + sample `ticker_ohlc_daily` (canonical)  
+   - dipakai untuk verifikasi cepat: timezone shift, partial candle, mapping error, unit volume
+
+Kalau `md_runs.status` bukan `SUCCESS`, anggap downstream **tidak aman** sampai investigasi selesai.
+
+
 Cek minimal:
 1) **Effective date range** (cutoff benar?)
 2) **Coverage** (% ticker punya bar di trading day terbaru)
