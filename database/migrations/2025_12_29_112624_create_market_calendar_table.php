@@ -20,6 +20,9 @@ class CreateMarketCalendarTable extends Migration
             $table->boolean('is_trading_day')->default(true);
 
             $table->string('holiday_name', 120)->nullable();
+            $table->string('session_open_time', 5)->nullable();
+            $table->string('session_close_time', 5)->nullable();
+            $table->text('breaks_json')->nullable();
             $table->string('source', 120)->nullable();
 
             $table->timestamp('created_at')->useCurrent();
