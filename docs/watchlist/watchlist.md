@@ -10,7 +10,7 @@ Dokumen ini adalah **kontrak lintas-policy**: schema output, data dictionary, go
 
 **Single source of truth untuk angka/threshold/rules per strategi ada di policy docs:**
 - `weekly_swing.md`
-- `dividen_swing.md`
+- `dividend_swing.md`
 - `intraday_light.md`
 - `position_trade.md`
 - `no_trade.md`
@@ -790,7 +790,7 @@ Eligibility rules harus ditulis di dokumen policy masing-masing (atau doc router
 Read order (wajib):
 1) `watchlist.md` (dokumen ini)
 2) `weekly_swing.md`
-3) `dividen_swing.md`
+3) `dividend_swing.md`
 4) `intraday_light.md`
 5) `position_trade.md`
 6) `no_trade.md`
