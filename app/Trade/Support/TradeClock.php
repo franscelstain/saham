@@ -19,7 +19,7 @@ final class TradeClock
         if (self::$cfg) return self::$cfg->timezone();
 
         // Fallback for safety (app may call TradeClock before providers boot)
-        return (string) config('trade.clock.timezone', 'Asia/Jakarta');
+        return 'Asia/Jakarta';
     }
 
     public static function now(?Carbon $now = null): Carbon
@@ -38,7 +38,7 @@ final class TradeClock
         if (self::$cfg) return self::$cfg->eodCutoffHour();
 
         // Fallback for safety
-        return (int) config('trade.clock.eod_cutoff.hour', 16);
+        return 16;
     }
 
     public static function eodCutoffMin(): int
@@ -46,7 +46,7 @@ final class TradeClock
         if (self::$cfg) return self::$cfg->eodCutoffMin();
 
         // Fallback for safety
-        return (int) config('trade.clock.eod_cutoff.min', 30);
+        return 30;
     }
 
     public static function isBeforeEodCutoff(?Carbon $now = null): bool

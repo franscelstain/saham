@@ -42,4 +42,9 @@ final class TradeClockConfig
     {
         return $this->eodCutoffMin;
     }
+
+    public function eodCutoffHms(): string
+    {
+        return sprintf('%02d:%02d:00', $this->eodCutoffHour(), $this->eodCutoffMin());
+    }
 }

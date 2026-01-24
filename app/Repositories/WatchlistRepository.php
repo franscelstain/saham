@@ -29,8 +29,6 @@ class WatchlistRepository
             ->pluck('cal_date')
             ->all();
 
-        $aMin = (float) config('trade.watchlist.liq.dv20_a_min', 20000000000);
-        $bMin = (float) config('trade.watchlist.liq.dv20_b_min', 5000000000);
 
         // dv20 = avg(close*volume) for those dates
         $dv20Sub = null;
@@ -68,21 +66,6 @@ class WatchlistRepository
                 $join->on('ti.ticker_id', '=', 'dv.ticker_id');
             });
         }
-
-        $liqCase = "CASE
-"
-            . " WHEN dv.dv20 IS NULL THEN 'U'
-"
-            . " WHEN dv.dv20 >= {$aMin} THEN 'A'
-"
-            . " WHEN dv.dv20 >= {$bMin} THEN 'B'
-"
-            . " WHEN dv.dv20 > 0 THEN 'C'
-"
-            . " ELSE 'U'
-"
-            . " END";
-
         $select = [
             't.ticker_id',
             't.ticker_code',
@@ -136,7 +119,7 @@ class WatchlistRepository
 
         if ($dv20Sub) {
             $select[] = DB::raw('dv.dv20 as dv20');
-            $select[] = DB::raw("{$liqCase} as liq_bucket");
+            $select[] = DB::raw("NULL as liq_bucket");
         } else {
             $select[] = DB::raw('NULL as dv20');
             $select[] = DB::raw("'U' as liq_bucket");

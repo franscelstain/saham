@@ -4,6 +4,13 @@ namespace App\Trade\Planning;
 
 class PlanValidator
 {
+    private PlanningPolicy $policy;
+
+    public function __construct(PlanningPolicy $policy)
+    {
+        $this->policy = $policy;
+    }
+
     public function validate(TradePlan $p): array
     {
         $errors = [];
@@ -24,13 +31,12 @@ class PlanValidator
             $errors[] = 'TP2_BELOW_TP1';
         }
 
-        // BE biasanya berada di atas entry (karena fee), tapi jangan terlalu jauh
         if (!($p->be >= $p->entry)) {
             $errors[] = 'BE_BELOW_ENTRY';
         }
 
         // RR minimal (net)
-        $minRR = (float) config('trade.planning.min_rr_tp2', 1.5);
+        $minRR = $this->policy->minRrTp2();
         if ($p->rrTp2 < $minRR) {
             $errors[] = 'RR_TP2_TOO_LOW';
         }

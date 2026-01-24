@@ -11,6 +11,7 @@ use App\Repositories\MarketData\RawEodRepository;
 use App\Trade\MarketData\Config\ImportPolicy;
 use App\Trade\MarketData\Config\QualityRules;
 use App\Trade\MarketData\Config\ProviderPriority;
+use App\Trade\MarketData\Config\ImportHoldRules;
 
 use App\Trade\MarketData\Normalize\EodBarNormalizer;
 use App\Trade\MarketData\Providers\Contracts\EodProvider;
@@ -65,6 +66,12 @@ final class ImportEodService
     /** @var SoftQualityRulesService */
     private $softQualitySvc;
 
+    /** @var ImportHoldRules */
+    private $holdRules;
+
+    /** @var int */
+    private $httpPoolConc;
+
 
     public function __construct(
         ImportPolicy $policy,
@@ -78,6 +85,8 @@ final class ImportEodService
         DisagreementMajorService $disagreeSvc,
         MissingTradingDayService $missingSvc,
         SoftQualityRulesService $softQualitySvc,
+        ImportHoldRules $holdRules,
+        int $httpPoolConc,
         array $providersByName // bind this in ServiceProvider: ['yahoo' => YahooEodProvider]
     ) {
         $this->policy = $policy;
@@ -90,6 +99,8 @@ final class ImportEodService
         $this->disagreeSvc = $disagreeSvc;
         $this->missingSvc = $missingSvc;
         $this->softQualitySvc = $softQualitySvc;
+        $this->holdRules = $holdRules;
+        $this->httpPoolConc = max(1, $httpPoolConc);
 
 
         $this->providersByName = [];
@@ -200,7 +211,7 @@ final class ImportEodService
         $tickerChunks = array_chunk($tickerRows, max(1, $chunkSize));
 
         // perf: fetch per-provider in parallel per chunk (still 1 req per symbol, but concurrent)
-        $poolConc = max(1, (int) config('trade.perf.http_pool', 15));
+        $poolConc = $this->httpPoolConc;
 
         foreach ($tickerChunks as $chunk) {
             // Prefetch results for this chunk to avoid serial HTTP per ticker.
@@ -456,8 +467,8 @@ final class ImportEodService
                     $notes[] = 'disagree_samples=' . implode(',', $parts);
                 }
 
-                $holdDisagreeRatio = (float) config('trade.market_data.quality.hold_disagree_ratio_min', 0.01);
-                $holdDisagreeCount = (int) config('trade.market_data.quality.hold_disagree_count_min', 20);
+                $holdDisagreeRatio = $this->holdRules->holdDisagreeRatioMin();
+                $holdDisagreeCount = $this->holdRules->holdDisagreeCountMin();
 
                 $shouldHold = ($ratio >= $holdDisagreeRatio) || ($disagreeMajor >= $holdDisagreeCount);
                 if ($shouldHold) {
@@ -471,8 +482,8 @@ final class ImportEodService
         $missingTradingDay = 0;
 
         if ($status === 'SUCCESS') {
-            $minDayCoverageRatio = (float) config('trade.market_data.quality.min_day_coverage_ratio', 0.60);
-            $minPointsPerDay = (int) config('trade.market_data.quality.min_points_per_day', 5);
+            $minDayCoverageRatio = $this->holdRules->minDayCoverageRatio();
+            $minPointsPerDay = $this->holdRules->minPointsPerDay();
 
             $mt = $this->missingSvc->compute(
                 $runId,
@@ -492,7 +503,7 @@ final class ImportEodService
                 $notes[] = 'held_reason=missing_trading_day';
             } else {
                 $lowDays = (int) ($mt['low_coverage_days'] ?? 0);
-                $holdLowCoverageDaysMin = (int) config('trade.market_data.quality.hold_low_coverage_days_min', 2);
+                $holdLowCoverageDaysMin = $this->holdRules->holdLowCoverageDaysMin();
 
                 if ($lowDays >= $holdLowCoverageDaysMin) {
                     $notes[] = 'low_coverage_days=' . $lowDays;

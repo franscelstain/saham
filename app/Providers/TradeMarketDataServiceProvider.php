@@ -7,6 +7,7 @@ use App\Services\MarketData\ImportEodService;
 use App\Trade\MarketData\Config\ImportPolicy;
 use App\Trade\MarketData\Config\ProviderPriority;
 use App\Trade\MarketData\Config\QualityRules;
+use App\Trade\MarketData\Config\ImportHoldRules;
 use App\Trade\MarketData\Config\ValidatorPolicy;
 use App\Trade\MarketData\Providers\Contracts\EodProvider;
 use App\Trade\MarketData\Providers\Yahoo\YahooEodProvider;
@@ -38,6 +39,23 @@ class TradeMarketDataServiceProvider extends ServiceProvider
             $gapPct = (float) config('trade.market_data.quality.gap_extreme_pct', 20.0);
 
             return new QualityRules($tol, $disagreePct, $gapPct);
+        });
+
+
+        $this->app->singleton(ImportHoldRules::class, function () {
+            $holdDisagreeRatio = (float) config('trade.market_data.quality.hold_disagree_ratio_min', 0.01);
+            $holdDisagreeCount = (int) config('trade.market_data.quality.hold_disagree_count_min', 20);
+            $minDayCoverageRatio = (float) config('trade.market_data.quality.min_day_coverage_ratio', 0.60);
+            $minPointsPerDay = (int) config('trade.market_data.quality.min_points_per_day', 5);
+            $holdLowCoverageDaysMin = (int) config('trade.market_data.quality.hold_low_coverage_days_min', 2);
+
+            return new ImportHoldRules(
+                $holdDisagreeRatio,
+                $holdDisagreeCount,
+                $minDayCoverageRatio,
+                $minPointsPerDay,
+                $holdLowCoverageDaysMin
+            );
         });
 
         // Validator policy (Phase 7) to avoid config() reads inside service.
@@ -86,6 +104,8 @@ class TradeMarketDataServiceProvider extends ServiceProvider
                 $app->make(DisagreementMajorService::class),
                 $app->make(MissingTradingDayService::class),
                 $app->make(SoftQualityRulesService::class),
+                $app->make(ImportHoldRules::class),
+                (int) config('trade.perf.http_pool', 15),
                 $app->make('md.eod.providers_map')
             );
         });

@@ -2,13 +2,15 @@
 
 namespace App\DTO\Watchlist;
 
-use App\Trade\Explain\LabelCatalog;
 
+/**
+ * CandidateInput (DTO)
+ *
+ * DTO murni: hanya data + normalisasi tipe sederhana.
+ * Semua derivasi (liq bucket, CA gate, candle flags) dilakukan oleh builder/service terpisah.
+ */
 class CandidateInput
 {
-    /** Raw row (normalized) for downstream engine consumption. */
-    private array $raw = [];
-
     public int $tickerId;
     public string $code;
     public string $name;
@@ -17,20 +19,20 @@ class CandidateInput
     public ?float $open = null;
     public ?float $high = null;
     public ?float $low = null;
-    public float $close;
+    public float $close = 0.0;
     public ?int $volume = null;
 
-    // prev candle (for gap + candle flags)
+    // prev candle
     public ?float $prevOpen = null;
     public ?float $prevHigh = null;
     public ?float $prevLow = null;
     public ?float $prevClose = null;
 
     // indicators
-    public float $ma20;
-    public float $ma50;
-    public float $ma200;
-    public float $rsi;
+    public float $ma20 = 0.0;
+    public float $ma50 = 0.0;
+    public float $ma200 = 0.0;
+    public float $rsi = 0.0;
     public ?float $volSma20 = null;
     public ?float $volRatio = null;
     public ?float $atr14 = null;
@@ -38,9 +40,9 @@ class CandidateInput
     public ?float $resistance20d = null;
 
     // derived proxies
-    public ?float $valueEst = null; // close*volume (today)
-    public ?float $dv20 = null;     // SMA20(close*volume) over 20 prior trading days (exclude today)
-    public ?string $liqBucket = null; // A/B/C/U
+    public ?float $valueEst = null;
+    public ?float $dv20 = null;
+    public ?string $liqBucket = null;
 
     // indicators (CA / validity)
     public ?float $adjClose = null;
@@ -52,42 +54,38 @@ class CandidateInput
     // watchlist / ranking
     public ?float $scoreTotal = null;
 
-    // corporate action gate (heuristic)
+    // derived: corporate action gate (heuristic)
     public bool $corpActionSuspected = false;
-    public ?float $corpActionRatio = null; // close/prevClose
+    public ?float $corpActionRatio = null;
 
     // decision / signal
-    public int $decisionCode;
-    public int $signalCode;
-    public int $volumeLabelCode;
+    public int $decisionCode = 0;
+    public int $signalCode = 0;
+    public int $volumeLabelCode = 0;
 
-    public string $decisionLabel;
-    public string $signalLabel;
-    public string $volumeLabel;
+    public string $decisionLabel = '';
+    public string $signalLabel = '';
+    public string $volumeLabel = '';
 
     // expiry
     public ?string $signalFirstSeenDate = null;
     public ?int $signalAgeDays = null;
 
     // date
-    public string $tradeDate;
+    public string $tradeDate = '';
 
-    // candle structure ratios (0..1)
+    // derived: candle structure
     public ?float $candleBodyPct = null;
     public ?float $candleUpperWickPct = null;
     public ?float $candleLowerWickPct = null;
     public ?bool $isInsideDay = null;
-    public ?string $engulfingType = null; // bull|bear|null
+    public ?string $engulfingType = null;
     public ?bool $isLongUpperWick = null;
     public ?bool $isLongLowerWick = null;
-
     public ?bool $closeNearHigh = null;
 
     public function __construct(array $row)
     {
-        // keep original row, will be normalized
-        $this->raw = $row;
-
         $this->tickerId = (int)($row['ticker_id'] ?? 0);
         $this->code = (string)($row['ticker_code'] ?? '');
         $this->name = (string)($row['company_name'] ?? '');
@@ -128,22 +126,22 @@ class CandidateInput
         $this->decisionCode = (int)($row['decision_code'] ?? 0);
         $this->signalCode = (int)($row['signal_code'] ?? 0);
         $this->volumeLabelCode = (int)($row['volume_label_code'] ?? 0);
-
-        $this->decisionLabel = LabelCatalog::decision($this->decisionCode);
-        $this->signalLabel = LabelCatalog::signal($this->signalCode);
-        $this->volumeLabel = LabelCatalog::volumeLabel($this->volumeLabelCode);
+        // labels are filled by orchestrator (WatchlistEngine) to keep DTO pure.
 
         $this->signalFirstSeenDate = !empty($row['signal_first_seen_date']) ? (string)$row['signal_first_seen_date'] : null;
         $this->signalAgeDays = isset($row['signal_age_days']) ? (int)$row['signal_age_days'] : null;
 
         $this->tradeDate = (string)($row['trade_date'] ?? '');
+    }
 
-        $this->computeCorporateActionGate();
-
-        $this->computeCandleFlags();
-
-        // normalize raw row for engine consumption
-        $this->raw = array_merge($this->raw, [
+    /**
+     * Array view used by WatchlistEngine.
+     *
+     * NOTE: keys here are part of internal watchlist data dictionary.
+     */
+    public function toArray(): array
+    {
+        return [
             'ticker_id' => $this->tickerId,
             'ticker_code' => $this->code,
             'company_name' => $this->name,
@@ -204,84 +202,6 @@ class CandidateInput
             'is_long_upper_wick' => $this->isLongUpperWick,
             'is_long_lower_wick' => $this->isLongLowerWick,
             'close_near_high' => $this->closeNearHigh,
-        ]);
-    }
-
-    /**
-     * Array view used by WatchlistEngine.
-     *
-     * NOTE: keys here are part of internal watchlist data dictionary.
-     */
-    public function toArray(): array
-    {
-        return $this->raw;
-    }
-
-    private function computeCorporateActionGate(): void
-    {
-        // Heuristic: indikasi split/reverse split/unadjusted corporate action
-        // Jika harga berubah drastis (rasio) antar hari, indikator EOD berpotensi palsu.
-        if ($this->prevClose === null || $this->prevClose <= 0 || $this->close <= 0) return;
-
-        $ratio = $this->close / $this->prevClose;
-        $this->corpActionRatio = round($ratio, 6);
-
-        $min = (float) config('trade.watchlist.corporate_action.suspect_ratio_min', 0.55);
-        $max = (float) config('trade.watchlist.corporate_action.suspect_ratio_max', 1.80);
-
-        $suspect = ($ratio <= $min) || ($ratio >= $max);
-
-        // tambahan: gunakan open juga untuk menangkap perubahan struktural saat close belum ada (atau stale)
-        if (!$suspect && $this->open !== null && $this->open > 0) {
-            $openRatio = $this->open / $this->prevClose;
-            if ($openRatio <= $min || $openRatio >= $max) $suspect = true;
-        }
-
-        $this->corpActionSuspected = (bool) $suspect;
-    }
-
-    private function computeCandleFlags(): void
-    {
-        if ($this->open === null || $this->high === null || $this->low === null) return;
-        $range = $this->high - $this->low;
-        if ($range <= 0) return;
-
-        $o = $this->open;
-        $c = $this->close;
-        $h = $this->high;
-        $l = $this->low;
-
-        $body = abs($c - $o) / $range;
-        $upper = ($h - max($o, $c)) / $range;
-        $lower = (min($o, $c) - $l) / $range;
-
-        $this->candleBodyPct = round($body, 4);
-        $this->candleUpperWickPct = round($upper, 4);
-        $this->candleLowerWickPct = round($lower, 4);
-
-
-        // close_near_high (watchlist.md definition): ((high-close)/max(high-low,1))<=0.25
-        $den = max($range, 1.0);
-        $this->closeNearHigh = (((($h - $c) / $den)) <= 0.25);
-
-        $thr = (float) config('trade.watchlist.candle.long_wick_pct', 0.55);
-        $this->isLongUpperWick = ($this->candleUpperWickPct !== null) ? ($this->candleUpperWickPct >= $thr) : null;
-        $this->isLongLowerWick = ($this->candleLowerWickPct !== null) ? ($this->candleLowerWickPct >= $thr) : null;
-
-        if ($this->prevHigh !== null && $this->prevLow !== null) {
-            $this->isInsideDay = ($h <= $this->prevHigh) && ($l >= $this->prevLow);
-        }
-
-        // engulfing
-        if ($this->prevOpen !== null && $this->prevClose !== null) {
-            $po = $this->prevOpen;
-            $pc = $this->prevClose;
-
-            $bull = ($c > $o) && ($pc < $po) && ($c >= $po) && ($o <= $pc);
-            $bear = ($c < $o) && ($pc > $po) && ($c <= $po) && ($o >= $pc);
-
-            if ($bull) $this->engulfingType = 'bull';
-            elseif ($bear) $this->engulfingType = 'bear';
-        }
+        ];
     }
 }

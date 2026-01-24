@@ -3,6 +3,7 @@
 namespace App\Trade\Watchlist;
 
 use App\DTO\Watchlist\CandidateInput;
+use App\Trade\Explain\LabelCatalog;
 use App\Repositories\DividendEventRepository;
 use App\Repositories\IntradaySnapshotRepository;
 use App\Repositories\MarketBreadthRepository;
@@ -10,6 +11,10 @@ use App\Repositories\MarketCalendarRepository;
 use App\Repositories\PortfolioPositionRepository;
 use App\Repositories\TickerStatusRepository;
 use App\Repositories\WatchlistRepository;
+use App\Trade\Pricing\FeeConfig;
+use App\Trade\Pricing\TickRule;
+use App\Trade\Support\TradeClockConfig;
+use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
 use App\Trade\Watchlist\Contracts\WatchlistContractValidator;
 
 /**
@@ -30,8 +35,14 @@ class WatchlistEngine
     private TickerStatusRepository $statusRepo;
     private PortfolioPositionRepository $posRepo;
 
+    private TickRule $tickRule;
+
     private WatchlistContractValidator $validator;
     private SetupTypeClassifier $setupClassifier;
+
+    private CandidateDerivedMetricsBuilder $derivedBuilder;
+    private TradeClockConfig $clockCfg;
+    private WatchlistPolicyConfig $cfg;
 
     /** Defaults from docs/watchlist/watchlist.md Section 2.4 */
     private float $buyFeePct;
@@ -45,7 +56,12 @@ class WatchlistEngine
         DividendEventRepository $divRepo,
         IntradaySnapshotRepository $intraRepo,
         TickerStatusRepository $statusRepo,
-        PortfolioPositionRepository $posRepo
+        PortfolioPositionRepository $posRepo,
+        TickRule $tickRule,
+        FeeConfig $feeCfg,
+        TradeClockConfig $clockCfg,
+        WatchlistPolicyConfig $cfg,
+        CandidateDerivedMetricsBuilder $derivedBuilder
     ) {
         $this->watchRepo = $watchRepo;
         $this->breadthRepo = $breadthRepo;
@@ -55,12 +71,18 @@ class WatchlistEngine
         $this->statusRepo = $statusRepo;
         $this->posRepo = $posRepo;
 
+        $this->tickRule = $tickRule;
+
+        $this->clockCfg = $clockCfg;
+        $this->cfg = $cfg;
+        $this->derivedBuilder = $derivedBuilder;
+
         $this->validator = new WatchlistContractValidator();
         $this->setupClassifier = new SetupTypeClassifier();
 
-        $this->buyFeePct = (float) config('trade.fees.buy_rate', 0.0015);
-        $this->sellFeePct = (float) config('trade.fees.sell_rate', 0.0025);
-        $this->slippagePct = (float) config('trade.fees.slippage_rate', 0.0005);
+        $this->buyFeePct = $feeCfg->buyRate();
+        $this->sellFeePct = $feeCfg->sellRate();
+        $this->slippagePct = $feeCfg->slippageRate();
     }
 
     /**
@@ -78,7 +100,7 @@ class WatchlistEngine
 
 public function build(array $opts = []): array
     {
-        $tz = (string) config('trade.clock.timezone', 'Asia/Jakarta');
+        $tz = $this->clockCfg->timezone();
         $nowTs = $opts['now_ts'] ?? null;
         try {
             $now = $nowTs ? new \DateTimeImmutable((string)$nowTs) : new \DateTimeImmutable('now', new \DateTimeZone($tz));
@@ -96,18 +118,16 @@ public function build(array $opts = []): array
         // - otherwise: previous trading day
         // Cutoff time for deciding as_of_trade_date.
         // Prefer explicit override, otherwise fall back to global EOD cutoff (trade.clock.eod_cutoff).
-        $cutoffHms = (string) config('trade.watchlist.eod_cutoff_time', '');
+        $cutoffHms = (string)($this->cfg->eodCutoffTimeOverride() ?? '');
         if (trim($cutoffHms) === '') {
-            $h = (int) config('trade.clock.eod_cutoff.hour', 16);
-            $m = (int) config('trade.clock.eod_cutoff.min', 30);
-            $cutoffHms = sprintf('%02d:%02d:00', $h, $m);
+            $cutoffHms = $this->clockCfg->eodCutoffHms();
         }
         $asOfTradeDate = $this->computeAsOfTradeDate($now, $cutoffHms);
 
         // Requested policy can be explicit (e.g. WEEKLY_SWING) or AUTO (router).
         $requestedPolicy = strtoupper(trim((string)($opts['policy'] ?? '')));
         if ($requestedPolicy === '') {
-            $requestedPolicy = strtoupper((string) config('trade.watchlist.policy_default', 'AUTO'));
+            $requestedPolicy = strtoupper($this->cfg->policyDefault());
         }
 
         $allowedPolicies = ['WEEKLY_SWING','DIVIDEND_SWING','INTRADAY_LIGHT','POSITION_TRADE','NO_TRADE','AUTO'];
@@ -132,8 +152,8 @@ public function build(array $opts = []): array
         $eodReady = $eodCanonicalReady;
 
         // Market regime (breadth)
-        $mrEnabled = (bool) config('trade.watchlist.market_regime_enabled', true);
-        $thresholds = (array) config('trade.watchlist.market_regime_thresholds', []);
+        $mrEnabled = (bool) $this->cfg->marketRegimeEnabled();
+        $thresholds = (array) $this->cfg->marketRegimeThresholds();
         $riskOn = (array)($thresholds['risk_on'] ?? []);
         $riskOff = (array)($thresholds['risk_off'] ?? []);
 
@@ -188,7 +208,7 @@ public function build(array $opts = []): array
         // EOD stale gate (docs/watchlist/watchlist.md: legacy mapping EOD_STALE → GL_EOD_STALE)
         // If trade_date is too far behind as_of_trade_date (in trading days), block NEW ENTRY.
         $eodStale = false;
-        $maxStaleTd = (int) config('trade.watchlist.max_stale_trading_days', 1);
+        $maxStaleTd = $this->cfg->maxStaleTradingDays();
         if ($asOfTradeDate && $eodDate) {
             $tdDiff = $this->tradingDaysDiff((string)$eodDate, (string)$asOfTradeDate);
             if ($tdDiff > $maxStaleTd) {
@@ -294,6 +314,11 @@ public function build(array $opts = []): array
 
         $rows = [];
         foreach ($candidates as $ci) {
+            $this->derivedBuilder->enrich($ci);
+            // labels are part of output contract; keep mapping out of DTO (docs/DTO.md)
+            $ci->decisionLabel = LabelCatalog::decision($ci->decisionCode);
+            $ci->signalLabel = LabelCatalog::signal($ci->signalCode);
+            $ci->volumeLabel = LabelCatalog::volumeLabel($ci->volumeLabelCode);
             $row = $this->buildCandidate(
                 $ci,
                 $policy,
@@ -674,9 +699,9 @@ foreach ($rows as $j => $r2) {
             ],
             'recommendations' => $recs,
             'groups' => [
-                'top_picks' => array_values(array_map(function($r){ return $this->toContractCandidate($r, $policy); }, $top)),
-                'secondary' => array_values(array_map(function($r){ return $this->toContractCandidate($r, $policy); }, $secondary)),
-                'watch_only' => array_values(array_map(function($r){ return $this->toContractCandidate($r, $policy); }, $watch)),
+                'top_picks' => array_values(array_map(function($r) use ($policy) { return $this->toContractCandidate($r, $policy); }, $top)),
+                'secondary' => array_values(array_map(function($r) use ($policy) { return $this->toContractCandidate($r, $policy); }, $secondary)),
+                'watch_only' => array_values(array_map(function($r) use ($policy) { return $this->toContractCandidate($r, $policy); }, $watch)),
             ],
         ];
 
@@ -2138,8 +2163,8 @@ foreach ($rows as $j => $r2) {
         // normalize cutoff to HH:MM:SS
         $defaultCutoff = sprintf(
             '%02d:%02d:00',
-            (int) config('trade.clock.eod_cutoff.hour', 16),
-            (int) config('trade.clock.eod_cutoff.min', 30)
+            (int) $this->clockCfg->eodCutoffHour(),
+            (int) $this->clockCfg->eodCutoffMin()
         );
         $cutoffHms = preg_match('/^\d{2}:\d{2}:\d{2}$/', $cutoffHms)
             ? $cutoffHms
@@ -2403,8 +2428,8 @@ foreach ($rows as $j => $r2) {
 
 private function isEodReady(array $coverage): bool
     {
-        $minCanon = (float) config('trade.watchlist.min_canonical_coverage_pct', 85.0);
-        $minInd = (float) config('trade.watchlist.min_indicator_coverage_pct', 85.0);
+        $minCanon = $this->cfg->minCanonicalCoveragePct();
+        $minInd = $this->cfg->minIndicatorCoveragePct();
         $canon = $coverage['canonical_coverage_pct'] ?? null;
         $ind = $coverage['indicators_coverage_pct'] ?? ($coverage['indicator_coverage_pct'] ?? null);
         if ($canon === null || $ind === null) return false;
@@ -2488,7 +2513,7 @@ private function isEodReady(array $coverage): bool
         // when there are open positions, unless explicitly enabled.
         $dsEligible = !empty($divEventsByTicker);
         $ilEligible = !empty($intradayByTicker);
-        $ptEligible = $hasOpenPositions || (bool) config('trade.watchlist.auto_position_trade_enabled', false);
+        $ptEligible = $hasOpenPositions || (bool) $this->cfg->autoPositionTradeEnabled();
 
         $pickAuto = function() use ($dsEligible, $ilEligible, $ptEligible) {
             if ($dsEligible) return 'DIVIDEND_SWING';
@@ -2626,8 +2651,7 @@ private function isEodReady(array $coverage): bool
     private function tickSizeByPrice(float $price): int
     {
         // config-driven IDX tick ladder (docs/watchlist/watchlist.md Section 3)
-        $rule = new \App\Trade\Pricing\TickRule();
-        return $rule->tickSize($price);
+        return $this->tickRule->tickSize($price);
     }
 
     private function roundToTick(float $price, int $tick, string $dir): int

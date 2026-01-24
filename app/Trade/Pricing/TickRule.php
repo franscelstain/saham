@@ -6,9 +6,9 @@ class TickRule
 {
     private array $ladder;
 
-    public function __construct(?array $ladder = null)
+    public function __construct(TickLadderConfig $cfg)
     {
-        $this->ladder = $ladder ?: (array) config('trade.pricing.idx_ticks', []);
+        $this->ladder = (array) $cfg->ladder();
     }
 
     public function tickSize(float $price): int

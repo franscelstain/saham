@@ -70,6 +70,31 @@ return [
             'days' => 30,
         ],
 
+
+
+        // Domain log: Intraday (capture / pipeline)
+        'intraday' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/intraday.log'),
+            'level' => 'debug',
+            'days' => 30,
+        ],
+
+        // Domain log: Watchlist (scoring / decision / explain)
+        'watchlist' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/watchlist.log'),
+            'level' => 'debug',
+            'days' => 30,
+        ],
+
+        // Domain log: Portfolio (positions / execution / pnl)
+        'portfolio' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/portfolio.log'),
+            'level' => 'debug',
+            'days' => 30,
+        ],
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

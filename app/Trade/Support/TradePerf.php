@@ -4,28 +4,36 @@ namespace App\Trade\Support;
 
 final class TradePerf
 {
+    /** @var TradePerfConfig|null */
+    private static $cfg;
+
+    public static function init(TradePerfConfig $cfg): void
+    {
+        self::$cfg = $cfg;
+    }
+
     public static function tickerChunk(): int
     {
-        return (int) config('trade.perf.ticker_chunk', 200);
+        return self::$cfg ? self::$cfg->tickerChunk() : 200;
     }
 
     public static function httpPoolSize(): int
     {
-        return (int) config('trade.perf.http_pool', 20);
+        return self::$cfg ? self::$cfg->httpPool() : 20;
     }
 
     public static function httpTimeoutSec(): int
     {
-        return (int) config('trade.perf.http_timeout', 20);
+        return self::$cfg ? self::$cfg->httpTimeoutSec() : 20;
     }
 
     public static function httpRetries(): int
     {
-        return (int) config('trade.perf.retries', 2);
+        return self::$cfg ? self::$cfg->httpRetries() : 2;
     }
 
     public static function httpRetrySleepMs(): int
     {
-        return (int) config('trade.perf.retry_sleep_ms', 300);
+        return self::$cfg ? self::$cfg->httpRetrySleepMs() : 300;
     }
 }

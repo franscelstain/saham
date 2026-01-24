@@ -66,7 +66,7 @@ final class MarketDataValidateEod extends Command
         // Phase 7: automatic tickers source
         // If user doesn't pass --tickers, take from watchlist top picks (recommended picks) to avoid manual input.
         if (!$tickers) {
-            $wl = $this->watchSvc->preopenContract();
+            $wl = $this->watchSvc->preopenContract([]);
             // Contract: trade_date is the EOD basis date
             $wlDate = (string) ($wl['trade_date'] ?? '');
 

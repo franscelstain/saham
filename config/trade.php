@@ -208,6 +208,9 @@ return [
         'min_canonical_coverage_pct' => env('WATCHLIST_MIN_CANONICAL_COVERAGE_PCT', 85),
         'min_indicator_coverage_pct' => env('WATCHLIST_MIN_INDICATOR_COVERAGE_PCT', 85),
 
+        // Optional: auto-open position (paper/real) dari hasil watchlist
+        'auto_position_trade_enabled' => env('WATCHLIST_AUTO_POSITION_TRADE_ENABLED', false),
+
         // Market context / regime (risk_on / neutral / risk_off)
         // Dipakai untuk gating rekomendasi saat breadth sedang risk_off.
         'market_regime_enabled' => env('WATCHLIST_MARKET_REGIME_ENABLED', true),

@@ -9,11 +9,13 @@ class TradePlanner
 {
     private TickRule $tick;
     private FeeModel $fee;
+    private PlanningPolicy $policy;
 
-    public function __construct(TickRule $tick, FeeModel $fee)
+    public function __construct(TickRule $tick, FeeModel $fee, PlanningPolicy $policy)
     {
         $this->tick = $tick;
         $this->fee = $fee;
+        $this->policy = $policy;
     }
 
     /**
@@ -31,13 +33,12 @@ class TradePlanner
         $support = $m['support_20d'] ?? null;
         $resist  = $m['resistance_20d'] ?? null;
 
-        $entryMode = (string) config('trade.planning.entry_mode', 'BREAKOUT');
-        $bufferTicks = (int) config('trade.planning.entry_buffer_ticks', 1);
+        $entryMode = $this->policy->entryMode();
+        $bufferTicks = $this->policy->entryBufferTicks();
 
         // ENTRY
         $entry = $close;
         if ($entryMode === 'BREAKOUT' && $resist !== null) {
-            // entry di atas resistance + buffer ticks (preopen order)
             $entry = $this->tick->addTicks((float)$resist, $bufferTicks);
         }
 
@@ -45,25 +46,23 @@ class TradePlanner
         $entry = $this->tick->roundUp($entry);
 
         // SL
-        $slMode = (string) config('trade.planning.sl_mode', 'ATR');
+        $slMode = $this->policy->slMode();
         $sl = $this->calcSl($slMode, $entry, $atr, $support, $low);
-
-        // SL harus di-round DOWN (biar stop price valid dan lebih konservatif)
         $sl = $this->tick->roundDown($sl);
 
         // Risk per share (gross)
         $risk = max(1.0, $entry - $sl);
 
-        // TP targets as R-multiple (gross), then tick round DOWN (sell target -> lebih realistis)
-        $tp1R = (float) config('trade.planning.tp1_r_mult', 1.0);
-        $tp2R = (float) config('trade.planning.tp2_r_mult', 2.0);
+        // TP targets as R-multiple (gross)
+        $tp1R = $this->policy->tp1R();
+        $tp2R = $this->policy->tp2R();
 
         $tp1 = $this->tick->roundDown($entry + ($risk * $tp1R));
         $tp2 = $this->tick->roundDown($entry + ($risk * $tp2R));
 
         // BE (fee-aware)
         $be = $this->fee->breakevenExitPrice($entry);
-        $be = $this->tick->roundUp($be); // BE target sebaiknya up
+        $be = $this->tick->roundUp($be);
 
         // RR TP2 (fee-aware)
         $rrTp2 = $this->calcNetRR($entry, $sl, $tp2);
@@ -91,29 +90,27 @@ class TradePlanner
     private function calcSl(string $mode, float $entry, $atr, $support, float $low): float
     {
         if ($mode === 'SUPPORT' && $support !== null) {
-            // SL sedikit di bawah support (1 tick)
             $base = (float)$support;
             return $this->tick->subTicks($base, 1);
         }
 
         if ($mode === 'PCT') {
-            $pct = (float) config('trade.planning.sl_pct', 0.03);
+            $pct = $this->policy->slPct();
             return $entry * (1.0 - $pct);
         }
 
         // default ATR
-        $mult = (float) config('trade.planning.sl_atr_mult', 1.5);
+        $mult = $this->policy->slAtrMult();
         if ($atr !== null) {
             return $entry - ((float)$atr * $mult);
         }
 
-        // fallback kalau ATR belum ada: pakai low hari ini (konservatif)
         return min($low, $entry * 0.97);
     }
 
     private function calcNetRR(float $entry, float $sl, float $tp): float
     {
-        $loss = abs($this->fee->netPnlPerShare($entry, $sl)); // ini sebenarnya negatif, kita abs
+        $loss = abs($this->fee->netPnlPerShare($entry, $sl));
         $gain = $this->fee->netPnlPerShare($entry, $tp);
 
         if ($loss <= 0.0) return 0.0;
