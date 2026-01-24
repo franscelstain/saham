@@ -35,8 +35,8 @@ class TradePlanService
             'high' => (float) ($c->high ?? $c->close),
             'low' => (float) ($c->low ?? $c->close),
             'atr14' => $c->atr14 ?? null,
-            'support_20d' => $c->support20 ?? ($c->support_20d ?? null),
-            'resistance_20d' => $c->resistance20 ?? ($c->resistance_20d ?? null),
+            'support_20d' => ($c->support20d ?? ($c->support_20d ?? null)),
+            'resistance_20d' => ($c->resistance20d ?? ($c->resistance_20d ?? null)),
         ];
 
         return $this->build($metrics);

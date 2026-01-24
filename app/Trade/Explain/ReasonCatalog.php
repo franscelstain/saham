@@ -11,7 +11,7 @@ class ReasonCatalog
         // Ini “kamus tetap” untuk UI (code => message).
         // Jangan taruh angka dinamis di sini (valueEst, rr, points), itu tetap bisa dihitung UI kalau perlu.
         return [
-            // --- v3 scoring model ---
+            // --- scoring model ---
             'TREND_C_GT_MA20' => 'Trend: Close > MA20',
             'TREND_MA20_GT_MA50' => 'Trend: MA20 > MA50',
             'TREND_MA50_GT_MA200' => 'Trend: MA50 > MA200',

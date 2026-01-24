@@ -16,7 +16,7 @@ class WatchlistController extends Controller
     public function preopen()
     {
         return response()->json(
-            $this->watchlistService->preopenRaw()
+            $this->watchlistService->preopenContract()
         );
     }
 }

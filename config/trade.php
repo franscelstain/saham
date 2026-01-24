@@ -134,19 +134,31 @@ return [
         // 5000-<20000 => 25
         // >=20000 => 50
         'idx_ticks' => [
-            ['lt' => 200,   'tick' => 1],
-            ['lt' => 500,   'tick' => 2],
-            ['lt' => 2000,  'tick' => 5],
-            ['lt' => 5000,  'tick' => 10],
-            ['lt' => 20000, 'tick' => 25],
-            ['lt' => null,  'tick' => 50],
+            ['lt' => 200,  'tick' => 1],
+            ['lt' => 500,  'tick' => 2],
+            ['lt' => 2000, 'tick' => 5],
+            ['lt' => 5000, 'tick' => 10],
+            ['lt' => null, 'tick' => 25],
         ],
     ],
     'watchlist' => [
+        // Cutoff untuk menentukan apakah EOD hari ini dianggap sudah "ready" untuk dipakai sebagai as_of_trade_date.
+        // Jika kosong, engine akan fallback ke trade.clock.eod_cutoff.
+        'eod_cutoff_time' => env('WATCHLIST_EOD_CUTOFF_TIME', ''),
         // Strategy policy (explicit). Default = WEEKLY_SWING.
-        'policy_default' => env('WATCHLIST_POLICY_DEFAULT', 'WEEKLY_SWING'),
+        'policy_default' => env('WATCHLIST_POLICY_DEFAULT', 'AUTO'),
         // Supported policies (CSV), ex: "WEEKLY_SWING,DIVIDEND_SWING"
         'supported_policies' => array_values(array_filter(array_map('trim', explode(',', (string) env('WATCHLIST_SUPPORTED_POLICIES', 'WEEKLY_SWING'))))),
+        // Strict contract validation (docs/watchlist/watchlist.md)
+        'strict_enabled' => env('WATCHLIST_STRICT_ENABLED', true),
+        // Default session times if market_calendar doesn't provide them
+        'session_default' => [
+            'open_time' => env('WATCHLIST_SESSION_OPEN', '09:00'),
+            'close_time' => env('WATCHLIST_SESSION_CLOSE', '15:50'),
+            'breaks' => [],
+        ],
+        // Policy precedence when no explicit policy is requested
+        'policy_precedence' => ['DIVIDEND_SWING', 'INTRADAY_LIGHT', 'POSITION_TRADE', 'WEEKLY_SWING'],
         'bucket_top_min_score' => env('WATCHLIST_BUCKET_TOP_MIN_SCORE', 60),
         'bucket_watch_min_score' => env('WATCHLIST_BUCKET_WATCH_MIN_SCORE', 35),
         'expiry_aging_from_days' => env('WATCHLIST_EXPIRY_AGING_FROM_DAYS', 2), // label banding umur (buat UI)

@@ -6,6 +6,9 @@ use App\Trade\Explain\LabelCatalog;
 
 class CandidateInput
 {
+    /** Raw row (normalized) for downstream engine consumption. */
+    private array $raw = [];
+
     public int $tickerId;
     public string $code;
     public string $name;
@@ -39,6 +42,16 @@ class CandidateInput
     public ?float $dv20 = null;     // SMA20(close*volume) over 20 prior trading days (exclude today)
     public ?string $liqBucket = null; // A/B/C/U
 
+    // indicators (CA / validity)
+    public ?float $adjClose = null;
+    public ?string $caHint = null;
+    public ?string $caEvent = null;
+    public bool $isValid = true;
+    public ?string $invalidReason = null;
+
+    // watchlist / ranking
+    public ?float $scoreTotal = null;
+
     // corporate action gate (heuristic)
     public bool $corpActionSuspected = false;
     public ?float $corpActionRatio = null; // close/prevClose
@@ -68,8 +81,13 @@ class CandidateInput
     public ?bool $isLongUpperWick = null;
     public ?bool $isLongLowerWick = null;
 
+    public ?bool $closeNearHigh = null;
+
     public function __construct(array $row)
     {
+        // keep original row, will be normalized
+        $this->raw = $row;
+
         $this->tickerId = (int)($row['ticker_id'] ?? 0);
         $this->code = (string)($row['ticker_code'] ?? '');
         $this->name = (string)($row['company_name'] ?? '');
@@ -99,6 +117,14 @@ class CandidateInput
         $this->dv20 = isset($row['dv20']) && is_numeric($row['dv20']) ? (float)$row['dv20'] : null;
         $this->liqBucket = isset($row['liq_bucket']) ? (string)$row['liq_bucket'] : null;
 
+        $this->adjClose = isset($row['adj_close']) && is_numeric($row['adj_close']) ? (float)$row['adj_close'] : null;
+        $this->caHint = !empty($row['ca_hint']) ? (string)$row['ca_hint'] : null;
+        $this->caEvent = !empty($row['ca_event']) ? (string)$row['ca_event'] : null;
+        $this->isValid = isset($row['is_valid']) ? (bool)$row['is_valid'] : true;
+        $this->invalidReason = !empty($row['invalid_reason']) ? (string)$row['invalid_reason'] : null;
+
+        $this->scoreTotal = isset($row['score_total']) && is_numeric($row['score_total']) ? (float)$row['score_total'] : null;
+
         $this->decisionCode = (int)($row['decision_code'] ?? 0);
         $this->signalCode = (int)($row['signal_code'] ?? 0);
         $this->volumeLabelCode = (int)($row['volume_label_code'] ?? 0);
@@ -115,6 +141,80 @@ class CandidateInput
         $this->computeCorporateActionGate();
 
         $this->computeCandleFlags();
+
+        // normalize raw row for engine consumption
+        $this->raw = array_merge($this->raw, [
+            'ticker_id' => $this->tickerId,
+            'ticker_code' => $this->code,
+            'company_name' => $this->name,
+            'trade_date' => $this->tradeDate,
+
+            'open' => $this->open,
+            'high' => $this->high,
+            'low' => $this->low,
+            'close' => $this->close,
+            'volume' => $this->volume,
+
+            'prev_open' => $this->prevOpen,
+            'prev_high' => $this->prevHigh,
+            'prev_low' => $this->prevLow,
+            'prev_close' => $this->prevClose,
+
+            'ma20' => $this->ma20,
+            'ma50' => $this->ma50,
+            'ma200' => $this->ma200,
+            'rsi14' => $this->rsi,
+            'vol_sma20' => $this->volSma20,
+            'vol_ratio' => $this->volRatio,
+            'atr14' => $this->atr14,
+            'support_20d' => $this->support20d,
+            'resistance_20d' => $this->resistance20d,
+
+            'value_est' => $this->valueEst,
+            'dv20' => $this->dv20,
+            'liq_bucket' => $this->liqBucket,
+
+            'adj_close' => $this->adjClose,
+            'ca_hint' => $this->caHint,
+            'ca_event' => $this->caEvent,
+            'is_valid' => $this->isValid,
+            'invalid_reason' => $this->invalidReason,
+
+            'decision_code' => $this->decisionCode,
+            'signal_code' => $this->signalCode,
+            'volume_label_code' => $this->volumeLabelCode,
+
+            'decision_label' => $this->decisionLabel,
+            'signal_label' => $this->signalLabel,
+            'volume_label' => $this->volumeLabel,
+
+            'signal_first_seen_date' => $this->signalFirstSeenDate,
+            'signal_age_days' => $this->signalAgeDays,
+
+            'score_total' => $this->scoreTotal,
+
+            'corp_action_suspected' => $this->corpActionSuspected,
+            'corp_action_ratio' => $this->corpActionRatio,
+
+            'candle_body_pct' => $this->candleBodyPct,
+            'candle_upper_wick_pct' => $this->candleUpperWickPct,
+            'candle_lower_wick_pct' => $this->candleLowerWickPct,
+            'is_inside_day' => $this->isInsideDay,
+            'engulfing_type' => $this->engulfingType,
+            'is_long_upper_wick' => $this->isLongUpperWick,
+            'is_long_lower_wick' => $this->isLongLowerWick,
+            'close_near_high' => $this->closeNearHigh,
+        ]);
+    }
+
+    /**
+     * Array view used by WatchlistEngine.
+     *
+     * NOTE: keys here are part of internal watchlist data dictionary.
+     */
+    public function toArray(): array
+    {
+        return $this->raw;
     }
 
     private function computeCorporateActionGate(): void
@@ -158,6 +258,11 @@ class CandidateInput
         $this->candleBodyPct = round($body, 4);
         $this->candleUpperWickPct = round($upper, 4);
         $this->candleLowerWickPct = round($lower, 4);
+
+
+        // close_near_high (watchlist.md definition): ((high-close)/max(high-low,1))<=0.25
+        $den = max($range, 1.0);
+        $this->closeNearHigh = (((($h - $c) / $den)) <= 0.25);
 
         $thr = (float) config('trade.watchlist.candle.long_wick_pct', 0.55);
         $this->isLongUpperWick = ($this->candleUpperWickPct !== null) ? ($this->candleUpperWickPct >= $thr) : null;

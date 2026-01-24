@@ -95,6 +95,13 @@ class WatchlistRepository
             DB::raw('COALESCE(od.close, ti.close) as close'),
             DB::raw('COALESCE(od.volume, ti.volume) as volume'),
 
+            // adjusted / corporate action hints
+            DB::raw('COALESCE(od.adj_close, ti.adj_close) as adj_close'),
+            'ti.ca_hint',
+            'ti.ca_event',
+            'ti.is_valid',
+            'ti.invalid_reason',
+
             // prev candle
             DB::raw('od_prev.open as prev_open'),
             DB::raw('od_prev.high as prev_high'),
@@ -195,5 +202,47 @@ class WatchlistRepository
             'indicators_coverage_pct' => $indPct,
             'canonical_coverage_pct' => $ohlcPct,
         ];
+    }
+
+    /**
+     * Max close between dates (inclusive) for one ticker.
+     * Used for position trailing stop computations.
+     */
+    public function maxCloseBetween(int $tickerId, string $fromDate, string $toDate): ?float
+    {
+        if ($tickerId <= 0) return null;
+        if ($fromDate === '' || $toDate === '') return null;
+
+        try {
+            $v = DB::table('ticker_ohlc_daily')
+                ->where('is_deleted', 0)
+                ->where('ticker_id', $tickerId)
+                ->whereBetween('trade_date', [$fromDate, $toDate])
+                ->max('close');
+            return ($v !== null) ? (float)$v : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Max high between dates (inclusive) for one ticker.
+     * Used for checking whether TP1 has been touched.
+     */
+    public function maxHighBetween(int $tickerId, string $fromDate, string $toDate): ?float
+    {
+        if ($tickerId <= 0) return null;
+        if ($fromDate === '' || $toDate === '') return null;
+
+        try {
+            $v = DB::table('ticker_ohlc_daily')
+                ->where('is_deleted', 0)
+                ->where('ticker_id', $tickerId)
+                ->whereBetween('trade_date', [$fromDate, $toDate])
+                ->max('high');
+            return ($v !== null) ? (float)$v : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

@@ -66,8 +66,9 @@ final class MarketDataValidateEod extends Command
         // Phase 7: automatic tickers source
         // If user doesn't pass --tickers, take from watchlist top picks (recommended picks) to avoid manual input.
         if (!$tickers) {
-            $wl = $this->watchSvc->preopenRaw();
-            $wlDate = (string) ($wl['eod_date'] ?? '');
+            $wl = $this->watchSvc->preopenContract();
+            // Contract: trade_date is the EOD basis date
+            $wlDate = (string) ($wl['trade_date'] ?? '');
 
             // If user didn't pass --date, default to watchlist latest eod_date.
             if (trim($date) === '' && $wlDate !== '') {
@@ -78,7 +79,7 @@ final class MarketDataValidateEod extends Command
             $top = (array) ($groups['top_picks'] ?? []);
             foreach ($top as $row) {
                 if (!is_array($row)) continue;
-                $code = strtoupper(trim((string) ($row['code'] ?? '')));
+                $code = strtoupper(trim((string) ($row['ticker_code'] ?? '')));
                 if ($code !== '') $tickers[] = $code;
             }
         }

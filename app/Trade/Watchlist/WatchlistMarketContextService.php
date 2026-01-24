@@ -4,7 +4,7 @@ namespace App\Trade\Watchlist;
 
 /**
  * SRP: klasifikasi market_regime dari snapshot breadth.
- * Output: risk_on / neutral / risk_off + notes.
+ * Output: risk-on / neutral / risk-off + notes.
  */
 class WatchlistMarketContextService
 {
@@ -34,7 +34,7 @@ class WatchlistMarketContextService
             && $rsi >= (float)($riskOn['avg_rsi14'] ?? 50)
         ) {
             return [
-                'regime' => 'risk_on',
+                'regime' => 'risk-on',
                 'notes' => 'Breadth kuat: banyak ticker di atas MA200 + MA alignment + RSI rata-rata sehat.',
             ];
         }
@@ -45,7 +45,7 @@ class WatchlistMarketContextService
             && $rsi <= (float)($riskOff['avg_rsi14'] ?? 45)
         ) {
             return [
-                'regime' => 'risk_off',
+                'regime' => 'risk-off',
                 'notes' => 'Breadth lemah: sedikit ticker di atas MA200 / MA alignment rendah / RSI rata-rata rendah.',
             ];
         }

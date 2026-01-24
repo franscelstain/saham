@@ -87,7 +87,11 @@ class WatchlistPersistenceRepository
         DB::table('watchlist_candidates')->where('watchlist_daily_id', $dailyId)->delete();
 
         $mapBuckets = [
+            // contract buckets
             'top_picks' => 'TOP_PICKS',
+            'secondary' => 'SECONDARY',
+            'watch_only' => 'WATCH_ONLY',
+            // legacy buckets
             'watch' => 'WATCH',
             'avoid' => 'AVOID',
         ];
@@ -105,6 +109,15 @@ class WatchlistPersistenceRepository
                 elseif (isset($r['rank_score']) && is_numeric($r['rank_score'])) $rankScore = (float) $r['rank_score'];
 
                 $plan = $r['plan'] ?? ($r['trade_plan'] ?? null);
+                if ($plan === null && (isset($r['levels']) || isset($r['timing']) || isset($r['sizing']))) {
+                    $plan = [
+                        'levels' => $r['levels'] ?? null,
+                        'timing' => $r['timing'] ?? null,
+                        'sizing' => $r['sizing'] ?? null,
+                        'reason_codes' => $r['reason_codes'] ?? [],
+                        'setup_type' => $r['setup_type'] ?? null,
+                    ];
+                }
                 $debug = isset($r['debug']) && is_array($r['debug']) ? $r['debug'] : null;
 
                 $rankReasonCodes = $r['rankReasonCodes'] ?? ($r['rank_reason_codes'] ?? ($debug['rank_reason_codes'] ?? null));
@@ -114,7 +127,7 @@ class WatchlistPersistenceRepository
                     'watchlist_daily_id' => $dailyId,
                     'trade_date' => $tradeDate,
                     'ticker_id' => (int)($r['ticker_id'] ?? ($r['tickerId'] ?? 0)),
-                    'ticker' => (string)($r['ticker'] ?? ($r['code'] ?? '')),
+                    'ticker' => (string)($r['ticker'] ?? ($r['ticker_code'] ?? ($r['code'] ?? ''))),
                     'bucket' => $bucket,
                     'rank' => is_numeric($r['rank'] ?? null) ? (int)$r['rank'] : ($idx + 1),
                     'watchlist_score' => $rankScore ?? 0,

@@ -5,7 +5,7 @@ namespace App\Trade\Ranking;
 use App\Trade\Explain\ReasonCatalog;
 
 /**
- * WatchlistRanker v3
+ * WatchlistRanker
  *
  * Target output: score 0..100 yang deterministik dan bisa dijelaskan.
  * Komponen (maks):
