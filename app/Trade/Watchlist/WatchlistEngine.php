@@ -260,10 +260,14 @@ public function build(array $opts = []): array
         $policyMeta = $this->policyMeta($policy, $opts, $execTradeDate);
         $timingGlobal = $this->buildTiming($policy, $execTradeDate, $policyMeta, $globalLockCodes);
 
-        $entryWindows = $this->resolveWindows($timingGlobal['entry_windows'] ?? [], $session['open_time'], $session['close_time']);
+        $entryWindowsRaw = $this->resolveWindows($timingGlobal['entry_windows'] ?? [], $session['open_time'], $session['close_time']);
         // Contract: subtract market breaks from entry windows (docs/watchlist/watchlist.md Section 1.3)
-        $entryWindows = $this->subtractBreaks($entryWindows, (array)($session['breaks'] ?? []));
+        $entryWindowsRaw = $this->subtractBreaks($entryWindowsRaw, (array)($session['breaks'] ?? []));
         $avoidWindows = $this->resolveWindows($timingGlobal['avoid_windows'] ?? [], $session['open_time'], $session['close_time']);
+
+        // Contract: avoid_windows wins over entry_windows.
+        // effective_entry_windows = entry_windows - avoid_windows (docs/watchlist/watchlist.md Section 1.3)
+        $entryWindows = $this->subtractBreaks($entryWindowsRaw, $avoidWindows);
 
         // WEEKLY_SWING: mark default entry window selection (docs/watchlist/weekly_swing.md)
         $wsEntryWindowDefault = false;
@@ -271,7 +275,8 @@ public function build(array $opts = []): array
             $wsDefEntry = $this->resolveWindows(["09:20-10:30", "13:35-14:30"], $session['open_time'], $session['close_time']);
             $wsDefEntry = $this->subtractBreaks($wsDefEntry, (array)($session['breaks'] ?? []));
             $wsDefAvoid = $this->resolveWindows(["09:00-09:15", "15:50-close"], $session['open_time'], $session['close_time']);
-            $wsEntryWindowDefault = ($entryWindows === $wsDefEntry) && ($avoidWindows === $wsDefAvoid);
+            // Compare against raw (break-adjusted) entry windows, not effective windows.
+            $wsEntryWindowDefault = ($entryWindowsRaw === $wsDefEntry) && ($avoidWindows === $wsDefAvoid);
         }
 
         // If there is no executable entry window for today, treat as global no-trade for strict contract consistency.
