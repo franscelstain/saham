@@ -277,6 +277,7 @@ public function build(array $opts = []): array
                 $ci,
                 $policy,
                 $execTradeDate,
+                $now,
                 $session,
                 $statusByTicker,
                 $intradayByTicker,
@@ -784,6 +785,7 @@ foreach ($rows as $j => $r2) {
         CandidateInput $ci,
         string $policy,
         string $execTradeDate,
+        \DateTimeImmutable $now,
         array $session,
         array $statusByTicker,
         array $intradayByTicker,
@@ -877,6 +879,7 @@ foreach ($rows as $j => $r2) {
                 'atr14' => $atr14,
                 'atr_pct' => ($atr14 !== null && $close > 0) ? ((float)$atr14 / $close) : null,
                 'vol_ratio' => $volRatio,
+                'vol_sma20' => $r['vol_sma20'] ?? null,
                 'liq_bucket' => $liqBucket,
                 'dv20' => $dv20,
                 'signal_age_days' => $r['signal_age_days'] ?? null,
@@ -898,6 +901,8 @@ foreach ($rows as $j => $r2) {
         $reasonCodes = $policyRes['reason_codes'];
         $score = (float)($policyRes['score'] ?? 0);
         $entryStyle = (string)($policyRes['entry_style'] ?? 'Default');
+
+        $eligBlockCodes = (array)($policyRes['eligibility_block_codes'] ?? []);
 
         $levels = $this->buildLevels($setupType, $r, $openOrLastExec);
         if ($tradeDisabled) {
@@ -929,6 +934,28 @@ foreach ($rows as $j => $r2) {
         }
 
         $sizing = $this->buildSizing($levels);
+
+        if ($policy === 'INTRADAY_LIGHT') {
+            // docs/watchlist/intraday_light.md: levels completeness + min trade viability (RR net)
+            $lvOk = true;
+            foreach (['entry_trigger_price','stop_loss_price','tp1_price','tp2_price','tick_size'] as $k) {
+                if (!isset($levels[$k]) || !is_numeric($levels[$k]) || (float)$levels[$k] <= 0) { $lvOk = false; break; }
+            }
+            if (!$lvOk) {
+                $levels['entry_type'] = 'WATCH_ONLY';
+                $reasonCodes[] = 'IL_LEVELS_INCOMPLETE';
+                $eligBlockCodes[] = 'IL_LEVELS_INCOMPLETE';
+                $eligBlockCodes = array_values(array_unique($eligBlockCodes));
+            } else {
+                $rrNet = $sizing['rr_tp2_net'] ?? null;
+                if (($levels['entry_type'] ?? '') !== 'WATCH_ONLY') {
+                    if ($rrNet === null || (float)$rrNet < 1.6) {
+                        // hard DROP
+                        return null;
+                    }
+                }
+            }
+        }
 
         // Position context (optional)
         $pos = $openPositions[$tickerId] ?? null;
@@ -976,7 +1003,8 @@ foreach ($rows as $j => $r2) {
                     'setup_type' => $setupType,
                 ],
                 $execTradeDate,
-                $session
+                $session,
+                $now
             );
 
             $positionObj['position_state'] = $pm['position_state'];
@@ -987,7 +1015,7 @@ foreach ($rows as $j => $r2) {
         }
 
         // Eligibility flag (used later for group selection)
-        $elig = $this->evaluateEligibilityForNewEntry($policy, $policyRes['eligibility_block_codes'] ?? [], $tradeDisabled);
+        $elig = $this->evaluateEligibilityForNewEntry($policy, $eligBlockCodes, $tradeDisabled);
 
         return [
             'ticker_id' => $tickerId,
@@ -1027,6 +1055,7 @@ foreach ($rows as $j => $r2) {
                 'atr14' => $atr14 !== null ? (float)$atr14 : null,
                 'atr_pct' => ($atr14 !== null && $close > 0) ? round(((float)$atr14 / $close), 4) : null,
                 'vol_ratio' => $volRatio !== null ? (float)$volRatio : null,
+                'vol_sma20' => isset($r['vol_sma20']) ? (float)$r['vol_sma20'] : null,
                 'dv20' => $dv20 !== null ? (float)$dv20 : null,
                 'liq_bucket' => $liqBucket,
                 'support_20d' => $r['support_20d'] ?? null,
@@ -1061,7 +1090,7 @@ foreach ($rows as $j => $r2) {
             // internal
             '_eligibility' => [
                 'is_eligible_new_entry' => $elig,
-                'block_codes' => (array)($policyRes['eligibility_block_codes'] ?? []),
+                'block_codes' => $eligBlockCodes,
             ],
             '_policy_rules' => [
                 'size_multiplier_adj' => (float)($policyRes['size_multiplier_adj'] ?? 1.0),
@@ -1082,7 +1111,7 @@ foreach ($rows as $j => $r2) {
      * @param array<string,mixed> $session
      * @return array{position_state:string,action_windows:array<int,string>,updated_stop_loss_price:int|null,reason_codes:array<int,string>}
      */
-    private function buildPositionManagement(string $policy, array $positionObj, array $ctx, string $execTradeDate, array $session): array
+    private function buildPositionManagement(string $policy, array $positionObj, array $ctx, string $execTradeDate, array $session, \DateTimeImmutable $now): array
     {
         $entryDate = (string)($positionObj['entry_date'] ?? '');
         $avg = (float)($positionObj['position_avg_price'] ?? 0);
@@ -1130,8 +1159,26 @@ foreach ($rows as $j => $r2) {
         }
 
         if ($policy === 'INTRADAY_LIGHT') {
-            // Intraday should be flat before close; we cannot infer 90m time-stop from EOD.
+            // docs/watchlist/intraday_light.md: flat before close + 90m time-stop when no follow-through.
             $reason[] = 'IL_FLAT_BEFORE_CLOSE';
+
+            // Approximation: same-day position, >= 90 minutes after open, and return still small.
+            if ($entryDate !== '' && $entryDate === $execTradeDate) {
+                $tz = $now->getTimezone();
+                $openHm = (string)($session['open_time'] ?? '09:00');
+                try {
+                    $openTs = new \DateTimeImmutable($execTradeDate . ' ' . $openHm . ':00', $tz);
+                    $cut = $openTs->modify('+90 minutes');
+                    if ($now >= $cut) {
+                        if ($retPct === null || $retPct < 0.005) {
+                            $reason[] = 'IL_TIME_STOP_90M';
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
+
             $posState = 'EXIT';
             // keep default windows so UI can guide exits
             return [
@@ -1568,9 +1615,18 @@ foreach ($rows as $j => $r2) {
             }
 
             $ma200 = (float)$x['ma200']; $ma50 = (float)$x['ma50'];
-            if (!($close > $ma200 && $ma50 > $ma200)) {
-                $drop = true; $reasonCodes[] = 'PT_TREND_NOT_OK';
-                return $this->policyRes($drop, $score, $entryStyle, $confidence, $reasonCodes, $blockCodes, $sizeAdj, $shiftEntryWindows);
+            $trendOk = ($close > $ma200 && $ma50 > $ma200);
+            if (!$trendOk) {
+                if ($setup === 'Breakout') {
+                    // docs/watchlist/position_trade.md: breakout boleh WATCH_ONLY jika trend gate belum kuat
+                    $reasonCodes[] = 'PT_BREAKOUT_BLOCK_TREND_NOT_OK';
+                    $blockCodes[] = 'PT_BREAKOUT_BLOCK_TREND_NOT_OK';
+                    $score -= 10.0;
+                    $entryStyle = 'Breakout-wait';
+                } else {
+                    $drop = true; $reasonCodes[] = 'PT_TREND_NOT_OK';
+                    return $this->policyRes($drop, $score, $entryStyle, $confidence, $reasonCodes, $blockCodes, $sizeAdj, $shiftEntryWindows);
+                }
             }
 
             // treat missing ATR% as unsafe volatility
