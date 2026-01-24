@@ -411,11 +411,19 @@ public function build(array $opts = []): array
                 $r['levels']['entry_type'] = 'WATCH_ONLY';
 
                 if ($r['timing']['trade_disabled_reason'] === null) {
-                    $r['timing']['trade_disabled_reason'] = !empty($candBlocks) ? (string)$candBlocks[0] : 'GL_POLICY_BLOCK';
+                    // Strict docs/watchlist compliance: no undocumented fallback codes.
+                    // If a WATCH_ONLY decision has no explicit block code, treat it as an unmapped/unknown legacy condition.
+                    $r['timing']['trade_disabled_reason'] = !empty($candBlocks) ? (string)$candBlocks[0] : 'GL_LEGACY_CODE_UNMAPPED';
                 }
 
                 $codes = (array)($r['timing']['trade_disabled_reason_codes'] ?? []);
                 foreach ($candBlocks as $bc) { $codes[] = (string)$bc; }
+
+                // Ensure the primary reason is always present in reason_codes (even when candBlocks is empty).
+                if ($r['timing']['trade_disabled_reason'] !== null) {
+                    $codes[] = (string)$r['timing']['trade_disabled_reason'];
+                }
+
                 $r['timing']['trade_disabled_reason_codes'] = array_values(array_unique($codes));
             }
 
