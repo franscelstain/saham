@@ -243,6 +243,13 @@ public function build(array $opts = []): array
             $policy = $this->selectPolicy($requestedPolicy, $divEventsByTicker, $intradayByTicker, $hasOpenPositions);
         }
 
+        // Policy doc presence gate (docs/watchlist/watchlist.md)
+        if (!$this->policyDocExists($policy)) {
+            $globalLockCodes[] = 'GL_POLICY_DOC_MISSING';
+            $notes[] = 'Policy doc missing for selected policy: ' . $policy;
+            $policy = 'NO_TRADE';
+        }
+
         // NO_TRADE behavior: if there are open positions, expose carry-only management reason.
         if ($policy === 'NO_TRADE' && $hasOpenPositions) {
             $globalLockCodes[] = 'NT_CARRY_ONLY_MANAGEMENT';
@@ -257,6 +264,15 @@ public function build(array $opts = []): array
         // Contract: subtract market breaks from entry windows (docs/watchlist/watchlist.md Section 1.3)
         $entryWindows = $this->subtractBreaks($entryWindows, (array)($session['breaks'] ?? []));
         $avoidWindows = $this->resolveWindows($timingGlobal['avoid_windows'] ?? [], $session['open_time'], $session['close_time']);
+
+        // WEEKLY_SWING: mark default entry window selection (docs/watchlist/weekly_swing.md)
+        $wsEntryWindowDefault = false;
+        if ($policy === 'WEEKLY_SWING') {
+            $wsDefEntry = $this->resolveWindows(["09:20-10:30", "13:35-14:30"], $session['open_time'], $session['close_time']);
+            $wsDefEntry = $this->subtractBreaks($wsDefEntry, (array)($session['breaks'] ?? []));
+            $wsDefAvoid = $this->resolveWindows(["09:00-09:15", "15:50-close"], $session['open_time'], $session['close_time']);
+            $wsEntryWindowDefault = ($entryWindows === $wsDefEntry) && ($avoidWindows === $wsDefAvoid);
+        }
 
         // If there is no executable entry window for today, treat as global no-trade for strict contract consistency.
         if (empty($entryWindows) && empty($globalLockCodes)) {
@@ -317,6 +333,11 @@ public function build(array $opts = []): array
                 'trade_disabled_reason' => null,
                 'trade_disabled_reason_codes' => [],
             ];
+
+            if ($wsEntryWindowDefault && !empty($r['timing']['entry_windows']) && ($r['timing']['trade_disabled'] ?? false) === false) {
+                $r['reason_codes'][] = 'WS_ENTRY_WINDOW_DEFAULT';
+                $r['reason_codes'] = array_values(array_unique($r['reason_codes']));
+            }
 
             // Apply candidate-specific timing adjustments from policy rules
             $adj = 1.0;
@@ -640,9 +661,9 @@ foreach ($rows as $j => $r2) {
             ],
             'recommendations' => $recs,
             'groups' => [
-                'top_picks' => array_values(array_map(function($r){ return $this->toContractCandidate($r); }, $top)),
-                'secondary' => array_values(array_map(function($r){ return $this->toContractCandidate($r); }, $secondary)),
-                'watch_only' => array_values(array_map(function($r){ return $this->toContractCandidate($r); }, $watch)),
+                'top_picks' => array_values(array_map(function($r){ return $this->toContractCandidate($r, $policy); }, $top)),
+                'secondary' => array_values(array_map(function($r){ return $this->toContractCandidate($r, $policy); }, $secondary)),
+                'watch_only' => array_values(array_map(function($r){ return $this->toContractCandidate($r, $policy); }, $watch)),
             ],
         ];
 
@@ -1910,7 +1931,125 @@ foreach ($rows as $j => $r2) {
         if ($policy === 'DIVIDEND_SWING') return 'DS';
         if ($policy === 'INTRADAY_LIGHT') return 'IL';
         if ($policy === 'POSITION_TRADE') return 'PT';
+        if ($policy === 'NO_TRADE') return 'NT';
         return 'GL';
+    }
+
+    private function policyDocExists(string $policy): bool
+    {
+        // Only enforce in environments where docs are shipped.
+        $root = function_exists('base_path')
+            ? base_path('docs/watchlist')
+            : (dirname(__DIR__, 3) . '/docs/watchlist');
+
+        if (!is_dir($root)) return true;
+
+        $map = [
+            'WEEKLY_SWING' => 'weekly_swing.md',
+            'DIVIDEND_SWING' => 'dividend_swing.md',
+            'INTRADAY_LIGHT' => 'intraday_light.md',
+            'POSITION_TRADE' => 'position_trade.md',
+            'NO_TRADE' => 'no_trade.md',
+        ];
+
+        $file = $map[$policy] ?? null;
+        if ($file === null) return false;
+        return is_file(rtrim($root, "/\\") . DIRECTORY_SEPARATOR . $file);
+    }
+
+    private function hasAllowedReasonPrefix(string $code): bool
+    {
+        foreach (['WS_','DS_','IL_','PT_','NT_','GL_'] as $p) {
+            if (strpos($code, $p) === 0) return true;
+        }
+        return false;
+    }
+
+    private function mapLegacyReasonCode(string $legacy, string $policyPrefix): ?string
+    {
+        $legacy = strtoupper(trim($legacy));
+        if ($legacy === '') return null;
+
+        // Global legacy mapping
+        $global = [
+            'EOD_NOT_READY' => 'GL_EOD_NOT_READY',
+            'EOD_STALE' => 'GL_EOD_STALE',
+            'MARKET_RISK_OFF' => 'GL_MARKET_RISK_OFF',
+            'POLICY_INACTIVE' => 'GL_POLICY_INACTIVE',
+        ];
+        if (isset($global[$legacy])) return $global[$legacy];
+
+        // Policy-scoped mapping
+        $pp = $policyPrefix;
+        if ($pp === 'GL') $pp = 'NT';
+
+        if ($legacy === 'GAP_UP_BLOCK') return $pp . '_GAP_UP_BLOCK';
+        if ($legacy === 'CHASE_BLOCK_DISTANCE_TOO_FAR') return $pp . '_CHASE_BLOCK_DISTANCE_TOO_FAR';
+
+        if ($legacy === 'MIN_EDGE_FAIL' || $legacy === 'FEE_IMPACT_HIGH') return $pp . '_MIN_TRADE_VIABILITY_FAIL';
+
+        if ($legacy === 'FRIDAY_EXIT_BIAS') return $pp . '_FRIDAY_EXIT_BIAS';
+        if ($legacy === 'WEEKEND_RISK_BLOCK') return $pp . '_FRIDAY_EXIT_BIAS';
+
+        if ($legacy === 'TIME_STOP_TRIGGERED' || $legacy === 'NO_FOLLOW_THROUGH') {
+            if ($pp === 'PT') return 'PT_TIME_STOP_T1';
+            return $pp . '_TIME_STOP_T2';
+        }
+        if ($legacy === 'TIME_STOP_T2') {
+            if ($pp === 'PT') return 'PT_TIME_STOP_T1';
+            return $pp . '_TIME_STOP_T2';
+        }
+        if ($legacy === 'TIME_STOP_T3') {
+            if ($pp === 'PT') return 'PT_TIME_STOP_T1';
+            return $pp . '_TIME_STOP_T3';
+        }
+
+        if ($legacy === 'VOLATILITY_HIGH') {
+            if ($pp === 'WS') return 'WS_VOL_HIGH';
+            if ($pp === 'DS') return 'DS_VOL_TOO_HIGH';
+            if ($pp === 'IL') return 'IL_VOL_TOO_HIGH';
+            if ($pp === 'PT') return 'PT_VOL_TOO_HIGH';
+            return $pp . '_VOL_HIGH';
+        }
+
+        if ($legacy === 'SETUP_EXPIRED') return $pp . '_SIGNAL_STALE';
+
+        return null;
+    }
+
+    private function normalizeLegacyReasonCodes(array $codes, string $policyPrefix, array &$debugRankCodes, bool &$hasAnyUnmapped): array
+    {
+        $out = [];
+        $unmapped = false;
+
+        foreach ($codes as $rc) {
+            if (!is_string($rc) || trim($rc) === '') continue;
+            $rc = strtoupper(trim($rc));
+
+            if ($this->hasAllowedReasonPrefix($rc)) {
+                $out[] = $rc;
+                continue;
+            }
+
+            $mapped = $this->mapLegacyReasonCode($rc, $policyPrefix);
+            if ($mapped !== null) {
+                $out[] = $mapped;
+                $debugRankCodes[] = $rc;
+            } else {
+                $debugRankCodes[] = $rc;
+                $unmapped = true;
+            }
+        }
+
+        $out = array_values(array_unique($out));
+        $debugRankCodes = array_values(array_unique(array_filter($debugRankCodes, function($x){ return is_string($x) && trim($x) !== ''; })));
+
+        if ($unmapped) {
+            $hasAnyUnmapped = true;
+            if (!in_array('GL_LEGACY_CODE_UNMAPPED', $out, true)) $out[] = 'GL_LEGACY_CODE_UNMAPPED';
+        }
+
+        return $out;
     }
 
     /**
@@ -2162,7 +2301,7 @@ foreach ($rows as $j => $r2) {
      * @param array<string,mixed> $row
      * @return array<string,mixed>
      */
-    private function toContractCandidate(array $row): array
+    private function toContractCandidate(array $row, string $policy): array
     {
         $setup = (string)($row['setup_type'] ?? 'Base');
 
@@ -2211,6 +2350,16 @@ foreach ($rows as $j => $r2) {
             'rank_reason_codes' => array_values((array)($row['debug']['rank_reason_codes'] ?? [])),
         ];
 
+        // Legacy reason-code mapping: never publish generic codes without prefix (docs/watchlist/watchlist.md)
+        $policyPrefix = $this->policyPrefix($policy);
+        $debugRank = (array)($debugOut['rank_reason_codes'] ?? []);
+        $hasUnmapped = false;
+
+        $uiReasonCodes = $this->normalizeLegacyReasonCodes((array)($row['reason_codes'] ?? []), $policyPrefix, $debugRank, $hasUnmapped);
+        $timingOut['trade_disabled_reason_codes'] = $this->normalizeLegacyReasonCodes((array)($timingOut['trade_disabled_reason_codes'] ?? []), $policyPrefix, $debugRank, $hasUnmapped);
+
+        $debugOut['rank_reason_codes'] = array_values(array_unique($debugRank));
+
         // Default checklist if missing/empty
         $checklist = (array)($row['checklist'] ?? []);
         if (count($checklist) === 0) {
@@ -2228,7 +2377,7 @@ foreach ($rows as $j => $r2) {
             'watchlist_score' => (float)($row['watchlist_score'] ?? 0),
             'confidence' => $this->normalizeConfidence((string)($row['confidence'] ?? 'Low')),
             'setup_type' => $setup,
-            'reason_codes' => array_values((array)($row['reason_codes'] ?? [])),
+            'reason_codes' => array_values((array)($uiReasonCodes ?? [])),
             'debug' => $debugOut,
             'ticker_flags' => is_array($row['ticker_flags'] ?? null) ? $row['ticker_flags'] : [],
             'timing' => $timingOut,
