@@ -8,8 +8,12 @@ use Illuminate\Support\Facades\DB;
 
 class StrategyRunRepository
 {
-    public function __construct(private ScorecardConfig $cfg)
+    /** @var ScorecardConfig */
+    private $cfg;
+
+    public function __construct(ScorecardConfig $cfg)
     {
+        $this->cfg = $cfg;
     }
 
     /**

@@ -17,16 +17,41 @@ use App\Trade\Watchlist\Scorecard\StrategyRunRepository;
 
 class WatchlistScorecardService
 {
+    /** @var StrategyRunRepository */
+    private $runRepo;
+    /** @var StrategyCheckRepository */
+    private $checkRepo;
+    /** @var ScorecardRepository */
+    private $scoreRepo;
+    /** @var ExecutionEligibilityEvaluator */
+    private $evaluator;
+    /** @var ScorecardMetricsCalculator */
+    private $calculator;
+    /** @var TickerOhlcDailyRepository */
+    private $ohlcRepo;
+    /** @var ScorecardConfig */
+    private $cfg;
+    /** @var Clock */
+    private $clock;
+
     public function __construct(
-        private StrategyRunRepository $runRepo,
-        private StrategyCheckRepository $checkRepo,
-        private ScorecardRepository $scoreRepo,
-        private ExecutionEligibilityEvaluator $evaluator,
-        private ScorecardMetricsCalculator $calculator,
-        private TickerOhlcDailyRepository $ohlcRepo,
-        private ScorecardConfig $cfg,
-        private Clock $clock,
+        StrategyRunRepository $runRepo,
+        StrategyCheckRepository $checkRepo,
+        ScorecardRepository $scoreRepo,
+        ExecutionEligibilityEvaluator $evaluator,
+        ScorecardMetricsCalculator $calculator,
+        TickerOhlcDailyRepository $ohlcRepo,
+        ScorecardConfig $cfg,
+        Clock $clock
     ) {
+        $this->runRepo = $runRepo;
+        $this->checkRepo = $checkRepo;
+        $this->scoreRepo = $scoreRepo;
+        $this->evaluator = $evaluator;
+        $this->calculator = $calculator;
+        $this->ohlcRepo = $ohlcRepo;
+        $this->cfg = $cfg;
+        $this->clock = $clock;
     }
 
     /**
@@ -145,8 +170,13 @@ class WatchlistScorecardService
         $latestCheckDto = $latest ? $this->mapEligibilityCheckFromArray($latest->result) : null;
 
         // Repo call stays in service (orchestrator). Calculator stays pure.
-        $tickers = array_values(array_unique(array_map(fn($c) => $c->ticker, array_merge($run->topPicks, $run->secondary))));
-        $tickers = array_values(array_filter($tickers, fn($t) => $t !== ''));
+        $tickers = [];
+        foreach (array_merge($run->topPicks, $run->secondary) as $c) {
+            if (is_object($c) && isset($c->ticker) && $c->ticker !== '') {
+                $tickers[] = (string)$c->ticker;
+            }
+        }
+        $tickers = array_values(array_unique($tickers));
         $ohlc = [];
         if ($run->execDate !== '' && !empty($tickers)) {
             $ohlc = $this->ohlcRepo->mapOhlcByTickerCodesForDate($run->execDate, $tickers);
