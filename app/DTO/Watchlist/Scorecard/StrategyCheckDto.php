@@ -30,4 +30,17 @@ class StrategyCheckDto
         $this->snapshot = $snapshot;
         $this->result = $result;
     }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function toArray()
+    {
+        return [
+            'check_id' => $this->checkId,
+            'checked_at' => $this->checkedAt,
+            'snapshot' => $this->snapshot,
+            'result' => $this->result,
+        ];
+    }
 }

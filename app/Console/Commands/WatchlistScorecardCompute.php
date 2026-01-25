@@ -30,7 +30,17 @@ class WatchlistScorecardCompute extends Command
             return 2;
         }
 
-        $out = $svc->computeScorecard($tradeDate, $execDate, $policy, $source);
+        $metrics = $svc->computeScorecardDto($tradeDate, $execDate, $policy, $source);
+
+        $out = [
+            'trade_date' => $tradeDate,
+            'exec_trade_date' => $execDate,
+            'exec_date' => $execDate,
+            'policy' => $policy,
+            'source' => $source,
+            'metrics' => $metrics->toArray(),
+        ];
+
         $this->line(json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         return 0;
     }

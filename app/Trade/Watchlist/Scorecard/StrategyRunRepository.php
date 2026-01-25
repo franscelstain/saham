@@ -22,7 +22,7 @@ class StrategyRunRepository
      *
      * @param array<string,mixed> $payload
      */
-    public function upsertFromPayload(array $payload, string $source = 'watchlist'): int
+    private function upsertFromPayload(array $payload, string $source = 'watchlist'): int
     {
         $tradeDate = (string) ($payload['trade_date'] ?? '');
         $execDate = (string) (($payload['exec_trade_date'] ?? '') ?: ($payload['exec_date'] ?? ''));
@@ -79,7 +79,7 @@ class StrategyRunRepository
     /**
      * @return array<string,mixed>|null
      */
-    public function getRun(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): ?array
+    private function getRun(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): ?array
     {
         $row = DB::table('watchlist_strategy_runs')
             ->where('trade_date', $tradeDate)
@@ -115,7 +115,7 @@ class StrategyRunRepository
         return StrategyRunDto::fromPayloadArray($payload, (int)$row->run_id, $this->cfg);
     }
 
-    public function getRunId(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): int
+    private function getRunId(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): int
     {
         $row = DB::table('watchlist_strategy_runs')
             ->where('trade_date', $tradeDate)

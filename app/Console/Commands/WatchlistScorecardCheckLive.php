@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Services\Watchlist\WatchlistScorecardService;
+use App\Trade\Watchlist\Config\ScorecardConfig;
+use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
 use Illuminate\Console\Command;
 
 class WatchlistScorecardCheckLive extends Command
@@ -17,7 +19,7 @@ class WatchlistScorecardCheckLive extends Command
 
     protected $description = 'Run a live execution eligibility check for a watchlist strategy run and persist the check.';
 
-    public function handle(WatchlistScorecardService $svc): int
+    public function handle(WatchlistScorecardService $svc, ScorecardConfig $cfg): int
     {
         $tradeDate = (string)($this->option('trade-date') ?? '');
         $execDate = (string)($this->option('exec-date') ?? '');
@@ -58,13 +60,14 @@ class WatchlistScorecardCheckLive extends Command
         }
 
         try {
-            $result = $svc->checkLive($tradeDate, $execDate, $policy, $snapshot, $source);
+            $snapshotDto = LiveSnapshotDto::fromArray($snapshot, $cfg, (string)($snapshot['checked_at'] ?? ''));
+            $resultDto = $svc->checkLiveDto($tradeDate, $execDate, $policy, $snapshotDto, $source);
         } catch (\Throwable $e) {
             $this->error('FAIL: ' . $e->getMessage());
             return 1;
         }
 
-        $this->line(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $this->line(json_encode($resultDto->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         return 0;
     }
 }

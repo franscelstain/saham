@@ -5,18 +5,22 @@ namespace App\Services\Watchlist;
 use App\Repositories\WatchlistPersistenceRepository;
 use App\Trade\Watchlist\WatchlistEngine;
 use App\Services\Watchlist\WatchlistScorecardService;
+use App\Trade\Watchlist\Config\ScorecardConfig;
+use App\DTO\Watchlist\Scorecard\StrategyRunDto;
 
 class WatchlistService
 {
     private WatchlistEngine $engine;
     private WatchlistPersistenceRepository $persistRepo;
     private ?WatchlistScorecardService $scorecard;
+    private ?ScorecardConfig $scorecardCfg;
 
-    public function __construct(WatchlistEngine $engine, WatchlistPersistenceRepository $persistRepo, ?WatchlistScorecardService $scorecard = null)
+    public function __construct(WatchlistEngine $engine, WatchlistPersistenceRepository $persistRepo, ?WatchlistScorecardService $scorecard = null, ?ScorecardConfig $scorecardCfg = null)
     {
         $this->engine = $engine;
         $this->persistRepo = $persistRepo;
         $this->scorecard = $scorecard;
+        $this->scorecardCfg = $scorecardCfg;
     }
 
     /**
@@ -49,7 +53,10 @@ class WatchlistService
 
                 // Also persist as a scorecard "strategy run" (plan). Fail-soft.
                 if ($this->scorecard) {
-                    $this->scorecard->saveStrategyRun($payload, $source);
+                    if ($this->scorecardCfg) {
+                        $dto = StrategyRunDto::fromPayloadArray($payload, 0, $this->scorecardCfg);
+                        $this->scorecard->saveStrategyRunDto($dto, $source);
+                    }
                 }
             }
         } catch (\Throwable $e) {

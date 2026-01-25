@@ -30,4 +30,18 @@ class ScorecardMetricsDto
         $this->outcomeRate = ($outcomeRate === null) ? null : (float)$outcomeRate;
         $this->payload = $payload;
     }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function toArray()
+    {
+        return [
+            'feasible_rate' => $this->feasibleRate,
+            'fill_rate' => $this->fillRate,
+            'outcome_rate' => $this->outcomeRate,
+            'details' => $this->payload,
+        ];
+    }
+
 }

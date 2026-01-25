@@ -14,7 +14,7 @@ class StrategyCheckRepository
         return $this->insertCheck($runId, $snapshot->checkedAt, $snapshot->toArray(), $result->toArray());
     }
 
-    public function insertCheck(int $runId, string $checkedAt, array $snapshot, array $result): int
+    private function insertCheck(int $runId, string $checkedAt, array $snapshot, array $result): int
     {
         $snapJson = json_encode($snapshot, JSON_UNESCAPED_SLASHES);
         $resJson = json_encode($result, JSON_UNESCAPED_SLASHES);
@@ -37,7 +37,7 @@ class StrategyCheckRepository
     /**
      * @return array{check_id:int,checked_at:string,snapshot:array,result:array}|null
      */
-    public function getLatestCheck(int $runId): ?array
+    private function getLatestCheck(int $runId): ?array
     {
         $row = DB::table('watchlist_strategy_checks')
             ->where('run_id', $runId)

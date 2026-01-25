@@ -12,7 +12,7 @@ class ScorecardRepository
         $this->upsertScorecard($runId, $dto->feasibleRate, $dto->fillRate, $dto->outcomeRate, $dto->payload);
     }
 
-    public function upsertScorecard(int $runId, ?float $feasibleRate, ?float $fillRate, ?float $outcomeRate, array $payload = []): void
+    private function upsertScorecard(int $runId, ?float $feasibleRate, ?float $fillRate, ?float $outcomeRate, array $payload = []): void
     {
         $json = null;
         if (!empty($payload)) {

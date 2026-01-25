@@ -57,9 +57,11 @@ class WatchlistScorecardService
     /**
      * Save / upsert strategy run (plan) from watchlist contract payload.
      */
-    public function saveStrategyRun(array $payload, string $source = 'watchlist'): int
+    /**
+     * Save / upsert strategy run (plan) from a DTO.
+     */
+    public function saveStrategyRunDto(StrategyRunDto $dto, string $source = 'watchlist'): int
     {
-        $dto = $this->normalizeStrategyRunPayload($payload);
         return $this->runRepo->upsertFromDto($dto, $source);
     }
 
@@ -135,20 +137,23 @@ class WatchlistScorecardService
      *
      * @return array<string,mixed> result JSON
      */
-    public function checkLive(string $tradeDate, string $execDate, string $policy, array $snapshot, string $source = 'watchlist'): array
+    /**
+     * Evaluate and persist a live check.
+     */
+    public function checkLiveDto(string $tradeDate, string $execDate, string $policy, LiveSnapshotDto $snapshot, string $source = 'watchlist'): EligibilityCheckDto
     {
         $run = $this->runRepo->getRunDto($tradeDate, $execDate, $policy, $source);
         if (!$run) {
             throw new \RuntimeException("strategy run not found: $tradeDate/$execDate/$policy (source=$source)");
         }
 
-        $checkedAtFallback = $this->clock->nowRfc3339();
-        $snapDto = LiveSnapshotDto::fromArray($snapshot, $this->cfg, $checkedAtFallback);
-        $resultDto = $this->evaluator->evaluate($run, $snapDto, $this->cfg);
+        $resultDto = $this->evaluator->evaluate($run, $snapshot, $this->cfg);
 
-        if ($run->runId > 0) $this->checkRepo->insertCheckFromDto($run->runId, $snapDto, $resultDto);
+        if ($run->runId > 0) {
+            $this->checkRepo->insertCheckFromDto($run->runId, $snapshot, $resultDto);
+        }
 
-        return $resultDto->toArray();
+        return $resultDto;
     }
 
     /**
@@ -156,7 +161,10 @@ class WatchlistScorecardService
      *
      * @return array<string,mixed>
      */
-    public function computeScorecard(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): array
+    /**
+     * Compute and persist scorecard metrics for the latest check.
+     */
+    public function computeScorecardDto(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): \App\DTO\Watchlist\Scorecard\ScorecardMetricsDto
     {
         $run = $this->runRepo->getRunDto($tradeDate, $execDate, $policy, $source);
         if (!$run) {
@@ -166,7 +174,6 @@ class WatchlistScorecardService
         if ($run->runId <= 0) throw new \RuntimeException('invalid run_id');
 
         $latest = $this->checkRepo->getLatestCheckDto($run->runId);
-
         $latestCheckDto = $latest ? $this->mapEligibilityCheckFromArray($latest->result) : null;
 
         // Repo call stays in service (orchestrator). Calculator stays pure.
@@ -185,23 +192,7 @@ class WatchlistScorecardService
         $calc = $this->calculator->compute($run, $latestCheckDto, $ohlc);
         $this->scoreRepo->upsertScorecardFromDto($run->runId, $calc);
 
-        return [
-            'run_id' => $run->runId,
-            'trade_date' => $tradeDate,
-            'exec_trade_date' => $execDate,
-            'exec_date' => $execDate,
-            'policy' => $policy,
-            'feasible_rate' => $calc->feasibleRate,
-            'fill_rate' => $calc->fillRate,
-            'outcome_rate' => $calc->outcomeRate,
-            'details' => $calc->payload,
-            'latest_check' => $latest ? [
-                'check_id' => $latest->checkId,
-                'checked_at' => $latest->checkedAt,
-                'snapshot' => $latest->snapshot,
-                'result' => $latest->result,
-            ] : null,
-        ];
+        return $calc;
     }
 
     /**
