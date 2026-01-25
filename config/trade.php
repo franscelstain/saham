@@ -287,6 +287,15 @@ return [
         'default_account_id' => env('PORTFOLIO_DEFAULT_ACCOUNT_ID', 1),
         'default_strategy_code' => env('PORTFOLIO_DEFAULT_STRATEGY_CODE', 'WEEKLY_SWING'),
 
+        'weekly_swing' => [
+            'cooldown_days_after_sl' => (int) env('PORTFOLIO_WEEKLY_COOLDOWN_AFTER_SL', 2),
+            'no_averaging_down' => (bool) env('PORTFOLIO_WEEKLY_NO_AVERAGING_DOWN', true),
+        ],
+        'dividend_swing' => [
+            'cooldown_days_after_sl' => (int) env('PORTFOLIO_DIVIDEND_COOLDOWN_AFTER_SL', 3),
+            'no_averaging_down' => (bool) env('PORTFOLIO_DIVIDEND_NO_AVERAGING_DOWN', true),
+        ],
+
         // Risk caps (soft): enforce via strategy rules / UI layer
         'max_open_positions' => env('PORTFOLIO_MAX_OPEN_POSITIONS', 5),
         'max_alloc_pct_per_position' => env('PORTFOLIO_MAX_ALLOC_PCT_PER_POSITION', 0.25),

@@ -18,6 +18,13 @@ class PortfolioPlanRepository
         }
     }
 
+
+
+    public function findById(int $planId): ?object
+    {
+        if ($planId <= 0 || !$this->tableExists()) return null;
+        return DB::table('portfolio_plans')->where('id', $planId)->first();
+    }
     /**
      * @param array<string,mixed> $row
      * @return array{id:int, created:bool, status?:string}
@@ -98,7 +105,12 @@ class PortfolioPlanRepository
         ]);
     }
 
-    public function markCancelled(int $planId): void
+    /**
+     * Mark a plan as CANCELLED.
+     *
+     * @param string|null $reason Optional cancel reason (kept for API compatibility; currently not persisted)
+     */
+    public function markCancelled(int $planId, ?string $reason = null): void
     {
         if ($planId <= 0 || !$this->tableExists()) return;
         DB::table('portfolio_plans')->where('id', $planId)->update([

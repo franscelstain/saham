@@ -6,6 +6,16 @@ use Illuminate\Support\Facades\DB;
 
 class MarketCalendarRepository
 {
+    public function tableExists(): bool
+    {
+        try {
+            return DB::getSchemaBuilder()->hasTable('market_calendar');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+
     public function isTradingDay(string $date): bool
     {
         $row = DB::table('market_calendar')

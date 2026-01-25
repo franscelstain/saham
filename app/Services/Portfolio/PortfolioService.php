@@ -15,6 +15,10 @@ use App\Repositories\PortfolioTradeRepository;
 use App\Repositories\TickerRepository;
 use App\Trade\Portfolio\PortfolioPolicyCodes;
 use App\Trade\Pricing\FeeConfig;
+use App\Exceptions\PortfolioInconsistentStateException;
+use App\Repositories\MarketCalendarRepository;
+use App\Trade\Portfolio\Policies\PolicyFactory;
+use App\Trade\Portfolio\Policies\PortfolioPolicy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -39,6 +43,9 @@ class PortfolioService
     private RunRepository $runRepo;
     private CanonicalEodRepository $canonRepo;
 
+    private MarketCalendarRepository $calRepo;
+    private PolicyFactory $policyFactory;
+
     private float $buyFee;
     private float $sellFee;
 
@@ -52,6 +59,7 @@ class PortfolioService
         TickerRepository $tickerRepo,
         RunRepository $runRepo,
         CanonicalEodRepository $canonRepo,
+        MarketCalendarRepository $calRepo,
         FeeConfig $feeCfg
     ) {
         $this->tradeRepo = $tradeRepo;
@@ -63,6 +71,8 @@ class PortfolioService
         $this->tickerRepo = $tickerRepo;
         $this->runRepo = $runRepo;
         $this->canonRepo = $canonRepo;
+        $this->calRepo = $calRepo;
+        $this->policyFactory = new PolicyFactory($calRepo, (array) config('trade.portfolio', []));
         $this->buyFee = $feeCfg->buyRate() + $feeCfg->extraBuyRate();
         $this->sellFee = $feeCfg->sellRate() + $feeCfg->extraSellRate();
     }
@@ -224,18 +234,47 @@ class PortfolioService
                 }
 
                 if ($dto->side === 'BUY') {
-                    // Validate entry fill against plan (expiry/intent). Never blocks ingest, but logs breaches.
-                    if ($plan && $preQty <= 0) {
-                        $v = $this->validateEntryFill($plan, $dto);
-                        if (!$v['ok']) {
+                    // Policy checks (never block ingest; but DO record breaches for audit)
+                    if ($plan) {
+                        $breaches = [];
+
+                        // Entry-only checks (expiry/intent) when opening a new position
+                        if ($preQty <= 0) {
+                            $v = $this->validateEntryFill($plan, $dto);
+                            if (!$v['ok']) {
+                                $breaches[] = strtoupper((string)($v['reason'] ?? 'policy_breach'));
+                            }
+                        }
+
+                        $policy = $this->getPolicy($plan);
+                        if ($policy) {
+                            $lastExitSlDate = $this->eventRepo->lastEventAsOfTradeDate($dto->accountId, $dto->tickerId, 'EXIT_SL');
+                            $ctx = [
+                                'pre_qty' => $preQty,
+                                'pre_avg_cost' => $pre['avg_cost'] ?? null,
+                                'last_exit_sl_date' => $lastExitSlDate,
+                                'trade_date' => $dto->tradeDate,
+                                'be_at_r' => (float) config('trade.planning.be_at_r', 0.5),
+                            ];
+                            $breaches = array_merge($breaches, $policy->validateBuy($plan, $dto, $ctx));
+                        }
+
+                        if (!empty($breaches)) {
+                            $breaches = array_values(array_unique(array_filter($breaches)));
                             $this->insertEvent($dto->accountId, $dto->tickerId, $plan, [
                                 'event_type' => 'POLICY_BREACH',
                                 'qty_before' => $preQty,
                                 'qty_after' => null,
                                 'price' => $dto->price,
-                                'reason_code' => 'ENTRY',
-                                'notes' => (string)($v['reason'] ?? 'policy_breach'),
-                                'payload_json' => json_encode(['trade_date' => $dto->tradeDate, 'entry_expiry_date' => $plan->entry_expiry_date ?? null, 'intent' => $plan->intent ?? null], JSON_UNESCAPED_SLASHES),
+                                'reason_code' => 'POLICY',
+                                'notes' => implode(',', $breaches),
+                                'payload_json' => json_encode([
+                                    'breaches' => $breaches,
+                                    'trade_id' => $tradeId,
+                                    'trade_date' => $dto->tradeDate,
+                                    'intent' => $plan->intent ?? null,
+                                    'entry_expiry_date' => $plan->entry_expiry_date ?? null,
+                                ], JSON_UNESCAPED_SLASHES),
                             ]);
                         }
                     }
@@ -355,6 +394,45 @@ class PortfolioService
                 return ['ok' => true, 'trade_id' => $tradeId, 'created' => (bool)$up['created']];
             }, 3);
         } catch (\Throwable $e) {
+            if ($e instanceof PortfolioInconsistentStateException) {
+                // IMPORTANT: audit event MUST be written outside the rolled-back DB transaction.
+                try {
+                    $plan = null;
+                    if ($this->planRepo->tableExists()) {
+                        $plan = $this->planRepo->findLatestForTicker($e->accountId, $e->tickerId, $e->strategyCode);
+                    }
+                    if (!$plan) {
+                        $plan = (object)[
+                            'strategy_code' => $e->strategyCode,
+                            'plan_version' => $e->planVersion,
+                            'as_of_trade_date' => $e->asOfTradeDate,
+                        ];
+                    }
+                    $this->insertEvent($e->accountId, $e->tickerId, $plan, [
+                        'event_type' => 'INCONSISTENT_STATE',
+                        'qty_before' => $e->positionQty,
+                        'qty_after' => $e->expectedQty,
+                        'price' => null,
+                        'reason_code' => 'INTEGRITY',
+                        'notes' => 'positions_qty_mismatch',
+                        'payload_json' => json_encode([
+                            'expected_lots_qty' => $e->expectedQty,
+                            'positions_qty' => $e->positionQty,
+                        ], JSON_UNESCAPED_SLASHES),
+                    ]);
+                } catch (\Throwable $ignored) {
+                    // avoid masking original exception
+                }
+
+                Log::channel('portfolio')->critical('portfolio.ingest_trade_inconsistent_state', $logCtx + [
+                    'error' => $e->getMessage(),
+                    'expected_qty' => $e->expectedQty,
+                    'position_qty' => $e->positionQty,
+                ]);
+
+                return ['ok' => false, 'error' => 'inconsistent_state_positions_qty'];
+            }
+
             Log::channel('portfolio')->error('portfolio.ingest_trade_failed', $logCtx + [
                 'error' => $e->getMessage(),
                 'exception_class' => get_class($e),
@@ -429,6 +507,53 @@ class PortfolioService
         }
     }
 
+
+    /**
+     * Cancel a plan manually.
+     * Sets status=CANCELLED and emits PLAN_CANCELLED event. Idempotent.
+     *
+     * @return array{ok:bool, plan_id:int, already_cancelled?:bool, error?:string}
+     */
+    public function cancelPlan(int $planId, string $reason = 'manual_cancel'): array
+    {
+        if ($planId <= 0) return ['ok' => false, 'plan_id' => $planId, 'error' => 'invalid_plan_id'];
+        try {
+            if (!$this->planRepo->tableExists()) {
+                return ['ok' => false, 'plan_id' => $planId, 'error' => 'plans_table_missing'];
+            }
+            $p = $this->planRepo->findById($planId);
+            if (!$p) return ['ok' => false, 'plan_id' => $planId, 'error' => 'plan_not_found'];
+
+            $status = isset($p->status) ? strtoupper((string)$p->status) : 'PLANNED';
+            if ($status === 'CANCELLED') {
+                return ['ok' => true, 'plan_id' => $planId, 'already_cancelled' => true];
+            }
+
+            // Once a plan is OPENED (entry filled), it should not be cancelled.
+            // Close/exit should be represented by position lifecycle + exit events.
+            if ($status === 'OPENED') {
+                return ['ok' => false, 'plan_id' => $planId, 'error' => 'plan_already_opened'];
+            }
+
+            $this->planRepo->markCancelled($planId, $reason);
+            $this->insertEvent((int)($p->account_id ?? 0), (int)($p->ticker_id ?? 0), $p, [
+                'event_type' => 'PLAN_CANCELLED',
+                'qty_before' => null,
+                'qty_after' => null,
+                'price' => null,
+                'reason_code' => 'PLAN',
+                'notes' => $reason,
+                'payload_json' => json_encode(['plan_id' => $planId, 'reason' => $reason], JSON_UNESCAPED_SLASHES),
+            ]);
+
+            Log::channel('portfolio')->info('portfolio.cancel_plan_ok', ['plan_id' => $planId, 'reason' => $reason]);
+            return ['ok' => true, 'plan_id' => $planId];
+        } catch (\Throwable $e) {
+            Log::channel('portfolio')->error('portfolio.cancel_plan_failed', ['plan_id' => $planId, 'reason' => $reason, 'error' => $e->getMessage()]);
+            return ['ok' => false, 'plan_id' => $planId, 'error' => 'cancel_plan_failed'];
+        }
+    }
+
     /**
      * Update valuations using canonical close for given trade_date.
      *
@@ -438,6 +563,19 @@ class PortfolioService
     {
         $tradeDate = trim($tradeDate);
         if ($tradeDate === '') return ['ok' => false, 'valued' => 0, 'error' => 'invalid_trade_date'];
+
+        $requestedDate = $tradeDate;
+        if ($this->calRepo->tableExists() && !$this->calRepo->isTradingDay($tradeDate)) {
+            $prev = $this->calRepo->previousTradingDate($tradeDate);
+            if ($prev) {
+                Log::channel('portfolio')->info('portfolio.value_eod_effective_date', [
+                    'requested_date' => $requestedDate,
+                    'effective_date' => $prev,
+                    'account_id' => $accountId,
+                ]);
+                $tradeDate = $prev;
+            }
+        }
 
         try {
             $open = $this->posRepo->openPositionsByTicker($accountId);
@@ -508,6 +646,28 @@ class PortfolioService
                     'unrealized_pnl' => $upl,
                     'last_valued_date' => $tradeDate,
                 ]);
+
+                // Optional risk-management events on valuation (minimal, per docs/PORTFOLIO.md)
+                if ($this->planRepo->tableExists()) {
+                    $plan = $this->planRepo->findLatestForTicker($accountId, (int)$tid);
+                    $policy = $this->getPolicy($plan);
+                    if ($plan && $policy) {
+                        $pv = isset($plan->plan_version) ? (string)$plan->plan_version : null;
+                        $ctx = [
+                            'be_at_r' => (float) config('trade.planning.be_at_r', 0.5),
+                            'be_armed' => $pv ? $this->eventRepo->existsForPlan($accountId, (int)$tid, 'BE_ARMED', $pv) : false,
+                            'sl_moved' => $pv ? $this->eventRepo->existsForPlan($accountId, (int)$tid, 'SL_MOVED', $pv) : false,
+                        ];
+                        $events = $policy->eodRiskEvents($plan, [
+                            'qty' => $qty,
+                            'avg_price' => $avg,
+                        ], (float)$close, $tradeDate, $ctx);
+                        foreach ($events as $ev) {
+                            if (!is_array($ev) || empty($ev['event_type'])) continue;
+                            $this->insertEvent($accountId, (int)$tid, $plan, $ev);
+                        }
+                    }
+                }
                 $valued++;
             }
 
@@ -540,16 +700,15 @@ class PortfolioService
         }
 
         if ($pos && $posQty !== $expectedQty) {
-            $this->insertEvent($accountId, $tickerId, $plan, [
-                'event_type' => 'INCONSISTENT_STATE',
-                'qty_before' => $posQty,
-                'qty_after' => $expectedQty,
-                'price' => null,
-                'reason_code' => 'CONSISTENCY',
-                'notes' => 'positions.qty != lots.remaining_qty',
-                'payload_json' => json_encode(['expected_qty' => $expectedQty, 'pos_qty' => $posQty], JSON_UNESCAPED_SLASHES),
-            ]);
-            throw new \RuntimeException('inconsistent_state_positions_qty');
+            throw new PortfolioInconsistentStateException(
+                $accountId,
+                $tickerId,
+                $posQty,
+                $expectedQty,
+                $plan && isset($plan->strategy_code) ? (string)$plan->strategy_code : null,
+                $plan && isset($plan->plan_version) ? (string)$plan->plan_version : null,
+                $plan && isset($plan->as_of_trade_date) ? (string)$plan->as_of_trade_date : null
+            );
         }
     }
 
@@ -608,7 +767,9 @@ class PortfolioService
     private function validateEntryFill(object $plan, TradeInput $dto): array
     {
         $intent = isset($plan->intent) ? strtoupper((string)$plan->intent) : '';
-        if ($intent !== '' && !in_array($intent, ['ENTRY', 'ADD', 'BUY'], true)) {
+        // Accept ENTRY/ADD and BUY* variants (BUY_0, BUY_1, BUY_2_SPLIT, etc.).
+        $isBuyVariant = ($intent !== '' && substr($intent, 0, 3) === 'BUY');
+        if ($intent !== '' && !$isBuyVariant && !in_array($intent, ['ENTRY', 'ADD'], true)) {
             return ['ok' => false, 'reason' => 'intent_not_entry'];
         }
 
@@ -619,6 +780,14 @@ class PortfolioService
             }
         }
         return ['ok' => true];
+    }
+
+
+    private function getPolicy(?object $plan): ?PortfolioPolicy
+    {
+        if (!$plan || !isset($plan->strategy_code) || !$plan->strategy_code) return null;
+        $code = strtoupper((string)$plan->strategy_code);
+        return $this->policyFactory->make($code);
     }
 
     /** @return array<string,mixed>|null */
