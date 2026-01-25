@@ -4,7 +4,7 @@ Dokumen ini mendefinisikan **aturan Portfolio** yang **kompatibel** dengan:
 - `SRP_Performa.md` (aturan tertinggi: SRP, performa, logging, deterministik)
 - `MARKET_DATA.md` (CANONICAL + cutoff/effective date + market calendar)
 - `compute_eod.md` (feature/indikator deterministik berbasis trading days)
-- `WATCHLIST.md` (Strategy Policies + Trade Plan output)
+- `watchlist.md` (Strategy Policies + Trade Plan output)
 
 Tujuan: Portfolio **bukan tempat “menebak” ulang sinyal**, tapi **mengeksekusi & mengelola posisi** secara konsisten agar hasil cuan bisa dievaluasi **per strategi** dan akurat.
 

@@ -9,11 +9,11 @@ Watchlist di TradeAxis **bukan “penentu beli”**. Watchlist adalah:
 Dokumen ini adalah **kontrak lintas-policy**: schema output, data dictionary, governance reason codes, tick rounding, lot sizing, fee model, dan invariants.
 
 **Single source of truth untuk angka/threshold/rules per strategi ada di policy docs:**
-- `weekly_swing.md`
-- `dividend_swing.md`
-- `intraday_light.md`
-- `position_trade.md`
-- `no_trade.md`
+- `policy/weekly_swing.md`
+- `policy/dividend_swing.md`
+- `policy/intraday_light.md`
+- `policy/position_trade.md`
+- `policy/no_trade.md`
 
 ---
 
