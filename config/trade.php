@@ -280,6 +280,23 @@ return [
         'top_picks_min_score' => env('WATCHLIST_TOP_PICKS_MIN_SCORE', 60),
         'top_picks_require_not_expired' => env('WATCHLIST_TOP_PICKS_REQUIRE_NOT_EXPIRED', true),
         'top_picks_require_setup_ok' => env('WATCHLIST_TOP_PICKS_REQUIRE_SETUP_OK', true),
+
+        // Execution Check + Scorecard (docs/watchlist/scorecard.md)
+        'scorecard' => [
+            // Default guards used when candidate doesn't carry explicit guard.
+            'max_chase_pct_default' => (float) env('WATCHLIST_SC_MAX_CHASE_PCT', 0.01),
+            'gap_up_block_pct_default' => (float) env('WATCHLIST_SC_GAP_UP_BLOCK_PCT', 0.015),
+            'spread_max_pct_default' => (float) env('WATCHLIST_SC_SPREAD_MAX_PCT', 0.004),
+
+            // By default, scorecard evaluates only top_picks + secondary.
+            'include_watch_only' => (bool) env('WATCHLIST_SC_INCLUDE_WATCH_ONLY', false),
+
+            // Session time defaults used by scorecard window parsing.
+            // Supports window tokens like "15:15-close" in docs/watchlist/scorecard.md.
+            // You can override via snapshot JSON keys: session_open_time/session_close_time.
+            'session_open_time_default' => env('WATCHLIST_SC_SESSION_OPEN', '09:00'),
+            'session_close_time_default' => env('WATCHLIST_SC_SESSION_CLOSE', '15:50'),
+        ],
     ],
 
     // Portfolio: lifecycle + lots + realized/unrealized PnL (docs/PORTFOLIO.md)

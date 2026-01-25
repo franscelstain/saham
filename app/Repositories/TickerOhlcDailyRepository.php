@@ -6,6 +6,37 @@ use Illuminate\Support\Facades\DB;
 
 class TickerOhlcDailyRepository
 {
+    /**
+     * Map OHLC for a single date keyed by ticker_code.
+     *
+     * @param string[] $tickerCodes
+     * @return array<string,array{open:?float,high:?float,low:?float,close:?float}>
+     */
+    public function mapOhlcByTickerCodesForDate(string $tradeDate, array $tickerCodes): array
+    {
+        $tickerCodes = array_values(array_unique(array_filter(array_map(fn($v) => strtoupper(trim((string)$v)), $tickerCodes))));
+        if (!$tickerCodes) return [];
+
+        $rows = DB::table('ticker_ohlc_daily as od')
+            ->join('tickers as t', 't.ticker_id', '=', 'od.ticker_id')
+            ->where('od.trade_date', $tradeDate)
+            ->whereIn('t.ticker_code', $tickerCodes)
+            ->select(['t.ticker_code', 'od.open', 'od.high', 'od.low', 'od.close'])
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $code = strtoupper((string) $r->ticker_code);
+            $out[$code] = [
+                'open' => $r->open !== null ? (float) $r->open : null,
+                'high' => $r->high !== null ? (float) $r->high : null,
+                'low' => $r->low !== null ? (float) $r->low : null,
+                'close' => $r->close !== null ? (float) $r->close : null,
+            ];
+        }
+        return $out;
+    }
+
     public function getTickerIdsHavingRowOnDate(string $tradeDate, ?string $tickerCode = null): array
     {
         $q = DB::table('ticker_ohlc_daily as od')
