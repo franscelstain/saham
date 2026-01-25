@@ -2,7 +2,7 @@
 
 Dokumen ini merangkum **seluruh Artisan command** yang tersedia di TradeAxis3.3 dan **urutan eksekusi yang disarankan** untuk operasi harian.
 
-> Catatan: ini fokus ke *command yang benar-benar dipakai* untuk pipeline Market Data → Compute EOD → Portfolio. Command demo `inspire` tetap dicantumkan terakhir.
+> Catatan: ini fokus ke *command yang benar-benar dipakai* untuk pipeline Market Data → Compute EOD → Score Card → Portfolio. Command demo `inspire` tetap dicantumkan terakhir.
 
 ## Urutan eksekusi harian yang disarankan
 
@@ -22,15 +22,22 @@ Dokumen ini merangkum **seluruh Artisan command** yang tersedia di TradeAxis3.3 
 5. `trade:compute-eod` — hitung indikator EOD + decision/volume + signal age
 
 
-### C. Portfolio lifecycle
+### C. Watchlist Score Card (live check + metrics)
 
-6. `portfolio:expire-plans` — expire plan PLANNED yang sudah lewat entry expiry
+6. `watchlist:scorecard:check-live` — evaluasi eksekusi *real-time* berbasis snapshot bid/ask/last (spread/gap/chase + entry/avoid windows) dan menghasilkan default recommendation.
 
-7. `portfolio:ingest-trade` — input 1 transaksi (BUY/SELL) untuk membentuk lots FIFO + posisi
+7. `watchlist:scorecard:compute` — hitung metrik scorecard (feasible_rate + fill_rate) dari hasil check-live + OHLC harian pada `exec_date`, lalu persist ke tabel scorecard.
 
-8. `portfolio:value-eod` — valuasi posisi pakai canonical close (setelah publish)
 
-9. `portfolio:cancel-plan` — cancel plan secara manual (ad hoc)
+### D. Portfolio lifecycle
+
+8. `portfolio:expire-plans` — expire plan PLANNED yang sudah lewat entry expiry
+
+9. `portfolio:ingest-trade` — input 1 transaksi (BUY/SELL) untuk membentuk lots FIFO + posisi
+
+10. `portfolio:value-eod` — valuasi posisi pakai canonical close (setelah publish)
+
+11. `portfolio:cancel-plan` — cancel plan secara manual (ad hoc)
 
 
 ---
@@ -38,7 +45,7 @@ Dokumen ini merangkum **seluruh Artisan command** yang tersedia di TradeAxis3.3 
 ## Detail setiap command
 
 ### `market-data:import-eod`
-**Tujuan:** Import Market Data EOD into md_raw_eod and md_canonical_eod (with gating)
+**Tujuan:** Import Market Data EOD into md_raw_eod and md_canonical_eod (with gating)  
 **Lokasi implementasi:** `app/Console/Commands/MarketDataImportEod.php` (`MarketDataImportEod`)
 
 **Argumen/Opsi:**
@@ -58,7 +65,7 @@ php artisan market-data:import-eod --date=2026-01-19 --ticker=BBCA
 - **Catatan:** kalau hasil import status *HELD / coverage di bawah threshold*, kamu **jangan publish**; lanjut ke rebuild canonical (atau perbaiki sumber data).
 
 ### `market-data:validate-eod`
-**Tujuan:** Validate canonical EOD against validator provider (EODHD) for subset tickers
+**Tujuan:** Validate canonical EOD against validator provider (EODHD) for subset tickers  
 **Lokasi implementasi:** `app/Console/Commands/MarketDataValidateEod.php` (`MarketDataValidateEod`)
 
 **Argumen/Opsi:**
@@ -77,7 +84,7 @@ php artisan market-data:validate-eod --date=2026-01-19 --max=50
 - **Catatan:** command ini bukan pengganti gating import; ini layer verifikasi tambahan.
 
 ### `market-data:rebuild-canonical`
-**Tujuan:** Phase 6: Rebuild md_canonical_eod from md_raw_eod without refetch (new run_id audit trail)
+**Tujuan:** Phase 6: Rebuild md_canonical_eod from md_raw_eod without refetch (new run_id audit trail)  
 **Lokasi implementasi:** `app/Console/Commands/MarketDataRebuildCanonical.php` (`MarketDataRebuildCanonical`)
 
 **Argumen/Opsi:**
@@ -97,7 +104,7 @@ php artisan market-data:rebuild-canonical --date=2026-01-19 --ticker=BBCA
 - **Catatan:** setelah rebuild, pastikan run-nya SUCCESS sebelum publish.
 
 ### `market-data:publish-eod`
-**Tujuan:** Publish md_canonical_eod (SUCCESS run) into ticker_ohlc_daily
+**Tujuan:** Publish md_canonical_eod (SUCCESS run) into ticker_ohlc_daily  
 **Lokasi implementasi:** `app/Console/Commands/MarketDataPublishEod.php` (`MarketDataPublishEod`)
 
 **Argumen/Opsi:**
@@ -114,7 +121,7 @@ php artisan market-data:publish-eod --run=16 --batch=3000
 - **Catatan:** publish adalah tahap yang “mengubah data konsumsi”; jadi jangan lakukan kalau canonical masih held/meragukan.
 
 ### `trade:compute-eod`
-**Tujuan:** Compute indikator EOD (holiday-aware) + decision/volume + signal age
+**Tujuan:** Compute indikator EOD (holiday-aware) + decision/volume + signal age  
 **Lokasi implementasi:** `app/Console/Commands/ComputeEod.php` (`ComputeEod`)
 
 **Argumen/Opsi:**
@@ -133,8 +140,48 @@ php artisan trade:compute-eod --date=2026-01-19 --ticker=BBCA
 ```
 - **Catatan:** command ini holiday-aware (mengikuti market calendar) sesuai deskripsi command.
 
+### `watchlist:scorecard:check-live`
+**Tujuan:** Jalankan *live execution check* untuk kandidat dari strategy run: hitung `spread_pct`, `gap_pct`, `chase_pct`, cek `entry_windows` & `avoid_windows`, dan hasilkan `default_recommendation`.  
+**Lokasi implementasi:** `app/Console/Commands/WatchlistScorecardCheckLive.php` (`WatchlistScorecardCheckLive`)
+
+**Argumen/Opsi:**
+- `--trade-date= : Trade date (YYYY-MM-DD)` (tanggal plan/watchlist dibuat)
+- `--exec-date= : Exec date (YYYY-MM-DD)` (tanggal eksekusi rencana / hari beli)
+- `--policy= : Nama policy (mis. WEEKLY_SWING / DIVIDEND / dll sesuai watchlist)`
+- `--input= : Path file JSON snapshot (atau gunakan STDIN bila implementasi mendukung)`
+- **Kapan dipakai:** pagi sebelum/selama market berjalan, setelah kamu punya plan kandidat (strategy run).
+- **Output utama:** hasil evaluasi per ticker `results[]` + `default_recommendation`, dan tersimpan sebagai `watchlist_strategy_checks`.
+
+**Contoh:**
+```bash
+php artisan watchlist:scorecard:check-live --trade-date=2026-01-19 --exec-date=2026-01-20 --policy=WEEKLY_SWING --input=storage/app/snapshots/live.json
+```
+
+**Catatan:**
+- Snapshot minimal idealnya berisi `bid`, `ask`, `last` (untuk spread) + `open`, `prev_close` (untuk gap).
+- `avoid_windows` dapat memakai format `HH:MM-HH:MM` dan juga token `close/open` (mis. `15:15-close`) bila sistem scorecard kamu mendukungnya sesuai `scorecard.md`.
+
+### `watchlist:scorecard:compute`
+**Tujuan:** Hitung metrik scorecard berbasis hasil `check-live` + OHLC harian pada `exec_date`, lalu simpan ke `watchlist_scorecards`.  
+- `feasible_rate` → dari hasil eligibility (berapa kandidat eligible)  
+- `fill_rate` → dari apakah slice price “tersentuh” OHLC di `exec_date`  
+
+**Lokasi implementasi:** `app/Console/Commands/WatchlistScorecardCompute.php` (`WatchlistScorecardCompute`)
+
+**Argumen/Opsi:**
+- `--trade-date= : Trade date (YYYY-MM-DD)`
+- `--exec-date= : Exec date (YYYY-MM-DD)`
+- `--policy= : Nama policy`
+- **Kapan dipakai:** setelah `watchlist:scorecard:check-live` (supaya ada data check), dan setelah EOD tersedia untuk `exec_date` (agar fill-rate akurat).
+- **Output utama:** 1 row scorecard per run pada `watchlist_scorecards`.
+
+**Contoh:**
+```bash
+php artisan watchlist:scorecard:compute --trade-date=2026-01-19 --exec-date=2026-01-20 --policy=WEEKLY_SWING
+```
+
 ### `portfolio:expire-plans`
-**Tujuan:** Expire PLANNED portfolio plans whose entry expiry has passed
+**Tujuan:** Expire PLANNED portfolio plans whose entry expiry has passed  
 **Lokasi implementasi:** `app/Console/Commands/PortfolioExpirePlans.php` (`PortfolioExpirePlans`)
 
 **Argumen/Opsi:**
@@ -149,7 +196,7 @@ php artisan portfolio:expire-plans --date=2026-01-25 --account_id=1
 ```
 
 ### `portfolio:ingest-trade`
-**Tujuan:** Ingest single trade/fill into portfolio (FIFO lots + derived positions)
+**Tujuan:** Ingest single trade/fill into portfolio (FIFO lots + derived positions)  
 **Lokasi implementasi:** `app/Console/Commands/PortfolioIngestTrade.php` (`PortfolioIngestTrade`)
 
 **Argumen/Opsi:**
@@ -183,7 +230,7 @@ php artisan portfolio:ingest-trade --account=1 --ticker=ITMA --date=2026-01-14 -
 - **Catatan penting tentang qty:** di IDX, **1 lot = 100 saham** → kalau kamu input dari Ajaib, konversi `qty = lot × 100`.
 
 ### `portfolio:value-eod`
-**Tujuan:** Update portfolio_positions valuations using canonical EOD close
+**Tujuan:** Update portfolio_positions valuations using canonical EOD close  
 **Lokasi implementasi:** `app/Console/Commands/PortfolioValueEod.php` (`PortfolioValueEod`)
 
 **Argumen/Opsi:**
@@ -197,7 +244,7 @@ php artisan portfolio:value-eod --date=2026-01-19 --account=1
 ```
 
 ### `portfolio:cancel-plan`
-**Tujuan:** Cancel a portfolio plan (status=CANCELLED) and emit PLAN_CANCELLED event.
+**Tujuan:** Cancel a portfolio plan (status=CANCELLED) and emit PLAN_CANCELLED event.  
 **Lokasi implementasi:** `app/Console/Commands/PortfolioCancelPlan.php` (`PortfolioCancelPlan`)
 
 **Argumen/Opsi:**
@@ -227,6 +274,10 @@ php artisan inspire
 - `market-data:publish-eod` **bergantung** pada canonical run SUCCESS (hasil import/rebuild).
 
 - `trade:compute-eod` **bergantung** pada `ticker_ohlc_daily` sudah terisi (hasil publish).
+
+- `watchlist:scorecard:check-live` **bergantung** pada strategy run / plan kandidat tersedia untuk `trade_date + exec_date + policy`.
+
+- `watchlist:scorecard:compute` **bergantung** pada hasil check-live (untuk feasible_rate) dan OHLC `exec_date` tersedia (untuk fill_rate).
 
 - `portfolio:value-eod` **bergantung** pada canonical EOD tersedia untuk tanggal effective (hasil publish/canonical repo).
 
