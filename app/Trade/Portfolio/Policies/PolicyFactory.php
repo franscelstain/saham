@@ -31,6 +31,14 @@ class PolicyFactory
             return new DividendSwingPolicy($this->cal, (array)($this->cfg['dividend_swing'] ?? []));
         }
 
+        if ($code === 'INTRADAY_LIGHT') {
+            return new IntradayLightPolicy($this->cal, (array)($this->cfg['intraday_light'] ?? []));
+        }
+
+        if ($code === 'POSITION_TRADE') {
+            return new PositionTradePolicy($this->cal, (array)($this->cfg['position_trade'] ?? []));
+        }
+
         // Unknown strategies: no policy enforcement (still records fills/positions)
         return null;
     }

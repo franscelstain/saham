@@ -252,7 +252,8 @@ class PortfolioService
                             $ctx = [
                                 'pre_qty' => $preQty,
                                 'pre_avg_cost' => $pre['avg_cost'] ?? null,
-                                'last_exit_sl_date' => $lastExitSlDate,
+                                // keep key name stable across policies
+                                'last_exit_sl_trade_date' => $lastExitSlDate,
                                 'trade_date' => $dto->tradeDate,
                                 'be_at_r' => (float) config('trade.planning.be_at_r', 0.5),
                             ];
@@ -292,7 +293,15 @@ class PortfolioService
                     ]);
 
                     $post = $this->lotRepo->summarizeOpenLots($dto->accountId, $dto->tickerId);
-                    $this->upsertDerivedPosition($dto->accountId, $dto->tickerId, $plan, $post, 'OPEN');
+                    // Keep OPEN only for the moment we just created the position.
+                    // Existing positions should remain MANAGED.
+                    $this->upsertDerivedPosition(
+                        $dto->accountId,
+                        $dto->tickerId,
+                        $plan,
+                        $post,
+                        ($preQty <= 0) ? 'OPEN' : 'MANAGED'
+                    );
 
                     // Strict consistency (fail-fast)
                     $this->assertConsistentState($dto->accountId, $dto->tickerId, $plan, $post);
@@ -308,6 +317,12 @@ class PortfolioService
                         'payload_json' => json_encode(['trade_id' => $tradeId], JSON_UNESCAPED_SLASHES),
                     ]);
 
+                    // Lifecycle: after ENTRY_FILLED, transition to MANAGED (deterministic).
+                    // Only if there is a plan/strategy attached.
+                    if ($eventType === 'ENTRY_FILLED' && $plan) {
+                        $this->upsertDerivedPosition($dto->accountId, $dto->tickerId, $plan, $post, 'MANAGED');
+                    }
+
                     if ($plan && isset($plan->id)) {
                         // State transition: PLANNED -> OPENED
                         $this->planRepo->markOpened((int)$plan->id);
@@ -322,6 +337,7 @@ class PortfolioService
                             ]);
                         }
                     }
+
                 } else {
                     // SELL - FIFO match
                     $remaining = $dto->qty;

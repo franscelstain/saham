@@ -296,6 +296,22 @@ return [
             'no_averaging_down' => (bool) env('PORTFOLIO_DIVIDEND_NO_AVERAGING_DOWN', true),
         ],
 
+        // Minimal policies to satisfy docs/PORTFOLIO.md strategy coverage.
+        // Enforcement is intentionally soft and can be disabled.
+        'intraday_light' => [
+            'enabled' => (bool) env('PORTFOLIO_INTRADAY_ENABLED', true),
+            'cooldown_days_after_sl' => (int) env('PORTFOLIO_INTRADAY_COOLDOWN_AFTER_SL', 0),
+            'no_averaging_down' => (bool) env('PORTFOLIO_INTRADAY_NO_AVERAGING_DOWN', false),
+            'enable_risk_events' => (bool) env('PORTFOLIO_INTRADAY_ENABLE_RISK_EVENTS', false),
+        ],
+        'position_trade' => [
+            'enabled' => (bool) env('PORTFOLIO_POSITION_TRADE_ENABLED', true),
+            'allow_new_entries' => (bool) env('PORTFOLIO_POSITION_TRADE_ALLOW_NEW_ENTRIES', false),
+            'cooldown_days_after_sl' => (int) env('PORTFOLIO_POSITION_TRADE_COOLDOWN_AFTER_SL', 0),
+            'no_averaging_down' => (bool) env('PORTFOLIO_POSITION_TRADE_NO_AVERAGING_DOWN', false),
+            'enable_risk_events' => (bool) env('PORTFOLIO_POSITION_TRADE_ENABLE_RISK_EVENTS', false),
+        ],
+
         // Risk caps (soft): enforce via strategy rules / UI layer
         'max_open_positions' => env('PORTFOLIO_MAX_OPEN_POSITIONS', 5),
         'max_alloc_pct_per_position' => env('PORTFOLIO_MAX_ALLOC_PCT_PER_POSITION', 0.25),
