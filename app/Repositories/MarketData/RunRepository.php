@@ -93,6 +93,28 @@ class RunRepository
         return $row && isset($row->run_id) ? (int) $row->run_id : null;
     }
 
+    public function findLatestImportRunCoveringDate(string $tradeDate): ?object
+    {
+        return DB::table('md_runs')
+            ->where('job', 'import_eod')
+            ->where('effective_start_date', '<=', $tradeDate)
+            ->where('effective_end_date', '>=', $tradeDate)
+            ->orderByDesc('run_id')
+            ->first();
+    }
+
+    public function findLatestSuccessImportRunAtOrBeforeDate(string $tradeDate): ?object
+    {
+        return DB::table('md_runs')
+            ->select('run_id', 'effective_end_date')
+            ->where('job', 'import_eod')
+            ->where('status', 'SUCCESS')
+            ->where('effective_end_date', '<=', $tradeDate)
+            ->orderByDesc('effective_end_date')
+            ->orderByDesc('run_id')
+            ->first();
+    }
+
     public function getStatus(int $runId): ?string
     {
         $row = $this->find($runId);

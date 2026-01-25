@@ -281,4 +281,19 @@ return [
         'top_picks_require_not_expired' => env('WATCHLIST_TOP_PICKS_REQUIRE_NOT_EXPIRED', true),
         'top_picks_require_setup_ok' => env('WATCHLIST_TOP_PICKS_REQUIRE_SETUP_OK', true),
     ],
+
+    // Portfolio: lifecycle + lots + realized/unrealized PnL (docs/PORTFOLIO.md)
+    'portfolio' => [
+        'default_account_id' => env('PORTFOLIO_DEFAULT_ACCOUNT_ID', 1),
+        'default_strategy_code' => env('PORTFOLIO_DEFAULT_STRATEGY_CODE', 'WEEKLY_SWING'),
+
+        // Risk caps (soft): enforce via strategy rules / UI layer
+        'max_open_positions' => env('PORTFOLIO_MAX_OPEN_POSITIONS', 5),
+        'max_alloc_pct_per_position' => env('PORTFOLIO_MAX_ALLOC_PCT_PER_POSITION', 0.25),
+        'max_total_alloc_pct' => env('PORTFOLIO_MAX_TOTAL_ALLOC_PCT', 1.0),
+
+        // FIFO matching (hard)
+        'matching_method' => env('PORTFOLIO_MATCHING_METHOD', 'FIFO'),
+        'reject_short_sell' => env('PORTFOLIO_REJECT_SHORT_SELL', true),
+    ],
 ];

@@ -31,4 +31,18 @@ class TickerRepository
         }
         return $out;
     }
+
+    public function resolveIdByCode(string $tickerCode): ?int
+    {
+        $tickerCode = strtoupper(trim($tickerCode));
+        if ($tickerCode === '') return null;
+
+        $row = DB::table('tickers')
+            ->select('ticker_id')
+            ->where('is_deleted', 0)
+            ->where('ticker_code', $tickerCode)
+            ->first();
+
+        return $row && isset($row->ticker_id) ? (int) $row->ticker_id : null;
+    }
 }
