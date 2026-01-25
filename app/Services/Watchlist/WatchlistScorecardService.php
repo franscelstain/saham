@@ -2,8 +2,15 @@
 
 namespace App\Services\Watchlist;
 
+use App\DTO\Watchlist\Scorecard\EligibilityCheckDto;
+use App\DTO\Watchlist\Scorecard\EligibilityResultDto;
+use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
+use App\DTO\Watchlist\Scorecard\StrategyRunDto;
+use App\Repositories\TickerOhlcDailyRepository;
+use App\Support\Clock;
+use App\Trade\Watchlist\Config\ScorecardConfig;
 use App\Trade\Watchlist\Scorecard\ExecutionEligibilityEvaluator;
-use App\Trade\Watchlist\Scorecard\ScorecardCalculator;
+use App\Trade\Watchlist\Scorecard\ScorecardMetricsCalculator;
 use App\Trade\Watchlist\Scorecard\ScorecardRepository;
 use App\Trade\Watchlist\Scorecard\StrategyCheckRepository;
 use App\Trade\Watchlist\Scorecard\StrategyRunRepository;
@@ -15,7 +22,10 @@ class WatchlistScorecardService
         private StrategyCheckRepository $checkRepo,
         private ScorecardRepository $scoreRepo,
         private ExecutionEligibilityEvaluator $evaluator,
-        private ScorecardCalculator $calculator
+        private ScorecardMetricsCalculator $calculator,
+        private TickerOhlcDailyRepository $ohlcRepo,
+        private ScorecardConfig $cfg,
+        private Clock $clock,
     ) {
     }
 
@@ -24,10 +34,8 @@ class WatchlistScorecardService
      */
     public function saveStrategyRun(array $payload, string $source = 'watchlist'): int
     {
-        // Persist a scorecard-oriented strategy_run payload aligned with
-        // docs/watchlist/scorecard.md (different from the watchlist contract schema).
-        $normalized = $this->normalizeStrategyRunPayload($payload);
-        return $this->runRepo->upsertFromPayload($normalized, $source);
+        $dto = $this->normalizeStrategyRunPayload($payload);
+        return $this->runRepo->upsertFromDto($dto, $source);
     }
 
     /**
@@ -40,18 +48,11 @@ class WatchlistScorecardService
      * @param array<string,mixed> $payload
      * @return array<string,mixed>
      */
-    private function normalizeStrategyRunPayload(array $payload): array
+    private function normalizeStrategyRunPayload(array $payload): StrategyRunDto
     {
         $tradeDate = (string)($payload['trade_date'] ?? '');
         $execDate = (string)($payload['exec_trade_date'] ?? ($payload['exec_date'] ?? ''));
         $policy = (string)(($payload['policy']['selected'] ?? '') ?: ($payload['policy'] ?? ''));
-
-        $cfg = (array) config('trade.watchlist.scorecard');
-        $guardsDefault = [
-            'max_chase_pct' => (float)($cfg['max_chase_pct_default'] ?? 0.01),
-            'gap_up_block_pct' => (float)($cfg['gap_up_block_pct_default'] ?? 0.015),
-            'spread_max_pct' => (float)($cfg['spread_max_pct_default'] ?? 0.004),
-        ];
 
         // Prefer an explicit generated timestamp if present; otherwise derive from now.
         $generatedAt = null;
@@ -60,53 +61,22 @@ class WatchlistScorecardService
         } elseif (isset($payload['generated_at']) && is_string($payload['generated_at']) && $payload['generated_at'] !== '') {
             $generatedAt = $payload['generated_at'];
         } else {
-            $generatedAt = now()->toRfc3339String();
+            $generatedAt = $this->clock->nowRfc3339();
         }
-
-        $out = [
-            'trade_date' => $tradeDate,
-            'exec_trade_date' => $execDate,
-            'exec_date' => $execDate,
-            'policy' => $policy,
-            // Recommendation mode from watchlist contract (e.g. BUY_1, BUY_2_SPLIT, CARRY_ONLY, NO_TRADE).
-            // Scorecard uses this to apply CARRY_ONLY exceptions during live eligibility checks.
-            'recommendation' => [
-                'mode' => (string)($payload['recommendation']['mode'] ?? ($payload['mode'] ?? '')),
-            ],
-            'meta' => [
-                'generated_at' => $generatedAt,
-            ],
-            // Keep a top-level alias for DB convenience.
-            'generated_at' => $generatedAt,
-            'groups' => [
-                'top_picks' => [],
-                'secondary' => [],
-                'watch_only' => [],
-            ],
-        ];
+        $mode = strtoupper(trim((string)($payload['recommendation']['mode'] ?? ($payload['mode'] ?? ''))));
 
         $groups = (array)($payload['groups'] ?? []);
-        foreach (['top_picks', 'secondary', 'watch_only'] as $g) {
-            $rows = $groups[$g] ?? [];
-            if (!is_array($rows)) continue;
+        $guardsFallback = new \App\DTO\Watchlist\Scorecard\CandidateGuardsDto(
+            $this->cfg->maxChasePctDefault,
+            $this->cfg->gapUpBlockPctDefault,
+            $this->cfg->spreadMaxPctDefault
+        );
 
-            // Scorecard.md expects deterministic rank ordering. If the contract payload
-            // doesn't carry rank, derive it from the group ordering.
-            $rank = 1;
+        $top = $this->normalizeCandidateList($groups['top_picks'] ?? [], $guardsFallback);
+        $sec = $this->normalizeCandidateList($groups['secondary'] ?? [], $guardsFallback);
+        $wo = $this->normalizeCandidateList($groups['watch_only'] ?? [], $guardsFallback);
 
-            foreach ($rows as $cand) {
-                if (!is_array($cand)) continue;
-                $norm = $this->normalizeCandidateForScorecard($cand, $guardsDefault, $rank);
-
-                // Drop invalid candidates early (no ticker).
-                if (!empty($norm['ticker'])) {
-                    $out['groups'][$g][] = $norm;
-                    $rank++;
-                }
-            }
-        }
-
-        return $out;
+        return StrategyRunDto::fromNormalized($tradeDate, $execDate, $policy, $mode, $generatedAt, $top, $sec, $wo);
     }
 
     /**
@@ -114,85 +84,25 @@ class WatchlistScorecardService
      * @param array<string,float> $guardsDefault
      * @return array<string,mixed>
      */
-    private function normalizeCandidateForScorecard(array $cand, array $guardsDefault, int $fallbackRank = 0): array
+    /**
+     * @param mixed $rows
+     * @param \App\DTO\Watchlist\Scorecard\CandidateGuardsDto $guardsFallback
+     * @return \App\DTO\Watchlist\Scorecard\CandidateDto[]
+     */
+    private function normalizeCandidateList($rows, \App\DTO\Watchlist\Scorecard\CandidateGuardsDto $guardsFallback): array
     {
-        $ticker = strtoupper(trim((string)($cand['ticker'] ?? ($cand['ticker_code'] ?? ''))));
-
-        $levels = is_array($cand['levels'] ?? null) ? $cand['levels'] : [];
-        $timing = is_array($cand['timing'] ?? null) ? $cand['timing'] : [];
-        $sizing = is_array($cand['sizing'] ?? null) ? $cand['sizing'] : [];
-        $position = is_array($cand['position'] ?? null) ? $cand['position'] : [];
-
-        $entryTrigger = $cand['entry_trigger'] ?? null;
-        if ($entryTrigger === null) $entryTrigger = ($levels['entry_trigger_price'] ?? null);
-
-        $entryLow = $cand['entry_limit_low'] ?? null;
-        if ($entryLow === null) $entryLow = ($levels['entry_limit_low'] ?? null);
-        $entryHigh = $cand['entry_limit_high'] ?? null;
-        if ($entryHigh === null) $entryHigh = ($levels['entry_limit_high'] ?? null);
-
-        $slices = (int)($cand['slices'] ?? ($sizing['slices'] ?? 1));
-        if ($slices < 1) $slices = 1;
-
-        // Scorecard.md expects slice_pct array. Watchlist contract has a float.
-        $slicePct = $cand['slice_pct'] ?? null;
-        if (!is_array($slicePct)) {
-            // If the contract provided a scalar pct, treat it as "each slice" only when it sums <= 1.
-            $scalar = $sizing['slice_pct'] ?? null;
-            if (is_numeric($scalar)) {
-                $scalar = (float)$scalar;
-            } else {
-                $scalar = null;
-            }
-
-            if ($slices === 1) {
-                $slicePct = [1.0];
-            } else {
-                // Default: equal slices.
-                $each = 1.0 / (float)$slices;
-                $slicePct = array_fill(0, $slices, $each);
-
-                // If scalar looks like a first-slice weight (e.g. 0.6), build 2-slice distribution.
-                if ($scalar !== null && $slices === 2 && $scalar > 0 && $scalar < 1.0) {
-                    $slicePct = [$scalar, 1.0 - $scalar];
-                }
+        if (!is_array($rows)) return [];
+        $out = [];
+        $rank = 1;
+        foreach ($rows as $cand) {
+            if (!is_array($cand)) continue;
+            $dto = \App\DTO\Watchlist\Scorecard\CandidateDto::fromArray($cand, $guardsFallback, $rank);
+            if ($dto->ticker !== '') {
+                $out[] = $dto;
+                $rank++;
             }
         }
-
-        $guards = is_array($cand['guards'] ?? null) ? $cand['guards'] : [];
-        // Backward compat: some contracts store max chase pct in levels.
-        $maxChase = $guards['max_chase_pct'] ?? ($levels['max_chase_from_close_pct'] ?? null);
-        $gapUp = $guards['gap_up_block_pct'] ?? null;
-        $spreadMax = $guards['spread_max_pct'] ?? null;
-
-        $guardsOut = [
-            'max_chase_pct' => is_numeric($maxChase) ? (float)$maxChase : (float)$guardsDefault['max_chase_pct'],
-            'gap_up_block_pct' => is_numeric($gapUp) ? (float)$gapUp : (float)$guardsDefault['gap_up_block_pct'],
-            'spread_max_pct' => is_numeric($spreadMax) ? (float)$spreadMax : (float)$guardsDefault['spread_max_pct'],
-        ];
-
-        return [
-            'ticker' => $ticker,
-            'has_position' => (bool)($cand['has_position'] ?? ($position['has_position'] ?? false)),
-            'score' => (int)round((float)($cand['score'] ?? ($cand['watchlist_score'] ?? 0))),
-            'rank' => (int)(is_numeric($cand['rank'] ?? null) && (int)$cand['rank'] > 0 ? (int)$cand['rank'] : ($fallbackRank > 0 ? $fallbackRank : 0)),
-            'entry_trigger' => is_numeric($entryTrigger) ? (int)$entryTrigger : null,
-            'entry_band' => [
-                'low' => is_numeric($entryLow) ? (int)$entryLow : null,
-                'high' => is_numeric($entryHigh) ? (int)$entryHigh : null,
-            ],
-            'guards' => $guardsOut,
-            'timing' => [
-                'trade_disabled' => (bool)($timing['trade_disabled'] ?? false),
-                'entry_windows' => array_values((array)($timing['entry_windows'] ?? [])),
-                'avoid_windows' => array_values((array)($timing['avoid_windows'] ?? [])),
-                'trade_disabled_reason' => $timing['trade_disabled_reason'] ?? null,
-                'trade_disabled_reason_codes' => array_values((array)($timing['trade_disabled_reason_codes'] ?? [])),
-            ],
-            'slices' => $slices,
-            'slice_pct' => array_values($slicePct),
-            'reason_codes' => array_values((array)($cand['reason_codes'] ?? [])),
-        ];
+        return $out;
     }
 
     /**
@@ -202,21 +112,18 @@ class WatchlistScorecardService
      */
     public function checkLive(string $tradeDate, string $execDate, string $policy, array $snapshot, string $source = 'watchlist'): array
     {
-        $run = $this->runRepo->getRun($tradeDate, $execDate, $policy, $source);
+        $run = $this->runRepo->getRunDto($tradeDate, $execDate, $policy, $source);
         if (!$run) {
             throw new \RuntimeException("strategy run not found: $tradeDate/$execDate/$policy (source=$source)");
         }
 
-        $cfg = (array) config('trade.watchlist.scorecard');
-        $result = $this->evaluator->evaluate($run, $snapshot, $cfg);
+        $checkedAtFallback = $this->clock->nowRfc3339();
+        $snapDto = LiveSnapshotDto::fromArray($snapshot, $this->cfg, $checkedAtFallback);
+        $resultDto = $this->evaluator->evaluate($run, $snapDto, $this->cfg);
 
-        $runId = (int) ($run['_run_id'] ?? 0);
-        if ($runId > 0) {
-            $checkedAt = (string) ($result['checked_at'] ?? now()->toRfc3339String());
-            $this->checkRepo->insertCheck($runId, $checkedAt, $snapshot, $result);
-        }
+        if ($run->runId > 0) $this->checkRepo->insertCheckFromDto($run->runId, $snapDto, $resultDto);
 
-        return $result;
+        return $resultDto->toArray();
     }
 
     /**
@@ -226,37 +133,84 @@ class WatchlistScorecardService
      */
     public function computeScorecard(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): array
     {
-        $run = $this->runRepo->getRun($tradeDate, $execDate, $policy, $source);
+        $run = $this->runRepo->getRunDto($tradeDate, $execDate, $policy, $source);
         if (!$run) {
             throw new \RuntimeException("strategy run not found: $tradeDate/$execDate/$policy (source=$source)");
         }
-        $runId = (int) ($run['_run_id'] ?? 0);
-        if ($runId <= 0) {
-            throw new \RuntimeException('invalid run_id');
+
+        if ($run->runId <= 0) throw new \RuntimeException('invalid run_id');
+
+        $latest = $this->checkRepo->getLatestCheckDto($run->runId);
+
+        $latestCheckDto = $latest ? $this->mapEligibilityCheckFromArray($latest->result) : null;
+
+        // Repo call stays in service (orchestrator). Calculator stays pure.
+        $tickers = array_values(array_unique(array_map(fn($c) => $c->ticker, array_merge($run->topPicks, $run->secondary))));
+        $tickers = array_values(array_filter($tickers, fn($t) => $t !== ''));
+        $ohlc = [];
+        if ($run->execDate !== '' && !empty($tickers)) {
+            $ohlc = $this->ohlcRepo->mapOhlcByTickerCodesForDate($run->execDate, $tickers);
         }
 
-        $latest = $this->checkRepo->getLatestCheck($runId);
-        $calc = $this->calculator->compute($run, $latest);
-
-        $this->scoreRepo->upsertScorecard(
-            $runId,
-            $calc['feasible_rate'],
-            $calc['fill_rate'],
-            $calc['outcome_rate'],
-            $calc['payload']
-        );
+        $calc = $this->calculator->compute($run, $latestCheckDto, $ohlc);
+        $this->scoreRepo->upsertScorecardFromDto($run->runId, $calc);
 
         return [
-            'run_id' => $runId,
+            'run_id' => $run->runId,
             'trade_date' => $tradeDate,
             'exec_trade_date' => $execDate,
             'exec_date' => $execDate,
             'policy' => $policy,
-            'feasible_rate' => $calc['feasible_rate'],
-            'fill_rate' => $calc['fill_rate'],
-            'outcome_rate' => $calc['outcome_rate'],
-            'details' => $calc['payload'],
-            'latest_check' => $latest,
+            'feasible_rate' => $calc->feasibleRate,
+            'fill_rate' => $calc->fillRate,
+            'outcome_rate' => $calc->outcomeRate,
+            'details' => $calc->payload,
+            'latest_check' => $latest ? [
+                'check_id' => $latest->checkId,
+                'checked_at' => $latest->checkedAt,
+                'snapshot' => $latest->snapshot,
+                'result' => $latest->result,
+            ] : null,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $a
+     */
+    private function mapEligibilityCheckFromArray(array $a): EligibilityCheckDto
+    {
+        $rows = isset($a['results']) && is_array($a['results']) ? $a['results'] : [];
+        $results = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $computed = isset($row['computed']) && is_array($row['computed']) ? $row['computed'] : [];
+            $flags = isset($row['flags']) && is_array($row['flags']) ? array_map('strval', $row['flags']) : [];
+            $reasons = isset($row['reasons']) && is_array($row['reasons']) ? array_map('strval', $row['reasons']) : [];
+            $results[] = new EligibilityResultDto(
+                strtoupper(trim((string)($row['ticker'] ?? ''))),
+                (bool)($row['eligible_now'] ?? false),
+                $flags,
+                isset($computed['gap_pct']) && is_numeric($computed['gap_pct']) ? (float)$computed['gap_pct'] : null,
+                isset($computed['spread_pct']) && is_numeric($computed['spread_pct']) ? (float)$computed['spread_pct'] : null,
+                isset($computed['chase_pct']) && is_numeric($computed['chase_pct']) ? (float)$computed['chase_pct'] : null,
+                $reasons,
+                (string)($row['notes'] ?? ''),
+            );
+        }
+
+        $def = isset($a['default_recommendation']) && is_array($a['default_recommendation']) ? $a['default_recommendation'] : null;
+        $defTicker = $def && isset($def['ticker']) ? (string)$def['ticker'] : null;
+        $defWhy = $def && isset($def['why']) ? (string)$def['why'] : null;
+
+        return new EligibilityCheckDto(
+            (string)($a['policy'] ?? ''),
+            (string)($a['trade_date'] ?? ''),
+            (string)($a['exec_trade_date'] ?? ($a['exec_date'] ?? '')),
+            (string)($a['checked_at'] ?? ''),
+            (string)($a['checkpoint'] ?? ''),
+            $results,
+            $defTicker,
+            $defWhy,
+        );
     }
 }

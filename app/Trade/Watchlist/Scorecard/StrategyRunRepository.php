@@ -2,10 +2,16 @@
 
 namespace App\Trade\Watchlist\Scorecard;
 
+use App\DTO\Watchlist\Scorecard\StrategyRunDto;
+use App\Trade\Watchlist\Config\ScorecardConfig;
 use Illuminate\Support\Facades\DB;
 
 class StrategyRunRepository
 {
+    public function __construct(private ScorecardConfig $cfg)
+    {
+    }
+
     /**
      * Upsert a strategy run from a watchlist contract payload.
      * Returns run_id.
@@ -43,8 +49,9 @@ class StrategyRunRepository
                 'source' => $source,
                 'payload_json' => $json,
                 'generated_at' => $generatedAt,
-                'updated_at' => now(),
-                'created_at' => now(),
+                // Avoid now() helper inside repo. Let DB fill timestamps.
+                'updated_at' => DB::raw('CURRENT_TIMESTAMP'),
+                'created_at' => DB::raw('CURRENT_TIMESTAMP'),
             ],
         ], ['trade_date', 'exec_trade_date', 'policy', 'source'], ['payload_json', 'generated_at', 'updated_at']);
 
@@ -57,6 +64,12 @@ class StrategyRunRepository
             ->first();
 
         return $row ? (int) $row->run_id : 0;
+    }
+
+    public function upsertFromDto(StrategyRunDto $dto, string $source = 'watchlist'): int
+    {
+        $payload = $dto->toPayloadArray();
+        return $this->upsertFromPayload($payload, $source);
     }
 
     /**
@@ -79,6 +92,23 @@ class StrategyRunRepository
 
         $payload['_run_id'] = (int) $row->run_id;
         return $payload;
+    }
+
+    public function getRunDto(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): ?StrategyRunDto
+    {
+        $row = DB::table('watchlist_strategy_runs')
+            ->where('trade_date', $tradeDate)
+            ->where('exec_trade_date', $execDate)
+            ->where('policy', $policy)
+            ->where('source', $source)
+            ->select(['run_id', 'payload_json'])
+            ->first();
+
+        if (!$row) return null;
+        $payload = json_decode((string)$row->payload_json, true);
+        if (!is_array($payload)) return null;
+
+        return StrategyRunDto::fromPayloadArray($payload, (int)$row->run_id, $this->cfg);
     }
 
     public function getRunId(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): int

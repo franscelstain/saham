@@ -2,6 +2,11 @@
 
 namespace App\Trade\Watchlist\Scorecard;
 
+use App\DTO\Watchlist\Scorecard\EligibilityCheckDto;
+use App\DTO\Watchlist\Scorecard\EligibilityResultDto;
+use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
+use App\DTO\Watchlist\Scorecard\StrategyRunDto;
+use App\Trade\Watchlist\Config\ScorecardConfig;
 use Carbon\Carbon;
 
 /**
@@ -17,214 +22,162 @@ use Carbon\Carbon;
 class ExecutionEligibilityEvaluator
 {
     /**
-     * @param array<string,mixed> $runPayload Strategy run payload.
-     * @param array<string,mixed> $snapshot Live snapshot JSON.
-     * @param array<string,mixed> $cfg config('trade.watchlist.scorecard')
-     * @return array<string,mixed> result JSON.
+     * Pure evaluation based on:
+     * - stored strategy_run payload (as DTO)
+     * - live snapshot (as DTO)
+     * - injected thresholds (as config object)
      */
-    public function evaluate(array $runPayload, array $snapshot, array $cfg): array
+    public function evaluate(StrategyRunDto $run, LiveSnapshotDto $snapshot, ScorecardConfig $cfg): EligibilityCheckDto
     {
-        $policy = (string)(($runPayload['policy']['selected'] ?? '') ?: ($runPayload['policy'] ?? ''));
-        $tradeDate = (string)($runPayload['trade_date'] ?? '');
-        $execDate = (string)($runPayload['exec_trade_date'] ?? ($runPayload['exec_date'] ?? ''));
+        $policy = $run->policy;
+        $tradeDate = $run->tradeDate;
+        $execDate = $run->execDate;
 
-        $checkedAt = (string)($snapshot['checked_at'] ?? '');
-        $now = $checkedAt !== '' ? Carbon::parse($checkedAt) : Carbon::now();
+        $now = Carbon::parse($snapshot->checkedAt);
         $nowTime = $now->format('H:i');
 
         // Recommendation mode (watchlist contract): BUY_*, CARRY_ONLY, NO_TRADE.
         // Used to allow CARRY_ONLY management checks without blocking on trade_disabled.
-        $mode = strtoupper(trim((string)($runPayload['recommendation']['mode'] ?? ($runPayload['mode'] ?? ''))));
+        $mode = $run->recommendationMode;
 
-        $includeWatchOnly = (bool)($cfg['include_watch_only'] ?? false);
-        $groups = (array)($runPayload['groups'] ?? []);
-
-        $candidates = [];
-        foreach (['top_picks', 'secondary'] as $g) {
-            if (!empty($groups[$g]) && is_array($groups[$g])) {
-                foreach ($groups[$g] as $cand) {
-                    if (is_array($cand)) $candidates[] = $cand;
-                }
-            }
+        $candidates = array_merge($run->topPicks, $run->secondary);
+        if ($cfg->includeWatchOnly) {
+            $candidates = array_merge($candidates, $run->watchOnly);
         }
-        if ($includeWatchOnly && !empty($groups['watch_only']) && is_array($groups['watch_only'])) {
-            foreach ($groups['watch_only'] as $cand) {
-                if (is_array($cand)) $candidates[] = $cand;
-            }
-        }
-
-        // Snapshot tickers map by code
-        $snapTickers = [];
-        $snapArr = $snapshot['tickers'] ?? [];
-        if (is_array($snapArr)) {
-            foreach ($snapArr as $row) {
-                if (!is_array($row)) continue;
-                $code = strtoupper(trim((string)($row['ticker'] ?? ($row['ticker_code'] ?? ''))));
-                if ($code === '') continue;
-                $snapTickers[$code] = $row;
-            }
-        }
-
-        $maxChaseDefault = (float)($cfg['max_chase_pct_default'] ?? 0.01);
-        $gapUpBlockDefault = (float)($cfg['gap_up_block_pct_default'] ?? 0.015);
-        $spreadMaxDefault = (float)($cfg['spread_max_pct_default'] ?? 0.004);
 
         $results = [];
         foreach ($candidates as $cand) {
-            $ticker = strtoupper(trim((string)($cand['ticker'] ?? ($cand['ticker_code'] ?? ''))));
+            $ticker = $cand->ticker;
             if ($ticker === '') continue;
 
-            $r = [
-                'ticker' => $ticker,
-                'eligible_now' => false,
-                'flags' => [],
-                'computed' => [
-                    'gap_pct' => null,
-                    'spread_pct' => null,
-                    'chase_pct' => null,
-                ],
-                'reasons' => [],
-                'notes' => '',
-            ];
+            $flags = [];
+            $reasons = [];
+            $gapPct = null;
+            $spreadPct = null;
+            $chasePct = null;
 
-            $snap = $snapTickers[$ticker] ?? null;
+            $snap = $snapshot->tickers[$ticker] ?? null;
             if (!$snap) {
-                $r['reasons'][] = 'SNAPSHOT_MISSING';
-                $results[] = $r;
+                $reasons[] = 'SNAPSHOT_MISSING';
+                $results[] = new EligibilityResultDto($ticker, false, $flags, $gapPct, $spreadPct, $chasePct, $reasons, 'Blocked: SNAPSHOT_MISSING');
                 continue;
             }
 
-            $timing = is_array($cand['timing'] ?? null) ? $cand['timing'] : [];
-            $levels = is_array($cand['levels'] ?? null) ? $cand['levels'] : [];
-            $guards = is_array($cand['guards'] ?? null) ? $cand['guards'] : [];
-            $posObj = is_array($cand['position'] ?? null) ? $cand['position'] : [];
-            $hasPosition = (bool)($cand['has_position'] ?? (bool)($posObj['has_position'] ?? false));
+            $hasPosition = $cand->hasPosition;
 
             // 1) hard disable
             // Exception (docs/watchlist/scorecard.md): when the run is in CARRY_ONLY mode
             // and the ticker already has a position, allow checks (management) without blocking.
-            if (!empty($timing['trade_disabled'])) {
+            if ($cand->timing->tradeDisabled) {
                 if ($mode === 'CARRY_ONLY' && $hasPosition) {
-                    $r['flags'][] = 'CARRY_ONLY_MANAGEMENT_OK';
+                    $flags[] = 'CARRY_ONLY_MANAGEMENT_OK';
                 } else {
-                    $r['reasons'][] = 'TRADE_DISABLED';
+                    $reasons[] = 'TRADE_DISABLED';
                 }
             }
 
             // 2) entry windows
-            $entryWindows = (array)($timing['entry_windows'] ?? []);
-            $avoidWindows = (array)($timing['avoid_windows'] ?? []);
+            $entryWindows = $cand->timing->entryWindows;
+            $avoidWindows = $cand->timing->avoidWindows;
             $inEntry = (count($entryWindows) === 0) ? true : $this->inAnyWindow($nowTime, $entryWindows, $snapshot, $cfg);
             $inAvoid = (count($avoidWindows) === 0) ? false : $this->inAnyWindow($nowTime, $avoidWindows, $snapshot, $cfg);
-            if (!$inEntry) $r['reasons'][] = 'OUTSIDE_ENTRY_WINDOW';
-            if ($inAvoid) $r['reasons'][] = 'IN_AVOID_WINDOW';
+            if (!$inEntry) $reasons[] = 'OUTSIDE_ENTRY_WINDOW';
+            if ($inAvoid) $reasons[] = 'IN_AVOID_WINDOW';
 
             // 3) chase guard
-            $entryTrigger = $this->toFloatOrNull($cand['entry_trigger'] ?? ($cand['entry_trigger_price'] ?? ($levels['entry_trigger_price'] ?? null)));
-            $maxChasePct = $this->toFloatOrNull($guards['max_chase_pct'] ?? ($levels['max_chase_from_close_pct'] ?? null));
-            if ($maxChasePct === null) $maxChasePct = $maxChaseDefault;
+            $entryTrigger = $cand->entryTrigger !== null ? (float)$cand->entryTrigger : null;
+            $maxChasePct = $cand->guards->maxChasePct;
 
-            $last = $this->toFloatOrNull($snap['last'] ?? ($snap['open_or_last'] ?? null));
+            $last = $snap->last;
             if ($entryTrigger === null) {
-                $r['reasons'][] = 'ENTRY_TRIGGER_MISSING';
+                $reasons[] = 'ENTRY_TRIGGER_MISSING';
             } elseif ($last === null) {
-                $r['reasons'][] = 'LAST_PRICE_MISSING';
+                $reasons[] = 'LAST_PRICE_MISSING';
             } elseif ($entryTrigger <= 0) {
-                $r['reasons'][] = 'ENTRY_TRIGGER_INVALID';
+                $reasons[] = 'ENTRY_TRIGGER_INVALID';
             } else {
                 $maxAllowed = $entryTrigger * (1.0 + (float)$maxChasePct);
                 $chasePct = ($last - $entryTrigger) / $entryTrigger;
-                $r['computed']['chase_pct'] = $chasePct;
                 if ($last > $maxAllowed) {
-                    $r['reasons'][] = 'CHASE_TOO_FAR';
+                    $reasons[] = 'CHASE_TOO_FAR';
                 }
             }
 
             // 4) gap-up block (open vs prev_close)
-            $prevClose = $this->toFloatOrNull($snap['prev_close'] ?? null);
-            $open = $this->toFloatOrNull($snap['open'] ?? null);
-            $gapUpBlockPct = $this->toFloatOrNull($guards['gap_up_block_pct'] ?? null);
-            if ($gapUpBlockPct === null) $gapUpBlockPct = $gapUpBlockDefault;
+            $prevClose = $snap->prevClose;
+            $open = $snap->open;
+            $gapUpBlockPct = $cand->guards->gapUpBlockPct;
             if ($prevClose !== null && $open !== null && $prevClose > 0) {
                 $gapPct = ($open - $prevClose) / $prevClose;
-                $r['computed']['gap_pct'] = $gapPct;
                 if ($gapPct > (float)$gapUpBlockPct) {
-                    $r['reasons'][] = 'GAP_UP_BLOCK';
+                    $reasons[] = 'GAP_UP_BLOCK';
                 }
             } else {
                 // Not always available on Ajaib depending on view.
-                $r['flags'][] = 'GAP_DATA_MISSING';
+                $flags[] = 'GAP_DATA_MISSING';
             }
 
             // 5) spread gate (proxy execution quality)
-            $bid = $this->toFloatOrNull($snap['bid'] ?? null);
-            $ask = $this->toFloatOrNull($snap['ask'] ?? null);
-            $spreadMax = $this->toFloatOrNull($guards['spread_max_pct'] ?? null);
-            if ($spreadMax === null) $spreadMax = $spreadMaxDefault;
+            $bid = $snap->bid;
+            $ask = $snap->ask;
+            $spreadMax = $cand->guards->spreadMaxPct;
 
             if ($bid === null || $ask === null || $last === null || $last <= 0) {
-                $r['reasons'][] = 'SPREAD_DATA_MISSING';
+                $reasons[] = 'SPREAD_DATA_MISSING';
             } else {
                 $spreadPct = ($ask - $bid) / $last;
-                $r['computed']['spread_pct'] = $spreadPct;
                 if ($spreadPct > (float)$spreadMax) {
-                    $r['reasons'][] = 'SPREAD_TOO_WIDE';
+                    $reasons[] = 'SPREAD_TOO_WIDE';
                 }
             }
 
-            $r['eligible_now'] = empty($r['reasons']);
-            $r['notes'] = $r['eligible_now']
-                ? 'In-window, chase OK, gap OK, spread OK'
-                : ('Blocked: ' . implode(',', $r['reasons']));
+            $eligibleNow = empty($reasons);
+            $notes = $eligibleNow ? 'In-window, chase OK, gap OK, spread OK' : ('Blocked: ' . implode(',', $reasons));
 
-            $results[] = $r;
+            $results[] = new EligibilityResultDto($ticker, $eligibleNow, $flags, $gapPct, $spreadPct, $chasePct, $reasons, $notes);
         }
 
         // Default recommendation: highest-rank eligible from top_picks, else secondary.
         $recommended = null;
-        $why = '';
-        foreach (['top_picks', 'secondary'] as $g) {
-            $rows = $groups[$g] ?? [];
-            if (!is_array($rows)) continue;
-            $best = null;
+        $why = null;
+        foreach (['top_picks' => $run->topPicks, 'secondary' => $run->secondary] as $g => $rows) {
+            $bestTicker = null;
             $bestRank = null;
             foreach ($rows as $cand) {
-                if (!is_array($cand)) continue;
-                $t = strtoupper(trim((string)($cand['ticker'] ?? ($cand['ticker_code'] ?? ''))));
-                if ($t === '') continue;
-                $rowRes = $this->findResult($results, $t);
-                if (!$rowRes || empty($rowRes['eligible_now'])) continue;
-                $rank = (int)($cand['rank'] ?? 0);
-                if ($best === null || $rank < $bestRank || $bestRank === null) {
-                    $best = $t;
+                $rowRes = $this->findResult($results, $cand->ticker);
+                if (!$rowRes || !$rowRes->eligibleNow) continue;
+                $rank = $cand->rank;
+                if ($bestTicker === null || $bestRank === null || $rank < $bestRank) {
+                    $bestTicker = $cand->ticker;
                     $bestRank = $rank;
                 }
             }
-            if ($best !== null) {
-                $recommended = $best;
+            if ($bestTicker !== null) {
+                $recommended = $bestTicker;
                 $why = 'eligible_now && best_rank_in_' . $g;
                 break;
             }
         }
 
-        return [
-            'policy' => $policy,
-            'trade_date' => $tradeDate,
-            'exec_trade_date' => $execDate,
-            'checked_at' => $now->toRfc3339String(),
-            'checkpoint' => (string)($snapshot['checkpoint'] ?? ''),
-            'results' => $results,
-            'default_recommendation' => $recommended ? ['ticker' => $recommended, 'why' => $why] : null,
-        ];
+        return new EligibilityCheckDto(
+            $policy,
+            $tradeDate,
+            $execDate,
+            $now->toRfc3339String(),
+            $snapshot->checkpoint,
+            $results,
+            $recommended,
+            $why,
+        );
     }
 
     /**
-     * @param array<int,array<string,mixed>> $results
+     * @param EligibilityResultDto[] $results
      */
-    private function findResult(array $results, string $ticker): ?array
+    private function findResult(array $results, string $ticker): ?EligibilityResultDto
     {
         foreach ($results as $r) {
-            if (is_array($r) && strtoupper((string)($r['ticker'] ?? '')) === $ticker) return $r;
+            if ($r instanceof EligibilityResultDto && $r->ticker === $ticker) return $r;
         }
         return null;
     }
@@ -232,7 +185,7 @@ class ExecutionEligibilityEvaluator
     /**
      * @param string[] $windows
      */
-    private function inAnyWindow(string $timeHHMM, array $windows, array $snapshot, array $cfg): bool
+    private function inAnyWindow(string $timeHHMM, array $windows, LiveSnapshotDto $snapshot, ScorecardConfig $cfg): bool
     {
         $t = $this->toMinutesToken($timeHHMM, $snapshot, $cfg);
         if ($t === null) return false;
@@ -256,17 +209,11 @@ class ExecutionEligibilityEvaluator
      * - "HH:MM" (mandatory)
      * - "open" / "close" (resolved via snapshot or config defaults)
      */
-    private function toMinutesToken(string $token, array $snapshot, array $cfg): ?int
+    private function toMinutesToken(string $token, LiveSnapshotDto $snapshot, ScorecardConfig $cfg): ?int
     {
         $t = strtolower(trim($token));
         if ($t === 'open' || $t === 'close') {
-            // Allow snapshot to override session times.
-            $key = $t === 'open' ? 'session_open_time' : 'session_close_time';
-            $fallback = $t === 'open'
-                ? (string)($cfg['session_open_time_default'] ?? '09:00')
-                : (string)($cfg['session_close_time_default'] ?? '15:50');
-
-            $raw = (string)($snapshot[$key] ?? $fallback);
+            $raw = $t === 'open' ? $snapshot->sessionOpenTime : $snapshot->sessionCloseTime;
             return $this->toMinutesHHMM($raw);
         }
 
@@ -282,16 +229,4 @@ class ExecutionEligibilityEvaluator
         return $h * 60 + $mi;
     }
 
-    private function toFloatOrNull($v): ?float
-    {
-        if ($v === null || $v === '') return null;
-        if (is_int($v) || is_float($v)) return (float)$v;
-        if (is_string($v)) {
-            $v = trim($v);
-            if ($v === '') return null;
-            if (!is_numeric($v)) return null;
-            return (float)$v;
-        }
-        return null;
-    }
 }

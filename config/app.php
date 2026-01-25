@@ -176,6 +176,7 @@ return [
         App\Providers\RouteServiceProvider::class,
         App\Providers\TradeComputeServiceProvider::class,
         App\Providers\TradeMarketDataServiceProvider::class,
+        App\Providers\TradeWatchlistServiceProvider::class,
 
     ],
 

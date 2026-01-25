@@ -2,10 +2,18 @@
 
 namespace App\Trade\Watchlist\Scorecard;
 
+use App\DTO\Watchlist\Scorecard\EligibilityCheckDto;
+use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
+use App\DTO\Watchlist\Scorecard\StrategyCheckDto;
 use Illuminate\Support\Facades\DB;
 
 class StrategyCheckRepository
 {
+    public function insertCheckFromDto(int $runId, LiveSnapshotDto $snapshot, EligibilityCheckDto $result): int
+    {
+        return $this->insertCheck($runId, $snapshot->checkedAt, $snapshot->toArray(), $result->toArray());
+    }
+
     public function insertCheck(int $runId, string $checkedAt, array $snapshot, array $result): int
     {
         $snapJson = json_encode($snapshot, JSON_UNESCAPED_SLASHES);
@@ -19,8 +27,8 @@ class StrategyCheckRepository
             'checked_at' => $checkedAt,
             'snapshot_json' => $snapJson,
             'result_json' => $resJson,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'created_at' => DB::raw('CURRENT_TIMESTAMP'),
+            'updated_at' => DB::raw('CURRENT_TIMESTAMP'),
         ]);
 
         return (int) $id;
@@ -50,5 +58,12 @@ class StrategyCheckRepository
             'snapshot' => $snapshot,
             'result' => $result,
         ];
+    }
+
+    public function getLatestCheckDto(int $runId): ?StrategyCheckDto
+    {
+        $r = $this->getLatestCheck($runId);
+        if (!$r) return null;
+        return new StrategyCheckDto((int)$r['check_id'], (string)$r['checked_at'], (array)($r['snapshot'] ?? []), (array)($r['result'] ?? []));
     }
 }
