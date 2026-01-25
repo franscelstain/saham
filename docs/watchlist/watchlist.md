@@ -569,9 +569,78 @@ Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
 }
 ```
 
-### 7.3 Rules wajib untuk groups
-- `groups.top_picks[]` hanya boleh berisi kandidat yang **trade_disabled == false** (kecuali mode `NO_TRADE/CARRY_ONLY`, lihat invariant).
-- Kandidat yang gagal viability/sizing boleh dipindahkan ke `watch_only` (policy menentukan reason code).
+### 7.3 Rules wajib untuk groups (tujuan: kandidat, bukan semua ticker)
+
+Watchlist **bukan** “listing semua ticker”. Output hanya berisi **kandidat yang relevan** untuk eksekusi atau monitoring.
+
+#### 7.3.1 Tahapan (wajib)
+Engine wajib menjalankan 3 tahap ini agar output tetap ringkas:
+
+1) **Universe filter (drop dulu, baru ranking)**  
+   Ticker yang **tidak relevan** harus di-`DROP` (tidak dimasukkan ke `groups.*`), contoh:
+   - gagal hard gate lintas-policy (suspensi/FCA/X, data invalid, dsb), atau
+   - gagal minimum liquidity/universe policy (policy-specific), atau
+   - tidak punya setup dan tidak punya alasan monitoring yang kuat.
+
+2) **Ranking (hanya untuk kandidat yang lolos universe filter)**  
+   Hitung `watchlist_score` dan `rank` hanya untuk kandidat yang akan ditampilkan.
+
+3) **Bucketing + cap output**  
+   Kandidat yang ditampilkan dibagi ke 3 group dengan batas maksimum (cap) agar tidak membengkak.
+
+Catatan: jumlah ticker yang diproses internal boleh besar, tapi jumlah ticker yang dipublish harus kecil.
+
+#### 7.3.2 Definisi group (wajib)
+- `groups.top_picks[]` = kandidat terbaik untuk **NEW ENTRY** (eksekusi).  
+  Rule:
+  - hanya berisi kandidat dengan `timing.trade_disabled == false`
+  - berisi kandidat yang memenuhi eligibility policy untuk entry **hari eksekusi**
+  - diurutkan deterministik (lihat Section 8.7)
+
+- `groups.secondary[]` = kandidat cadangan untuk **NEW ENTRY**, tetapi bukan prioritas utama.  
+  Rule:
+  - `timing.trade_disabled == false`
+  - kualitas masih layak dieksekusi, namun kalah ranking / minor penalty / bukan pilihan utama mode hari ini
+  - dipakai sebagai **fallback** ketika `top_picks` sedikit/0 atau user ingin memilih manual
+
+- `groups.watch_only[]` = kandidat **monitoring** yang *masih relevan*, bukan dumping ground.  
+  Wajib memenuhi salah satu:
+  - `position.has_position == true` (posisi existing yang perlu dipantau/manage), atau
+  - `timing.trade_disabled == true` **karena guard yang bersifat situasional** (mis. window kosong, snapshot missing, eod not ready), atau
+  - “near-eligible” (hampir masuk entry) dan masih punya nilai monitoring.
+
+Ticker yang tidak memenuhi definisi di atas harus **DROP** (tidak dimunculkan di output).
+
+#### 7.3.3 Output limits (wajib)
+Agar watchlist tetap fungsional sebagai daftar kandidat, engine wajib menerapkan cap berikut (configurable):
+
+Config key (disarankan):
+- `output_limits.top_picks_max` (default: 10)
+- `output_limits.secondary_max` (default: 20)
+- `output_limits.watch_only_max` (default: 30)
+- `output_limits.watch_only_min_score` (default: 50)  → kandidat monitoring “near-eligible” minimal harus memenuhi skor ini
+
+Aturan:
+- Setelah ranking, ambil:
+  - `top_picks` = top N pertama yang `trade_disabled == false` (N = `top_picks_max`, dan tetap harus konsisten dengan `recommendations.mode` + `allocations`).
+  - `secondary` = kandidat berikutnya yang `trade_disabled == false` sampai `secondary_max`.
+  - `watch_only` = gabungan dari:
+    1) semua kandidat dengan `position.has_position == true` (wajib ditampilkan), lalu
+    2) kandidat monitoring lain yang memenuhi definisi 7.3.2, dipilih berdasarkan `watchlist_score desc`, sampai `watch_only_max`.
+- Kandidat monitoring yang tidak punya `watchlist_score` (mis. karena mode NO_TRADE) tetap boleh masuk `watch_only`, tetapi tetap harus mengikuti cap (kecuali posisi existing).
+
+Jika `recommendations.mode in ["NO_TRADE","CARRY_ONLY"]`:
+- `groups.top_picks` wajib `[]` (lihat invariant).
+- `groups.secondary` default `[]`.
+- `groups.watch_only` tetap **dibatasi**: posisi existing + monitoring kandidat (cap tetap berlaku).
+
+#### 7.3.4 Definisi `meta.counts` (klarifikasi)
+`meta.counts.*` mengacu pada **jumlah kandidat yang dipublish** (setelah filter + cap), bukan jumlah seluruh ticker yang diproses internal.
+
+Opsional (disarankan untuk audit, tapi tidak wajib ada di schema):
+- `meta.counts.universe_total` = jumlah kandidat sebelum cap
+- `meta.counts.dropped_total` = jumlah ticker yang di-drop sebelum publish
+
 
 ---
 

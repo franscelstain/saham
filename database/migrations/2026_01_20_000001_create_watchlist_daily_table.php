@@ -19,7 +19,7 @@ class CreateWatchlistDailyTable extends Migration
 
             $table->timestamp('generated_at')->nullable()->index();
             $table->timestamps();
-            $table->index(['trade_date', 'source'], 'watchlist_daily_trade_date_source_unique');
+            $table->unique(['trade_date', 'source'], 'watchlist_daily_trade_date_source_unique');
         });
     }
 

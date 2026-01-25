@@ -300,8 +300,19 @@ public function build(array $opts = []): array
         }
 
         // If there is no executable entry window for today, treat as global no-trade for strict contract consistency.
-        if (empty($entryWindows) && empty($globalLockCodes)) {
-            $globalLockCodes[] = 'GL_NO_EXEC_WINDOW';
+        // BUT: if the policy itself declares "no-entry day" (e.g., WEEKLY_SWING Mon/Fri; DIVIDEND_SWING Fri),
+        // emit the policy reason code (not GL_NO_EXEC_WINDOW) to keep auditability aligned with docs.
+        if (empty($entryWindows) && empty($globalLockCodes) && $policy !== 'NO_TRADE') {
+            $dow = $this->dayOfWeek((string)$execTradeDate);
+
+            $lock = 'GL_NO_EXEC_WINDOW';
+            if ($policy === 'WEEKLY_SWING' && ($dow === 'Mon' || $dow === 'Fri' || $dow === 'Sat' || $dow === 'Sun')) {
+                $lock = 'WS_DOW_NO_ENTRY';
+            } elseif ($policy === 'DIVIDEND_SWING' && ($dow === 'Fri' || $dow === 'Sat' || $dow === 'Sun')) {
+                $lock = 'DS_DOW_NO_ENTRY';
+            }
+
+            $globalLockCodes[] = $lock;
             $avoidWindows = [$session['open_time'] . '-' . $session['close_time']];
             $timingGlobal['trade_disabled'] = true;
             $timingGlobal['size_multiplier'] = 0.0;
@@ -352,7 +363,14 @@ public function build(array $opts = []): array
         $rank = 1;
         foreach ($rows as &$r) {
             $r['rank'] = $rank++;
-            $r['confidence'] = $this->normalizeConfidence((string)($r['confidence'] ?? 'Med'));
+
+            // Confidence is cross-universe percentile (docs/watchlist/watchlist.md Section 7.2.1)
+            $tid = (int)($r['ticker_id'] ?? 0);
+            if ($tid > 0 && isset($confidenceMap[$tid])) {
+                $r['confidence'] = $confidenceMap[$tid];
+            } else {
+                $r['confidence'] = $this->normalizeConfidence((string)($r['confidence'] ?? 'Med'));
+            }
 
             $r['timing'] = [
                 'entry_windows' => $entryWindows,
@@ -403,16 +421,22 @@ public function build(array $opts = []): array
                 $r['timing']['size_multiplier'] = 0.0;
             }
 
-            // If global timing disables entry windows (e.g., WS Mon/Fri), lock candidate
+                        // If global timing disables entry windows, lock candidate.
+            // Do NOT override an existing primary reason (policy/global locks); only fall back to GL_NO_EXEC_WINDOW when unset.
             if (empty($entryWindows)) {
                 $r['timing']['trade_disabled'] = true;
-                $r['timing']['trade_disabled_reason'] = $r['timing']['trade_disabled_reason'] ?? 'GL_NO_EXEC_WINDOW';
-                $codes = $r['timing']['trade_disabled_reason_codes'];
-                $codes[] = 'GL_NO_EXEC_WINDOW';
-                $r['timing']['trade_disabled_reason_codes'] = array_values(array_unique($codes));
+
+                if ($r['timing']['trade_disabled_reason'] === null) {
+                    $r['timing']['trade_disabled_reason'] = 'GL_NO_EXEC_WINDOW';
+                    $codes = $r['timing']['trade_disabled_reason_codes'];
+                    $codes[] = 'GL_NO_EXEC_WINDOW';
+                    $r['timing']['trade_disabled_reason_codes'] = array_values(array_unique($codes));
+                }
+
                 $r['timing']['entry_style'] = 'No-trade';
                 $r['timing']['size_multiplier'] = 0.0;
             }
+
 
             // Ensure checklist exists
             if (!isset($r['checklist'])) $r['checklist'] = [];
@@ -435,9 +459,13 @@ public function build(array $opts = []): array
 
                 $r['levels']['entry_type'] = 'WATCH_ONLY';
 
-                if ($r['timing']['trade_disabled_reason'] === null) {
-                    // Strict docs/watchlist compliance: no undocumented fallback codes.
-                    // If a WATCH_ONLY decision has no explicit block code, treat it as an unmapped/unknown legacy condition.
+                                $existingPrimary = $r['timing']['trade_disabled_reason'] ?? null;
+
+                // Prefer policy-specific block codes as the *primary* reason.
+                // If we already have a strong/global lock (e.g. GL_EOD_NOT_READY, GL_SUSPENDED, GL_MECHANISM_FCA),
+                // keep it. If the current reason is generic (GL_NO_EXEC_WINDOW) or unset, override with the policy block.
+                $genericPrimaries = ['GL_NO_EXEC_WINDOW', 'GL_LEGACY_CODE_UNMAPPED'];
+                if ($existingPrimary === null || in_array((string)$existingPrimary, $genericPrimaries, true)) {
                     $r['timing']['trade_disabled_reason'] = !empty($candBlocks) ? (string)$candBlocks[0] : 'GL_LEGACY_CODE_UNMAPPED';
                 }
 
