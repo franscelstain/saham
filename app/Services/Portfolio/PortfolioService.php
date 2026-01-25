@@ -15,6 +15,7 @@ use App\Repositories\PortfolioTradeRepository;
 use App\Repositories\TickerRepository;
 use App\Trade\Portfolio\PortfolioPolicyCodes;
 use App\Trade\Pricing\FeeConfig;
+use App\Trade\Planning\PlanningPolicy;
 use App\Exceptions\PortfolioInconsistentStateException;
 use App\Repositories\MarketCalendarRepository;
 use App\Trade\Portfolio\Policies\PolicyFactory;
@@ -45,6 +46,7 @@ class PortfolioService
 
     private MarketCalendarRepository $calRepo;
     private PolicyFactory $policyFactory;
+    private PlanningPolicy $planningPolicy;
 
     private float $buyFee;
     private float $sellFee;
@@ -60,7 +62,9 @@ class PortfolioService
         RunRepository $runRepo,
         CanonicalEodRepository $canonRepo,
         MarketCalendarRepository $calRepo,
-        FeeConfig $feeCfg
+        FeeConfig $feeCfg,
+        PolicyFactory $policyFactory,
+        PlanningPolicy $planningPolicy
     ) {
         $this->tradeRepo = $tradeRepo;
         $this->lotRepo = $lotRepo;
@@ -72,7 +76,8 @@ class PortfolioService
         $this->runRepo = $runRepo;
         $this->canonRepo = $canonRepo;
         $this->calRepo = $calRepo;
-        $this->policyFactory = new PolicyFactory($calRepo, (array) config('trade.portfolio', []));
+        $this->policyFactory = $policyFactory;
+        $this->planningPolicy = $planningPolicy;
         $this->buyFee = $feeCfg->buyRate() + $feeCfg->extraBuyRate();
         $this->sellFee = $feeCfg->sellRate() + $feeCfg->extraSellRate();
     }
@@ -255,7 +260,7 @@ class PortfolioService
                                 // keep key name stable across policies
                                 'last_exit_sl_trade_date' => $lastExitSlDate,
                                 'trade_date' => $dto->tradeDate,
-                                'be_at_r' => (float) config('trade.planning.be_at_r', 0.5),
+                                'be_at_r' => $this->planningPolicy->beAtR(),
                             ];
                             $breaches = array_merge($breaches, $policy->validateBuy($plan, $dto, $ctx));
                         }
@@ -670,7 +675,7 @@ class PortfolioService
                     if ($plan && $policy) {
                         $pv = isset($plan->plan_version) ? (string)$plan->plan_version : null;
                         $ctx = [
-                            'be_at_r' => (float) config('trade.planning.be_at_r', 0.5),
+                            'be_at_r' => $this->planningPolicy->beAtR(),
                             'be_armed' => $pv ? $this->eventRepo->existsForPlan($accountId, (int)$tid, 'BE_ARMED', $pv) : false,
                             'sl_moved' => $pv ? $this->eventRepo->existsForPlan($accountId, (int)$tid, 'SL_MOVED', $pv) : false,
                         ];

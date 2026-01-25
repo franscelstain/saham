@@ -17,6 +17,7 @@ final class PlanningPolicy
     private float $tp1R;
     private float $tp2R;
     private float $minRrTp2;
+    private float $beAtR;
 
     public function __construct(
         string $entryMode,
@@ -26,7 +27,8 @@ final class PlanningPolicy
         float $slAtrMult,
         float $tp1R,
         float $tp2R,
-        float $minRrTp2
+        float $minRrTp2,
+        float $beAtR
     ) {
         $this->entryMode = strtoupper(trim($entryMode)) ?: 'BREAKOUT';
         $this->entryBufferTicks = max(0, $entryBufferTicks);
@@ -36,6 +38,7 @@ final class PlanningPolicy
         $this->tp1R = max(0.0, $tp1R);
         $this->tp2R = max(0.0, $tp2R);
         $this->minRrTp2 = max(0.0, $minRrTp2);
+        $this->beAtR = max(0.0, $beAtR);
     }
 
     public function entryMode(): string { return $this->entryMode; }
@@ -46,4 +49,5 @@ final class PlanningPolicy
     public function tp1R(): float { return $this->tp1R; }
     public function tp2R(): float { return $this->tp2R; }
     public function minRrTp2(): float { return $this->minRrTp2; }
+    public function beAtR(): float { return $this->beAtR; }
 }
