@@ -1,0 +1,103 @@
+{
+  "trade_date": "2026-01-26",
+  "exec_trade_date": "2026-01-27",
+  "generated_at": "2026-01-26T20:00:00+07:00",
+  "policy": {
+    "selected": "WEEKLY_SWING",
+    "policy_version": "v1"
+  },
+  "meta": {
+    "dow": "Mon",
+    "market_regime": "neutral",
+    "eod_canonical_ready": true,
+    "as_of_trade_date": "2026-01-26",
+    "missing_trading_dates": [],
+    "counts": {
+      "total": 1,
+      "top_picks": 1,
+      "secondary": 0,
+      "watch_only": 0
+    },
+    "notes": [],
+    "session": {
+      "open_time": "09:00",
+      "close_time": "15:50",
+      "breaks": []
+    }
+  },
+  "recommendations": {
+    "mode": "BUY_1",
+    "max_positions_today": 1,
+    "risk_per_trade_pct": 1.0,
+    "capital_total": 10000000,
+    "allocations": [
+      {
+        "ticker_code": "BBCA",
+        "alloc_pct": 1.0,
+        "alloc_budget": 10000000,
+        "entry_price_ref": 9000,
+        "lots_recommended": 1,
+        "estimated_cost": 901800,
+        "remaining_cash": 9098200,
+        "reason_codes": ["WS_ALLOC_TOP1"]
+      }
+    ]
+  },
+  "groups": {
+    "top_picks": [
+      {
+        "ticker_id": 1,
+        "ticker_code": "BBCA",
+        "rank": 1,
+        "watchlist_score": 78.5,
+        "confidence": "High",
+        "setup_type": "Breakout",
+        "reason_codes": ["WS_SIGNAL_BREAKOUT"],
+        "debug": {"note": "fixture"},
+        "ticker_flags": {
+          "special_notations": [],
+          "is_suspended": false,
+          "status_quality": "OK",
+          "status_asof_trade_date": "OK",
+          "trading_mechanism": "REGULAR"
+        },
+        "timing": {
+          "entry_windows": ["09:05-10:30"],
+          "avoid_windows": [],
+          "entry_style": "Breakout",
+          "size_multiplier": 1.0,
+          "trade_disabled": false,
+          "trade_disabled_reason": null,
+          "trade_disabled_reason_codes": []
+        },
+        "levels": {
+          "entry_type": "TRIGGER",
+          "entry_trigger_price": 9000,
+          "entry_limit_low": 8980,
+          "entry_limit_high": 9040,
+          "stop_loss_price": 8700,
+          "tp1_price": 9180,
+          "tp2_price": 9360,
+          "be_price": 9050
+        },
+        "sizing": {
+          "lot_size": 100,
+          "slices": 1,
+          "slice_pct": 1.0,
+          "lots_recommended": 1,
+          "estimated_cost": 901800,
+          "remaining_cash": 9098200,
+          "risk_pct": 1.0,
+          "profit_tp2_net": 0.0,
+          "rr_tp2_net": 2.0
+        },
+        "position": {
+          "has_position": false
+        },
+        "checklist": []
+      }
+    ],
+    "secondary": [],
+    "watch_only": []
+  }
+}

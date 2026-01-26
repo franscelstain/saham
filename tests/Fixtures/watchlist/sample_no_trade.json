@@ -1,0 +1,92 @@
+{
+  "trade_date": "2026-01-26",
+  "exec_trade_date": "2026-01-27",
+  "generated_at": "2026-01-26T20:05:00+07:00",
+  "policy": {
+    "selected": "NO_TRADE",
+    "policy_version": "v1"
+  },
+  "meta": {
+    "dow": "Mon",
+    "market_regime": "risk_off",
+    "eod_canonical_ready": false,
+    "as_of_trade_date": "2026-01-25",
+    "missing_trading_dates": ["2026-01-26"],
+    "counts": {
+      "total": 1,
+      "top_picks": 0,
+      "secondary": 0,
+      "watch_only": 1
+    },
+    "notes": ["EOD_NOT_READY"],
+    "session": {
+      "open_time": "09:00",
+      "close_time": "15:50",
+      "breaks": []
+    }
+  },
+  "recommendations": {
+    "mode": "NO_TRADE",
+    "max_positions_today": 0,
+    "risk_per_trade_pct": 1.0,
+    "capital_total": 10000000,
+    "allocations": []
+  },
+  "groups": {
+    "top_picks": [],
+    "secondary": [],
+    "watch_only": [
+      {
+        "ticker_id": 2,
+        "ticker_code": "BBRI",
+        "rank": 1,
+        "watchlist_score": 50.0,
+        "confidence": "Med",
+        "setup_type": "No-trade",
+        "reason_codes": ["NT_EOD_NOT_READY"],
+        "debug": {"note": "fixture"},
+        "ticker_flags": {
+          "special_notations": [],
+          "is_suspended": false,
+          "status_quality": "OK",
+          "status_asof_trade_date": "OK",
+          "trading_mechanism": "REGULAR"
+        },
+        "timing": {
+          "entry_windows": [],
+          "avoid_windows": ["09:00-15:50"],
+          "entry_style": "No-trade",
+          "size_multiplier": 0.0,
+          "trade_disabled": true,
+          "trade_disabled_reason": "EOD_NOT_READY",
+          "trade_disabled_reason_codes": ["NT_EOD_NOT_READY"]
+        },
+        "levels": {
+          "entry_type": "WATCH_ONLY",
+          "entry_trigger_price": 0,
+          "entry_limit_low": 0,
+          "entry_limit_high": 0,
+          "stop_loss_price": 0,
+          "tp1_price": 0,
+          "tp2_price": 0,
+          "be_price": 0
+        },
+        "sizing": {
+          "lot_size": 100,
+          "slices": 0,
+          "slice_pct": 0.0,
+          "lots_recommended": 0,
+          "estimated_cost": 0,
+          "remaining_cash": 10000000,
+          "risk_pct": 0.0,
+          "profit_tp2_net": 0.0,
+          "rr_tp2_net": 0.0
+        },
+        "position": {
+          "has_position": false
+        },
+        "checklist": []
+      }
+    ]
+  }
+}
