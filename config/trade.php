@@ -151,6 +151,14 @@ return [
         'supported_policies' => array_values(array_filter(array_map('trim', explode(',', (string) env('WATCHLIST_SUPPORTED_POLICIES', 'WEEKLY_SWING'))))),
         // Strict contract validation (docs/watchlist/watchlist.md)
         'strict_enabled' => env('WATCHLIST_STRICT_ENABLED', true),
+
+        // Policy docs root (optional, for environments where docs folder isn't shipped).
+        // - If empty, system will auto-detect using base_path()/fallback.
+        // - If strict=true and root can't be found, watchlist will fail fast.
+        'policy_docs' => [
+            'root' => env('WATCHLIST_POLICY_DOCS_ROOT', ''),
+            'strict' => env('WATCHLIST_POLICY_DOCS_STRICT', false),
+        ],
         // Default session times if market_calendar doesn't provide them
         'session_default' => [
             'open_time' => env('WATCHLIST_SESSION_OPEN', '09:00'),

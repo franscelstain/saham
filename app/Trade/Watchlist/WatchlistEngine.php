@@ -15,6 +15,7 @@ use App\Trade\Pricing\FeeConfig;
 use App\Trade\Pricing\TickRule;
 use App\Trade\Support\TradeClockConfig;
 use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
+use App\Trade\Watchlist\Contracts\PolicyDocLocator;
 use App\Trade\Watchlist\Contracts\WatchlistContractValidator;
 
 /**
@@ -44,6 +45,8 @@ class WatchlistEngine
     private TradeClockConfig $clockCfg;
     private WatchlistPolicyConfig $cfg;
 
+    private PolicyDocLocator $policyDocs;
+
     /** Defaults from docs/watchlist/watchlist.md Section 2.4 */
     private float $buyFeePct;
     private float $sellFeePct;
@@ -61,6 +64,7 @@ class WatchlistEngine
         FeeConfig $feeCfg,
         TradeClockConfig $clockCfg,
         WatchlistPolicyConfig $cfg,
+        PolicyDocLocator $policyDocs,
         CandidateDerivedMetricsBuilder $derivedBuilder
     ) {
         $this->watchRepo = $watchRepo;
@@ -75,6 +79,7 @@ class WatchlistEngine
 
         $this->clockCfg = $clockCfg;
         $this->cfg = $cfg;
+        $this->policyDocs = $policyDocs;
         $this->derivedBuilder = $derivedBuilder;
 
         $this->validator = new WatchlistContractValidator();
@@ -2003,24 +2008,8 @@ foreach ($rows as $j => $r2) {
 
     private function policyDocExists(string $policy): bool
     {
-        // Only enforce in environments where docs are shipped.
-        $root = function_exists('base_path')
-            ? base_path('docs/watchlist')
-            : (dirname(__DIR__, 3) . '/docs/watchlist');
-
-        if (!is_dir($root)) return true;
-
-        $map = [
-            'WEEKLY_SWING' => 'weekly_swing.md',
-            'DIVIDEND_SWING' => 'dividend_swing.md',
-            'INTRADAY_LIGHT' => 'intraday_light.md',
-            'POSITION_TRADE' => 'position_trade.md',
-            'NO_TRADE' => 'no_trade.md',
-        ];
-
-        $file = $map[$policy] ?? null;
-        if ($file === null) return false;
-        return is_file(rtrim($root, "/\\") . DIRECTORY_SEPARATOR . $file);
+        $res = $this->policyDocs->check($policy);
+        return (bool) $res->ok;
     }
 
     private function hasAllowedReasonPrefix(string $code): bool

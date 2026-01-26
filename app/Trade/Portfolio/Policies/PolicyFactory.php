@@ -13,7 +13,7 @@ class PolicyFactory
     /**
      * @param array<string,mixed> $cfg
      */
-    public function __construct(MarketCalendarRepository $cal, array $cfg)
+    public function __construct(MarketCalendarRepository $cal, array $cfg = [])
     {
         $this->cal = $cal;
         $this->cfg = $cfg;
