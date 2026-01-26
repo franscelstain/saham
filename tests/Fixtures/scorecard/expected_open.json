@@ -1,0 +1,25 @@
+{
+  "policy": "PREOPEN_WEEKLY_SWING",
+  "trade_date": "2026-01-26",
+  "exec_trade_date": "2026-01-26",
+  "checked_at": "2026-01-26T09:30:00+07:00",
+  "checkpoint": "open",
+  "results": [
+    {
+      "ticker": "BBCA",
+      "eligible_now": true,
+      "flags": [],
+      "computed": {
+        "gap_pct": 0.005025,
+        "spread_pct": 0.00499,
+        "chase_pct": 0.002
+      },
+      "reasons": [],
+      "notes": "In-window, chase OK, gap OK, spread OK"
+    }
+  ],
+  "default_recommendation": {
+    "ticker": "BBCA",
+    "why": "eligible_now && best_rank_in_top_picks"
+  }
+}

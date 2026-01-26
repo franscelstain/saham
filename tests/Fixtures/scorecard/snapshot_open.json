@@ -1,0 +1,18 @@
+{
+  "strategy_code": "WEEKLY_SWING",
+  "exec_trade_date": "2026-01-26",
+  "checked_at": "2026-01-26T09:30:00+07:00",
+  "checkpoint": "open",
+  "session_open_time": "09:00",
+  "session_close_time": "16:00",
+  "tickers": [
+    {
+      "ticker": "BBCA",
+      "bid": 1000,
+      "ask": 1005,
+      "last": 1002,
+      "open": 1000,
+      "prev_close": 995
+    }
+  ]
+}

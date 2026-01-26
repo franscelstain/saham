@@ -4,6 +4,7 @@ namespace App\Trade\Portfolio\Policies;
 
 use App\DTO\Portfolio\TradeInput;
 use App\Repositories\MarketCalendarRepository;
+use Illuminate\Support\Str;
 
 /**
  * Minimal policy for INTRADAY_LIGHT.
@@ -41,7 +42,7 @@ class IntradayLightPolicy implements PortfolioPolicy
         $breaches = [];
 
         $intent = strtoupper((string)($plan->intent ?? ''));
-        $isBuyIntent = ($intent === 'ENTRY' || $intent === 'BUY' || $intent === 'ADD' || str_starts_with($intent, 'BUY_'));
+        $isBuyIntent = ($intent === 'ENTRY' || $intent === 'BUY' || $intent === 'ADD' || Str::startsWith($intent, 'BUY_'));
         if (!$isBuyIntent) {
             $breaches[] = 'INTENT_NOT_BUY';
         }
