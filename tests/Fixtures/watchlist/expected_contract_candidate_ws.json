@@ -1,0 +1,64 @@
+{
+  "ticker_id": 1,
+  "ticker_code": "BBCA",
+  "rank": 1,
+  "watchlist_score": 77.5,
+  "confidence": "High",
+  "setup_type": "Pullback",
+  "reason_codes": [
+    "WS_GAP_UP_BLOCK",
+    "GL_EOD_NOT_READY"
+  ],
+  "debug": {
+    "rank_reason_codes": [
+      "WS_RANK_BASE",
+      "GAP_UP_BLOCK",
+      "EOD_NOT_READY"
+    ]
+  },
+  "ticker_flags": [],
+  "timing": {
+    "entry_windows": ["open-close"],
+    "avoid_windows": [],
+    "entry_style": "Pullback-wait",
+    "size_multiplier": 1.0,
+    "trade_disabled": false,
+    "trade_disabled_reason": null,
+    "trade_disabled_reason_codes": []
+  },
+  "levels": {
+    "entry_type": "PULLBACK_LIMIT",
+    "entry_trigger_price": 1000,
+    "entry_limit_low": 980,
+    "entry_limit_high": 1000,
+    "stop_loss_price": 900,
+    "tp1_price": 1200,
+    "tp2_price": 1300,
+    "be_price": 1000
+  },
+  "sizing": {
+    "lot_size": 100,
+    "slices": 1,
+    "slice_pct": 1.0,
+    "lots_recommended": 1,
+    "estimated_cost": 1000000,
+    "remaining_cash": null,
+    "risk_pct": 0.0,
+    "profit_tp2_net": 25000,
+    "rr_tp2_net": 2.5
+  },
+  "position": {
+    "has_position": false,
+    "position_avg_price": null,
+    "position_lots": null,
+    "days_held": null,
+    "position_state": null,
+    "action_windows": [],
+    "updated_stop_loss_price": null
+  },
+  "checklist": [
+    "Cek spread & orderbook (hindari spread lebar / antrian tipis)",
+    "Pastikan tidak ada suspensi / FCA / notasi X",
+    "Eksekusi hanya di window waktu policy"
+  ]
+}

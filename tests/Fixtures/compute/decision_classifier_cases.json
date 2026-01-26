@@ -1,0 +1,32 @@
+[
+  {
+    "name": "false breakout => decision1",
+    "input": {"signal_code": 10, "volume_label": 1, "close": 1000},
+    "expected_decision": 1
+  },
+  {
+    "name": "climax signal => avoid2",
+    "input": {"signal_code": 9, "volume_label": 7, "close": 1000},
+    "expected_decision": 2
+  },
+  {
+    "name": "distribution => caution3",
+    "input": {"signal_code": 8, "volume_label": 6, "close": 1000},
+    "expected_decision": 3
+  },
+  {
+    "name": "RSI >= max buy => caution3",
+    "input": {"signal_code": 5, "volume_label": 7, "close": 1000, "rsi14": 75, "vol_ratio": 2.0, "resistance_20d": 950},
+    "expected_decision": 3
+  },
+  {
+    "name": "breakout + volume ok + no rsi warn => buy5",
+    "input": {"signal_code": 5, "volume_label": 4, "close": 1100, "rsi14": 60, "vol_ratio": 1.8, "resistance_20d": 1000, "ma20": 1050, "ma50": 1000, "ma200": 900},
+    "expected_decision": 5
+  },
+  {
+    "name": "positive signal but not enough volume => confirm4",
+    "input": {"signal_code": 4, "volume_label": 4, "close": 1000, "rsi14": 60, "vol_ratio": 1.0, "ma20": 990, "ma50": 980},
+    "expected_decision": 4
+  }
+]
