@@ -1,0 +1,33 @@
+{
+  "trade_date": "2026-01-26",
+  "exec_trade_date": "2026-01-27",
+  "policy": "WEEKLY_SWING",
+  "recommendation": {"mode": "BUY_ONLY"},
+  "meta": {"generated_at": "2026-01-26T16:05:00+07:00"},
+  "groups": {
+    "top_picks": [
+      {
+        "ticker": "BBCA",
+        "rank": 1,
+        "score": 80,
+        "has_position": false,
+        "entry_trigger": 9000,
+        "entry_band": {"low": 8950, "high": 9100},
+        "guards": {
+          "max_chase_pct": 0.03,
+          "gap_up_block_pct": 0.015,
+          "spread_max_pct": 0.01
+        },
+        "timing": {
+          "entry_windows": ["open-close"],
+          "avoid_windows": ["12:00-13:00"]
+        },
+        "slices": 1,
+        "slice_pct": [1.0],
+        "reason_codes": []
+      }
+    ],
+    "secondary": [],
+    "watch_only": []
+  }
+}

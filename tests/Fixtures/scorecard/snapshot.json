@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-01-27T09:05:00+07:00",
+  "checkpoint": "OPEN",
+  "session_open_time": "09:00",
+  "session_close_time": "15:50",
+  "tickers": [
+    {
+      "ticker": "BBCA",
+      "prev_close": 8900,
+      "open": 8950,
+      "last": 9000,
+      "bid": 8995,
+      "ask": 9000
+    }
+  ]
+}

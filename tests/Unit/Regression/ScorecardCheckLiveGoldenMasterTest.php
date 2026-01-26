@@ -4,92 +4,141 @@ namespace Tests\Unit\Regression;
 
 use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
 use App\DTO\Watchlist\Scorecard\StrategyRunDto;
-use App\Services\Watchlist\WatchlistScorecardService;
 use App\Trade\Watchlist\Config\ScorecardConfig;
+use App\Trade\Watchlist\Scorecard\ExecutionEligibilityEvaluator;
+use App\Trade\Watchlist\Scorecard\ScorecardMetricsCalculator;
+use App\Services\Watchlist\WatchlistScorecardService;
+use App\Support\SystemClock;
 use App\Trade\Watchlist\Scorecard\StrategyRunRepository;
-use Tests\Support\UsesSqliteInMemory;
+use App\Trade\Watchlist\Scorecard\StrategyCheckRepository;
+use App\Trade\Watchlist\Scorecard\ScorecardRepository;
+use App\DTO\Watchlist\Scorecard\EligibilityCheckDto;
+use App\DTO\Watchlist\Scorecard\ScorecardMetricsDto;
+use App\DTO\Watchlist\Scorecard\StrategyCheckDto;
+use App\Repositories\TickerOhlcDailyRepository;
 use Tests\TestCase;
 
-/**
- * Golden master for watchlist:scorecard:check-live
- *
- * This locks the CLI contract for live eligibility output given:
- * - a stored strategy run (plan payload)
- * - a snapshot JSON
- */
 class ScorecardCheckLiveGoldenMasterTest extends TestCase
 {
-    use UsesSqliteInMemory;
-
-    protected function setUp(): void
+    public function testGoldenMasterFixtureSnapshotMatchesExpected(): void
     {
-        parent::setUp();
-        $this->bootSqliteInMemory();
-        $this->migrateFreshSqlite();
-    }
+        // Be explicit: avoid relying on helper factories across versions.
+        $cfg = new ScorecardConfig(false, 0.01, 0.015, 0.004, '09:00', '15:50');
+        $clock = new SystemClock();
 
-    public function testGoldenMaster_fixtureSnapshot_matchesExpected(): void
-    {
-        $fixtureDir = __DIR__ . '/../../Fixtures/scorecard';
+        $runPayload = json_decode(file_get_contents(__DIR__ . '/../..' . '/Fixtures/scorecard/run_payload.json'), true);
+        $snapArr = json_decode(file_get_contents(__DIR__ . '/../..' . '/Fixtures/scorecard/snapshot.json'), true);
+        $expected = json_decode(file_get_contents(__DIR__ . '/../..' . '/Fixtures/scorecard/expected_check.json'), true);
 
-        $snapshot = json_decode((string) file_get_contents($fixtureDir . '/snapshot_open.json'), true);
-        $this->assertIsArray($snapshot);
-
-        // Store strategy run (what would normally come from preopen watchlist plan)
-        $runPayload = json_decode((string) file_get_contents($fixtureDir . '/strategy_run_payload.json'), true);
         $this->assertIsArray($runPayload);
-
-        /** @var ScorecardConfig $cfg */
-        $cfg = app()->make(ScorecardConfig::class);
-        $dto = StrategyRunDto::fromPayloadArray($runPayload, 0, $cfg);
-
-        /** @var StrategyRunRepository $runRepo */
-        $runRepo = app()->make(StrategyRunRepository::class);
-        $up = $runRepo->upsertFromDto($dto, 'WEEKLY_SWING', 'preopen_contract_weekly_swing');
-        $this->assertTrue((bool) ($up['ok'] ?? false));
-
-        /** @var WatchlistScorecardService $svc */
-        $svc = app()->make(WatchlistScorecardService::class);
-
-        // Sanity: snapshot parses
-        $snapDto = LiveSnapshotDto::fromArray($snapshot);
-        $this->assertSame('WEEKLY_SWING', strtoupper($snapDto->strategyCode));
-
-        $outDto = $svc->checkLiveDto('WEEKLY_SWING', $snapshot, 'open');
-        $actual = $this->normalize($outDto->toArray());
-
-        $expected = json_decode((string) file_get_contents($fixtureDir . '/expected_open.json'), true);
+        $this->assertIsArray($snapArr);
         $this->assertIsArray($expected);
+
+        $runDto = StrategyRunDto::fromPayloadArray($runPayload, 1, $cfg);
+        $snapshot = LiveSnapshotDto::fromArray($snapArr, $cfg, $snapArr['checked_at'] ?? '');
+
+        $tradeDate = (string)($runPayload['trade_date'] ?? '');
+        $execDate = (string)(($runPayload['exec_trade_date'] ?? '') ?: ($runPayload['exec_date'] ?? ''));
+        $policy = (string)(($runPayload['policy']['selected'] ?? '') ?: ($runPayload['policy'] ?? ''));
+        $this->assertNotSame('', $tradeDate);
+        $this->assertNotSame('', $execDate);
+        $this->assertNotSame('', $policy);
+
+        $service = new WatchlistScorecardService(
+            // Repos
+            new class($cfg, $runDto, $tradeDate, $execDate, $policy) extends StrategyRunRepository {
+                private StrategyRunDto $dto;
+                private string $tradeDate;
+                private string $execDate;
+                private string $policy;
+                public function __construct(ScorecardConfig $cfg, StrategyRunDto $dto, string $tradeDate, string $execDate, string $policy) {
+                    parent::__construct($cfg);
+                    $this->dto = $dto;
+                    $this->tradeDate = $tradeDate;
+                    $this->execDate = $execDate;
+                    $this->policy = $policy;
+                }
+                public function upsertFromDto(StrategyRunDto $dto, string $source = 'watchlist'): int { $this->dto = $dto; return 1; }
+                public function getRunDto(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): ?StrategyRunDto {
+                    if ($tradeDate === $this->tradeDate && $execDate === $this->execDate && $policy === $this->policy) {
+                        return $this->dto;
+                    }
+                    return null;
+                }
+            },
+            new class extends StrategyCheckRepository {
+                public function insertCheckFromDto(int $runId, LiveSnapshotDto $snapshot, EligibilityCheckDto $result): int { return 1; }
+                public function getLatestCheckDto(int $runId): ?StrategyCheckDto { return null; }
+            },
+            new class extends ScorecardRepository {
+                public function upsertScorecardFromDto(int $runId, ScorecardMetricsDto $dto): void { /* no-op */ }
+            },
+            // Evaluator + calculator
+            new ExecutionEligibilityEvaluator($cfg),
+            new ScorecardMetricsCalculator(),
+            // OHLC repo (not needed for check-live)
+            new class extends TickerOhlcDailyRepository {
+                public function mapOhlcByTickerCodesForDate(string $tradeDate, array $tickerCodes): array { return []; }
+            },
+            // config + clock
+            $cfg,
+            $clock
+        );
+
+        $dto = $service->checkLiveDto($tradeDate, $execDate, $policy, $snapshot);
+        $out = $this->normalize($dto->toArray());
         $expected = $this->normalize($expected);
 
-        $this->assertSame($expected, $actual);
+        $this->assertSame($expected, $out);
     }
 
     /**
-     * Normalize float noise and order.
+     * Normalize output shape across minor refactors:
+     * - computed.gap_pct/spread_pct/chase_pct (preferred) vs flat fields (legacy)
+     * - default_recommendation{ticker,why} (preferred) vs recommended_ticker/recommended_why (legacy)
+     * - cast numeric fields to float for stable diffs
      *
-     * @param mixed $v
-     * @return mixed
+     * @param array<string,mixed> $a
+     * @return array<string,mixed>
      */
-    private function normalize($v)
+    private function normalize(array $a): array
     {
-        if (is_array($v)) {
-            // If this looks like results array, enforce stable order by ticker.
-            if (isset($v[0]) && is_array($v[0]) && isset($v[0]['ticker'])) {
-                usort($v, function ($a, $b) {
-                    return strcmp((string) ($a['ticker'] ?? ''), (string) ($b['ticker'] ?? ''));
-                });
+        if (isset($a['results']) && is_array($a['results'])) {
+            foreach ($a['results'] as $i => $r) {
+                if (!is_array($r)) continue;
+
+                // Prefer nested computed
+                if (isset($r['computed']) && is_array($r['computed'])) {
+                    foreach (['gap_pct', 'spread_pct', 'chase_pct'] as $k) {
+                        if (array_key_exists($k, $r['computed'])) {
+                            $a['results'][$i]['computed'][$k] = (float)$r['computed'][$k];
+                        }
+                    }
+                } else {
+                    // Legacy flat keys -> lift into computed
+                    $computed = [];
+                    foreach (['gap_pct', 'spread_pct', 'chase_pct'] as $k) {
+                        if (array_key_exists($k, $r)) {
+                            $computed[$k] = (float)$r[$k];
+                            unset($a['results'][$i][$k]);
+                        }
+                    }
+                    if (!empty($computed)) {
+                        $a['results'][$i]['computed'] = $computed;
+                    }
+                }
             }
-            $out = [];
-            foreach ($v as $k => $vv) {
-                $out[$k] = $this->normalize($vv);
-            }
-            return $out;
         }
 
-        if (is_float($v)) {
-            return round($v, 6);
+        // Recommendation shape
+        if (!isset($a['default_recommendation']) && (isset($a['recommended_ticker']) || isset($a['recommended_why']))) {
+            $a['default_recommendation'] = [
+                'ticker' => (string)($a['recommended_ticker'] ?? ''),
+                'why' => (string)($a['recommended_why'] ?? ''),
+            ];
+            unset($a['recommended_ticker'], $a['recommended_why']);
         }
-        return $v;
+
+        return $a;
     }
 }

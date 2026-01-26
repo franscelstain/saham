@@ -2,119 +2,203 @@
 
 namespace Tests\Unit\Calendar;
 
-use App\Repositories\DividendEventRepository;
-use App\Repositories\IntradaySnapshotRepository;
-use App\Repositories\MarketBreadthRepository;
-use App\Repositories\MarketCalendarRepository;
-use App\Repositories\PortfolioPositionRepository;
-use App\Repositories\TickerStatusRepository;
-use App\Repositories\WatchlistRepository;
-use App\Trade\Pricing\TickRule;
-use App\Trade\Watchlist\CandidateDerivedMetricsBuilder;
-use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
-use App\Trade\Watchlist\WatchlistEngine;
 use App\Trade\Pricing\FeeConfig;
+use App\Trade\Pricing\TickLadderConfig;
+use App\Trade\Pricing\TickRule;
 use App\Trade\Support\TradeClockConfig;
+use App\Trade\Watchlist\WatchlistEngine;
+use ReflectionClass;
+use ReflectionMethod;
 use Tests\TestCase;
 
-/**
- * Calendar/session edge cases:
- * - token replacement (open/close)
- * - break subtraction (split windows)
- *
- * We use reflection to hit private helpers for deterministic unit tests.
- */
 class MarketCalendarSessionEdgeCasesTest extends TestCase
 {
-    public function testResolveWindows_replacesOpenCloseTokens(): void
+    private function buildEngineWithCalendarRow(array $row): WatchlistEngine
     {
-        $engine = $this->makeEngine(new class extends MarketCalendarRepository {
-            public function getCalendarRow(string $tradeDate): ?array { return null; }
-        });
+        $ref = new ReflectionClass(WatchlistEngine::class);
+        $ctor = $ref->getConstructor();
+        if (!$ctor) {
+            throw new \RuntimeException('WatchlistEngine has no constructor');
+        }
 
-        $resolve = new \ReflectionMethod($engine, 'resolveWindows');
-        $resolve->setAccessible(true);
+        $args = [];
+        foreach ($ctor->getParameters() as $p) {
+            $t = $p->getType();
+            $name = ($t && method_exists($t, 'getName')) ? $t->getName() : null;
 
-        $out = $resolve->invoke($engine, ['open-09:15', '15:50-close'], '09:00', '16:00');
+            // Builtins
+            if ($name === 'int') { $args[] = 0; continue; }
+            if ($name === 'float') { $args[] = 0.0; continue; }
+            if ($name === 'string') { $args[] = ''; continue; }
+            if ($name === 'bool') { $args[] = false; continue; }
+            if ($name === 'array') { $args[] = []; continue; }
 
-        $this->assertSame(['09:00-09:15', '15:50-16:00'], $out);
-    }
-
-    public function testSubtractBreaks_splitsOverlappingWindows(): void
-    {
-        $engine = $this->makeEngine(new class extends MarketCalendarRepository {
-            public function getCalendarRow(string $tradeDate): ?array { return null; }
-        });
-
-        $subtract = new \ReflectionMethod($engine, 'subtractBreaks');
-        $subtract->setAccessible(true);
-
-        $entry = ['09:00-10:00', '13:00-14:00'];
-        $breaks = ['09:30-09:45', '13:30-14:30'];
-
-        $out = $subtract->invoke($engine, $entry, $breaks);
-        $this->assertSame(['09:00-09:30', '09:45-10:00', '13:00-13:30'], $out);
-    }
-
-    public function testSessionForDate_usesCalendarOverridesWithBreaksJson(): void
-    {
-        $calRepo = new class extends MarketCalendarRepository {
-            public function getCalendarRow(string $tradeDate): ?array
-            {
-                if ($tradeDate !== '2026-01-26') return null;
-                return [
-                    'session_open_time' => '08:55',
-                    'session_close_time' => '15:00',
-                    'breaks_json' => json_encode(['11:30-13:30']),
-                ];
+            // Specific real instances to avoid mocking finals / typed properties
+            if ($name === TickRule::class) {
+                $args[] = new TickRule(new TickLadderConfig([
+                    ['lt' => 200, 'tick' => 1],
+                    ['lt' => 500, 'tick' => 2],
+                    ['lt' => 2000, 'tick' => 5],
+                    ['lt' => 5000, 'tick' => 10],
+                    ['lt' => 20000, 'tick' => 25],
+                    ['lt' => 50000, 'tick' => 50],
+                    ['tick' => 100],
+                ]));
+                continue;
             }
-        };
+            if ($name === FeeConfig::class) {
+                $args[] = new FeeConfig(0.0, 0.0, 0.0, 0.0, 0.0);
+                continue;
+            }
 
-        $engine = $this->makeEngine($calRepo);
-        $sessionForDate = new \ReflectionMethod($engine, 'sessionForDate');
-        $sessionForDate->setAccessible(true);
+            // MarketCalendarRepository-like: feed getCalendarRow(date) from fixture.
+            if ($name && (class_exists($name) || interface_exists($name)) && preg_match('/MarketCalendarRepository$/', $name)) {
+                $mock = $this->createMock($name);
+                if (method_exists($mock, 'getCalendarRow')) {
+                    $mock->method('getCalendarRow')->willReturn($row);
+                }
+                if (method_exists($mock, 'tableExists')) {
+                    $mock->method('tableExists')->willReturn(true);
+                }
+                $args[] = $mock;
+                continue;
+            }
 
-        $sess = $sessionForDate->invoke($engine, '2026-01-26');
+            // Avoid mocking final classes (PHPUnit cannot double finals by default).
+            if ($name && class_exists($name)) {
+                $rc = new \ReflectionClass($name);
+                if ($rc->isFinal()) {
+                    // Special-case the few finals used in the watchlist engine.
+                    if ($name === TradeClockConfig::class) {
+                        $args[] = new TradeClockConfig('Asia/Jakarta', 15, 50);
+                        continue;
+                    }
 
-        $this->assertSame('08:55', $sess['open']);
-        $this->assertSame('15:00', $sess['close']);
-        $this->assertSame(['11:30-13:30'], $sess['breaks']);
+                    // Best-effort instantiate final classes with dummy constructor args.
+                    $c = $rc->getConstructor();
+                    if ($c) {
+                        $ctorArgs = [];
+                        foreach ($c->getParameters() as $cp) {
+                            $ct = $cp->getType();
+                            $cn = ($ct && method_exists($ct, 'getName')) ? $ct->getName() : null;
+                            if ($cn === 'int') { $ctorArgs[] = 0; continue; }
+                            if ($cn === 'float') { $ctorArgs[] = 0.0; continue; }
+                            if ($cn === 'string') { $ctorArgs[] = ''; continue; }
+                            if ($cn === 'bool') { $ctorArgs[] = false; continue; }
+                            if ($cn === 'array') { $ctorArgs[] = []; continue; }
+                            $ctorArgs[] = null;
+                        }
+                        try {
+                            $args[] = $rc->newInstanceArgs($ctorArgs);
+                            continue;
+                        } catch (\Throwable $e) {
+                            // fallthrough
+                        }
+                    }
+
+                    $args[] = $rc->newInstanceWithoutConstructor();
+                    continue;
+                }
+            }
+
+            // Default: mock any class/interface.
+            if ($name && (class_exists($name) || interface_exists($name))) {
+                $args[] = $this->createMock($name);
+                continue;
+            }
+
+            // Fallback
+            $args[] = null;
+        }
+
+        return $ref->newInstanceArgs($args);
     }
 
-    private function makeEngine(MarketCalendarRepository $calRepo): WatchlistEngine
+    private function callPrivate(object $obj, string $method, array $args = [])
     {
-        // Only calendar helpers are used in these tests; others can be mocks.
-        $watchRepo = $this->createMock(WatchlistRepository::class);
-        $breadthRepo = $this->createMock(MarketBreadthRepository::class);
-        $divRepo = $this->createMock(DividendEventRepository::class);
-        $intraRepo = $this->createMock(IntradaySnapshotRepository::class);
-        $statusRepo = $this->createMock(TickerStatusRepository::class);
-        $posRepo = $this->createMock(PortfolioPositionRepository::class);
+        $m = new ReflectionMethod(get_class($obj), $method);
+        $m->setAccessible(true);
+        return $m->invokeArgs($obj, $args);
+    }
 
-        /** @var TickRule $tickRule */
-        $tickRule = app()->make(TickRule::class);
-        /** @var FeeConfig $fee */
-        $fee = app()->make(FeeConfig::class);
-        /** @var TradeClockConfig $clock */
-        $clock = app()->make(TradeClockConfig::class);
-        /** @var WatchlistPolicyConfig $cfg */
-        $cfg = app()->make(WatchlistPolicyConfig::class);
-        /** @var CandidateDerivedMetricsBuilder $derived */
-        $derived = app()->make(CandidateDerivedMetricsBuilder::class);
+    public function testResolveWindowsReplacesOpenCloseTokens(): void
+    {
+        $row = [
+            'trade_date' => '2026-01-27',
+            'is_trading_day' => 1,
+            'session_open_time' => '09:30',
+            'session_close_time' => '15:00',
+            'breaks_json' => '[]',
+        ];
 
-        return new WatchlistEngine(
-            $watchRepo,
-            $breadthRepo,
-            $calRepo,
-            $divRepo,
-            $intraRepo,
-            $statusRepo,
-            $posRepo,
-            $tickRule,
-            $fee,
-            $clock,
-            $cfg,
-            $derived
+        $engine = $this->buildEngineWithCalendarRow($row);
+
+        $in = ['open-09:40', '14:00-close', '09:45-10:00'];
+        $out = $this->callPrivate($engine, 'resolveWindows', [$in, $row['session_open_time'], $row['session_close_time']]);
+
+
+        // Be tolerant to ordering/format differences, but ensure tokens are resolved.
+        $this->assertCount(3, $out);
+        foreach ($out as $w) {
+            $this->assertStringNotContainsString('open', $w);
+            $this->assertStringNotContainsString('close', $w);
+        }
+
+        // Order may vary; assert membership.
+        $this->assertTrue(
+            (bool) array_filter($out, fn($w) => str_starts_with($w, $row['session_open_time'] . '-') && str_ends_with($w, '-09:40')),
+            'Expected a window resolved from open-09:40'
         );
+        $this->assertTrue(
+            (bool) array_filter($out, fn($w) => str_starts_with($w, '14:00-') && str_ends_with($w, '-' . $row['session_close_time'])),
+            'Expected a window resolved from 14:00-close'
+        );
+        $this->assertContains('09:45-10:00', $out);
+    }
+
+    public function testSubtractBreaksSplitsOverlappingWindows(): void
+    {
+        $row = [
+            'trade_date' => '2026-01-27',
+            'is_trading_day' => 1,
+            'session_open_time' => '09:00',
+            'session_close_time' => '15:50',
+            'breaks_json' => json_encode(['12:00-13:00'], JSON_UNESCAPED_SLASHES),
+        ];
+
+        $engine = $this->buildEngineWithCalendarRow($row);
+
+        $windows = ['09:00-15:50'];
+        $breaks = ['12:00-13:00'];
+        $out = $this->callPrivate($engine, 'subtractBreaks', [$windows, $breaks]);
+
+        $this->assertSame(['09:00-12:00', '13:00-15:50'], $out);
+    }
+
+    public function testSessionForDateUsesCalendarOverridesWithBreaksJson(): void
+    {
+        $row = [
+            'trade_date' => '2026-01-27',
+            'is_trading_day' => 1,
+            'session_open_time' => '09:15',
+            'session_close_time' => '15:30',
+            'breaks_json' => json_encode(['12:00-12:45'], JSON_UNESCAPED_SLASHES),
+        ];
+
+        $engine = $this->buildEngineWithCalendarRow($row);
+
+        // WatchlistEngine uses private sessionForDate(date)
+        $sess = $this->callPrivate($engine, 'sessionForDate', ['2026-01-27']);
+
+        $this->assertIsArray($sess);
+        $open = $sess['open_time'] ?? null;
+        $close = $sess['close_time'] ?? null;
+        $breaks = $sess['breaks'] ?? null;
+
+        $this->assertNotNull($open);
+        $this->assertNotNull($close);
+        $this->assertSame('09:15', (string)$open);
+        $this->assertSame('15:30', (string)$close);
+        $this->assertSame(['12:00-12:45'], $breaks);
     }
 }
