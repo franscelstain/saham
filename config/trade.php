@@ -338,7 +338,7 @@ return [
         ],
 
         // Risk caps (soft): enforce via strategy rules / UI layer
-        'max_open_positions' => env('PORTFOLIO_MAX_OPEN_POSITIONS', 5),
+        'max_open_positions' => (int) env('PORTFOLIO_MAX_OPEN_POSITIONS', 5),
         'max_alloc_pct_per_position' => env('PORTFOLIO_MAX_ALLOC_PCT_PER_POSITION', 0.25),
         'max_total_alloc_pct' => env('PORTFOLIO_MAX_TOTAL_ALLOC_PCT', 1.0),
 
