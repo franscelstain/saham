@@ -126,12 +126,18 @@ Semua sub-score dihitung 0..1 dan di-clamp.
 
 `score_total = clamp(Σ(w_i*s_i), 0, 1)`
 
-## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED)
+## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED, dynamic)
 
-Mini strategy hanya untuk UI pada `Top Picks` & `Secondary` (bukan rekomendasi final).
-- Default tranche: `[0.60, 0.40]` dari total budget (pct sum=1.0).
-- Default timing hint: tranche1 `09:20`, tranche2 `10:30`.
-- Jika ticker masuk `recommendations` dan capital ada, lots/tranches harus **copy** dari `recommendations.tranches` (single source).
+Policy ini memakai rule global **EOD_TRANCHE_RULE_V1** (lihat `watchlist.md` → Mini strategy).
+Mapping profile → tranche pct (2 tranche):
+- `CONSERVATIVE`: 50/50
+- `DEFAULT`: 60/40
+- `AGGRESSIVE`: 70/30
+
+Timing hint (LOCKED): tranche1 `09:20`, tranche2 `10:30`.
+
+Catatan:
+- `mini_tranches_lots` hanya boleh muncul jika ticker ada di `recommendations` (copy dari `recommendations.tranches`).
 
 ## Invalidation & monitoring (EOD-only)
 - Setelah entry terjadi, posisi invalid jika daily close <= plan_stop (exit by stop, EOD-only).

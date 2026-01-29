@@ -374,27 +374,68 @@ Jika `score_total` sama, urutan final ditentukan:
 3) `tick_pct` lebih rendah
 4) `ticker_code` A→Z
 
-### Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED)
+### Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED, dynamic)
 
-Tujuan: setiap ticker di `Top Picks` dan `Secondary` memiliki rencana eksekusi bertahap yang ringan untuk UI (tanpa mengubah PLAN).
+Tujuan: setiap ticker di `Top Picks` dan `Secondary` memiliki rencana eksekusi bertahap yang **deterministik** (tanpa intraday) dan bisa **adaptif** berdasarkan risk/reward dari hasil PLAN.
 
 Kontrak:
 - Mini strategy hanya ditambahkan pada `groups.top_picks[]` dan `groups.secondary[]`.
-- `mini_tranches_pct[]` selalu berbasis **persentase** (tidak butuh capital).
-- Jika `capital` ada dan ticker tersebut masuk `recommendations`, boleh tampilkan `mini_tranches_lots[]` sebagai **copy** dari `recommendations.tranches` (single source).
-- Jika ticker tidak masuk `recommendations`, maka `mini_tranches_lots=null` (tidak ada sizing preview).
+- Mini strategy dihitung **setelah** PLAN (entry/stop/tp1/rr_est) valid, sehingga tranching berasal dari hasil proses, bukan asumsi.
+- `mini_tranches_pct[]` selalu berbasis persentase (tidak butuh capital).
+- Jika `capital` ada dan ticker masuk `recommendations`, maka `mini_tranches_lots[]` **harus** copy dari `recommendations.tranches` (single source), bukan dihitung ulang.
+- Jika ticker tidak masuk `recommendations`, maka `mini_tranches_lots=null`.
 
-Default tranche profile per policy (LOCKED):
-- Weekly Swing: 2_TRANCHE → 60/40.
-- Dividend Swing: 2_TRANCHE → 60/40.
-- Position Trade: 2_TRANCHE → 60/40.
-- Intraday Light: 2_TRANCHE → 70/30 (lebih cepat, “light”).
-- NO_TRADE: tidak ada mini strategy.
+#### Proses penentuan tranche profile (LOCKED)
 
-Rounding/timing:
-- Jam `at` adalah **hint** untuk eksekusi (CONFIRM boleh adjust), contoh default:
-  - Tranche 1: `09:20`
-  - Tranche 2: `10:30`
+Input yang dipakai (EOD-only):
+- `rr_est` (dari PLAN)
+- `atr_pct`, `tick_pct` (risk metrics)
+- `flags` (optional): `GAP_RISK_HIGH`, `CA_EVENT_NEAR` (jika tersedia)
+
+Step 1 — Risk bucket (LOCKED)
+- `risk_bucket = HIGH` jika salah satu true:
+  - `atr_pct >= 0.12`
+  - `tick_pct >= 0.012`
+  - `flags` mengandung `GAP_RISK_HIGH` atau `CA_EVENT_NEAR`
+- `risk_bucket = LOW` jika semua true:
+  - `atr_pct <= 0.07`
+  - `tick_pct <= 0.008`
+  - tidak ada flag risk di atas
+- Selain itu: `risk_bucket = MED`
+
+Step 2 — Reward bucket (LOCKED)
+- `reward_bucket = HIGH` jika `rr_est >= 1.8`
+- `reward_bucket = LOW` jika `rr_est < 1.3`
+- Selain itu: `reward_bucket = MED`
+
+Step 3 — Profile selection per policy (LOCKED)
+- Weekly Swing / Dividend Swing / Position Trade:
+  - Jika `risk_bucket=HIGH` → profile `CONSERVATIVE`
+  - Else jika `reward_bucket=HIGH` dan `risk_bucket=LOW` → profile `AGGRESSIVE`
+  - Else → profile `DEFAULT`
+- Intraday Light:
+  - Jika `risk_bucket=HIGH` → profile `CONSERVATIVE`
+  - Else jika `reward_bucket=HIGH` → profile `AGGRESSIVE`
+  - Else → profile `DEFAULT`
+- NO_TRADE: tidak ada mini strategy
+
+Step 4 — Profile → tranche pct (LOCKED)
+- Untuk WS/DS/PT (2 tranche):
+  - `CONSERVATIVE`: 50/50
+  - `DEFAULT`: 60/40
+  - `AGGRESSIVE`: 70/30
+- Untuk IL (2 tranche):
+  - `CONSERVATIVE`: 60/40
+  - `DEFAULT`: 70/30
+  - `AGGRESSIVE`: 80/20
+
+Timing hint (LOCKED):
+- tranche1: `09:20`
+- tranche2: `10:30`
+
+Output tambahan (audit):
+- `mini_tranche_profile` (string): `CONSERVATIVE` | `DEFAULT` | `AGGRESSIVE`
+- `mini_tranche_rule` (string): contoh `EOD_TRANCHE_RULE_V1`
 
 ### Dua mode deterministik: tanpa capital vs dengan capital
 **Mode A: capital missing / null / <=0**
