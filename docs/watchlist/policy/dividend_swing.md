@@ -278,6 +278,13 @@ Total = 0.35 + 0.20 + 0.15 + 0.15 + 0.15 = 1.00
 
 `score_total = clamp(Σ(w_i*s_i), 0, 1)`
 
+## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED)
+
+Mini strategy hanya untuk UI pada `Top Picks` & `Secondary` (bukan rekomendasi final).
+- Default tranche: `[0.60, 0.40]` dari total budget (pct sum=1.0).
+- Default timing hint: tranche1 `09:20`, tranche2 `10:30`.
+- Jika ticker masuk `recommendations` dan capital ada, lots/tranches harus **copy** dari `recommendations.tranches` (single source).
+
 ## Invalidation & monitoring (EOD-only)
 - Sebelum ex-date: jika exec_trade_date >= ex_date → invalid (sudah di-cover hard rule).
 - Setelah entry: invalid jika daily close <= plan_stop (EOD-only).

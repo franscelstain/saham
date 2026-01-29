@@ -222,6 +222,13 @@ Default parameter:
 - `IL_TP1_R_MULT = 1.0`
 - `IL_MIN_RR = 1.0`
 
+## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED)
+
+Mini strategy hanya untuk UI pada `Top Picks` & `Secondary` (bukan rekomendasi final).
+- Default tranche: `[0.70, 0.30]` dari total budget (pct sum=1.0).
+- Default timing hint: tranche1 `09:20`, tranche2 `10:30`.
+- Jika ticker masuk `recommendations` dan capital ada, lots/tranches harus **copy** dari `recommendations.tranches` (single source).
+
 ## Invalidation & monitoring (EOD-only)
 - Policy ini tetap EOD-first: setelah entry, invalid jika daily close <= plan_stop (EOD-only).
 - Jika tidak entry hari ini (CONFIRM reject), evaluasi ulang besok dari EOD berikutnya (PLAN baru).

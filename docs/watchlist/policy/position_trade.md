@@ -249,6 +249,13 @@ Validasi:
 Default parameter:
 - `PT_TP2_R_MULT = 3.0`
 
+## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED)
+
+Mini strategy hanya untuk UI pada `Top Picks` & `Secondary` (bukan rekomendasi final).
+- Default tranche: `[0.60, 0.40]` dari total budget (pct sum=1.0).
+- Default timing hint: tranche1 `09:20`, tranche2 `10:30`.
+- Jika ticker masuk `recommendations` dan capital ada, lots/tranches harus **copy** dari `recommendations.tranches` (single source).
+
 ## Invalidation & monitoring (EOD-only)
 - Setelah entry: invalid jika daily close <= plan_stop (EOD-only).
 - Jika trend gate memakai MA200, dan daily close < ma200 setelah entry, tandai `TREND_BREAK` (monitoring).

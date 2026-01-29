@@ -28,6 +28,10 @@ Jika canonical EOD belum ready, itu **bukan** alasan memakai `NO_TRADE`; kondisi
 - `recommendations=[]` wajib
 - groups boleh monitoring dengan flag `EOD_NOT_READY`
 
+## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED)
+
+Tidak berlaku untuk NO_TRADE.
+
 ## Invalidation & monitoring (EOD-only)
 - NO_TRADE adalah policy manual-only: tidak ada entry, tidak ada recommendations.
 

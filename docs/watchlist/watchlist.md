@@ -374,6 +374,28 @@ Jika `score_total` sama, urutan final ditentukan:
 3) `tick_pct` lebih rendah
 4) `ticker_code` A→Z
 
+### Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED)
+
+Tujuan: setiap ticker di `Top Picks` dan `Secondary` memiliki rencana eksekusi bertahap yang ringan untuk UI (tanpa mengubah PLAN).
+
+Kontrak:
+- Mini strategy hanya ditambahkan pada `groups.top_picks[]` dan `groups.secondary[]`.
+- `mini_tranches_pct[]` selalu berbasis **persentase** (tidak butuh capital).
+- Jika `capital` ada dan ticker tersebut masuk `recommendations`, boleh tampilkan `mini_tranches_lots[]` sebagai **copy** dari `recommendations.tranches` (single source).
+- Jika ticker tidak masuk `recommendations`, maka `mini_tranches_lots=null` (tidak ada sizing preview).
+
+Default tranche profile per policy (LOCKED):
+- Weekly Swing: 2_TRANCHE → 60/40.
+- Dividend Swing: 2_TRANCHE → 60/40.
+- Position Trade: 2_TRANCHE → 60/40.
+- Intraday Light: 2_TRANCHE → 70/30 (lebih cepat, “light”).
+- NO_TRADE: tidak ada mini strategy.
+
+Rounding/timing:
+- Jam `at` adalah **hint** untuk eksekusi (CONFIRM boleh adjust), contoh default:
+  - Tranche 1: `09:20`
+  - Tranche 2: `10:30`
+
 ### Dua mode deterministik: tanpa capital vs dengan capital
 **Mode A: capital missing / null / <=0**
 - `planned_lots = null`, `estimated_cost = null`
@@ -623,3 +645,252 @@ Jika kamu ingin sizing lebih “trader-grade” (menghindari stop terlalu lebar)
 Catatan:
 - Ini opsional; jangan aktifkan tanpa menetapkan `RISK_PCT`.
 - Mode ini menjaga posisi tidak kebesaran saat stop jauh.
+
+---
+
+## Appendices (binding)
+## Appendix A — Output schema (DTO)
+
+### Output schema (DTO) (LOCKED)
+
+Tujuan: satu kontrak output yang sama untuk semua policy. Policy hanya mengubah isi kandidat/plan/score, bukan bentuk JSON.
+
+#### Root object
+
+Wajib ada field berikut:
+
+- `meta` (object)
+  - `trade_date` (YYYY-MM-DD): tanggal EOD yang dipakai untuk PLAN (kemarin).
+  - `policy` (string): nama policy aktif (`WEEKLY_SWING`, `DIVIDEND_SWING`, `POSITION_TRADE`, `INTRADAY_LIGHT`, `NO_TRADE`).
+  - `eod_canonical_ready` (bool)
+  - `fee_included` (bool)
+  - `flags` (string[]): flag global (mis. `EOD_NOT_READY`)
+  - `reasons` (string[]): reason code global (mis. `GL_EOD_NOT_READY`)
+
+- `groups` (object)
+  - `top_picks` (TickerPlan[])
+  - `secondary` (TickerPlan[])
+  - `watch_only` (TickerPlan[])
+  - `avoid` (TickerPlan[])  
+  - `no_trade` (TickerPlan[])  *(boleh kosong untuk policy selain NO_TRADE; atau dipakai untuk menampung ticker yang ditandai “NO_TRADE” oleh classifier)*
+
+- `recommendations` (RecommendationPlan[])
+  - Wajib selalu ada, tapi boleh `[]`.
+
+#### TickerPlan (untuk groups.*)
+
+Setiap item `TickerPlan` wajib punya:
+
+- `ticker_code` (string)
+- `score_total` (float)  
+- `setup_type` (string|null): `PULLBACK` / `BREAKOUT` (atau null jika policy tidak memakai)
+- `plan` (object)
+  - `entry` (int|null)
+  - `stop` (int|null)
+  - `tp1` (int|null)
+  - `tp2` (int|null) *(opsional; boleh null)*
+  - `r` (int|null)
+  - `rr_est` (float|null)
+- `risk` (object)
+  - `atr_pct` (float|null)
+  - `tick_pct` (float|null)
+  - `dv20_idr` (int|null)
+- `flags` (string[]) *(boleh kosong)*
+- `reasons` (string[]): reason code audit-able (DROP/AVOID/WATCH) dari global + policy
+
+Tambahan untuk Top Picks & Secondary (mini strategy, non-breaking):
+
+- `mini_tranches_pct` (array of object|null)
+  - Hanya untuk `groups.top_picks` dan `groups.secondary`.
+  - Format: `{ "at": "HH:MM", "pct": float, "reason": string }`
+  - `pct` berada di range (0..1], total pct = 1.0.
+
+- `mini_tranches_lots` (array of object|null)
+  - Opsional, hanya jika ticker tersebut **ada di `recommendations`** (Mode B / capital ada).
+  - Format: `{ "at": "HH:MM", "lots": int, "reason": string }`
+  - Nilai lots di sini **harus** disalin dari `recommendations.tranches` (single source), bukan dihitung ulang.
+
+Catatan:
+- `groups.*` boleh berisi plan null jika policy tidak menghasilkan plan (mis. NO_TRADE), tapi shape tetap sama.
+
+#### RecommendationPlan (rencana eksekusi beli)
+
+Setiap item `RecommendationPlan` wajib punya:
+
+- `ticker_code` (string)
+- `planned_lots` (int|null)  
+  - Mode A (capital missing): null.
+  - Mode B (capital ada): integer >= 1.
+- `estimated_cost` (int|null)  *(include fee jika `meta.fee_included=true`)*
+- `weight_pct` (float|null)
+- `tranches` (array of object) *(boleh kosong jika planned_lots null)*
+  - `{ "at": "HH:MM", "lots": int, "reason": string }`
+- `reasons` (string[]): minimal 1, audit-able
+- `ref_plan` (object|null): snapshot plan yang dipakai (entry/stop/tp1/rr_est) agar rekomendasi bisa diaudit tanpa join.
+
+Backward-compatibility:
+- Jika implementasi sekarang belum punya `ref_plan`/`tranches`, field boleh ada tapi null/[]; jangan mengubah tipe field secara breaking.
+
+## Appendix B — Reason code registry
+
+Ini adalah registry otomatis dari reason code yang muncul di dokumen. Deskripsi tetap mengikuti lokasi definisi masing-masing code.
+
+### GL_*
+- `GL_DATA_INCOMPLETE`
+- `GL_EOD_NOT_READY`
+- `GL_FEE_EXCLUDED`
+- `GL_LIQ_METRIC_MISSING`
+- `GL_LIQ_TOO_LOW`
+- `GL_MECHANISM_FCA`
+- `GL_POLICY_INPUT_MISSING`
+- `GL_PRICE_TOO_LOW`
+- `GL_SPECIAL_NOTATION_E`
+- `GL_SPECIAL_NOTATION_X`
+- `GL_SUSPENDED`
+- `GL_VOL_TOO_HIGH`
+
+### WS_*
+- `WS_MAX_ATR_PCT`
+- `WS_MAX_TICK_PCT`
+- `WS_MIN_ATR_PCT`
+- `WS_MIN_DV20_IDR`
+- `WS_MIN_RR`
+- `WS_RR_TOO_LOW`
+- `WS_R_INVALID_LT_TICK`
+- `WS_R_INVALID_NONPOSITIVE`
+
+### DS_*
+- `DS_AVOID_ATR_PCT`
+- `DS_CONFIRM_MAX_CHASE_PCT`
+- `DS_CONFIRM_MAX_GAP_PCT`
+- `DS_EVENT_MISSING`
+- `DS_EVENT_RUNUP_RISK`
+- `DS_LIQ_STRONG`
+- `DS_MAX_CHASE_PCT`
+- `DS_MAX_DAYS_TO_EX`
+- `DS_MAX_EXTEND_ATR`
+- `DS_MAX_GAP_PCT`
+- `DS_MAX_STOP_PCT`
+- `DS_MIN_DAYS_TO_EX`
+- `DS_MIN_RR`
+- `DS_NEAR_RESISTANCE`
+- `DS_NO_SETUP`
+- `DS_OUTSIDE_EVENT_WINDOW`
+- `DS_PRICE_EXTENDED`
+- `DS_RR_TOO_LOW`
+- `DS_R_INVALID_`
+- `DS_STABLE`
+- `DS_STOP_TOO_WIDE`
+- `DS_TOO_LATE_EXDATE`
+- `DS_TP1_NOT_ABOVE_ENTRY`
+- `DS_TP2_R_MULT`
+- `DS_TREND_WEAK`
+- `DS_VOL_CHAOS`
+- `DS_YIELD_GOOD`
+
+### PT_*
+- `PT_ATR_SHOCK`
+- `PT_BLOWOFF_RISK`
+- `PT_BLOWOFF_RSI`
+- `PT_BLOWOFF_VOL_RATIO`
+- `PT_CLOSE_STRONG`
+- `PT_CONFIRM_MAX_CHASE_PCT`
+- `PT_CONFIRM_MAX_GAP_PCT`
+- `PT_DATA_INCOMPLETE`
+- `PT_MAX_ATR_PCT`
+- `PT_MAX_ATR_PCT_SHOCK`
+- `PT_MAX_CHASE_PCT`
+- `PT_MAX_GAP_PCT`
+- `PT_MAX_STOP_PCT`
+- `PT_MIN_RR`
+- `PT_NEAR_RESISTANCE`
+- `PT_NEAR_RESIST_PCT`
+- `PT_NO_SETUP`
+- `PT_OVERHEAT`
+- `PT_RR_TOO_LOW`
+- `PT_R_INVALID_`
+- `PT_STOP_TOO_WIDE`
+- `PT_TP1_NOT_ABOVE_ENTRY`
+- `PT_TP2_R_MULT`
+- `PT_TREND_NOT_OK`
+- `PT_TREND_STRONG`
+- `PT_VOL_TOO_HIGH`
+
+### IL_*
+- `IL_BLOWOFF_RISK`
+- `IL_CHAOS_RISK`
+- `IL_CLEAN_CANDLE`
+- `IL_DATA_INCOMPLETE`
+- `IL_LIQ_TOO_LOW`
+- `IL_MAX_ATR_PCT`
+- `IL_MAX_CHASE_PCT`
+- `IL_MAX_GAP_PCT`
+- `IL_MAX_SPREAD_PCT`
+- `IL_MAX_STOP_PCT`
+- `IL_MAX_TICK_PCT`
+- `IL_MIN_ATR_PCT`
+- `IL_MIN_DV20_IDR`
+- `IL_MIN_RR`
+- `IL_NO_SETUP`
+- `IL_RR_TOO_LOW`
+- `IL_R_INVALID_`
+- `IL_STOP_TOO_WIDE`
+- `IL_TP1_R_MULT`
+- `IL_VOL_BAND_FAIL`
+- `IL_VOL_CONFIRM`
+- `IL_VOL_STRONG`
+
+## Appendix C — Regression checklist
+
+### Regression checklist (LOCKED)
+
+Tujuan: setiap perubahan engine/threshold harus lolos checklist ini agar output tidak berubah “diam-diam”.
+
+#### A. Global contract
+
+1) **PLAN EOD-only**
+- Ubah/hapus snapshot intraday → output PLAN (entry/stop/tp) tidak berubah.
+
+2) **highest_high/lowest_low exclusive**
+- Pastikan `highest_high(N)` tidak meng-include trade_date.
+- Skenario: breakout level berubah jika include trade_date → harus FAIL test.
+
+3) **RR definition**
+- Jika `R <= 0` atau `R < tick` → DROP reason jelas (tidak ada magic number).
+
+4) **Canonical not ready**
+- `meta.eod_canonical_ready=false` → `recommendations=[]` wajib, groups tetap dihitung + flag/reason global.
+
+5) **Deterministic tie-breakers**
+- Dua ticker score_total sama → urutan harus stabil (dv20_idr desc, atr_pct asc, tick_pct asc, ticker_code A→Z).
+
+6) **Fee inclusion contract**
+- Jika fee belum dihitung → `meta.fee_included=false` + `GL_FEE_EXCLUDED`.
+
+#### B. Recommendations allocation
+
+7) **Mode A (capital missing)**
+- `planned_lots=null`, `estimated_cost=null`, tapi recommendations tetap muncul (berdasarkan ranking & feasibility non-capital).
+
+8) **Mode B (capital ada) floor lots**
+- `lots = floor(target_budget / est_cost_per_lot_inc_fee)`.
+
+9) **Drop < 1 lot**
+- Jika `lots < 1` → drop ticker (reason feasible) lalu renormalize weights.
+
+10) **Leftover distribution**
+- Sisa modal dibagikan deterministik (urut ranking) untuk tambah 1 lot kalau feasible.
+
+11) **Tranche rounding**
+- 2_TRANCHE: t1=ceil(0.6*lots), t2=lots-t1.
+- 3_TRANCHE: t1=ceil(0.5*lots), t2=ceil(0.3*lots), t3=lots-t1-t2.
+
+#### C. Policy-specific
+
+12) Weekly Swing: stop formula final konsisten (tidak ada alternatif).
+13) Dividend Swing: `exec_trade_date < ex_date` wajib true; event day counting konsisten.
+14) Position Trade: RR gate pakai TP1 global; breakout TP1 tidak di-cap ke resistance yang sama.
+15) Intraday Light: setup_type deterministik + resistance_20 didefinisikan.
+16) NO_TRADE: manual-only; tidak ada triggers kosong; tidak ada recommendations.
+
+Setiap item di atas harus punya minimal 1 fixture test/fixture JSON yang bisa dibandingkan (golden master).
