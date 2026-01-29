@@ -92,7 +92,6 @@ Tambahkan metrik agar sistem bisa di-tuning dan tidak “asal feeling”:
 - **Reco feasibility rate**: % recommendations yang valid min 1 lot (target >95%).
 - **Outcome tracking** (opsional tapi dianjurkan): dalam 5/10 hari, berapa yang hit TP1/stop untuk evaluasi policy.
 
-
 File: `watchlist.md`
 Tujuan dokumen ini: **kontrak lintas-policy** + **Universe Filter**.  
 Detail strategi (Hard/Soft/Risk/Ranking/PLAN/CONFIRM) ada di `policy/*.md`.
@@ -226,7 +225,7 @@ Jika kamu sudah punya `*_pct` di feature table, pastikan definisinya konsisten d
 
 ### 3.2 Gap & chase (CONFIRM only)
 - `gap_pct = (exec_price / close) - 1` (close = EOD `trade_date`)
-- `chase_pct = (exec_price / plan.entry) - 1` (hanya jika plan.entry ada)
+- `chase_pct = (exec_price / plan.entry) - 1` (hanya jika entry_price ada)
 
 Jika `exec_price` null → status confirm `PENDING`.
 
@@ -339,6 +338,41 @@ Jika kamu butuh menampilkan alternatif strategi (2–3 opsi) tanpa memecah DTO u
 Jika canonical EOD belum ready pada `trade_date`:
 - `recommendations = []` (**wajib**).
 - Groups (Top Picks/Secondary/Watch Only/Avoid) tetap dihitung untuk monitoring dengan `flags:["EOD_NOT_READY"]` + reason global `GL_EOD_NOT_READY`.
+
+### Operational guardrails (EOD-first) (LOCKED)
+
+Bagian ini menambah guardrail operasional agar output stabil dan audit-able, tanpa menggeser PLAN dari EOD.
+
+#### 1) Data completeness gate (EOD-only)
+- Engine wajib memvalidasi `Input minimum (PLAN)` dari policy aktif.
+- Jika ada field minimum yang missing/null → DROP ticker sebelum scoring.
+  - Reason code global: `GL_POLICY_INPUT_MISSING`
+  - `reasons[]` wajib menyebut `missing_fields=[...]`.
+
+#### 2) Corporate action / event risk (EOD-only, optional)
+Jika dataset menyediakan event/corporate-action (mis. `ex_date`, `rights_date`, `suspension_flag`):
+- Engine boleh menambahkan `flags += ["CA_EVENT_NEAR"]` (monitoring).
+- Guardrail ini tidak boleh membuat ticker lolos hard rules; hanya boleh menaikkan risk label (mis. `Avoid`) dan/atau mencegah masuk `recommendations`.
+Jika data event tidak tersedia → treat missing (tidak ada asumsi).
+
+#### 3) Gap-risk proxy (EOD-only, optional)
+Tanpa intraday hari ini, gap risk hanya boleh di-approx dari EOD historis jika metrik tersedia.
+Jika dataset menyediakan metrik seperti `gap_pct_20_max` / `gap_rate_20` / `gap_open_prevclose_pct`:
+- Engine boleh menambah flag `GAP_RISK_HIGH` dan menurunkan ranking atau memindahkan ke `Avoid`.
+Jika metrik gap tidak tersedia → treat missing.
+
+#### 4) Fee model / lot size / tick ladder (single source)
+- Lot size & tick ladder wajib single source (global config), dan semua modul harus pakai definisi yang sama.
+- `estimated_cost` pada recommendations wajib include fee sesuai model.
+Jika engine belum include fee, output harus set:
+- `meta.fee_included=false` dan reason `GL_FEE_EXCLUDED`.
+
+#### 5) Deterministic ordering (tie-breakers global)
+Jika `score_total` sama, urutan final ditentukan:
+1) `dv20_idr` lebih tinggi
+2) `atr_pct` lebih rendah
+3) `tick_pct` lebih rendah
+4) `ticker_code` A→Z
 
 ### Dua mode deterministik: tanpa capital vs dengan capital
 **Mode A: capital missing / null / <=0**
@@ -518,7 +552,7 @@ Jika gagal → `micro_strategy = null` dan tambahkan salah satu reason:
   (Jangan memaksakan lots=0 sebagai filler.)
 
 ### 3) Schema ringkas `micro_strategy`
-```
+``
 micro_strategy: {
   mode: "ONE_SHOT" | "2_TRANCHE" | "3_TRANCHE",
   eligible_now: boolean,
@@ -529,7 +563,7 @@ micro_strategy: {
   ],
   reasons[]                     // reason global micro_strategy
 }
-```
+``
 ### 4) Policy-aware execution mapping (default)
 Mapping ini dipakai untuk menentukan `mode` dan `tranches` bila policy mengizinkan.
 

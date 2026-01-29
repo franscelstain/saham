@@ -243,8 +243,19 @@ Validasi:
 - Wajib `plan.tp1 > plan.entry` (kalau tidak → DROP `PT_TP1_NOT_ABOVE_ENTRY`)
 - `rr_est = (plan.tp1 - plan.entry) / R`
 - Binding check: `rr_est >= PT_MIN_RR` (kalau tidak → DROP `PT_RR_TOO_LOW`)
-### TP2 (opsional, management target)
+### TP2 (opsional, management target) (LOCKED jika diisi)
 - `plan.tp2 = round_down(plan.entry + (PT_TP2_R_MULT * R))` (opsional; bukan untuk RR gate)
 
 Default parameter:
 - `PT_TP2_R_MULT = 3.0`
+
+## Invalidation & monitoring (EOD-only)
+- Setelah entry: invalid jika daily close <= plan_stop (EOD-only).
+- Jika trend gate memakai MA200, dan daily close < ma200 setelah entry, tandai `TREND_BREAK` (monitoring).
+
+## CONFIRM hints (intraday, non-binding)
+CONFIRM hanya boleh approve/reject/adjust timing; tidak boleh mengubah PLAN.
+
+- Reject jika open hari ini gap-up membuat stop terlalu jauh vs risk budget.
+- Reject jika spread tinggi / depth tipis (slippage).
+- Jika terjadi halt/reopen intraday, jangan entry (CONFIRM reject).

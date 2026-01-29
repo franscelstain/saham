@@ -232,7 +232,7 @@ Aturan:
 - Wajib `plan.tp1 > plan.entry` (kalau tidak → DROP `DS_TP1_NOT_ABOVE_ENTRY`)
 - `rr_est = (plan.tp1 - plan.entry) / R`
 - Binding check: `rr_est >= DS_MIN_RR` (kalau tidak → DROP `DS_RR_TOO_LOW`)
-### TP2 (opsional, management target)
+### TP2 (opsional, management target) (LOCKED jika diisi)
 - `plan.tp2 = round_down(plan.entry + (DS_TP2_R_MULT * R))` (opsional, tidak dipakai untuk RR gate)
 
 Default parameter:
@@ -277,3 +277,15 @@ Total = 0.35 + 0.20 + 0.15 + 0.15 + 0.15 = 1.00
   - lo=0.00, hi=0.05 (lebih kecil lebih baik)
 
 `score_total = clamp(Σ(w_i*s_i), 0, 1)`
+
+## Invalidation & monitoring (EOD-only)
+- Sebelum ex-date: jika exec_trade_date >= ex_date → invalid (sudah di-cover hard rule).
+- Setelah entry: invalid jika daily close <= plan_stop (EOD-only).
+- Jika ex-date lewat dan masih hold, tandai risk `POST_EVENT_HOLDING` untuk monitoring (EOD-only).
+
+## CONFIRM hints (intraday, non-binding)
+CONFIRM hanya boleh approve/reject/adjust timing; tidak boleh mengubah PLAN.
+
+- Reject jika open hari ini membuat RR plan tidak feasible (chase).
+- Reject jika antrian padat dan slippage estimasi tinggi.
+- Jika ada news spike intraday, boleh hold off (CONFIRM reject), tanpa ubah PLAN.

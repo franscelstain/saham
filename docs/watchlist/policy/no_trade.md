@@ -27,3 +27,11 @@ Menonaktifkan NEW ENTRY secara deterministik ketika kondisi “bukan saatnya ent
 Jika canonical EOD belum ready, itu **bukan** alasan memakai `NO_TRADE`; kondisi tersebut ditangani oleh Global Contract (`EOD_NOT_READY`):
 - `recommendations=[]` wajib
 - groups boleh monitoring dengan flag `EOD_NOT_READY`
+
+## Invalidation & monitoring (EOD-only)
+- NO_TRADE adalah policy manual-only: tidak ada entry, tidak ada recommendations.
+
+## CONFIRM hints (intraday, non-binding)
+CONFIRM hanya boleh approve/reject/adjust timing; tidak boleh mengubah PLAN.
+
+- Jika user memilih NO_TRADE, CONFIRM tidak relevan (selalu no entry).

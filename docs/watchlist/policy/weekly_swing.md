@@ -125,3 +125,14 @@ Semua sub-score dihitung 0..1 dan di-clamp.
 - `s_pattern`: dari pattern classifier kamu (0..1). Jika classifier keluaran 0..100 → bagi 100 lalu clamp.
 
 `score_total = clamp(Σ(w_i*s_i), 0, 1)`
+
+## Invalidation & monitoring (EOD-only)
+- Setelah entry terjadi, posisi invalid jika daily close <= plan_stop (exit by stop, EOD-only).
+- Jika daily close mencapai plan_tp1, boleh tandai partial/exit sesuai execution plan (EOD-only).
+
+## CONFIRM hints (intraday, non-binding)
+CONFIRM hanya boleh approve/reject/adjust timing; tidak boleh mengubah PLAN.
+
+- Reject jika open hari ini gap-up terlalu jauh dari plan_entry (hindari chase).
+- Reject jika spread/queue tidak wajar (slippage tinggi).
+- Jika volume pembukaan sangat rendah vs normal, tunda eksekusi (tanpa ubah PLAN).

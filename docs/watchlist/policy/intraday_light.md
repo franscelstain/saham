@@ -221,3 +221,14 @@ Hard rule (optional jika kamu ingin ketat):
 Default parameter:
 - `IL_TP1_R_MULT = 1.0`
 - `IL_MIN_RR = 1.0`
+
+## Invalidation & monitoring (EOD-only)
+- Policy ini tetap EOD-first: setelah entry, invalid jika daily close <= plan_stop (EOD-only).
+- Jika tidak entry hari ini (CONFIRM reject), evaluasi ulang besok dari EOD berikutnya (PLAN baru).
+
+## CONFIRM hints (intraday, non-binding)
+CONFIRM hanya boleh approve/reject/adjust timing; tidak boleh mengubah PLAN.
+
+- Wajib cek gap/open: jika open jauh di atas plan_entry (chase) → reject.
+- Wajib cek spread: jika spread melebar di opening → reject atau tunda.
+- Jika volume opening tidak mendukung (thin) → reject (hindari slippage).
