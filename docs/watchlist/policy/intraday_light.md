@@ -1,123 +1,223 @@
-# Policy: INTRADAY_LIGHT
+# Policy: INTRADAY_LIGHT (SOP)
 
-Dokumen ini adalah **single source of truth** untuk policy **INTRADAY_LIGHT**.
-Semua angka/threshold dan **UI reason codes** untuk policy ini harus berasal dari dokumen ini.
+Dokumen ini hanya mendefinisikan aturan spesifik policy. Aturan universal wajib lihat `watchlist.md` bagian **Global Contract**.
 
-Dependensi lintas policy (Data Dictionary, output schema, namespace reason codes, tick rounding) ada di `watchlist.md`.
-
----
-
-## 0) Intent & scope
-Intraday “ringan” untuk eksekusi cepat berbasis setup EOD kuat, dengan guard spread/liquidity ketat.
-Jika snapshot intraday tidak ada → policy ini tidak boleh aktif.
+Kontrak lintas-policy ada di `watchlist.md`.
 
 ---
 
-## 1) Data dependency
-### 1.1 Wajib
-- Canonical EOD + indikator minimal (MA, RSI, ATR, dv20, liq_bucket)
-- Snapshot intraday minimal (opening range / last price) untuk eksekusi:
-  - `preopen_last_price` atau `open_or_last_exec` (sesuai implementasi)
-  - spread proxy / orderbook quality (jika ada)
+## 0) Tujuan & horizon
+- Horizon: same-day sampai 1–2 trading days.
+- Target cuan realistis: 0.8%–2.5%.
+- Entry: momentum continuation berbasis setup EOD, eksekusi dijaga CONFIRM.
+
+## A) Definisi setup (SOP, objektif)
+
+### A.1 Breakout_N (EOD)
+Breakout dianggap valid jika semua terpenuhi:
+1. `close > highest_high(N)`  (highest high dari N trading days **sebelum** trade_date)
+2. `close_pos >= BREAKOUT_MIN_CLOSE_POS`  (default 0.70)
+3. `vol_ratio >= BREAKOUT_MIN_VOL_RATIO` (policy-specific default)
+
+Jika (1) terpenuhi tapi (2) gagal → dianggap breakout “lemah” (boleh jadi Soft/Risk sesuai policy).
+
+### A.2 Pullback_to_MA (EOD)
+Pullback dianggap valid jika semua terpenuhi:
+1. Trend context terpenuhi (policy-specific, mis. close>=MA20 atau MA20>=MA50)
+2. Jarak ke MA target kecil:
+   - `abs(close - MAx) <= PULLBACK_MAX_MA_DIST_ATR * atr14` (default 0.5)
+3. Ada reversal candle bullish:
+   - `close > open`
+   - `lower_wick / range >= PULLBACK_MIN_LOWER_WICK_RATIO` (default 0.30)
+   - `close_pos >= PULLBACK_MIN_CLOSE_POS` (default 0.60)
+
+### A.3 Resistance/Support (EOD proxy)
+- `resistance_N = highest_high(N)` (N trading days sebelum trade_date)
+- `support_N = lowest_low(N)` (N trading days sebelum trade_date)
+
+Dipakai untuk membatasi TP dan mendeteksi “near resistance” secara deterministik.
 
 ---
 
-## 2) Hard filters
-- Snapshot intraday **harus ada** → jika tidak ada: `IL_SNAPSHOT_MISSING` (policy tidak dipakai)
-- `liq_bucket` harus `A` → `IL_LIQ_TOO_LOW`
-- `atr_pct <= 0.06` → `IL_VOL_TOO_HIGH`
+## 1) Input minimum (PLAN, EOD-only)
+Wajib:
+- OHLCV
+- `atr14`, `atr_pct`
+- `vol_ratio`
+- `ma20` (wajib)
+- (opsional tapi disarankan) `close_pos`, wick ratios
+
+Jika missing → DROP `IL_DATA_INCOMPLETE`.
 
 ---
 
-## 3) Soft filters + scoring
+## 2) Hard Rules
+### 2.1 Liquidity strict
+Wajib lebih ketat dari universe:
+- `dv20_idr >= IL_MIN_DV20_IDR`
+Default `IL_MIN_DV20_IDR = 3000000000` (Rp 3B)
+Jika gagal → DROP `IL_LIQ_TOO_LOW`.
 
-### 3.1 Base score
-- `base_score = 100`
-- Score floor = 0.
-- Score dipakai untuk grouping deterministik (Section 5.6).
+### 2.2 Volatility band
+Wajib:
+- `IL_MIN_ATR_PCT <= atr_pct <= IL_MAX_ATR_PCT`
+Default:
+- IL_MIN_ATR_PCT = 0.02
+- IL_MAX_ATR_PCT = 0.15
+Jika gagal → DROP `IL_VOL_BAND_FAIL` (subreason: TOO_LOW/TOO_HIGH).
 
-### 3.2 Penalti (soft)
-- Jika spread proxy buruk → score -10 → `IL_SPREAD_WIDE`
-- RSI overheating (`rsi14 >= 78`) → score -6, entry wait → `IL_RSI_OVERHEAT`
----
+### 2.3 Momentum setup gate (EOD)
+Minimal salah satu:
+- Breakout_10 (N=10) dengan:
+  - BREAKOUT_MIN_CLOSE_POS = 0.75
+  - BREAKOUT_MIN_VOL_RATIO = 1.0  (hard, data-driven; vol_ratio tinggi jadi soft boost)
+- “Strong close” continuation:
+  - close_pos >= 0.80
+  - upper_wick/range <= 0.25
+  - vol_ratio >= 1.0  (hard minimal)
+Jika gagal → DROP `IL_NO_SETUP`.
 
-## 4) Setup allowlist
-- `Breakout` dan `Continuation` saja (intraday butuh momentum jelas)
-- Setup lain → WATCH_ONLY → `IL_SETUP_NOT_ALLOWED`
+### 2.4 Stop feasibility
+Wajib:
+- stop_distance_pct <= IL_MAX_STOP_PCT (default 0.02)
+Jika gagal → DROP `IL_STOP_TOO_WIDE`.
 
----
-
-## 5) Entry rules (anti-chasing/gap)
-- Entry windows: ["09:20-10:15", "13:35-14:15"]
-- No entry: ["09:00-09:15", "11:30-13:30", "15:15-close"]  # hindari lunch lull + auction noise
-- Snapshot intraday **wajib** untuk NEW ENTRY:
-  - jika snapshot tidak ada → kandidat wajib `WATCH_ONLY` → `IL_SNAPSHOT_MISSING`
-- Anti-chasing:
-  - `max_chase_from_close_pct = 0.010` → `IL_CHASE_BLOCK_DISTANCE_TOO_FAR`
-- Gap-up guard:
-  - `max_gap_up_pct = 0.015` → `IL_GAP_UP_BLOCK`
----
-
-## 5.6 Final selection & grouping (mechanism)
-
-Bagian ini mengunci **mekanisme seleksi kandidat beli intraday** agar output deterministik.
-
-### 5.6.1 Eligibility untuk NEW ENTRY (hard)
-Kandidat eligible NEW ENTRY hanya jika:
-- Snapshot intraday tersedia (Section 2), dan
-- Lolos Hard filters (liq_bucket, atr_pct), dan
-- Setup termasuk allowlist (Section 4), dan
-- Tidak terkena guard `IL_CHASE_BLOCK_DISTANCE_TOO_FAR` / `IL_GAP_UP_BLOCK`, dan
-- `timing.trade_disabled == false` (global gates di watchlist.md), dan
-- `max_positions > 0`.
-
-Jika salah satu gagal → kandidat wajib `WATCH_ONLY`.
-
-### 5.6.2 Trade viability (minimum RR, tanpa komponen biaya transaksi)
-Untuk kandidat eligible NEW ENTRY:
-- Jika `levels.entry_trigger_price`, `levels.stop_loss_price`, dan `levels.tp1_price` tersedia:
-  - `rr = (tp1 - entry) / max(entry - sl, 1e-9)`
-  - Jika `rr < 1.6` → DROP → `IL_MIN_TRADE_VIABILITY_FAIL`
-- Jika salah satu level tidak tersedia → WATCH_ONLY → `IL_LEVELS_INCOMPLETE`
-
-### 5.6.3 Mapping score → group
-- `top_picks`: `score >= 80`, ambil maksimal `max_positions`
-- `secondary`: `65 <= score < 80`
-- `watch_only`: `score < 65`
-
-### 5.6.4 Ordering deterministik (tie-breaker)
-Sort kandidat eligible berdasarkan:
-1) `score desc`
-2) `watchlist_score desc` (jika tersedia)
-3) `ticker_code asc`
-
-## 6) Exit rules (intraday)
-- Time stop:
-  - jika setelah 90 menit tidak follow-through → exit → `IL_TIME_STOP_90M`
-- EOD flat:
-  - posisi intraday harus flat sebelum close → `IL_FLAT_BEFORE_CLOSE`
+### 2.5 RR gate
+Wajib:
+- rr_est >= IL_MIN_RR (default 1.0)
+Jika gagal → DROP `IL_RR_TOO_LOW`.
 
 ---
 
-## 7) Sizing defaults
-- `risk_per_trade_pct = 0.003` (0.30%)
-- `max_positions = 1`
-- `max_holding_minutes = 180` (3 jam)  # tetap intraday-light, bukan daytrade berat
-- Viability:
-  - `min_alloc_idr = 500_000`
-  - `min_lots = 1`
+## 3) Soft Rules
+- vol_ratio >= 1.2 → `IL_VOL_CONFIRM`
+- vol_ratio >= 1.3 → `IL_VOL_STRONG`
+- candle clean (upper wick kecil, body cukup) → `IL_CLEAN_CANDLE`
+
 ---
 
-## 8) Reason codes (UI)
-- `IL_SNAPSHOT_MISSING`
-- `IL_LIQ_TOO_LOW`
-- `IL_VOL_TOO_HIGH`
-- `IL_SPREAD_WIDE`
-- `IL_RSI_OVERHEAT`
-- `IL_SETUP_NOT_ALLOWED`
-- `IL_CHASE_BLOCK_DISTANCE_TOO_FAR`
-- `IL_GAP_UP_BLOCK`
-- `IL_LEVELS_INCOMPLETE`
-- `IL_MIN_TRADE_VIABILITY_FAIL`
-- `IL_TIME_STOP_90M`
-- `IL_FLAT_BEFORE_CLOSE`
+## 4) Risk Rules (Avoid)
+Avoid jika:
+- blow-off proxy (rsi>=80 & vol_ratio>=2.0) → `IL_BLOWOFF_RISK`
+- atr_pct mendekati batas atas + stop kecil tidak feasible → `IL_CHAOS_RISK`
+
+---
+
+## 5) Ranking Factors
+1. Liquidity
+2. Setup strength (breakout/strong close)
+3. RR quality
+4. Penalti risk flags
+
+---
+
+## 7) CONFIRM (wajib disiapkan, tapi opsional dipanggil)
+Intraday Light paling sensitif → confirm guard ketat:
+- IL_MAX_GAP_PCT = 0.03
+- IL_MAX_CHASE_PCT = 0.01
+- IL_MAX_SPREAD_PCT = 0.006
+Snapshot missing → PENDING.
+
+---
+
+## 8) Threshold defaults (LOCKED)
+
+Semua nilai liquidity memakai **IDR** (integer).
+
+- `IL_MIN_DV20_IDR = 3000000000`  (Rp 3B)
+- `IL_MIN_RR = 1.0`
+- `IL_MAX_ATR_PCT = 0.15`
+- `IL_MIN_ATR_PCT = 0.02`
+- `IL_MAX_TICK_PCT = 0.015`
+
+Binding check:
+- `dv20_idr >= IL_MIN_DV20_IDR`
+
+---
+
+## 6) Invalidation & Trade Management (minimal SOP)
+
+Tujuan: definisikan kapan setup dianggap **gagal** setelah entry (supaya tidak nyangkut).
+
+- **Horizon:** same-day / T+1 (intraday ringan)
+- **Time stop (default):** 1 trading day (wajib cepat). Jika tidak jalan → keluar.
+
+### Invalidation rules (hard)
+- Jika menyentuh stop intraday → exit (hard). 
+- Jika tidak ada follow-through sampai akhir sesi 2. Definisi follow-through: `last_price_session2 >= entry`. → exit (reason: `NO_FOLLOW_THROUGH`).
+- Jika spread melebar abnormal saat eksekusi → block (confirm).
+
+### Management (minimal)
+- Jika harga bergerak +1R, boleh set stop ke **breakeven** (opsional; tidak mengubah PLAN, hanya eksekusi).
+- Jika gap turun melewati stop (slippage), catat `GAP_THROUGH_STOP`.
+
+### CONFIRM note
+Intraday Light wajib disiplin confirm (gap/chase/spread) karena stop ketat.
+---
+
+## Setup Type & Recommendation Execution (policy-specific)
+Policy ini wajib mengisi `setup_type` untuk setiap kandidat:
+- `setup_type ∈ {BREAKOUT, PULLBACK}`
+
+Default execution mapping (dipakai oleh engine Recommendations):
+- default → ONE_SHOT (100%)
+- staging dinonaktifkan by default (stop ketat + confirm ketat).
+
+Catatan: mapping ini **tidak** mengubah hard rules; hanya menentukan bentuk tranche eksekusi untuk ticker yang sudah qualified.
+
+---
+
+## Score components & weights (LOCKED, binding)
+
+### Default weights (sum = 1.00)
+- `s_liquidity` = 0.35
+- `s_momentum`  = 0.20
+- `s_volatility`= 0.20
+- `s_tick`      = 0.15
+- `s_risk`      = 0.10
+
+### Clamp rules (0..1)
+- `s_liquidity`: `dv20_idr` lo=2e9 hi=3e10
+- `s_momentum`: `roc5` lo=-0.02 hi=+0.06
+- `s_volatility`: inverse `atr_pct` lo=0.005 hi=0.06
+- `s_tick`: inverse `tick/price` lo=0.0005 hi=0.005
+- `s_risk`: inverse `stop_pct` lo=0.005 hi=0.03
+
+`score_total = clamp(Σ(w_i*s_i), 0, 1)`
+
+---
+
+## PLAN Entry/Stop/TP (locked, EOD-only)
+
+Definisi level bantu (LOCKED):
+- `resistance_20 = highest_high(20) + tick` (sebelum trade_date)
+- Semua harga PLAN di-round sesuai tick ladder.
+
+Intraday Light defaultnya **ONE_SHOT** dan staging disabled. Walau eksekusi intraday (CONFIRM), PLAN tetap EOD-only untuk konsistensi.
+
+### Setup type (deterministik, EOD-only) (LOCKED)
+
+- Default: `setup_type = PULLBACK`
+- Set `setup_type = BREAKOUT` jika: `close(trade_date) >= resistance_20`
+
+### Entry (plan.entry) (LOCKED)
+
+- BREAKOUT: `plan.entry = round_up(resistance_20)`
+- PULLBACK: `plan.entry = round_up(close(trade_date))`
+### Stop (plan.stop) (DECIDED)
+- `ll3 = lowest_low(3)` (sebelum trade_date)
+- `plan.stop = round_down(min(low(trade_date), ll3) - tick)`
+
+Validasi:
+- `R = plan.entry - plan.stop` harus lulus kontrak global (`R > 0` dan `R >= tick`), jika tidak → DROP (`IL_R_INVALID_*`).
+
+### TP1 / RR (GLOBAL-consistent)
+- `plan.tp1 = round_down(plan.entry + (IL_TP1_R_MULT * R))`
+- `rr_est = (plan.tp1 - plan.entry) / R` (GLOBAL)
+
+Hard rule (optional jika kamu ingin ketat):
+- Wajib `rr_est >= IL_MIN_RR` → DROP (`IL_RR_TOO_LOW`)
+
+Default parameter:
+- `IL_TP1_R_MULT = 1.0`
+- `IL_MIN_RR = 1.0`

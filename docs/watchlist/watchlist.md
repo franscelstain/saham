@@ -1,906 +1,591 @@
-# TradeAxis Watchlist — Cross-Policy Contract (EOD-driven)
+# TradeAxis Watchlist — Cross-Policy Contract + Universe Filter (SOP)
+
+## Global Contract (wajib lintas policy)
+
+Bagian ini adalah **kontrak universal**. Semua policy wajib patuh. Policy **tidak boleh** mengubah definisi di bawah ini.
+
+### 1) Data readiness & canonical consistency
+- **Source of truth OHLC:** gunakan `ticker_ohlc_daily` sebagai kebenaran OHLC. `ticker_indicators_daily` adalah **turunan**.
+- **Canonical ready gate:** jika data EOD untuk `trade_date` belum final/canonical → **wajib** `recommendations = []` (No Trade untuk eksekusi). Namun **groups** (Top Picks/Secondary/Watch Only/Avoid) tetap boleh dihitung untuk monitoring, dengan flag global `EOD_NOT_READY` dan reason `GL_EOD_NOT_READY`.
+- **Satu `trade_date` yang sama:** semua ticker dinilai pada tanggal EOD yang sama (PLAN).
+- **Run consistency (jika ada `run_id`):** pada `trade_date`, hasil scoring wajib pakai run yang sama (canonical). Jika OHLC berbeda antar run → dianggap belum ready.
+
+### 2) Window & lookback definition (anti-bias)
+
+#### Contract: `trading_days_between(a, b)` untuk event counting (GLOBAL)
+Dipakai untuk menghitung jarak hari bursa antar dua tanggal (khususnya event dividend).
+
+Definisi **wajib**:
+- `trading_days_between(a, b)` = jumlah **trading days** `d` sehingga `a < d <= b`.
+  - Artinya: **exclude** `a`, **include** `b` jika `b` adalah trading day.
+- Jika `a == b` → hasil = `0`.
+- Jika `a > b` → **invalid**. Implementasi wajib mengembalikan `null` (bukan negatif). Untuk dividend gate, kondisi ini → DROP reason khusus.
+
+Konsekuensi untuk dividend:
+- Entry harus terjadi **sebelum** `ex_date`, jadi wajib `exec_trade_date < ex_date`.
+- Jika `exec_trade_date >= ex_date` → DROP (`DS_TOO_LATE_EXDATE`).
+
+#### Contract: `highest_high(N)` / `lowest_low(N)` (GLOBAL, non-negotiable)
+Untuk menghindari hasil beda antar modul/versi, definisi ini **wajib sama** di seluruh engine:
+
+- `highest_high(N, trade_date)` = max(`high`) dari **N trading days sebelum** `trade_date` (**exclude `trade_date`**).
+- `lowest_low(N, trade_date)`  = min(`low`)  dari **N trading days sebelum** `trade_date` (**exclude `trade_date`**).
+
+Jika ada modul yang meng-include `trade_date`, itu dianggap bug (`LOOKBACK_INCLUDES_TODAY`).
+
+Definisi window harus konsisten agar hasil tidak bias:
+- `highest_high(N)` / `lowest_low(N)` dihitung dari **N hari trading sebelumnya** dan **exclude hari ini**.
+- `dv20_idr = SMA20(close*volume)` dengan `min_periods=20`. Jika kurang dari 20 baris → `DATA_INSUFFICIENT`.
+- `vol_sma20` / `ma20/50/200` mengikuti definisi indikator harian yang sama untuk semua ticker.
+- **Missing day handling:** jika ada missing EOD pada window lookback yang membuat indikator/setup tidak valid → ticker **gugur** untuk hard rules (reason: `DATA_INSUFFICIENT`), bukan dipaksa lolos.
+
+### 3) Tick ladder, rounding, lot sizing, fee model (feasibility)
+
+#### Contract: Risk unit `R` dan `rr_est` (GLOBAL)
+Untuk mencegah “magic number” dan RR yang ngawur:
+
+- `tick = tick_size(entry_price)` (dari tick ladder).
+- `R = entry_price - stop_price`.
+- Jika `R <= 0` → **DROP** (`R_INVALID_NONPOSITIVE`).
+- Jika `R < tick` → **DROP** (`R_INVALID_LT_TICK`) karena risk terlalu kecil dan rawan rounding.
+- `rr_est = (tp1_price - entry_price) / R` (tanpa `max(R, 1)`).
+
+#### Contract enforcement: RR definition (GLOBAL)
+Policy **tidak boleh** mendefinisikan ulang `rr_est` atau memakai fallback seperti `max(R,1)`.
+Jika ditemukan, itu dianggap bug dan harus disamakan dengan kontrak global:
+- `rr_est = (tp1 - entry) / R` dengan `R > 0` dan `R >= tick`.
+
+Catatan: rounding tick dilakukan **setelah** menghitung raw plan level, tapi validasi `R` wajib pakai harga yang sudah rounded.
+
+- `lot_size = 100`.
+- **Rounding (wajib konsisten):**
+  - Entry: round **UP** ke tick.
+  - Stop: round **DOWN** ke tick.
+  - TP: round **DOWN** ke tick.
+- Fee harus dihitung konsisten untuk Recommendations (`estimated_cost` include fee). Tanpa feasibility (min 1 lot) → tidak boleh masuk Recommendations.
+
+#### Contract: `fee_buy(gross_amount)` (GLOBAL, binding shape)
+Agar `estimated_cost` dan feasibility lots konsisten, bentuk fungsi fee harus dikunci.
+
+- `gross_amount` dalam IDR (rupiah) untuk satu transaksi (mis. 1 lot pada harga tertentu).
+- `fee_buy(gross_amount)` = ceil(gross_amount * FEE_BUY_RATE)
+- Jika ada minimum fee broker, tambahkan:
+  - `fee_buy` = max(fee_buy, FEE_BUY_MIN)
+- Pembulatan fee: **ceil ke 1 rupiah** (bukan floor/round).
+
+Nilai parameter (`FEE_BUY_RATE`, opsional `FEE_BUY_MIN`) **wajib** berasal dari konfigurasi aplikasi yang sama untuk semua modul (watchlist/recommendations/portfolio). Dokumen ini mengunci *bentuk perhitungan*, bukan angka broker tertentu.
+
+### 4) PLAN vs CONFIRM (pemisahan ketat)
+- **PLAN = EOD-only** (data kemarin). PLAN tidak memakai snapshot intraday.
+- **CONFIRM = guard intraday** untuk eksekusi hari ini (gap/chase/spread). CONFIRM **tidak boleh** memodifikasi PLAN; hanya mengubah status `confirmed`/`blocked` pada eksekusi.
+
+### 5) Auditability minimum (wajib)
+Setiap ticker yang muncul harus bisa diaudit:
+- `reasons[]` (rule hits, drop reasons, avoid reasons)
+- PLAN fields: `plan.entry`, `plan.stop`, `plan.tp1`, `plan.tp2`, `plan.rr`, `plan.stop_pct`, `plan.atr_pct`, `plan.dv20_idr`
+- Recommendations: `planned_lots`, `estimated_cost` (include fee)
+
+### 6) Validation & acceptance criteria (SOP)
+Tambahkan metrik agar sistem bisa di-tuning dan tidak “asal feeling”:
+- **Universe pass rate**: % ticker lolos Universe (target awal 30–70%).
+- **Candidate rate per policy**: jumlah ticker lolos hard rules (tidak harus ada setiap hari, tapi tidak boleh “sering nol” tanpa alasan).
+- **Reco feasibility rate**: % recommendations yang valid min 1 lot (target >95%).
+- **Outcome tracking** (opsional tapi dianjurkan): dalam 5/10 hari, berapa yang hit TP1/stop untuk evaluasi policy.
+
+
 File: `watchlist.md`
+Tujuan dokumen ini: **kontrak lintas-policy** + **Universe Filter**.  
+Detail strategi (Hard/Soft/Risk/Ranking/PLAN/CONFIRM) ada di `policy/*.md`.
 
-Watchlist di TradeAxis **bukan “penentu beli”**. Watchlist adalah:
-- Selektor kandidat (ranking) berbasis data.
-- Penyaji rencana eksekusi yang realistis (timing berbentuk **window**, bukan jam absolut).
-- Penghasil alasan yang bisa diaudit (**reason codes** deterministik).
-
-Dokumen ini adalah **kontrak lintas-policy**: schema output, data dictionary, governance reason codes, tick rounding, lot sizing, fee model, dan invariants.
-
-**Single source of truth untuk angka/threshold/rules per strategi ada di policy docs:**
+Policy docs:
 - `policy/weekly_swing.md`
 - `policy/dividend_swing.md`
-- `policy/intraday_light.md`
 - `policy/position_trade.md`
+- `policy/intraday_light.md`
 - `policy/no_trade.md`
+---
+
+## 0) Core design (wajib)
+
+### 0.1 PLAN (wajib, EOD-only)
+PLAN dibuat **hanya** dari data EOD `trade_date` (canonical) + indikator/label berbasis EOD.
+
+PLAN mencakup:
+- Universe Filter (dokumen ini)
+- Strategy rules (policy)
+- Ranking (policy)
+- Grouping (global, dokumen ini)
+- Recommendations (PLAN allocation) **tanpa** snapshot intraday
+
+**Invariant PLAN:**
+- PLAN tidak boleh baca snapshot intraday.
+- PLAN tidak boleh diubah oleh CONFIRM.
+- Tidak ada “filler/placeholder ticker”.
+
+### 0.2 CONFIRM (opsional, intraday guard)
+CONFIRM adalah guard eksekusi di `exec_trade_date` menggunakan snapshot (preopen/open/last):
+- gap ekstrem vs close EOD
+- chase (harga lari jauh dari entry plan)
+- spread/liquidity intraday buruk
+
+Jika snapshot tidak tersedia → status `PENDING` (bukan menggugurkan PLAN).
+
+**Invariant CONFIRM:**
+- CONFIRM hanya menambah status `OK | SKIP | PENDING` + reason, tidak mengubah kandidat/ranking/grouping/recommendations PLAN.
 
 ---
 
-## 1) Terminologi waktu & data readiness
+## 1) Time model (wajib konsisten)
+- `trade_date`: tanggal EOD canonical yang dipakai PLAN (basis level & scoring).
+- `exec_trade_date`: tanggal eksekusi (biasanya trading day berikutnya setelah `trade_date`).
+- Semua indikator yang dipakai PLAN harus dihitung pada `trade_date`.
 
-### 1.1 Field waktu (wajib konsisten)
-- `generated_at` (RFC3339, WIB): waktu JSON dibuat.
-- `trade_date` (YYYY-MM-DD): tanggal EOD yang dipakai untuk scoring/plan (basis data **canonical**).
-- `as_of_trade_date` (YYYY-MM-DD): trading day terakhir yang **seharusnya** sudah punya EOD canonical pada saat `generated_at`.
+---
 
-Definisi `as_of_trade_date`:
-- Jika `generated_at` **sebelum cutoff EOD** (pagi/pre-open) → `as_of_trade_date` = trading day **kemarin**.
-- Jika **sesudah cutoff + publish sukses** → `as_of_trade_date` = trading day **hari ini**.
+## 2) Universe Filter (global, hard rules)
+Universe Filter berlaku untuk semua policy dan dievaluasi sebelum policy rules.
 
+Output dari tahap ini: `UniverseEligible`.
 
-- `exec_trade_date` (YYYY-MM-DD): tanggal trading **target eksekusi** untuk rencana entry/exit (biasanya **next trading day** setelah `trade_date`).
+### 2.1 Data readiness gate (DROP)
+DROP jika:
+- OHLCV EOD untuk `trade_date` tidak lengkap/invalid
+- indikator minimum yang dipakai engine tidak tersedia (lookback tidak cukup)
+Reason codes:
+- `GL_DATA_INCOMPLETE`
+### 2.2 Canonical EOD ready gate (NEW ENTRY lock)
+Watchlist boleh tetap menampilkan monitoring, tapi **NEW ENTRY diblok** jika canonical EOD belum ready.
+Rule:
+- jika `meta.eod_canonical_ready == false` → `recommendations=[]` dan groups.top_picks tetap dihitung (tidak dikosongkan) (NEW ENTRY off)
+Reason code:
+- `GL_EOD_NOT_READY`
+Catatan:
+- Ini bukan “DROP”, tapi global lock terhadap recommendations (SOP: jangan entry pakai data setengah matang).
+
+### 2.3 Tradeability gate (TRADE_DISABLED, not DROP)
+
+Tujuan gate ini adalah **mencegah entry** pada ticker yang secara mekanisme tidak layak dieksekusi, tapi masih boleh muncul untuk monitoring.
+
+Aturan (LOCKED):
+- Suspend/halts → `tradeability = TRADE_DISABLED`, group = `Avoid`, reason `GL_SUSPENDED`.
+- Trading mechanism tidak regular (mis. FCA) → `tradeability = TRADE_DISABLED`, group = `Avoid`, reason `GL_MECHANISM_FCA`.
+- Special notation `X` → `tradeability = TRADE_DISABLED`, group = `Avoid`, reason `GL_SPECIAL_NOTATION_X`.
+- Special notation `E` → **tidak disable**, tetap tradeable; tambahkan warning reason `GL_SPECIAL_NOTATION_E` (group ditentukan oleh hasil policy/risk).
+
+### 2.4 Liquidity gate (DROP)
+
+Wajib memenuhi minimal likuiditas EOD (LOCKED).
+Universe Filter adalah minimum untuk masuk universe; tiap policy boleh menetapkan threshold yang lebih ketat (lebih tinggi) dan itu dievaluasi di policy hard rules.
+
+#### Definisi metrik (LOCKED)
+- `dv20_idr`: rata-rata nilai transaksi 20 hari (IDR), dihitung dari data EOD: `avg(close * volume)` untuk 20 trading day terakhir.
+- `turnover20_idr`: **alias/alternatif input** pada horizon yang sama (20 trading day) dengan skala yang sama (IDR). **Kontrak: engine tidak menghitung turnover20_idr dari sumber lain.** Jika field ini tidak ada/null di dataset input, dianggap **missing**.
+
+#### Threshold (LOCKED)
+- `MIN_DV20_IDR = 2000000000` (Rp 2B)
+- `MIN_TURNOVER20_IDR = 2000000000` (Rp 2B)
+
+#### Aturan deterministik (LOCKED)
+1) Jika `dv20_idr` tersedia (not null) → gunakan `dv20_idr` sebagai satu-satunya metrik:
+   - Wajib `dv20_idr >= MIN_DV20_IDR`, jika gagal → DROP `GL_LIQ_TOO_LOW`.
+2) Jika `dv20_idr` missing (null) dan `turnover20_idr` tersedia → gunakan `turnover20_idr` sebagai fallback:
+   - Wajib `turnover20_idr >= MIN_TURNOVER20_IDR`, jika gagal → DROP `GL_LIQ_TOO_LOW`.
+3) Jika **keduanya missing** → DROP `GL_LIQ_METRIC_MISSING`.
 
 Catatan:
-- `trade_date` = basis EOD untuk scoring/level.
-- `exec_trade_date` = basis **jam sesi** (`open/close`) untuk time-window eksekusi.
+- Jika sistem kamu mengisi `turnover20_idr = dv20_idr`, itu sah (alias), tapi bukan perhitungan engine.
 
-### 1.2 Data freshness gate (wajib)
-Watchlist ini EOD-driven. Rekomendasi **NEW ENTRY** hanya boleh keluar jika data EOD **CANONICAL** untuk `trade_date` tersedia.
-
-Kontrak minimal:
-- `meta.eod_canonical_ready` = boolean
-- `meta.missing_trading_dates[]` = daftar trading day dari (`trade_date` .. `as_of_trade_date`) yang belum punya canonical.
-
-Jika `meta.eod_canonical_ready == false`:
-- `recommendations.mode` wajib `NO_TRADE` (NEW ENTRY diblok).
-- Kandidat tetap boleh ditampilkan sebagai **watch-only** (untuk monitoring), tetapi:
-  - `timing.trade_disabled = true`
-  - `timing.entry_style = "No-trade"`
-  - `timing.size_multiplier = 0.0`
-  - `recommendations.max_positions_today = 0`
-  - `timing.entry_windows = []`
-  - `timing.avoid_windows = ["09:00-close"]`
-- Tambahkan reason code global: `GL_EOD_NOT_READY`.
-
-Catatan: manajemen posisi existing boleh tetap berjalan (lihat `no_trade.md`).
+### 2.5 Price sanity gate (DROP)
+DROP jika:
+- `close < MIN_PRICE`
+Reason:
+- `GL_PRICE_TOO_LOW`
+Default (rekomendasi awal):
+- `MIN_PRICE = 50`
+### 2.6 Extreme volatility guard (DROP, konservatif)
+Tujuan: buang ticker chaos ekstrem yang merusak semua strategi.
+DROP jika:
+- `atr_pct > MAX_ATR_PCT_UNIVERSE`
+Reason:
+- `GL_VOL_TOO_HIGH`
+Default:
+- `MAX_ATR_PCT_UNIVERSE = 0.20` (20%)
 
 ---
 
+## 3) Derived metrics (global, definisi wajib)
+Definisi ini dipakai lintas policy.
 
-### 1.3 Kontrak resolusi token `open` / `close` (lintas-policy)
+### 3.1 Candle shape (dari OHLC)
+- `range = max(high - low, 1)`
+- `close_pos = (close - low) / range`  (0..1)
+- `candle_body = abs(close - open)`
+- `upper_wick = high - max(open, close)`
+- `lower_wick = min(open, close) - low`
+Jika kamu sudah punya `*_pct` di feature table, pastikan definisinya konsisten dengan rumus ini.
 
-Token `open` dan `close` pada `entry_windows[]` / `avoid_windows[]` **wajib** di-resolve menggunakan jam sesi untuk `exec_trade_date`.
+### 3.2 Gap & chase (CONFIRM only)
+- `gap_pct = (exec_price / close) - 1` (close = EOD `trade_date`)
+- `chase_pct = (exec_price / plan.entry) - 1` (hanya jika plan.entry ada)
 
-Kontrak minimal (wajib di `meta.session`):
-- `meta.session.open_time`  (HH:MM, WIB)
-- `meta.session.close_time` (HH:MM, WIB)
-- (opsional) `meta.session.breaks[]` (array string, format `HH:MM-HH:MM`)
-
-Aturan:
-- `open` → `meta.session.open_time`
-- `close` → `meta.session.close_time`
-- Jika ada `breaks[]`, engine wajib mengurangi `entry_windows` yang overlap dengan break (atau memecah window).
-
-Sumber jam sesi harus berasal dari kalender bursa (bisa berubah pada hari tertentu), **bukan hardcode** di policy.
-
-## 2) Data dictionary (lintas-policy)
-
-### 2.1 Per-ticker EOD (wajib, canonical)
-Sumber: `ticker_ohlc_daily` untuk `trade_date`.
-- `open`, `high`, `low`, `close`, `volume`
-
-### 2.2 Per-ticker indicators/features (wajib)
-Sumber: `ticker_indicators_daily` (atau tabel feature harian lain) untuk `trade_date`.
-Minimal yang umum dipakai lintas policy:
-- `ma20`, `ma50`, `ma200`
-- `rsi14`
-- `atr14`, `atr_pct` (= atr14/close)
-- `vol_sma20`, `vol_ratio`
-- `dv20` (SMA20 dari `close*volume`, pakai 20 **trading days**), `liq_bucket` (A/B/C)
-- candle derived:
-  - `candle_body_pct`, `upper_wick_pct`, `lower_wick_pct`
-  - flags (opsional): `is_inside_day`, `engulfing_type`, `is_long_upper_wick`, `is_long_lower_wick`
-- setup lifecycle:
-  - `signal_code`, `signal_label` (opsional tapi disarankan)
-  - `signal_first_seen_date`, `signal_age_days` (trading days; opsional tapi sangat disarankan)
-
-### 2.3 Market context (wajib minimal)
-- `market_calendar`: `cal_date`, `is_trading_day`, `holiday_name`
-- `market_index_daily` (minimal IHSG): `trade_date`, `close`, `ret_1d`, `ret_5d`, opsional `ma20`, `ma50`
-- `meta.market_regime`: `risk-on | neutral | risk-off`
-
-Opsional (kalau tersedia):
-- breadth: `breadth_advancers`, `breadth_decliners`, `breadth_new_high_20d`, `breadth_new_low_20d`, `breadth_adv_decl_ratio`.
-
-### 2.4 Portfolio context (opsional input; wajib jika ingin output manage-mode)
-Jika ada input portfolio, watchlist boleh menambahkan konteks posisi:
-- `position.has_position` (bool)
-- `position.position_avg_price` (float), `position.position_lots` (int)
-- `position.entry_trade_date` (YYYY-MM-DD), `position.days_held` (trading days)
-
-#### 2.4.1 Input alias compatibility (backward compatibility)
-- Jika input portfolio memakai `avg_price`, mapping → `position.position_avg_price`
-- Jika input portfolio memakai `lots`, mapping → `position.position_lots`
-
-Policy docs wajib mengacu ke canonical fields. Alias hanya untuk normalisasi input.
-
-### 2.5 Execution snapshot (opsional)
-Untuk guard anti-gap/anti-chasing yang dievaluasi **hari eksekusi**:
-- `preopen_last_price` (int|null): harga indikatif sebelum market buka pada hari eksekusi (IDR, integer).
-- `intraday_last_price` (int|null): last price intraday pada hari eksekusi (IDR, integer), jika snapshot tersedia.
-- `open_or_last_exec` (int|null): derived = first non-null dari `preopen_last_price`, lalu `intraday_last_price`. Watchlist **tidak boleh** fallback ke `open` EOD.
+Jika `exec_price` null → status confirm `PENDING`.
 
 ---
 
-### 2.5.1 Derived metrics lintas-policy (wajib definisi)
+## 4) Group semantics (global)
+Semantics group sama di semua policy; yang beda hanya kandidat & ranking dari policy.
 
-Beberapa policy memakai metrik turunan berikut. Definisi harus konsisten:
+- **Top Picks**: kandidat valid (lolos universe + hard rules policy) dengan skor tertinggi & risk rendah.
+- **Secondary**: kandidat valid tapi kualitas di bawah Top Picks.
+- **Watch Only**: lolos universe tapi belum memenuhi hard rules (belum trigger) atau ada trade_disabled situasional; masih relevan untuk dipantau.
+- **Avoid**: red flag risk / tradeability lock; disarankan dihindari.
+- **No_Trade**: tidak ada kandidat qualified untuk policy aktif, atau policy aktif adalah NO_TRADE.
 
-- `gap_pct` (float|null):
-  - Definisi: `(open_or_last_exec / close) - 1`
-  - `close` adalah close canonical pada `trade_date` (EOD basis).
-  - Jika `open_or_last_exec` null → `gap_pct = null` (policy yang butuh gap guard harus treat sebagai “unknown”).
+Tidak ada hard cap jumlah item yang “dipilih internal”.  
+Jika UI butuh limit, itu **hanya limit publish** (config) dan harus eksplisit (bukan mempengaruhi keputusan recommendations).
 
-- `ret_since_entry_pct` (float|null) untuk posisi berjalan:
-  - Definisi EOD basis: `(close / position.position_avg_price) - 1` (menggunakan `close` pada `trade_date`)
-  - Jika ingin versi eksekusi intraday, gunakan `(open_or_last_exec / position.position_avg_price) - 1` ketika snapshot tersedia, tapi ini harus dinyatakan eksplisit oleh engine (jangan diam-diam).
+---
 
-- `close_near_high` (bool):
-  - Definisi: `((high - close) / max(high - low, 1)) <= 0.25`
-  - Menggunakan OHLC canonical pada `trade_date`.
+## 5) Recommendations (PLAN execution plan)
+Recommendations adalah rencana eksekusi beli hari itu (bukan sekadar ranking).
 
-### 2.6 Ticker tradeability & special notations (lintas-policy)
+Rules:
+1. Hanya boleh berisi ticker yang lolos **universe + hard rules policy** dan tidak trade_disabled.
+2. Harus mempertimbangkan `capital`, lot size, tick rounding, dan fee sehingga:
+   - `estimated_cost(include_fee) <= remaining_capital`
+   - `planned_lots` integer >= 1
+3. Top Picks tetap murni ranking EOD; recommendations boleh memilih kandidat ranking lebih rendah bila top picks tidak feasible 1 lot.
+4. Tidak ada filler. Jika tidak ada yang feasible → recommendations kosong.
+5. Audit wajib per ticker:
+   - `reasons[]`, `planned_lots`, `estimated_cost`, `plan.entry`.
 
-Watchlist wajib mengunci **kondisi ticker** yang membuat eksekusi berbeda/berisiko secara mekanisme.
+---
 
-#### 2.6.1 Field (wajib jika data tersedia)
-Tambahkan object berikut di setiap kandidat:
+## 6) Tick rounding, lot sizing, fee model (global contract)
+- Semua harga output adalah integer dan sesuai tick ladder.
+- Rounding:
+  - entry (buy trigger): ROUND_UP
+  - stop: ROUND_DOWN
+  - tp: ROUND_DOWN (konservatif)
+- Lot size default BEI: 100 saham (kecuali override).
+- Fee model konsisten dan dipakai dalam `estimated_cost`.
 
-- `ticker_flags.special_notations[]` (array string; contoh: `["E","X"]`)
-- `ticker_flags.is_suspended` (boolean)
-- `ticker_flags.status_quality` (string): `OK|STALE|UNKNOWN`
-- `ticker_flags.status_asof_trade_date` (YYYY-MM-DD|null): tanggal status yang dipakai untuk `special_notations/is_suspended/trading_mechanism`.
+---
 
-- `ticker_flags.trading_mechanism` (string):
-  - `REGULAR` (default)
-  - `FULL_CALL_AUCTION` (mis. papan pemantauan khusus / kondisi tertentu)
+## 7) Reason codes (governance)
+Namespace:
+- Global: `GL_*`
+- Weekly Swing: `WS_*`
+- Dividend Swing: `DS_*`
+- Position Trade: `PT_*`
+- Intraday Light: `IL_*`
+- No Trade: `NT_*`
+Rules:
+- deterministik (reproducible)
+- tidak tergantung urutan iterasi
+- minimal 1 reason utama saat DROP / trade_disabled / avoid / no_trade
 
-Jika data tidak tersedia, set nilai default aman:
-- `special_notations = []`, `is_suspended = false`, `trading_mechanism = "REGULAR"`.
+### Data aktif
+- `is_deleted = 0` berarti data aktif (belum dihapus). Nilai selain itu dianggap tidak aktif.
 
-#### 2.6.2 Global gating (wajib)
-Aturan lintas-policy berikut harus selalu berlaku:
+---
 
-- Jika `ticker_flags.is_suspended == true`:
-  - `timing.trade_disabled = true`
-  - `levels.entry_type = "WATCH_ONLY"`
-  - reason codes: `GL_SUSPENDED`
+## Implementation Notes (non-normative)
 
-- Jika `ticker_flags.trading_mechanism == "FULL_CALL_AUCTION"` **atau** `ticker_flags.special_notations` mengandung `"X"`:
-  - Default kontrak: **block NEW ENTRY** (karena mekanisme FCA beda dari regular)
-  - `timing.trade_disabled = true`
-  - `levels.entry_type = "WATCH_ONLY"`
-  - reason codes: `GL_SPECIAL_NOTATION_X` dan/atau `GL_MECHANISM_FCA`
+### Mismatch audit (opsional tapi sangat dianjurkan)
+Jika `ticker_indicators_daily` juga menyimpan OHLC dan nilainya tidak sama dengan `ticker_ohlc_daily` pada `(ticker_id, trade_date)`,
+anggap indikator untuk baris itu **invalid** dan pakai OHLC dari `ticker_ohlc_daily` saja. Catat reason `IND_OHLC_MISMATCH`.
 
-- Jika `ticker_flags.special_notations` mengandung `"E"`:
-  - Tidak auto-block oleh kontrak, tapi wajib **warning** di UI
-  - reason code: `GL_SPECIAL_NOTATION_E`
+---
+
+## Recommendations (PRIMARY: flat array, single strategy implicit)
+
+**Tujuan DTO:** bentuk output utama tetap sederhana dan stabil.
+
+### Primary schema (dipakai API/DTO sekarang)
+`recommendations` adalah array ticker plan hasil seleksi EOD (best default). Ini setara dengan **single strategy implicit** (engine memilih best default).
+
+Setiap item rekomendasi minimal berisi:
+- `ticker_code`
+- `planned_lots` (nullable jika capital missing)
+- `estimated_cost` (nullable jika capital missing; include fee)
+- `reasons[]` (audit)
+- `plan`: `{ entry, stop, tp1, tp2?, rr_est, stop_pct }`
+- `execution` (opsional tapi disarankan): `{ mode, tranches[] }`
+  - `mode ∈ {ONE_SHOT, 2_TRANCHE, 3_TRANCHE}`
+  - `tranches[]` berisi `{ tranche_pct, planned_lots, price, when, condition, reasons[] }`
+  - Jika capital missing → `planned_lots=null` untuk semua tranche.
+
+**Tidak ada** `recommendations.strategies[]` pada output utama agar DTO tidak retak.
+
+### Optional advanced (backward compatible)
+Jika kamu butuh menampilkan alternatif strategi (2–3 opsi) tanpa memecah DTO utama, pakai field tambahan:
+- `recommendation_strategies[]` (opsional; bisa dikontrol lewat feature flag / query param).
+- Jika field ini tidak ada, UI tetap pakai `recommendations[]`.
+
+`recommendation_strategies[]` berisi:
+- `strategy_code` (CONCENTRATED/BALANCED/STAGED)
+- `tickers[]` (dengan `weight_pct` dan `execution`)
+- `cash_remaining`
+- `reasons[]`
+`recommendations[]` tetap diisi dari **best default strategy** (flattened).
+
+### Preconditions (hard)
+- Recommendations hanya boleh diambil dari ticker yang **lolos hard rules policy aktif**.
+- Jika eligible candidates = 0 → `recommendations = []` dan `no_trade_reason = NO_QUALIFIED_CANDIDATES`.
+- Tidak ada filler/placeholder.
+
+### Canonical EOD not ready (hard)
+Jika canonical EOD belum ready pada `trade_date`:
+- `recommendations = []` (**wajib**).
+- Groups (Top Picks/Secondary/Watch Only/Avoid) tetap dihitung untuk monitoring dengan `flags:["EOD_NOT_READY"]` + reason global `GL_EOD_NOT_READY`.
+
+### Dua mode deterministik: tanpa capital vs dengan capital
+**Mode A: capital missing / null / <=0**
+- `planned_lots = null`, `estimated_cost = null`
+- `execution.tranches[].planned_lots = null`
+- reason global minimal: `RECO_CAPITAL_MISSING_LOTS_NULL`
+**Mode B: capital tersedia**
+- lots dihitung deterministik (lihat kontrak Allocation → lots).
+- ticker yang tidak feasible min 1 lot → drop dari recommendations (reason `RECO_TICKER_DROPPED_INFEASIBLE_MIN_LOT`).
+- jika semua drop → `recommendations=[]`.
+
+### Score scale contract (LOCKED)
+Agar cutoff seperti `MIN_RECO_SCORE` tidak jadi “semua lolos” / “semua gugur”, skala `score_total` harus dikunci.
+
+**Kontrak:**
+- `score_total` **wajib** berada pada range **0.00 .. 1.00** (float), di mana:
+  - 0.00 = kandidat terburuk (nyaris tidak layak),
+  - 1.00 = kandidat terbaik (setup sangat kuat).
+- `score_total` adalah **normalized weighted score** (bukan angka arbitrary, bukan 0..100).
+
+**Normalisasi yang wajib dipakai (deterministik):**
+1) Hitung sub-score per faktor (masing-masing 0..1, dengan clamp):
+   - `s_momentum`, `s_trend`, `s_volume`, `s_pattern`, `s_risk` (contoh; sesuai policy).
+2) Setiap sub-score dihitung dari metrik mentah memakai fungsi yang stabil:
+   - **Clamp + linear map** untuk metric yang punya batas jelas:
+     - `s = clamp((x - lo) / (hi - lo), 0, 1)`
+   - **Logistic** untuk metric yang ekstrem/outlier (opsional, tapi jika dipakai harus konsisten):
+     - `s = 1 / (1 + exp(-k*(x - x0)))`
+3) Gabungkan dengan weighted sum lalu clamp:
+   - `score_raw = Σ (w_i * s_i)`
+   - `score_total = clamp(score_raw, 0, 1)`
+**Catatan penting:**
+- Semua `w_i` harus dijelaskan di policy (atau di ranking section) dan jumlahnya idealnya 1.0.
+- Jika engine saat ini memakai skor 0..100, maka **wajib** dikonversi: `score_total = clamp(score_0_100 / 100, 0, 1)`.
+
+### Candidate pool & cutoff kualitas (tanpa hard cap)
+Input: `EligibleCandidates` (lolos Universe + hard policy, bukan Avoid).
+
+Sorting deterministik:
+1) `score_total` desc
+2) `plan.rr` desc
+3) `plan.stop_pct` asc
+4) `dv20_idr` desc
+5) `atr_pct` asc
+6) `ticker_code` asc
+
+Cutoff kualitas:
+- `S0 = score kandidat rank #1`
+- masuk pool jika: `score_total >= max(MIN_RECO_SCORE, S0 - RECO_SCORE_GAP)`
+Default:
+- `MIN_RECO_SCORE = 0.70`  // berlaku karena score_total ter-normalisasi 0..1
+- `RECO_SCORE_GAP = 0.05`
+### Allocation → lots (LOCKED, binding algorithm)
+
+Bagian ini adalah kontrak langkah-langkah **mengikat** untuk mengubah `capital` menjadi integer lots per ticker dan per tranche.
+Jika tidak ada `capital` (Mode A) → lots selalu `null` (lihat rules di atas). Jika `capital` ada (Mode B) → ikuti algoritma ini.
+
+#### A) Urutan iterasi allocation (ranking order)
+Urutan iterasi untuk allocation dan leftover **wajib** sama dengan sorting kandidat rekomendasi:
+1) `score_total` desc
+2) `plan.rr` desc
+3) `plan.stop_pct` asc
+4) `dv20_idr` desc
+5) `atr_pct` asc
+6) `ticker_code` asc
+
+#### B) Budget per ticker
+- Jika `weight_pct` tersedia (hasil allocation method) → `budget_i = capital * weight_pct_i`
+- Jika `weight_pct` tidak tersedia (harusnya jarang) → `budget_i = capital / N` (equal weight)
+
+Catatan: `weight_pct` adalah persentase (0..1). Jika format 0..100, konversi dulu.
+
+#### C) Estimasi biaya per 1 lot (include fee, safe against staging)
+Untuk ticker i, sudah ada `execution.tranches[]` dengan `price_t` (PLAN, rounded tick).
+
+Definisi:
+- `LOT_SIZE = 100`
+- `gross_per_lot(price) = price * LOT_SIZE`
+- `fee_per_lot(price) = fee_buy(gross_per_lot(price))` (mengikuti fee model global)
+- `cost_per_lot(price) = gross_per_lot(price) + fee_per_lot(price)`
+Agar tidak tembus modal akibat tranche harga lebih tinggi:
+- `price_worst = max(price_t untuk semua tranche ticker i)`
+- `est_cost_per_lot_i = cost_per_lot(price_worst)`
+#### D) Initial lots allocation
+Untuk setiap ticker i (urut ranking):
+1) `lots_i = floor(budget_i / est_cost_per_lot_i)`
+Hard rule:
+- Jika `lots_i < 1` → **DROP ticker** dari `recommendations` (reason `RECO_TICKER_DROPPED_INFEASIBLE_MIN_LOT`)
+- Setelah drop:
+  - lakukan **renormalize weights** pada ticker tersisa (sum weights = 1.0),
+  - lalu ulangi langkah B–D sampai stabil (tidak ada drop baru).
+
+Jika setelah drop ticker kosong → `recommendations = []`.
+
+#### E) Split lots ke tranche (rounding rules)
+Setelah `lots_i` final, bagi lots ke tranche sesuai `execution.mode`:
+
+**ONE_SHOT (100%)**
+- `t1 = lots_i`
+**2_TRANCHE (60/40)**
+- `t1 = ceil(0.60 * lots_i)`
+- `t2 = lots_i - t1`
+**3_TRANCHE (50/30/20)**
+- `t1 = ceil(0.50 * lots_i)`
+- `t2 = ceil(0.30 * lots_i)`
+- `t3 = lots_i - t1 - t2`
+- Jika `t3 < 0` (lots kecil), set:
+  - `t3 = 0`
+  - `t2 = lots_i - t1`
+Tranche yang mendapat `planned_lots=0` boleh tetap tampil sebagai template, tetapi tidak boleh menyebabkan biaya > capital.
+
+#### F) Hitung estimated_cost dan cash_remaining
+Biaya aktual dihitung per tranche (pakai harga tranche, bukan price_worst):
+- `estimated_cost_i = Σ_t (planned_lots_it * cost_per_lot(price_t))`
+- `total_estimated_cost = Σ_i estimated_cost_i`
+- `cash_remaining = capital - total_estimated_cost` (wajib >= 0)
+
+Jika `cash_remaining < 0`, itu bug (kontrak D menggunakan price_worst harus mencegahnya).
+
+#### G) Leftover allocation (deterministik, one-lot-per-iter)
+Setelah initial allocation:
+- Sisa modal boleh dipakai untuk menambah lots **hanya** pada ticker yang sudah terpilih (tidak revive ticker drop).
+
+Algoritma (ranking-first, deterministic):
+1) Ulangi selama masih ada penambahan yang feasible:
+2) Iterasi ticker dari ranking tertinggi ke terendah.
+3) Untuk ticker i, coba tambah **+1 lot pada tranche-1**.
+4) Feasible jika `cash_remaining >= cost_per_lot(price_tranche1)`.
+5) Jika feasible:
+   - tambah 1 lot tranche-1,
+   - update `estimated_cost_i`, `cash_remaining`,
+   - **break** (kembali ke langkah 1, mulai lagi dari ranking tertinggi).
+6) Stop jika satu putaran penuh tidak ada ticker yang feasible untuk +1 lot.
 
 Catatan:
-- Kalau suatu hari kamu menambah policy yang mendukung FCA, policy itu harus eksplisit men-declare dukung FCA dan kontrak ini perlu revisi (jangan diam-diam).
+- Ini menjaga leftover dibagi deterministik dan tidak “lompat” ke ticker lain yang tidak qualified.
+- Jika kamu ingin lebih ketat: hanya top K ticker (mis. top 1–2) yang boleh menerima leftover; kalau mau, kunci param `LEFTOVER_TOP_K`.
 
-
-
-#### 2.6.3 Status feed quality (wajib)
-
-Karena notasi/suspensi bisa berubah, engine wajib menandai kualitas data status:
-
-- Jika data status untuk `exec_trade_date` tersedia → `status_quality = "OK"`, `status_asof_trade_date = exec_trade_date`.
-- Jika yang dipakai adalah last-known (tanggal < `exec_trade_date`) → `status_quality = "STALE"`, `status_asof_trade_date = <tanggal last-known>`, tambahkan reason code `GL_TICKER_STATUS_STALE`.
-- Jika data status tidak tersedia sama sekali (atau tidak bisa dipastikan) → `status_quality = "UNKNOWN"`, `status_asof_trade_date = null`, tambahkan reason code `GL_TICKER_STATUS_UNKNOWN`.
-
-Catatan:
-- `STALE/UNKNOWN` tidak otomatis memblokir trade oleh kontrak, kecuali juga memenuhi gating Section 2.6.2 (suspension/FCA/X).
-- Policy boleh memperketat (mis. block jika STALE) tetapi harus ditulis di policy doc.
-
-
-
-
-
-
-### 2.6.4 Base eligibility lintas-policy vs policy-specific
-
-Kontrak lintas-policy hanya mengunci **tradeability** (suspension/FCA/X, window eksekusi, readiness data).
-Kriteria seleksi kandidat yang bersifat strategi (contoh: threshold trend/volume/RSI, liquidity minimum, scoring weights) adalah domain **policy docs** dan tidak boleh “dipindah-diam-diam” ke `watchlist.md`.
-
-
-## 3) Tick size & rounding (wajib lintas-policy)
-
-### 3.1 Tabel fraksi (IDX equities — Reguler/Tunai)
-Gunakan `last_price`/harga referensi terbaru untuk menentukan tick:
-
-| Range harga (Rp) | Tick (Rp) |
-|---|---:|
-| `< 200` | 1 |
-| `200 – < 500` | 2 |
-| `500 – < 2.000` | 5 |
-| `2.000 – < 5.000` | 10 |
-| `>= 5.000` | 25 |
-
-Catatan:
-- Tabel ini harus menjadi **config** (bukan hardcode), karena regulasi bisa berubah.
-- Jika sistem punya `tick_size` per ticker/hari dari market rules table, itu yang dipakai sebagai sumber utama.
-
-### 3.2 Kontrak rounding harga
-Semua harga plan (entry/SL/TP/trigger) **wajib** di-round ke tick.
-
-`round_to_tick(price, tick, mode)`:
-- mode `DOWN`  : floor ke tick
-- mode `UP`    : ceil ke tick
-- mode `NEAREST`: round terdekat (tie → UP)
-
-Default yang disarankan (kontrak lintas-policy; policy boleh override jika perlu):
-- Entry trigger (breakout): `UP`
-- Entry limit (pullback): `DOWN` untuk batas bawah, `UP` untuk batas atas
-- Stop loss: `DOWN` (lebih ketat/konservatif)
-- Take profit: `DOWN` (lebih realistis untuk eksekusi)
-- Break-even / trailing SL: `DOWN`
-
-Jika policy butuh “+1 tick”:
-- pakai `price + tick` (bukan +1 rupiah), lalu round lagi sesuai mode.
+### Execution mode (policy-aware, default)
+- Weekly Swing: BREAKOUT → 2_TRANCHE (60/40), PULLBACK → 3_TRANCHE (50/30/20)
+- Position Trade: BREAKOUT → 2_TRANCHE (60/40), PULLBACK → 3_TRANCHE (50/30/20)
+- Dividend Swing: ONE_SHOT (default; staging disabled)
+- Intraday Light: ONE_SHOT (default; staging disabled)
 
 ---
 
+## Micro Strategy (per-ticker execution template)
 
-### 3.3 Price typing & rounding output (lintas-policy)
+Selain `recommendations[]` (paket multi-ticker), setiap ticker pada output group
+**Top Picks / Secondary / Watch Only** boleh memiliki `micro_strategy` berupa template eksekusi untuk ticker itu saja.
 
-Untuk konsistensi lintas-policy dan menghindari bug float:
+Prinsip:
+- `micro_strategy` **bukan universal**; harus mengikuti rule policy aktif.
+- Jika policy tidak mendukung atau data tidak cukup → `micro_strategy = null` + reason jelas.
+- `micro_strategy` tidak boleh memindahkan ticker antar group. Watch Only tetap Watch Only.
 
-- Semua field `*_price` di output (`entry_*`, `stop_loss_price`, `tp*`, `be_price`, dll) wajib bertipe **integer IDR** (tanpa desimal).
-- Semua harga wajib sudah melalui tick rounding (lihat Section 3.2).
-- Field uang hasil hitung (contoh: `estimated_cost`, `remaining_cash`, `buy_fee`, `sell_fee`, `slip_cost`, `net_pnl`) juga wajib integer IDR.
+### 1) Kapan `micro_strategy` boleh dibuat (hard preconditions)
+`micro_strategy` hanya boleh dibuat jika:
+1) ticker punya `setup_type` valid dari policy (minimal `{BREAKOUT, PULLBACK}`),
+2) PLAN level valid: `plan.entry`, `plan.stop` ada dan `R = entry-stop` lulus kontrak global (`R > 0` dan `R >= tick`),
+3) ticker **bukan Avoid**,
+4) policy mengizinkan execution mode tersebut (lihat mapping di bawah).
 
-Kontrak pembulatan (deterministik):
-- Biaya/cost (`estimated_cost`, fee, slippage) → **ceil ke Rupiah** (konservatif, tidak meng-underestimate biaya).
-- PnL (`net_pnl`) → **floor ke Rupiah** (konservatif, tidak meng-overestimate cuan).
-- `remaining_cash = alloc_budget - estimated_cost` setelah pembulatan cost.
+Jika gagal → `micro_strategy = null` dan tambahkan salah satu reason:
+- `MICRO_STRATEGY_UNAVAILABLE_POLICY`
+- `MICRO_STRATEGY_DATA_INSUFFICIENT`
+- `MICRO_STRATEGY_R_INVALID`
+- `MICRO_STRATEGY_AVOID`
+### 2) Dua mode: tanpa capital vs dengan capital (sama dengan Recommendations)
+**Mode A: capital missing**
+- `planned_lots = null`, `estimated_cost = null`
+- Tranche % dan plan price tetap ada (tanpa asumsi).
+- reason: `MICRO_CAPITAL_MISSING_LOTS_NULL`
+**Mode B: capital tersedia**
+- Hitung `planned_lots` integer per tranche berdasarkan porsi capital ticker (lihat aturan sizing di bagian Recommendations).
+- Jika min 1 lot tidak feasible → `micro_strategy = null` dengan reason `MICRO_INFEASIBLE_MIN_LOT`. Sizing mengikuti kontrak **Allocation → lots (LOCKED)** di bagian Recommendations.
+  (Jangan memaksakan lots=0 sebagai filler.)
 
-## 4) Lot sizing & rounding (wajib lintas-policy)
-
-### 4.1 Definisi lot
-- `lot_size = 100` lembar untuk Pasar Reguler & Tunai.
-- Semua output lots di watchlist mengacu ke **round lot**.
-
-### 4.2 Kontrak sizing minimum
-- Lots **harus integer >= 0**.
-- Jika hasil sizing < 1 lot → watchlist **tidak boleh** memaksa BUY, harus turun menjadi `WATCH_ONLY` (policy menentukan reason code-nya).
-
-### 4.3 Pembulatan lots
-Kontrak default:
-- `lots = floor( alloc_budget / (entry_price * lot_size) )`
-- `estimated_cost = lots * lot_size * entry_price`
-- `remaining_cash = alloc_budget - estimated_cost`
-
-Policy boleh menambahkan guard viability (min alloc, min lots, min net edge) di dokumen policy.
-
----
-
-## 5) Fee model (wajib lintas-policy)
-
-Fee berbeda antar broker. Watchlist **tidak boleh** hardcode fee broker; fee harus configurable.
-
-### 5.1 Config keys (contoh)
-- `fee.buy_pct`  (contoh 0.0015 = 0.15%)
-- `fee.sell_pct` (contoh 0.0025 = 0.25%)
-- (opsional) `fee.min_idr` (minimal fee)
-- (opsional) `slippage_pct` (penalti spread/slippage konservatif, ex: 0.001)
-
-### 5.2 Rumus net P&L (kontrak)
-Untuk sebuah trade dengan:
-- `entry_price`, `exit_price`
-- `shares = lots * lot_size`
-
-Gross:
-- `gross_pnl = (exit_price - entry_price) * shares`
-
-Fees (model sederhana):
-- `buy_fee  = entry_price * shares * fee.buy_pct`
-- `sell_fee = exit_price  * shares * fee.sell_pct`
-
-Slippage (opsional):
-- `slip_cost = (entry_price + exit_price) * shares * (slippage_pct / 2)`
-
-Net:
-- `net_pnl = gross_pnl - buy_fee - sell_fee - slip_cost`
-- `net_pnl_pct = net_pnl / (entry_price * shares)`
-
-Kontrak output (opsional, tapi kalau ada harus konsisten):
-- `profit_tp2_net`, `rr_tp2_net`, `net_edge_pct_est`
-
----
-
-## 6) Reason code governance (wajib)
-
-### 6.1 Namespace rule (UI reason codes)
-`reason_codes[]` adalah **UI codes** dan wajib prefixed sesuai policy:
-- WEEKLY_SWING: `WS_*`
-- DIVIDEND_SWING: `DS_*`
-- INTRADAY_LIGHT: `IL_*`
-- POSITION_TRADE: `PT_*`
-- NO_TRADE: `NT_*`
-- Global gate lintas-policy: `GL_*` (contoh: `GL_EOD_NOT_READY`, `GL_POLICY_DOC_MISSING`)
-
-### 6.2 Debug vs UI
-- `reason_codes[]` (UI): **tidak boleh** pakai kode generik seperti `TREND_STRONG`.
-- Kode generik (untuk audit/scoring) boleh disimpan di:
-  - `debug.rank_reason_codes[]` (opsional).
-
-### 6.3 Legacy mapping (wajib kalau masih ada output lama)
-Jika sebelumnya engine/UI pernah memakai kode **generik** (tanpa prefix policy), maka:
-
-**Rule hard (contract):**
-- `reason_codes[]` **tidak boleh** berisi kode tanpa prefix resmi (`WS_ / DS_ / IL_ / PT_ / NT_ / GL_`).
-- Kode generik lama **wajib dimigrasikan** secara deterministik ke canonical UI code.
-- Kode generik boleh disimpan untuk audit/scoring **hanya** di `debug.rank_reason_codes[]` (bukan di `reason_codes[]`).
-
-#### Mapping minimal (generic lama → canonical UI code)
-
-> Prinsip: map ke `{policy_prefix}_*` berdasarkan policy aktif; untuk gate global pakai `GL_*`.
-
-| legacy (jangan dipublish ke UI) | canonical UI code (publish) |
-|---|---|
-| `GAP_UP_BLOCK` | `{policy_prefix}_GAP_UP_BLOCK` |
-| `CHASE_BLOCK_DISTANCE_TOO_FAR` | `{policy_prefix}_CHASE_BLOCK_DISTANCE_TOO_FAR` |
-| `MIN_EDGE_FAIL` | `{policy_prefix}_MIN_TRADE_VIABILITY_FAIL` *(atau code edge/viability yang dipakai policy)* |
-| `TIME_STOP_TRIGGERED` | `{policy_prefix}_TIME_STOP_T2` *(atau T3 sesuai rule yang kena)* |
-| `TIME_STOP_T2` | `{policy_prefix}_TIME_STOP_T2` |
-| `TIME_STOP_T3` | `{policy_prefix}_TIME_STOP_T3` |
-| `FRIDAY_EXIT_BIAS` | `{policy_prefix}_FRIDAY_EXIT_BIAS` |
-| `WEEKEND_RISK_BLOCK` | `{policy_prefix}_FRIDAY_EXIT_BIAS` *(fallback jika policy tidak punya code weekend spesifik)* |
-| `VOLATILITY_HIGH` | `{policy_prefix}_VOL_HIGH` *(atau code volatility yang dipakai policy)* |
-| `FEE_IMPACT_HIGH` | `{policy_prefix}_MIN_TRADE_VIABILITY_FAIL` *(fee/edge gagal)* |
-| `NO_FOLLOW_THROUGH` | `{policy_prefix}_TIME_STOP_T2` *(fallback; atau buat code follow-through spesifik di policy)* |
-| `SETUP_EXPIRED` | `{policy_prefix}_SIGNAL_STALE` *(atau code stale yang dipakai policy)* |
-
-Mapping global (lintas-policy):
-- `EOD_NOT_READY` → `GL_EOD_NOT_READY`
-- `EOD_STALE` → `GL_EOD_STALE`
-- `MARKET_RISK_OFF` → `GL_MARKET_RISK_OFF`
-- `POLICY_INACTIVE` → `GL_POLICY_INACTIVE`
-
-Catatan implementasi:
-- `{policy_prefix}` adalah salah satu: `WS`, `DS`, `IL`, `PT`, `NT`.
-- Kalau ada legacy code yang **tidak dikenal**, engine wajib:
-  - taruh di `debug.rank_reason_codes[]`, dan
-  - tambahkan `GL_LEGACY_CODE_UNMAPPED` ke `reason_codes[]` (agar mudah diaudit).
-
----
-## 7) Output JSON schema (final)
-
-### 7.1 Root schema (wajib)
-```json
-{
-  "trade_date": "YYYY-MM-DD",
-  "exec_trade_date": "YYYY-MM-DD",
-  "generated_at": "RFC3339",
-  "policy": {
-    "selected": "WEEKLY_SWING|DIVIDEND_SWING|INTRADAY_LIGHT|POSITION_TRADE|NO_TRADE",
-    "policy_version": "string|null"
-  },
-  "meta": {
-    "dow": "Mon|Tue|Wed|Thu|Fri",
-    "market_regime": "risk-on|neutral|risk-off",
-    "eod_canonical_ready": true,
-    "as_of_trade_date": "YYYY-MM-DD",
-    "missing_trading_dates": [],
-    "counts": {
-      "total": 0,
-      "top_picks": 0,
-      "secondary": 0,
-      "watch_only": 0
-    },
-    "notes": [],
-    "session": {
-      "open_time": "HH:MM",
-      "close_time": "HH:MM",
-      "breaks": []
-    }
-  },
-  "recommendations": {
-    "mode": "NO_TRADE|CARRY_ONLY|BUY_1|BUY_2_SPLIT|BUY_3_SMALL",
-    "max_positions_today": 0,
-    "risk_per_trade_pct": null,
-    "capital_total": null,
-    "allocations": []
-  },
-  "groups": {
-    "top_picks": [],
-    "secondary": [],
-    "watch_only": []
-  }
+### 3) Schema ringkas `micro_strategy`
+```
+micro_strategy: {
+  mode: "ONE_SHOT" | "2_TRANCHE" | "3_TRANCHE",
+  eligible_now: boolean,
+  trigger_needed?: string,     // wajib untuk Watch Only
+  weights_pct: 100,            // selalu 100 karena 1 ticker
+  tranches: [
+    { tranche_pct, planned_lots, price, when, condition, reasons[] }
+  ],
+  reasons[]                     // reason global micro_strategy
 }
 ```
+### 4) Policy-aware execution mapping (default)
+Mapping ini dipakai untuk menentukan `mode` dan `tranches` bila policy mengizinkan.
 
+- **Weekly Swing**
+  - BREAKOUT → `2_TRANCHE` (60/40)
+  - PULLBACK → `3_TRANCHE` (50/30/20)
 
-### 7.0 Schema `recommendations.allocations[]` (lintas-policy)
+- **Position Trade**
+  - BREAKOUT → `2_TRANCHE` (60/40)
+  - PULLBACK → `3_TRANCHE` (50/30/20)
 
+- **Dividend Swing**
+  - default → `ONE_SHOT` (100%)
+  - staging dinonaktifkan by default (window event sempit + gap risk)
 
-### 7.1.1 Arti `risk_per_trade_pct` dan `capital_total` (lintas-policy)
+- **Intraday Light**
+  - default → `ONE_SHOT` (100%)
+  - staging dinonaktifkan by default (stop ketat + confirm ketat)
 
-- `capital_total` adalah input/angka referensi modal yang digunakan engine untuk menghitung `alloc_budget` dan `lots_recommended`.
-- `risk_per_trade_pct` adalah parameter risiko per posisi (mis. 0.5%–2% dari `capital_total`) yang digunakan untuk mengukur sizing berbasis stop-loss (jika policy menerapkan risk-based sizing).
+- **No Trade**
+  - tidak punya micro strategy
 
-Kontrak:
-- Keduanya boleh `null` jika sizing menggunakan metode lain (mis. fixed-alloc tanpa risk model).
-- Jika `recommendations.allocations[]` diisi dan `alloc_budget` dihitung dari modal:
-  - `capital_total` harus non-null.
-- Jika policy menggunakan risk-based sizing (`risk_pct` / risk model di output):
-  - `risk_per_trade_pct` harus non-null.
+### 5) Watch Only behavior (wajib ketat)
+Untuk ticker di **Watch Only**:
+- `eligible_now = false`
+- `trigger_needed` wajib menjelaskan hard rule yang belum terpenuhi (mis. “close belum breakout resistance_20d”).
+- `micro_strategy` hanya template “jika trigger terjadi”, bukan sinyal beli hari ini.
 
-Jika saat ini belum dipakai penuh:
-- Field tetap boleh ada sebagai “reserved”, tetapi aturan di atas menjadi target implementasi dan contract test bisa memilih untuk hanya memvalidasi tipe (`null|number`) sampai engine memakai sepenuhnya.
+### 6) CONFIRM separation
+Jam dan data intraday tidak boleh masuk PLAN:
+- `when` hanya `D0/D1/D2` di PLAN.
+- Jika perlu jam/snapshot → taruh di CONFIRM dan jangan mengubah `micro_strategy` PLAN.
 
-
-
-Jika `recommendations.allocations[]` digunakan, setiap item wajib mengikuti schema berikut (minimum):
-
-```json
-{
-  "ticker_code": "ABCD",
-  "alloc_pct": 0.25,
-  "alloc_budget": 12500000,
-  "entry_price_ref": 1230,
-  "lots_recommended": 10,
-  "estimated_cost": 1230000,
-  "remaining_cash": 20000,
-  "reason_codes": ["WS_ALLOC_BALANCED"]
-}
-```
-
-Aturan:
-- `ticker_code` wajib ada dan harus cocok dengan kandidat di `groups.*[]`.
-- Minimal salah satu ada: `alloc_pct` atau `alloc_budget`.
-- `entry_price_ref` wajib integer IDR dan sudah tick-rounded (Section 3).
-- `lots_recommended` wajib integer >= 0 (Section 4).
-- `estimated_cost`/`remaining_cash` wajib integer IDR dan mengikuti kontrak rounding (Section 3.3 bila ada di dokumen ini).
-- `reason_codes[]` optional, tapi jika ada harus mengikuti governance prefix (Section 6).
-
-Jika mode `NO_TRADE` atau `CARRY_ONLY` → `allocations` wajib `[]`.
-
-
-
-### 7.2.1 `watchlist_score` & `confidence` (lintas-policy)
-
-- `watchlist_score` adalah skor ranking internal watchlist untuk mengurutkan kandidat dalam policy yang dipilih.
-- Kontrak tipe & arah:
-  - Tipe: number (float atau int).
-  - Range yang disarankan: `0..100` (semakin besar semakin baik).
-  - Tidak boleh `NaN/Infinity`.
-
-- `confidence` adalah label kualitatif berbasis **percentile** dari `watchlist_score` dalam universe kandidat policy pada `trade_date`.
-  - `High` : top 20% (percentile >= 80)
-  - `Med`  : percentile 40–79
-  - `Low`  : percentile < 40
-
-Kontrak:
-- Engine wajib menghitung `confidence` dari ranking score (bukan manual/acak).
-- Policy boleh mengubah mapping percentile, tapi **tidak boleh** mengubah key/enum value (`High|Med|Low`).
-
-
-
-### 7.2.2 `slices` & `slice_pct` (lintas-policy)
-
-Untuk membantu user memilih kandidat selain rekomendasi dan tetap sizing rapi, setiap kandidat wajib menyediakan:
-
-- `sizing.slices` (int): jumlah pembagian modal per posisi jika user ingin “beli bertahap” atau memilih lebih banyak ticker. Default `1`.
-- `sizing.slice_pct` (float): porsi per-slice terhadap `capital_total` (atau terhadap modal kerja policy). Default `1.0`.
-
-Kontrak:
-- `slices >= 1`
-- `0 < slice_pct <= 1`
-- Default mapping: `slice_pct = 1 / slices` (toleransi floating ±0.0001)
-- `slices/slice_pct` adalah **helper UI/manual**, tidak mengubah rekomendasi engine kecuali user memilih memakai mode manual.
-
-Jika `recommendations.capital_total` null, `slice_pct` tetap dihitung dari `slices` (tanpa konversi ke rupiah).
-
-### 7.2 Candidate object (wajib minimal)
-Semua kandidat di `groups.*[]` menggunakan struktur yang sama.
-
-```json
-{
-  "ticker_id": 0,
-  "ticker_code": "ABCD",
-  "rank": 1,
-  "watchlist_score": 0,
-  "confidence": "High|Med|Low",
-  "setup_type": "Breakout|Pullback|Continuation|Reversal|Base",
-  "reason_codes": ["WS_TREND_ALIGN_OK"],
-  "debug": {
-    "rank_reason_codes": ["TREND_STRONG"]
-  },
-
-  "ticker_flags": {
-    "special_notations": [],
-    "is_suspended": false,
-    "status_quality": "OK",
-    "status_asof_trade_date": null,
-    "trading_mechanism": "REGULAR"
-  },
-
-  "timing": {
-    "entry_windows": ["09:20-10:30"],
-    "avoid_windows": ["09:00-09:15"],
-    "entry_style": "Breakout-confirm|Pullback-wait|Reversal-confirm|No-trade",
-    "size_multiplier": 1.0,
-    "trade_disabled": false,
-    "trade_disabled_reason": null,
-    "trade_disabled_reason_codes": []
-  },
-
-  "levels": {
-    "entry_type": "BREAKOUT_TRIGGER|PULLBACK_LIMIT|REVERSAL_CONFIRM|WATCH_ONLY",
-    "entry_trigger_price": null,
-    "entry_limit_low": null,
-    "entry_limit_high": null,
-    "stop_loss_price": null,
-    "tp1_price": null,
-    "tp2_price": null,
-    "be_price": null
-  },
-
-  "sizing": {
-    "lot_size": 100,
-    "slices": 1,
-    "slice_pct": 1.0,
-    "lots_recommended": null,
-    "estimated_cost": null,
-    "remaining_cash": null,
-    "risk_pct": null,
-    "profit_tp2_net": null,
-    "rr_tp2_net": null
-  },
-
-  "position": {
-    "has_position": false,
-    "position_avg_price": null,
-    "position_lots": null,
-    "days_held": null,
-    "position_state": null,
-    "action_windows": [],
-    "updated_stop_loss_price": null
-  },
-
-  "checklist": [
-    "Spread rapat, bid/ask padat (cek top-5)",
-    "Tidak gap-up terlalu jauh dari close kemarin",
-    "Ada follow-through, bukan spike 1 menit"
-  ]
-}
-```
-
-### 7.3 Rules wajib untuk groups (tujuan: kandidat, bukan semua ticker)
-
-Watchlist **bukan** “listing semua ticker”. Output hanya berisi **kandidat yang relevan** untuk eksekusi atau monitoring.
-
-#### 7.3.1 Tahapan (wajib)
-Engine wajib menjalankan 3 tahap ini agar output tetap ringkas:
-
-1) **Universe filter (drop dulu, baru ranking)**  
-   Ticker yang **tidak relevan** harus di-`DROP` (tidak dimasukkan ke `groups.*`), contoh:
-   - gagal hard gate lintas-policy (suspensi/FCA/X, data invalid, dsb), atau
-   - gagal minimum liquidity/universe policy (policy-specific), atau
-   - tidak punya setup dan tidak punya alasan monitoring yang kuat.
-
-2) **Ranking (hanya untuk kandidat yang lolos universe filter)**  
-   Hitung `watchlist_score` dan `rank` hanya untuk kandidat yang akan ditampilkan.
-
-3) **Bucketing + cap output**  
-   Kandidat yang ditampilkan dibagi ke 3 group dengan batas maksimum (cap) agar tidak membengkak.
-
-Catatan: jumlah ticker yang diproses internal boleh besar, tapi jumlah ticker yang dipublish harus kecil.
-
-#### 7.3.2 Definisi group (wajib)
-- `groups.top_picks[]` = kandidat terbaik untuk **NEW ENTRY** (eksekusi).  
-  Rule:
-  - hanya berisi kandidat dengan `timing.trade_disabled == false`
-  - berisi kandidat yang memenuhi eligibility policy untuk entry **hari eksekusi**
-  - diurutkan deterministik (lihat Section 8.7)
-
-- `groups.secondary[]` = kandidat cadangan untuk **NEW ENTRY**, tetapi bukan prioritas utama.  
-  Rule:
-  - `timing.trade_disabled == false`
-  - kualitas masih layak dieksekusi, namun kalah ranking / minor penalty / bukan pilihan utama mode hari ini
-  - dipakai sebagai **fallback** ketika `top_picks` sedikit/0 atau user ingin memilih manual
-
-- `groups.watch_only[]` = kandidat **monitoring** yang *masih relevan*, bukan dumping ground.  
-  Wajib memenuhi salah satu:
-  - `position.has_position == true` (posisi existing yang perlu dipantau/manage), atau
-  - `timing.trade_disabled == true` **karena guard yang bersifat situasional** (mis. window kosong, snapshot missing, eod not ready), atau
-  - “near-eligible” (hampir masuk entry) dan masih punya nilai monitoring.
-
-Ticker yang tidak memenuhi definisi di atas harus **DROP** (tidak dimunculkan di output).
-
-#### 7.3.3 Output limits (wajib)
-Agar watchlist tetap fungsional sebagai daftar kandidat, engine wajib menerapkan cap berikut (configurable):
-
-Config key (disarankan):
-- `output_limits.top_picks_max` (default: 10)
-- `output_limits.secondary_max` (default: 20)
-- `output_limits.watch_only_max` (default: 30)
-- `output_limits.watch_only_min_score` (default: 50)  → kandidat monitoring “near-eligible” minimal harus memenuhi skor ini
-
-Aturan:
-- Setelah ranking, ambil:
-  - `top_picks` = top N pertama yang `trade_disabled == false` (N = `top_picks_max`, dan tetap harus konsisten dengan `recommendations.mode` + `allocations`).
-  - `secondary` = kandidat berikutnya yang `trade_disabled == false` sampai `secondary_max`.
-  - `watch_only` = gabungan dari:
-    1) semua kandidat dengan `position.has_position == true` (wajib ditampilkan), lalu
-    2) kandidat monitoring lain yang memenuhi definisi 7.3.2, dipilih berdasarkan `watchlist_score desc`, sampai `watch_only_max`.
-- Kandidat monitoring yang tidak punya `watchlist_score` (mis. karena mode NO_TRADE) tetap boleh masuk `watch_only`, tetapi tetap harus mengikuti cap (kecuali posisi existing).
-
-Jika `recommendations.mode in ["NO_TRADE","CARRY_ONLY"]`:
-- `groups.top_picks` wajib `[]` (lihat invariant).
-- `groups.secondary` default `[]`.
-- `groups.watch_only` tetap **dibatasi**: posisi existing + monitoring kandidat (cap tetap berlaku).
-
-#### 7.3.4 Definisi `meta.counts` (klarifikasi)
-`meta.counts.*` mengacu pada **jumlah kandidat yang dipublish** (setelah filter + cap), bukan jumlah seluruh ticker yang diproses internal.
-
-Opsional (disarankan untuk audit, tapi tidak wajib ada di schema):
-- `meta.counts.universe_total` = jumlah kandidat sebelum cap
-- `meta.counts.dropped_total` = jumlah ticker yang di-drop sebelum publish
-
+### Canonical readiness handling (EOD_NOT_READY)
+- recommendations=[]; groups tetap dihitung; flags+reason global wajib.
 
 ---
 
+## Risk-based sizing (optional, feature-flag)
 
+Default allocation sekarang berbasis feasibility (capital → lots) dan cukup untuk v1.
+Jika kamu ingin sizing lebih “trader-grade” (menghindari stop terlalu lebar), tambahkan opsi **feature flag**:
 
-### 7.4 Kontrak format time window (lintas-policy)
+### Flag
+- `SIZING_MODE = FEASIBILITY` (default)
+- `SIZING_MODE = RISK_BUDGET` (opsional)
 
-Semua `entry_windows[]` dan `avoid_windows[]` wajib menggunakan format string yang konsisten:
-
-- Format dasar: `HH:MM-HH:MM` (24h, tanpa detik, WIB).
-- Endpoint khusus yang diizinkan:
-  - `open` (pembukaan sesi reguler)
-  - `close` (penutupan sesi reguler)
-  Contoh valid: `open-09:15`, `13:30-close`, `open-close`.
-
-Aturan validasi:
-- Start < end (setelah resolve `open/close` ke jam nyata sesuai kalender bursa).
-- Windows harus diurutkan naik berdasarkan start time.
-- Tidak boleh ada overlap duplikat; kalau overlap terjadi, engine wajib normalisasi/merge.
-
-Aturan konflik:
-- `avoid_windows` **menang** atas `entry_windows`.
-- Engine wajib melakukan `effective_entry_windows = entry_windows - avoid_windows`.
-- Jika hasil `effective_entry_windows` kosong → kandidat harus menjadi `WATCH_ONLY` (`timing.trade_disabled = true`), reason `GL_NO_EXEC_WINDOW`.
-
-### 7.5 Output compatibility mapping (legacy keys)
-
-Dokumen lama (`WATCHLIST_check1.md`) menyebut beberapa key di level root. Kontrak final memakai struktur root+`meta`.
-
-Jika engine/UI masih memakai key lama, lakukan mapping deterministik berikut (tanpa mengubah makna):
-
-| legacy key | canonical key |
-|---|---|
-| `dow` | `meta.dow` |
-| `market_regime` | `meta.market_regime` |
-| `market_notes` / `notes` | `meta.notes[]` |
-| `market_open` | `meta.session.open_time` |
-| `market_close` | `meta.session.close_time` |
-| `market_breaks` | `meta.session.breaks[]` |
-
-Untuk per-ticker:
-- `ticker` → `ticker_code`
-- `score` → `watchlist_score`
-- `reasons[]` → `reason_codes[]` (wajib prefixed)
-- `buy_window[]` → `timing.entry_windows[]`
-- `avoid_window[]` → `timing.avoid_windows[]`
+### RISK_BUDGET rule (LOCKED jika diaktifkan)
+- `risk_budget = capital * RISK_PCT` (mis. 1%–2%, kamu yang kunci)
+- `risk_per_lot = R * LOT_SIZE` (R dalam IDR per share)
+- `lots_i = floor(risk_budget / risk_per_lot)`
+- Lalu tetap cek feasibility biaya:
+  - `max_cost = lots_i * est_cost_per_lot_i`
+  - jika `max_cost > budget_i` → turunkan lots sampai feasible
+- Jika `lots_i < 1` → drop ticker (seperti kontrak Allocation → lots)
 
 Catatan:
-- Ini hanya untuk kompatibilitas migrasi. Semua pengembangan baru harus menulis canonical schema.
-
----
-
-## 8) Invariants (hard rules)
-
-### 8.1 Global gating lock (NO_TRADE)
-Jika `recommendations.mode == "NO_TRADE"`:
-- semua kandidat wajib:
-  - `timing.trade_disabled = true`
-  - `timing.entry_style = "No-trade"`
-  - `timing.size_multiplier = 0.0`
-  - `timing.entry_windows = []`
-  - `timing.avoid_windows = ["09:00-close"]`
-- `recommendations.allocations = []`
-- Tambahkan `meta.notes` + reason code global `GL_EOD_NOT_READY` atau reason `NT_*` sesuai pemicu.
-
-### 8.2 CARRY_ONLY
-Jika `recommendations.mode == "CARRY_ONLY"`:
-- NEW ENTRY tidak boleh direkomendasikan (`allocations = []`).
-- Kandidat boleh tampil untuk monitoring, tapi `top_picks` harus kosong.
-- `position.*` boleh berisi aksi `HOLD/REDUCE/EXIT/TRAIL_SL` sesuai policy.
-
-### 8.3 Reason codes validity
-- Semua `reason_codes[]` harus memenuhi rule namespace di Section 6.
-- Jika ada unknown/invalid prefix → output dianggap **invalid** (contract test harus fail).
-
----
-
-
-
-### 8.4 Ticker tradeability lock (lintas-policy)
-
-Jika kandidat memenuhi salah satu kondisi berikut:
-- `ticker_flags.is_suspended == true`, atau
-- `ticker_flags.trading_mechanism == "FULL_CALL_AUCTION"`, atau
-- `ticker_flags.special_notations` mengandung `"X"`,
-
-maka kandidat wajib:
-- `timing.trade_disabled = true`
-- `levels.entry_type = "WATCH_ONLY"`
-- `timing.entry_windows = []`
-- `timing.avoid_windows = ["open-close"]`
-- reason codes sesuai Section 2.6 (`GL_SUSPENDED`, `GL_MECHANISM_FCA`, `GL_SPECIAL_NOTATION_X`)
-
-
-
-### 8.5 Konsistensi `recommendations.mode` vs `allocations` vs `groups` (lintas-policy)
-
-Aturan ini wajib untuk mencegah output yang “nggak nyambung” antara mode, sizing, dan daftar kandidat:
-
-- Jika `recommendations.mode == "BUY_1"`:
-  - `recommendations.max_positions_today == 1`
-  - `recommendations.allocations.length == 1`
-- Jika `recommendations.mode == "BUY_2_SPLIT"`:
-  - `recommendations.max_positions_today == 2`
-  - `recommendations.allocations.length == 2`
-- Jika `recommendations.mode == "BUY_3_SMALL"`:
-  - `recommendations.max_positions_today == 3`
-  - `recommendations.allocations.length == 3`
-- Jika `recommendations.mode in ["NO_TRADE","CARRY_ONLY"]`:
-  - `recommendations.allocations == []`
-  - `groups.top_picks == []` (tidak boleh ada NEW ENTRY picks)
-
-Linking rule:
-- Setiap item `recommendations.allocations[]` wajib menunjuk ke kandidat yang ada di `groups.top_picks[]` (match `ticker_code`).
-- Kandidat yang tidak ada di `groups.top_picks[]` **tidak boleh** muncul di `allocations[]`.
-
-
-
-### 8.6 Konsistensi `meta.counts` vs isi `groups` (lintas-policy)
-
-Jika `meta.counts` disediakan, nilainya wajib konsisten:
-
-- `meta.counts.top_picks == len(groups.top_picks)`
-- `meta.counts.secondary == len(groups.secondary)`
-- `meta.counts.watch_only == len(groups.watch_only)`
-- `meta.counts.total == meta.counts.top_picks + meta.counts.secondary + meta.counts.watch_only`
-
-Jika terjadi mismatch → output dianggap invalid (contract test harus fail).
-
-
-
-### 8.7 Ordering & uniqueness (lintas-policy)
-
-Untuk memastikan output deterministik dan tidak “lompat-lompat”:
-
-- `ticker_code` harus unik di seluruh `groups.*[]` (tidak boleh muncul dua kali di group berbeda).
-- `rank` harus unik per kandidat dan berada pada range `1..N` (tanpa duplikat).
-- Ordering wajib:
-  - `groups.top_picks` diurutkan berdasarkan `rank` ascending.
-  - `groups.secondary` diurutkan berdasarkan `rank` ascending.
-  - `groups.watch_only` diurutkan berdasarkan `rank` ascending.
-
-Jika engine membutuhkan tiebreaker (mis. rank dihitung ulang):
-- tiebreaker order: `watchlist_score desc`, lalu `ticker_code asc`.
-
-
-
-### 8.8 Konsistensi matematika `allocations` (lintas-policy)
-
-Jika `recommendations.allocations[]` tidak kosong, aturan berikut wajib dipenuhi:
-
-**Uniqueness & linking**
-- `ticker_code` unik di `allocations[]`.
-- Setiap `ticker_code` di `allocations[]` harus ada di `groups.top_picks[]`.
-
-**Model alokasi (jangan campur)**
-- Gunakan salah satu model secara konsisten untuk seluruh item:
-  - **Percent model**: semua item punya `alloc_pct` (dan `alloc_budget` boleh diisi sebagai hasil hitung), atau
-  - **Budget model** : semua item punya `alloc_budget` (dan `alloc_pct` boleh diisi sebagai hasil turunan).
-- Tidak boleh sebagian item hanya `alloc_pct` dan sebagian hanya `alloc_budget`.
-
-**Aturan sum**
-- Jika menggunakan `alloc_pct`:
-  - `sum(alloc_pct) == 1.0` untuk mode `BUY_*` (toleransi floating: ±0.0001).
-- Jika menggunakan `alloc_budget` dan `capital_total` non-null:
-  - `sum(alloc_budget) <= capital_total`.
-
-**Aturan cost**
-Untuk setiap allocation:
-- `estimated_cost == lots_recommended * lot_size * entry_price_ref`
-- `estimated_cost <= alloc_budget`
-- `remaining_cash == alloc_budget - estimated_cost`
-- Semua nilai uang wajib integer IDR dan mengikuti kontrak rounding (Section 3.3).
-
-Jika ada pelanggaran → output dianggap invalid (contract test harus fail).
-
-
-
-### 8.9 Konsistensi `slices` & `slice_pct` (lintas-policy)
-
-Untuk setiap kandidat:
-- `sizing.slices` wajib integer `>= 1`.
-- `sizing.slice_pct` wajib memenuhi `0 < slice_pct <= 1`.
-- Default rule: `abs(slice_pct - (1 / slices)) <= 0.0001`.
-
-Jika tidak memenuhi → output invalid (contract test harus fail).
-
-Catatan:
-- Jika user memilih mode manual dan memilih `k` ticker dari grup (mis. bukan hanya top_picks),
-  UI dapat menggunakan `slice_pct` untuk menghitung `alloc_budget_manual = capital_total * slice_pct`
-  lalu sizing lots mengikuti kontrak lot sizing (Section 4) dan fee/rounding (Section 3 & 5).
-
-## 9) Policy selection precedence (default)
-
-Bagian ini hanya memastikan pemilihan policy **deterministik** dan tidak saling bertabrakan.
-
-Yang boleh ada di sini (lintas-policy):
-1) **Global gates**:
-   - Jika `meta.eod_canonical_ready == false` → `NO_TRADE`.
-     - Jika `position.has_position == true` → boleh set `recommendations.mode = "CARRY_ONLY"` (manage posisi saja).
-   - Jika `meta.market_regime == "risk-off"` → `NO_TRADE` (reason: `GL_MARKET_RISK_OFF`).
-
-2) **Urutan prioritas** (jika >1 policy eligible pada hari yang sama):
-   1. `DIVIDEND_SWING`
-   2. `INTRADAY_LIGHT`
-   3. `POSITION_TRADE`
-   4. `WEEKLY_SWING`
-
-Yang tidak boleh ada di sini:
-- definisi eligibility / threshold / scoring / timing spesifik policy.
-
-Eligibility rules harus ditulis di dokumen policy masing-masing (atau doc router khusus bila dibuat).
-
-## 10) Policy doc loading & failure behavior
-
-Read order (wajib):
-1) `watchlist.md` (dokumen ini)
-2) `weekly_swing.md`
-3) `dividend_swing.md`
-4) `intraday_light.md`
-5) `position_trade.md`
-6) `no_trade.md`
-
-Jika salah satu policy doc yang dibutuhkan tidak bisa diload:
-- set `recommendations.mode = "NO_TRADE"` untuk NEW ENTRY,
-- `meta.notes` tambahkan “Policy doc missing”,
-- reason code global: `GL_POLICY_DOC_MISSING`.
-
----
-
-## 11) Contoh reason codes (sesuai governance)
-
-Contoh ringkas (WEEKLY_SWING):
-- `reason_codes`: `["WS_TREND_ALIGN_OK","WS_VOLUME_OK","WS_SETUP_BREAKOUT"]`
-- `debug.rank_reason_codes`: `["TREND_STRONG","VOL_RATIO_HIGH","BREAKOUT_BIAS"]`
-
-Tidak boleh:
-- `reason_codes`: `["TREND_STRONG","MA_ALIGN_BULL"]`  ❌ (harus prefixed policy)
-
-
-## 12) Persistence & post-mortem (wajib)
-
-Agar watchlist bisa dievaluasi ulang (post-mortem), output JSON **wajib disimpan** setiap trade date.
-
-Kontrak minimal:
-- Simpan 1 file JSON per `trade_date` + `policy.selected`.
-- Nama file deterministik (contoh): `watchlist_{trade_date}_{policy.selected}.json`.
-- Jika engine menghasilkan mode `NO_TRADE`, file tetap disimpan (supaya terlihat kenapa tidak trade).
-
-Field yang wajib sudah cukup untuk audit:
-- `trade_date`, `exec_trade_date`, `generated_at`
-- `policy.selected`, `policy.policy_version`
-- `meta.eod_canonical_ready`, `meta.market_regime`, `meta.notes[]`
-- per kandidat: `reason_codes[]`, `timing.*`, `levels.*`, `sizing.*`
-
-Opsional tapi sangat disarankan (kalau nanti ada tempat penyimpanan DB):
-- `meta.run_id` (angka/uuid)
-- `meta.source_snapshot` (ringkas: canonical run id, coverage, dsb)
-
-Kalau `meta.run_id` ditambahkan:
-- jangan ubah struktur kandidat; cukup menambah field baru di `meta` agar backward-compatible.
-
-
+- Ini opsional; jangan aktifkan tanpa menetapkan `RISK_PCT`.
+- Mode ini menjaga posisi tidak kebesaran saat stop jauh.
