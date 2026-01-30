@@ -1,5 +1,10 @@
 # Policy: DIVIDEND_SWING (SOP)
 
+> **Source of Truth (LOCKED)**
+> Dokumen policy ini mengunci **Hard Rules, Soft Rules, Risk Rules, PLAN (EOD-only), dan Scoring weights** untuk policy ini.
+> - Universe filter + grouping + recommendations allocation ada di `watchlist.md` (global).
+> - CONFIRM checks ada di `scorecard.md`.
+
 Dokumen ini hanya mendefinisikan aturan spesifik policy. Aturan universal wajib lihat `watchlist.md` bagian **Global Contract**.
 
 Kontrak lintas-policy ada di `watchlist.md`.
@@ -163,6 +168,8 @@ Default execution mapping (dipakai oleh engine Recommendations):
 - staging dinonaktifkan by default (window event sempit + gap risk).
 
 Catatan: mapping ini **tidak** mengubah hard rules; hanya menentukan bentuk tranche eksekusi untuk ticker yang sudah qualified.
+
+Harga per tranche (plan_limit_price / plan_price_cap) **tidak** ditentukan oleh policy; wajib mengikuti kontrak global di `watchlist.md` (EOD_TRANCHE_PRICE_INTENT_V1). Policy hanya menentukan `mode`, `tranche_pct`, dan timing/condition.
 
 ---
 

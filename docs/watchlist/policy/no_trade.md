@@ -1,5 +1,10 @@
 # Policy: NO_TRADE (SOP)
 
+> **Source of Truth (LOCKED)**
+> Dokumen policy ini mengunci **Hard Rules, Soft Rules, Risk Rules, PLAN (EOD-only), dan Scoring weights** untuk policy ini.
+> - Universe filter + grouping + recommendations allocation ada di `watchlist.md` (global).
+> - CONFIRM checks ada di `scorecard.md`.
+
 Dokumen ini hanya mendefinisikan aturan spesifik policy. Aturan universal wajib lihat `watchlist.md` bagian **Global Contract**.
 
 Kontrak lintas-policy ada di `watchlist.md`.
@@ -17,7 +22,7 @@ Menonaktifkan NEW ENTRY secara deterministik ketika kondisi “bukan saatnya ent
   - `groups.top_picks=[]`
   - `groups.secondary=[]`
   - `recommendations=[]`
-  - `groups.watch_only` dan `groups.avoid` boleh diisi untuk monitoring 
+  - `groups.watch_only` dan `groups.avoid` boleh diisi untuk monitoring
 
 ---
 

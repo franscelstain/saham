@@ -1,301 +1,567 @@
-# Execution & Evaluation Workflow (EOD → Eksekusi → Scorecard)
+### Reasons object (LOCKED)
+- Semua field `reasons` di seluruh output (groups, recommendations, confirm) **wajib** berupa array object:
+  - `code` (string, machine-stable)
+  - `message` (string, 1 kalimat, user-facing)
+  - `severity` (optional enum: `INFO|WARN|BLOCK`)
+- `code` tetap wajib dikirim untuk audit/log.
+- `message` disediakan oleh layer aplikasi (mis. `app/Trade/Explain`), bukan oleh dokumen ini.
 
-Dokumen ini menjelaskan **langkah kerja end-to-end** untuk memakai output Watchlist (EOD) sebagai **rencana eksekusi**, lalu melakukan **cek live** (manual input dari Ajaib) dan menghitung **indikator keberhasilan**.
+# Scorecard (CONFIRM) — Live Execution Check vs PLAN (EOD-only)
 
-> Prinsip utama: **Watchlist = Plan Generator (EOD)**.  
-> Eksekusi & evaluasi **terpisah modulnya**, tapi **terhubung** lewat `strategy_run` yang disimpan.
+> **Source of Truth (LOCKED)**
+> - `scorecard.md` mengunci: **CONFIRM input**, **guard checks**, **decision**, dan **recommended_orders per tranche**.
+> - CONFIRM **tidak boleh** mengubah PLAN (PLAN immutable).
+> - Hard/Soft/Risk PLAN berada di `policy/<policy>.md` dan kontrak global di `watchlist.md`.
+
+## Reason objects (LOCKED, user-facing)
+Semua `reasons[]` di CONFIRM harus berupa object:
+- `code` (stable)
+- `message` (1 kalimat, untuk UI)
+- `severity` (opsional): `INFO | WARN | BLOCK`
+
+Mapping `code -> message` adalah tanggung jawab layer aplikasi (mis. `app/Trade/Explain`). CONFIRM output wajib menyertakan `message` agar operator tidak perlu menghafal code.
+
+Dokumen ini adalah **kontrak CONFIRM** (intraday/live) untuk membandingkan **PLAN (EOD-only)** dari Watchlist dengan kondisi real-time saat eksekusi.
+
+**Aturan keras:**
+- **PLAN tidak boleh diubah** oleh CONFIRM. Output CONFIRM hanya memberi status `eligible_now`, alasan, dan (opsional) rekomendasi “default next action”.
+- CONFIRM **tidak boleh** menambahkan ticker baru. Universe CONFIRM hanyalah ticker yang sudah ada di output Watchlist (`groups.*` dan/atau `recommendations`).
+- Semua rule di sini harus **deterministik** untuk input yang sama.
 
 ---
 
 ## 0) Terminologi
 
-- **Strategy / Policy**: satu pendekatan (contoh: `WEEKLY_SWING`, `DIVIDEND_SWING`, `INTRADAY_LIGHT`, `POSITION_TRADE`, `NO_TRADE`).
-- **Strategy Run (EOD Plan)**: hasil EOD untuk satu policy pada satu tanggal, berisi kandidat ticker + rules entry/slices/guards.
-- **Live Check**: pengecekan real-time saat jam eksekusi (manual input data dari Ajaib).
-- **Scorecard**: ringkasan metrik keberhasilan (feasible / fill / outcome).
+- **PLAN**: output Watchlist (EOD-only) untuk tanggal `trade_date` (kemarin).
+- **CONFIRM / Execution Check**: evaluasi live per ticker terhadap PLAN + kondisi pasar saat ini.
+- **Strategy Run**: artefak tersimpan yang mengikat PLAN + policy + exec_date. Ini menjadi “pembanding” lintas hari.
+- **Eligible now**: ticker **boleh dieksekusi sekarang** (untuk tranche yang sedang aktif) menurut rule CONFIRM.
 
 ---
 
-## 1) Batasan & Tujuan Output
+## Hardening (anti-debat) (LOCKED)
 
-### 1.1 Watchlist bukan listing semua ticker
-Output watchlist yang dipublish harus berupa **kandidat**:
-- `top_picks`: prioritas eksekusi.
-- `secondary`: kandidat cadangan untuk eksekusi (fallback).
-- `watch_only`: kandidat monitoring (posisi existing / near-eligible / guard situasional).
+### 0) Definisi `checked_at` (LOCKED)
+- `checked_at` = jam saat operator mengambil **snapshot live** dari Ajaib (refresh yang sama untuk semua angka).
+- Format minimal: `HH:MM:SS` (WIB). Contoh: `09:20:12`.
+- Semua field LIVE (open/last/book/depth/volume/value) **wajib** berasal dari snapshot yang sama dengan `checked_at`.
+- Jika operator mengisi angka dari refresh berbeda → treat sebagai snapshot tidak sinkron → hasil harus `DELAY` (`CF_LIVE_SNAPSHOT_STALE`).
 
-Ticker yang tidak relevan **DROP** (tidak dipublish) walaupun diproses internal.
+Catatan implementasi (LOCKED):
+- Sistem boleh menyimpan `server_checked_at` (timestamp server saat input diterima) untuk menghitung umur snapshot.
 
-### 1.2 Default 1 rekomendasi
-Default rekomendasi **boleh** ditetapkan dari:
-- `top_picks[0]` yang **feasible_now == true**, atau
-- fallback ke `secondary` (ranking tertinggi yang feasible_now).
+Bagian ini mengunci titik yang biasanya memicu perbedaan implementasi.
 
----
+### 1) Source-of-truth `prev_close_plan` (LOCKED)
+- `prev_close_plan` = `close(trade_date)` dari dataset PLAN (EOD kemarin). Ini adalah **source-of-truth** untuk semua perhitungan gap/percent.
+- Jika live feed menyediakan `prev_close_live` → simpan untuk audit saja (tidak dipakai perhitungan).
+- Jika `prev_close_plan` missing/null/<=0 → CONFIRM tidak boleh menghitung gap; set `eligible_now=false` reason `CF_PLAN_INPUT_MISSING`.
 
-## 2) Arsitektur Modul (Disarankan)
+Output audit:
+- `live.prev_close_live` (optional, audit-only)
+- `plan.prev_close_plan`
 
-### 2.1 Watchlist (EOD)
-**Tugas**: membentuk *plan*.
-- Input: data market EOD + indikator + status harian.
-- Output: `strategy_runs[]` (per policy) berisi kandidat + aturan.
+### 2) Definisi `spread_pct` & guard zero/missing (LOCKED)
+- Jika **depth** tersedia (Top-3/Top-5) → gunakan definisi `spread_pct` pada bagian **Derived book metrics dari depth**.
+- Jika depth **tidak** tersedia → gunakan best bid/ask:
+  - `mid = (bid_best + ask_best)/2`
+  - `spread_pct = (ask_best - bid_best)/mid`
+- Jika `bid<=0` atau `ask<=0` atau `ask<bid` → treat live input invalid: `eligible_now=false` reason `CF_LIVE_BOOK_INVALID`.
+- Jika `mid<=0` → treat missing: `eligible_now=false` reason `CF_LIVE_BOOK_INVALID`.
 
-### 2.2 Execution Check (Intraday)
-**Tugas**: validasi plan vs kondisi live.
-- Input: `strategy_run` + snapshot live dari Ajaib (manual).
-- Output: `eligible_now / feasible_now`, alasan, rekomendasi default 1.
+Catatan: *Jangan* memakai `last` sebagai denominator agar stabil terhadap spike.
 
-### 2.3 Scorecard (After market / T+N)
-**Tugas**: menilai kualitas plan.
-- Input: `strategy_run` + log live checks + hasil harian (high/low/close) atau hasil transaksi.
-- Output: metrik `feasible_rate`, `fill_rate`, `outcome_rate`.
+### 3) Definisi `gap_pct` & `chase_pct` (LOCKED)
+- `gap_pct = (open - prev_close_plan) / prev_close_plan`
+- `chase_pct = (price_ref - plan_entry) / plan_entry`
+  - `price_ref = open` pada window 09:00–09:10
+  - `price_ref = last` pada window eksekusi (09:20/09:35/10:30)
+- Jika `plan_entry<=0` → `eligible_now=false` reason `CF_PLAN_INPUT_MISSING`.
 
----
+### 4) Breakout entry band (LOCKED)
+Untuk setup `BREAKOUT`, entry tidak boleh “ngejar” terlalu jauh dari `plan_entry`.
 
-## 3) Data yang Harus Disimpan (EOD Plan)
+- `breakout_band_pct = CF_BREAKOUT_BAND_PCT`
+- Syarat BREAKOUT approve (selain spread/gap/chase):
+  - `last >= plan_entry` **dan** `last <= plan_entry * (1 + breakout_band_pct)`
+- Jika `last > plan_entry * (1 + breakout_band_pct)` → `REJECT` reason `CF_BREAKOUT_TOO_EXTENDED`
 
-Simpan **per policy** (satu `strategy_run` per policy per trade_date).
+Default:
+- `CF_BREAKOUT_BAND_PCT = 0.004` (0.4%)
 
-### 3.1 Wajib disimpan (minimum)
-- `trade_date` (tanggal basis EOD)
-- `exec_date` (hari eksekusi; default = next trading day)
-- `policy`
-- `groups.top_picks[]`, `groups.secondary[]`, `groups.watch_only[]`
-- Per ticker kandidat:
-  - `ticker`
-  - `score` dan `rank` (ordering deterministik)
-  - `entry` (trigger / band)
-  - `timing.entry_windows[]`
-  - `timing.avoid_windows[]`
-  - `timing.trade_disabled` + alasan/reasons
-  - `slices` + `slice_pct` (kalau digunakan)
-  - `guards` yang berlaku (contoh: gap_up_block_pct, max_chase_pct)
-  - `reason_codes[]` (audit kenapa masuk group)
+### 4.1) Recommended limit price per tranche (LOCKED)
 
-### 3.2 Disarankan (untuk audit)
-- `meta.generated_at` (RFC3339, WIB)
-- `meta.data_coverage` / `meta.signal_age_days`
-- `allocations` (budget/slice budget per ticker bila ada)
+Tujuan: CONFIRM tidak cuma bilang `eligible_now`, tapi juga mengeluarkan **harga limit yang disarankan per tranche ke-N** + alasan, tanpa mengubah PLAN.
 
----
+Kontrak PLAN (wajib tersedia di `recommendations[].execution.tranches[]` atau `ticker_plan.execution_slices[]`):
+- `plan_limit_price` (IDR int) — harga limit yang disarankan (PLAN, immutable).
+- `plan_price_cap` (IDR int) — batas maksimum boleh bayar (anti chase).
+- `planned_lots` boleh null jika capital missing.
 
-## 4) Data Live yang Diambil dari Ajaib (Manual Input)
+Kontrak CONFIRM (deterministik, bounded by PLAN):
+- Jika depth tersedia (Top-3/Top-5) → `ask_best = ask1`.
+- Jika depth tidak ada → `ask_best` dari input `ask_best`.
+- Jika `ask_best > plan_price_cap` → `action = WAIT/REJECT` + reason `CF_CHASE_BLOCK`.
+- Jika lolos:
+  - **PULLBACK**: `recommended_limit_price = min(plan_limit_price, ask_best, plan_price_cap)`
+  - **BREAKOUT**: `recommended_limit_price = min(ask_best, plan_price_cap)`
 
-Target: input yang **pasti ada di layar** Ajaib, dan cukup untuk cek kelayakan entry.
+Output per tranche (di `recommended_orders[]`):
+- `n` (1..N), `action ∈ {PLACE_LIMIT, WAIT, SKIP}`
+- `recommended_limit_price` (nullable jika WAIT/SKIP)
+- echo `plan_limit_price` + `plan_price_cap` (audit)
+- `lots` (copy dari plan tranche jika ada)
+- `reasons[]` (CF_*) + `inputs_used` (ask1/bid1/spread/snapshot_age) (array of objects `{ code, message, severity? }`)
 
-### 4.1 Minimal (Level 1 — cukup untuk “eligible sekarang?”)
+### 5) Window semantics (inclusive/exclusive) (LOCKED)
+Semua window menggunakan aturan:
+- `window_start <= checked_at < window_end`
+Contoh: window 09:00–09:10 berarti 09:00:00 inclusive sampai 09:10:00 exclusive.
+
+### 6) Single-source PLAN vs CONFIRM (LOCKED)
+- CONFIRM tidak boleh menghitung ulang `plan_entry/stop/tp` dari live.
+- Semua field PLAN di CONFIRM harus copy dari output PLAN.
+- Perubahan yang diizinkan hanya pada field CONFIRM: `decision`, `eligible_now`, `next_check_at`, `reasons`, dan `execution(tranches)`.
+
+### 7) Stale / unsynced snapshot detector (LOCKED)
+Tujuan: mencegah keputusan berdasarkan data live yang belum sinkron (panel price vs order book beda refresh).
+
+Definisi:
+- `last` diambil dari panel harga.
+- `bid`/`ask` diambil dari order book level-1.
+- Snapshot dianggap **stale** jika salah satu kondisi berikut terjadi:
+  - `last > ask * (1 + CF_STALE_TOL_PCT)`  (last terlalu tinggi di atas ask)
+  - `last < bid * (1 - CF_STALE_TOL_PCT)`  (last terlalu rendah di bawah bid)
+  - `checked_at` lebih tua dari `CF_MAX_SNAPSHOT_AGE_SEC` (jika timestamp live tersedia)
+Aksi:
+- Jika stale → `decision=DELAY`, `eligible_now=false`, reason `CF_LIVE_SNAPSHOT_STALE`, dan wajib re-check pada window berikutnya.
+
+Default:
+- `CF_STALE_TOL_PCT = 0.003` (0.3%)
+- `CF_MAX_SNAPSHOT_AGE_SEC = 30`
+
+### 8) Retry budget & cooldown (LOCKED)
+Tujuan: membatasi loop delay yang tidak berujung.
+
+Definisi:
+- `retry_count` dihitung per ticker per hari (dalam satu sesi CONFIRM).
+- Jika `decision=DELAY` maka `retry_count += 1`.
+- Jika `retry_count > CF_MAX_RETRY_WINDOWS` → `decision=REJECT`, `eligible_now=false`, reason `CF_MAX_RETRY_REACHED`.
+
+Cooldown:
+- Setelah DELAY, `next_check_at` harus minimal `checked_at + CF_RETRY_COOLDOWN_SEC`.
+
+Default:
+- `CF_RETRY_COOLDOWN_SEC = 30`
+
+## 1) Input utama (source of truth)
+
+### 1.1 Input PLAN (wajib)
+Simpan **utuh** JSON output Watchlist (PLAN) sebagai `plan_json`.
+
+Minimal PLAN yang dipakai CONFIRM:
+- `meta.trade_date`, `meta.policy`, `meta.flags`, `meta.reasons`
+- `groups.top_picks[]`, `groups.secondary[]`, `groups.watch_only[]`, `groups.avoid[]`
+- `recommendations[]` (jika ada)
+
+Mapping (LOCKED):
+- `entry_trigger` = `TickerPlan.plan.entry`
+- `setup_type` = `TickerPlan.setup_type`
+- `plan_stop` = `TickerPlan.plan.stop`
+- `plan_tp1` = `TickerPlan.plan.tp1`
+- `plan_rr_est` = `TickerPlan.plan.rr_est`
+- `plan_r` = `TickerPlan.plan.r`
+- Mini execution hint:
+  - `mini_tranches_pct` dipakai untuk Top Picks/Secondary (pre-open hint)
+  - `recommendations.tranches` dipakai sebagai sumber lots (Mode B / capital ada)
+
+### 1.2 Input LIVE (manual dari Ajaib)
+Target: input yang **pasti ada di layar** Ajaib dan cukup untuk cek kelayakan entry.
+
+**Level 1 (minimum, wajib):**
 Per ticker:
-- `checked_at` (jam WIB saat kamu cek)
-- `last` (harga terakhir)
-- `bid` (best bid)
-- `ask` (best ask)
-- `open` (harga pembukaan hari ini)
-- `prev_close` (penutupan kemarin)
+- `checked_at` (timestamp WIB)
+- `last`
+- `bid`
+- `ask`
+- `open`
+- `prev_close_live` (optional, audit-only)**Level 2 (disarankan):**
+- `high`, `low`, `vol`
 
-> Kalau Ajaib tidak menampilkan `prev_close`, ambil dari ringkasan chart 1D / data close kemarin.
-
-### 4.2 Disarankan (Level 2 — lebih akurat)
-Tambahan:
-- `high` dan `low` (range harian)
-- `vol` (volume hari ini)
-
-### 4.3 Intraday-heavy (Level 3 — untuk fill slice / outcome intraday)
-Tambahan:
-- snapshot berkala (mis. setiap 5–15 menit) untuk ticker yang sedang dipantau,
-- atau setidaknya `high/low` update per jam check.
+Jika field Level 1 tidak lengkap → ticker dianggap **NOT_ELIGIBLE** dengan reason `CF_LIVE_INPUT_MISSING`.
 
 ---
 
-## 5) Aturan Evaluasi Live (Feasible / Eligible)
+## 2) Timing windows & guards (LOCKED defaults)
 
-Evaluasi ini dilakukan **per ticker**, lalu diringkas **per strategy**.
+CONFIRM membutuhkan timing/guards untuk menilai “boleh eksekusi sekarang?”. Angka di bawah adalah **default policy-level** (bukan per ticker), supaya implementasi tidak liar.
 
-### 5.1 In-window check
-- `in_entry_window = now ∈ timing.entry_windows AND now ∉ timing.avoid_windows`
+### 2.1 Default entry/avoid windows (WIB)
 
-### 5.2 Trade disabled
-- Jika `timing.trade_disabled == true` → default `eligible_now = false`  
-  *kecuali* policy memang mode `CARRY_ONLY` dan ticker `has_position == true`.
+Semua window memakai format `HH:MM-HH:MM` dan **inclusive start, exclusive end**.
 
-### 5.3 Chase check (harga sudah “lari”)
-- `chase_ok = last <= entry_trigger * (1 + max_chase_pct)`
-- Jika `chase_ok == false` → `eligible_now = false` (avoid entry chasing)
+- **WS/DS/PT**:
+  - `entry_windows`: `["09:20-10:15", "13:35-14:15"]`
+  - `avoid_windows`: `["09:00-09:20", "11:30-13:30", "15:15-16:00"]`
 
-### 5.4 Gap-up block check (hari eksekusi)
-- `gap_pct = (open - prev_close) / prev_close`
-- Jika `gap_pct > gap_up_block_pct` → `eligible_now = false`
+- **IL**:
+  - `entry_windows`: `["09:05-09:45", "13:35-14:10"]`
+  - `avoid_windows`: `["09:00-09:05", "11:30-13:30", "15:00-16:00"]`
 
-### 5.5 Spread proxy (eksekusi jelek)
-- `spread_pct = (ask - bid) / last`
-- Jika `spread_pct > spread_max_pct` → `eligible_now = false` atau downgrade (tergantung policy)
-
-### 5.6 Keputusan akhir (per ticker)
-- `eligible_now = in_entry_window && !trade_disabled && chase_ok && gap_ok && spread_ok`
+- **NO_TRADE**:
+  - `trade_disabled = true` (selalu)
 
 Catatan:
-- Untuk policy `NO_TRADE`, `top_picks=[]` dan `secondary=[]` selalu; hanya `watch_only` terbatas.
+- CONFIRM **boleh** dijalankan kapan saja (mis. 09:10), tapi `in_entry_window` akan false jika belum masuk window.
+
+### 2.2 Default guards (policy-level)
+
+Semua nilai persentase adalah fraction (0.01 = 1%).
+
+- **WS**:
+  - `max_chase_pct = 0.010`
+  - `gap_up_block_pct = 0.015`
+  - `spread_max_pct = 0.006`
+
+- **DS**:
+  - `max_chase_pct = 0.008`
+  - `gap_up_block_pct = 0.012`
+  - `spread_max_pct = 0.006`
+
+- **PT**:
+  - `max_chase_pct = 0.012`
+  - `gap_up_block_pct = 0.018`
+  - `spread_max_pct = 0.008`
+
+- **IL**:
+  - `max_chase_pct = 0.006`
+  - `gap_up_block_pct = 0.010`
+  - `spread_max_pct = 0.010`  *(lebih toleran spread, tapi chase lebih ketat)*
+
+- **NO_TRADE**:
+  - tidak relevan (trade_disabled)
+
+Override (LOCKED):
+- Jika PLAN ticker punya flag `GAP_RISK_HIGH` atau `CA_EVENT_NEAR` → turunkan agresivitas:
+  - `max_chase_pct = min(max_chase_pct, 0.006)`
+  - `gap_up_block_pct = min(gap_up_block_pct, 0.010)`
 
 ---
 
-## 6) Metrik Keberhasilan
+## 3) Universe CONFIRM (ticker mana yang dievaluasi)
 
-### 6.1 Feasible Rate (real-time)
-Definisi: dari kandidat yang dievaluasi, berapa yang `eligible_now == true` pada jam check.
+Default (LOCKED):
+1) Evaluasi semua ticker di `recommendations[]` (paling actionable).
+2) Jika `recommendations=[]`, evaluasi `groups.top_picks` lalu `groups.secondary` (untuk default pick).
+3) `watch_only/avoid` boleh dievaluasi jika user minta, tapi default **tidak** (biar ringan).
 
-- Per strategy:
-  - `feasible_rate = eligible_true / evaluated_candidates`
-- Per hari:
-  - agregasi dari beberapa checkpoint (mis. 09:20, 10:00, 13:40)
-
-### 6.2 Fill Rate (hari itu)
-Definisi: seberapa banyak slice entry yang benar-benar “kesentuh” oleh harga.
-
-Butuh minimal:
-- `high/low` harian atau intraday range.
-
-Contoh:
-- slices=3 → entry1/entry2/entry3
-- `fill_rate = filled_slices / total_slices`
-
-### 6.3 Outcome Rate (horizon strategy)
-Definisi: plan menghasilkan hasil sesuai rule exit (TP/SL/time stop).
-
-Butuh:
-- log transaksi atau data high/low/close hingga exit horizon.
+CONFIRM **tidak pernah** mengambil ticker di luar PLAN.
 
 ---
 
-## 7) Checklist Operasional Harian (Ringkas & Realistis)
+## 4) Per-ticker evaluation (LOCKED)
 
-### 7.1 Malam (setelah EOD)
-1) Jalankan Watchlist EOD
-2) Pastikan output publish **kandidat saja** (cap top/secondary/watch_only)
-3) Simpan `strategy_runs` ke DB (payload JSON)
+Semua rule di bawah menghasilkan:
+- `eligible_now` (bool)
+- `reasons[]` (reason code)
+- `computed{...}` (angka audit)
 
-### 7.2 Hari eksekusi (intraday)
-Lakukan 2–3 checkpoint saja (contoh):
-- 09:20 (open window)
-- 10:00 (konfirmasi)
-- 13:40 (session 2)
+### 4.1 Preconditions
 
-Di setiap checkpoint:
-1) Ambil data Ajaib per ticker kandidat (minimal level 1)
-2) Jalankan **Execution Check**
-3) Ambil default 1 rekomendasi (yang feasible_now dan ranking tertinggi)
-4) Simpan `strategy_check` (snapshot + hasil)
+Jika salah satu true → `eligible_now=false`:
+- `meta.flags` mengandung `EOD_NOT_READY` → reason ``
+- `entry_trigger` null → reason ``
+- live input L1 missing → reason `CF_LIVE_INPUT_MISSING`
 
-### 7.3 Setelah close / besok pagi
-1) Hitung scorecard (feasible + fill)
-2) (Opsional) outcome jika sudah ada rule exit / transaksi.
+### 4.2 In-window check
+
+- `in_entry_window = checked_at ∈ entry_windows AND checked_at ∉ avoid_windows`
+
+Jika false → `eligible_now=false`, reason ``.
+
+### 4.3 Trade disabled
+
+- `trade_disabled = (policy == NO_TRADE)` atau (opsional) PLAN flag `TRADE_DISABLED_TODAY`
+
+Jika true → `eligible_now=false`, reason ``.
+
+### 4.4 Chase check (anti “ngejar”)
+
+Definisi (LOCKED):
+- `chase_pct = max(0, (last - entry_trigger) / entry_trigger)`
+- `chase_ok = (last <= entry_trigger * (1 + max_chase_pct))`
+
+Jika `chase_ok=false` → `eligible_now=false`, reason `CF_CHASE_BLOCK`.
+
+Catatan:
+- Jika `last < entry_trigger`, chase_pct=0 (bukan negative).
+
+### 4.5 Gap-up block (hari eksekusi)
+
+Definisi (LOCKED):
+- `gap_pct = (open - prev_close_plan) / prev_close_plan`
+- `gap_ok = (gap_pct <= gap_up_block_pct)`
+
+Jika `gap_ok=false` → `eligible_now=false`, reason `CF_GAP_UP_BLOCK`.
+
+### 4.6 Spread proxy (quality gate)
+
+Definisi (LOCKED):
+- `spread_pct = (ask - bid) / mid`
+- `spread_ok = (spread_pct <= spread_max_pct)`
+
+Jika `spread_ok=false` → `eligible_now=false`, reason `CF_SPREAD_TOO_WIDE`.
+
+### 4.7 Keputusan akhir
+
+`eligible_now = in_entry_window && !trade_disabled && chase_ok && gap_ok && spread_ok`
 
 ---
 
-## 8) Template JSON (untuk simpan & cek)
+## 5) Default pick (1 ticker) (LOCKED)
 
-### 8.1 Strategy Run (disimpan dari EOD)
-```json
-{
-  "trade_date": "2026-01-26",
-  "exec_date": "2026-01-27",
-  "policy": "WEEKLY_SWING",
-  "meta": { "generated_at": "2026-01-26T20:15:00+07:00" },
-  "groups": {
-    "top_picks": [
-      {
-        "ticker": "JPFA",
-        "score": 86,
-        "rank": 1,
-        "entry_trigger": 1230,
-        "guards": { "max_chase_pct": 0.01, "gap_up_block_pct": 0.015, "spread_max_pct": 0.004 },
-        "timing": { "trade_disabled": false, "entry_windows": ["09:20-10:15","13:35-14:15"], "avoid_windows": ["11:30-13:30","15:15-close"] },
-        "slices": 2,
-        "slice_pct": [0.6, 0.4],
-        "reason_codes": ["WS_TREND_ALIGN_OK","WS_RR_OK","WS_LIQ_OK"]
-      }
-    ],
-    "secondary": [],
-    "watch_only": []
-  }
-}
-```
+Tujuan: UI/opsional automation membutuhkan satu “default next action”.
 
-### 8.2 Live Check (input manual dari Ajaib)
+Rule (LOCKED):
+- Kandidat default diambil dari urutan:
+  1) `recommendations[]` sesuai urutan output PLAN
+  2) fallback `groups.top_picks`
+  3) fallback `groups.secondary`
+- Pilih ticker pertama dengan `eligible_now=true`.
+- Jika tidak ada → `default_recommendation=null`.
+
+CONFIRM **tidak** boleh promote ticker dari `watch_only/avoid` jadi default kecuali user eksplisit minta.
+
+---
+
+## 6) Output schema (CONFIRM)
+
+### 6.1 Live Check input (disimpan)
+
 ```json
 {
   "checked_at": "2026-01-27T09:37:00+07:00",
   "tickers": [
-    { "ticker": "JPFA", "last": 1235, "bid": 1230, "ask": 1235, "open": 1220, "prev_close": 1210, "high": 1245, "low": 1215, "vol": 12000000 }
+    {
+      "ticker_code": "JPFA",
+      "last": 1235,
+      "bid": 1230,
+      "ask": 1235,
+      "open": 1220,
+      "prev_close_plan": 1210,
+      "high": 1245,
+      "low": 1215,
+      "vol": 12000000
+    }
   ]
 }
 ```
 
-### 8.3 Output Execution Check (hasil evaluasi)
+### 6.2 Execution Check output (hasil evaluasi)
+
 ```json
 {
   "checked_at": "2026-01-27T09:37:00+07:00",
+  "policy": "WEEKLY_SWING",
+  "trade_date": "2026-01-26",
+  "plan_ref": { "strategy_run_id": "SR-20260126-WEEKLY_SWING" },
   "results": [
     {
-      "ticker": "JPFA",
+      "ticker_code": "JPFA",
       "eligible_now": true,
-      "flags": [],
+      "reasons": [],
+      "plan": { "entry_trigger": 1230, "stop": 1180, "tp1": 1390, "rr_est": 1.3, "setup_type": "PULLBACK" },
       "computed": { "gap_pct": 0.0083, "spread_pct": 0.0040, "chase_pct": 0.0041 },
-      "notes": "In-window, chase OK, gap OK"
+      "live": { "last": 1235, "bid": 1230, "ask": 1235, "open": 1220, "prev_close_plan": 1210 },
+      "recommended_orders": [
+        {
+          "n": 1,
+          "action": "PLACE_LIMIT",
+          "recommended_limit_price": 1235,
+          "plan_limit_price": 1230,
+          "plan_price_cap": 1235,
+          "lots": 10,
+          "reasons": [{"code":"CF_PRICE_AT_ASK1_WITHIN_CAP","message":"<message>"}],
+          "inputs_used": { "ask_best": 1235, "spread_pct": 0.0040, "snapshot_age_sec": 3 }
+        }
+      ]
     }
   ],
-  "default_recommendation": { "ticker": "JPFA", "why": "eligible_now && rank=1" }
+  "default_recommendation": { "ticker_code": "JPFA", "why": "eligible_now && first_in_priority_order" }
 }
 ```
 
 ---
 
-## 9) DB Tables (opsional tapi disarankan)
+## 7) Reason codes (CONFIRM) (LOCKED, single-source)
 
-Jika kamu ingin audit lengkap dan bisa menghitung scorecard otomatis:
+Semua reason code CONFIRM harus berasal dari daftar ini (anti typo/duplikasi).
+
+Input & integrity:
+- `CF_PLAN_INPUT_MISSING`: field PLAN minimum missing/null (prev_close_plan/plan_entry/plan_price_cap/etc)
+- `CF_LIVE_INPUT_MISSING`: field live minimum missing/null
+- `CF_LIVE_BOOK_INVALID`: bid/ask invalid (<=0 / ask<bid / mid<=0)
+- `CF_LIVE_SNAPSHOT_STALE`: snapshot live tidak sinkron / terlalu tua
+
+Entry guards:
+- `CF_CHASE_BLOCK`: ask_best > plan_price_cap (over cap)
+- `CF_BREAKOUT_TOO_EXTENDED`: breakout sudah terlalu jauh di atas plan_entry band
+- `CF_GAP_UP_BLOCK`: gap-up terlalu besar vs prev_close_plan
+- `CF_SPREAD_TOO_WIDE`: spread_pct melebihi batas policy
+- `CF_BOOK_TOO_THIN`: depth tidak memadai (jika depth dipakai)
+- `CF_LIQUIDITY_DRY`: value/vol live terlalu rendah (opsional guard)
+
+Price intent (audit):
+- `CF_PRICE_AT_ASK1_WITHIN_CAP`
+- `CF_PRICE_CLAMPED_TO_PLAN_LIMIT`
+- `CF_PRICE_CLAMPED_TO_CAP`
+
+Control flow:
+- `CF_MAX_RETRY_REACHED`: retry DELAY melebihi batas; no entry hari ini
+- `CF_TRANCHE_SKIPPED`: tranche N di-skip karena rule (mis. follow-through fail)
+
+---
+
+## 8) Implementasi (ringkas)
+
+- Ambil PLAN (watchlist output) → simpan sebagai `strategy_run.plan_json`.
+- Saat intraday, user input live (Ajaib) → simpan `snapshot_json`.
+- Jalankan evaluator deterministik:
+  - map PLAN → `entry_trigger`
+  - load policy defaults (windows + guards)
+  - hitung computed metrics
+  - set eligible_now + reasons
+- Simpan `result_json` (execution check output).
+- Jangan pernah mutasi PLAN.
+## 9) Penyimpanan (DB) (disarankan)
+
+Tujuan: membandingkan PLAN vs CONFIRM lintas hari tanpa mengubah PLAN.
 
 ### 9.1 `watchlist_strategy_runs`
-- `id` (uuid)
-- `trade_date` (date)
-- `exec_date` (date)
-- `policy` (varchar)
-- `payload_json` (jsonb / longtext)
+Simpan output EOD (PLAN).
+Kolom minimal:
+- `id`
+- `trade_date`
+- `exec_date`
+- `policy`
+- `plan_json` (JSON lengkap output watchlist)
 - `created_at`
 
 ### 9.2 `watchlist_strategy_checks`
-- `id` (uuid)
-- `strategy_run_id` (uuid, FK)
-- `checked_at` (timestamp)
-- `snapshot_json` (jsonb)
-- `result_json` (jsonb)
+Simpan hasil CONFIRM (intraday).
+Kolom minimal:
+- `id`
+- `strategy_run_id` (FK)
+- `checked_at`
+- `snapshot_json` (Live Check input)
+- `result_json` (Execution Check output)
 - `created_at`
 
 ### 9.3 (Opsional) `watchlist_scorecards`
+Simpan metrik hasil (setelah horizon strategy) untuk evaluasi performa.
+Kolom minimal:
+- `id`
 - `strategy_run_id`
-- `feasible_rate`
-- `fill_rate`
-- `outcome_rate`
-- `notes`
+- `ticker_code`
+- `side` (BUY/SELL)
+- `entry_price`, `exit_price`, `pnl_pct`
+- `outcome_code` (WIN/LOSS/FLAT/OPEN)
+- `evaluated_at`
 
----
+## Policy Overrides (LOCKED)
 
-## 10) Keputusan Desain Penting
+Tujuan: membuat CONFIRM tetap deterministik tapi lebih sesuai karakter tiap policy.
+Kontrak: rumus & urutan gates **tetap sama**; yang boleh berbeda hanya nilai parameter (angka) per policy.
 
-### 10.1 Kenapa modul terpisah
-- Menghindari output watchlist jadi “dumping ground”
-- Memudahkan test (EOD plan deterministik, live check deterministik)
-- Membuat evaluasi lebih adil (plan disimpan, live dibandingkan dengan plan)
+### Precedence (LOCKED)
+1) Jika `policy` memiliki override untuk sebuah parameter → gunakan override itu.
+2) Jika tidak ada override → gunakan `Parameter defaults (LOCKED)` (global).
 
-### 10.2 Kalau ingin cek 1 ticker di luar strategi
-Buat fitur/endpoint terpisah: **Single Ticker Evaluation**:
-- input: ticker + asumsi policy template + data Ajaib
-- output: eligible_now + alasan
-- (opsional) simpan ke `ticker_check_logs`
+### Override-able parameters (LOCKED)
+- `CF_SPREAD_MAX_PCT`
+- `CF_MAX_CHASE_PCT`
+- `CF_BREAKOUT_BAND_PCT`
+- `CF_GAP_UP_BLOCK_PCT`
+- `CF_MAX_RETRY_WINDOWS`
 
----
+### Overrides per policy (LOCKED)
 
-## 11) Quick Start (paling cepat tanpa coding tambahan)
-1) Simpan output EOD (strategy_run JSON) untuk hari ini
-2) Besok saat eksekusi, input manual data Ajaib (level 1) untuk kandidat top+secondary
-3) Hitung eligible_now per ticker dan pilih default 1
-4) Simpan minimal: jam cek + last/open/prev_close/bid/ask + hasil eligible
+Nilai di bawah ini dipilih agar:
+- **IL** paling ketat (intraday cepat, anti spread/anti chase)
+- **PT** ketat untuk entry discipline (anti overextended)
+- **WS/DS** moderat (masih disiplin, tapi tidak seketat IL)
 
-Selesai.
+| Policy | CF_SPREAD_MAX_PCT | CF_MAX_CHASE_PCT | CF_BREAKOUT_BAND_PCT | CF_GAP_UP_BLOCK_PCT | CF_MAX_RETRY_WINDOWS |
+|---|---:|---:|---:|---:|---:|
+| INTRADAY_LIGHT | 0.005 | 0.008 | 0.003 | 0.025 | 1 |
+| WEEKLY_SWING   | 0.006 | 0.010 | 0.004 | 0.030 | 2 |
+| DIVIDEND_SWING | 0.006 | 0.010 | 0.004 | 0.030 | 2 |
+| POSITION_TRADE | 0.006 | 0.008 | 0.003 | 0.030 | 2 |
+| NO_TRADE       | (n/a) | (n/a) | (n/a) | (n/a) | (n/a) |
+
+Catatan NO_TRADE (LOCKED):
+- NO_TRADE tidak melakukan eksekusi, jadi CONFIRM hanya monitoring; overrides tidak dipakai.
+
+### Data live input (optional depth, recommended) (LOCKED)
+Selain input minimum (`open`, `last`, `bid`, `ask`, `volume/value`, `checked_at`), operator **boleh** memasukkan depth agar keputusan lebih stabil dari fluktuasi best price.
+
+Format depth (pilih salah satu, LOCKED):
+- Top-3: `bid1,bid2,bid3` + `bid_lots1,bid_lots2,bid_lots3` dan `ask1,ask2,ask3` + `ask_lots1,ask_lots2,ask_lots3`
+- Top-5: `bid1..bid5` + `bid_lots1..bid_lots5` dan `ask1..ask5` + `ask_lots1..ask_lots5`
+
+Kontrak snapshot (LOCKED):
+- Semua angka depth harus berasal dari **refresh yang sama** dengan `last/open`.
+- Jika tidak yakin sinkron → gunakan stale detector; hasilnya harus `DELAY`.
+
+Kontrak input bid/ask vs depth (LOCKED):
+- Jika operator mengisi **depth** (Top-3/Top-5), maka `bid_best` dan `ask_best` **wajib** diambil dari `bid1` dan `ask1` (derived).
+  Jangan input `bid_best/ask_best` terpisah (untuk menghindari mismatch).
+- Jika operator **tidak** mengisi depth, maka wajib mengisi `bid_best` dan `ask_best`.
+
+### Derived book metrics dari depth (LOCKED)
+Jika depth tersedia, hitung metrik berikut (deterministik):
+
+Best:
+- `bid_best = bid1`
+- `ask_best = ask1`
+
+Cumulative lots:
+- `cum_bid_lots_N = sum(bid_lots1..bid_lotsN)`
+- `cum_ask_lots_N = sum(ask_lots1..ask_lotsN)`
+
+VWAP level-1..N (opsional, stabil untuk mid):
+- `bid_vwap_N = sum(bid_i * bid_lots_i) / cum_bid_lots_N`
+- `ask_vwap_N = sum(ask_i * ask_lots_i) / cum_ask_lots_N`
+- `mid_vwap_N = (bid_vwap_N + ask_vwap_N)/2`
+
+Spread untuk guards (LOCKED):
+- Jika depth tersedia → gunakan `mid_vwap_N` sebagai denominator spread:
+  - `spread_pct = (ask_best - bid_best) / mid_vwap_N`
+- Jika depth tidak tersedia → fallback ke mid best:
+  - `mid = (bid_best + ask_best)/2`
+  - `spread_pct = (ask_best - bid_best)/mid`
+
+### Depth guards (optional, LOCKED)
+Tujuan: hindari entry pada order book yang tipis (risk slippage tinggi), terutama untuk IL.
+
+Jika depth tersedia:
+- `cum_bid_lots_N >= CF_MIN_CUM_BID_LOTS_N` dan `cum_ask_lots_N >= CF_MIN_CUM_ASK_LOTS_N`
+Jika gagal:
+- `decision=DELAY`, `eligible_now=false`, reason `CF_BOOK_TOO_THIN`
+
+Default thresholds (LOCKED, berlaku jika guard diaktifkan):
+- `CF_MIN_CUM_BID_LOTS_3 = 2_000`
+- `CF_MIN_CUM_ASK_LOTS_3 = 2_000`
+- `CF_MIN_CUM_BID_LOTS_5 = 3_000`
+- `CF_MIN_CUM_ASK_LOTS_5 = 3_000`
+
+Catatan (LOCKED):
+- Depth guards bersifat **optional**. Jika operator tidak input depth → guard ini tidak dievaluasi.
+- Jika diaktifkan, depth guards dievaluasi setelah `CF_LIVE_SNAPSHOT_STALE` dan sebelum `CF_SPREAD_TOO_WIDE`.
+
+### Policy-specific enablement (LOCKED)
+Depth guards dianjurkan **aktif** untuk:
+- `INTRADAY_LIGHT` (default: ON jika depth tersedia)
+
+Untuk policy lain:
+- `WEEKLY_SWING`, `DIVIDEND_SWING`, `POSITION_TRADE` default: OFF (evaluasi hanya spread/chase/gap), kecuali operator ingin mengaktifkan.

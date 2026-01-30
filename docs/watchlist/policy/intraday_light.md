@@ -1,5 +1,10 @@
 # Policy: INTRADAY_LIGHT (SOP)
 
+> **Source of Truth (LOCKED)**
+> Dokumen policy ini mengunci **Hard Rules, Soft Rules, Risk Rules, PLAN (EOD-only), dan Scoring weights** untuk policy ini.
+> - Universe filter + grouping + recommendations allocation ada di `watchlist.md` (global).
+> - CONFIRM checks ada di `scorecard.md`.
+
 Dokumen ini hanya mendefinisikan aturan spesifik policy. Aturan universal wajib lihat `watchlist.md` bagian **Global Contract**.
 
 Kontrak lintas-policy ada di `watchlist.md`.
@@ -143,7 +148,7 @@ Tujuan: definisikan kapan setup dianggap **gagal** setelah entry (supaya tidak n
 - **Time stop (default):** 1 trading day (wajib cepat). Jika tidak jalan → keluar.
 
 ### Invalidation rules (hard)
-- Jika menyentuh stop intraday → exit (hard). 
+- Jika menyentuh stop intraday → exit (hard).
 - Jika tidak ada follow-through sampai akhir sesi 2. Definisi follow-through: `last_price_session2 >= entry`. → exit (reason: `NO_FOLLOW_THROUGH`).
 - Jika spread melebar abnormal saat eksekusi → block (confirm).
 
@@ -164,6 +169,8 @@ Default execution mapping (dipakai oleh engine Recommendations):
 - staging dinonaktifkan by default (stop ketat + confirm ketat).
 
 Catatan: mapping ini **tidak** mengubah hard rules; hanya menentukan bentuk tranche eksekusi untuk ticker yang sudah qualified.
+
+Harga per tranche (plan_limit_price / plan_price_cap) **tidak** ditentukan oleh policy; wajib mengikuti kontrak global di `watchlist.md` (EOD_TRANCHE_PRICE_INTENT_V1). Policy hanya menentukan `mode`, `tranche_pct`, dan timing/condition.
 
 ---
 
