@@ -1,5 +1,10 @@
 # Weekly Swing (Policy)
 
+> **Source of Truth (LOCKED)**
+> Dokumen policy ini mengunci **Hard Rules, Soft Rules, Risk Rules, PLAN (EOD-only), dan Scoring weights** untuk policy ini.
+> - Universe filter + grouping + recommendations allocation ada di `watchlist.md` (global).
+> - CONFIRM checks ada di `scorecard.md`.
+
 ## 1) Tujuan & horizon
 - Horizon: 3–7 hari bursa.
 - Gaya entry: `setup_type ∈ {BREAKOUT, PULLBACK}` (ditentukan deterministik oleh rules PLAN) pada uptrend yang tradeable.
