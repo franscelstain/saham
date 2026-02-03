@@ -11,7 +11,7 @@ class WatchlistRepository
      *
      * Important (LOCKED by docs/watchlist/policy/*.md):
      * - WEEKLY_SWING needs highest_high(20) and lowest_low(5) computed using data **before** trade_date.
-     * - We compute those once per run using market_calendar to get the prior N trading dates and
+     * - We compute those once per run using market_calendars to get the prior N trading dates and
      *   joining aggregated subqueries (no per-ticker queries).
      *
      * @return array<int, array<string, mixed>>
@@ -20,28 +20,28 @@ class WatchlistRepository
     {
         // --- trading dates ---
         // prevDate is the most recent trading day BEFORE eodDate.
-        $prevDate = DB::table('market_calendar')
+        $prevDate = DB::table('market_calendars')
             ->where('is_trading_day', 1)
-            ->where('cal_date', '<', $eodDate)
-            ->orderBy('cal_date', 'desc')
-            ->value('cal_date as trade_date');
+            ->where('trade_date', '<', $eodDate)
+            ->orderBy('trade_date', 'desc')
+            ->value('trade_date');
 
         // Prior 20 trading dates BEFORE eodDate (exclude eodDate)
-        $prev20Dates = DB::table('market_calendar')
+        $prev20Dates = DB::table('market_calendars')
             ->where('is_trading_day', 1)
-            ->where('cal_date', '<', $eodDate)
-            ->orderBy('cal_date', 'desc')
+            ->where('trade_date', '<', $eodDate)
+            ->orderBy('trade_date', 'desc')
             ->limit(20)
-            ->pluck('cal_date as trade_date')
+            ->pluck('trade_date')
             ->toArray();
 
         // Prior 50 trading dates BEFORE eodDate (exclude eodDate) for longer resistance reference
-        $prev50Dates = DB::table('market_calendar')
+        $prev50Dates = DB::table('market_calendars')
             ->where('is_trading_day', 1)
-            ->where('cal_date', '<', $eodDate)
-            ->orderBy('cal_date', 'desc')
+            ->where('trade_date', '<', $eodDate)
+            ->orderBy('trade_date', 'desc')
             ->limit(50)
-            ->pluck('cal_date as trade_date')
+            ->pluck('trade_date')
             ->toArray();
 
         // Prior 5 trading dates BEFORE eodDate
@@ -64,12 +64,12 @@ class WatchlistRepository
         }
 
         // dv20 dates: includes eodDate + previous 19 days (existing behavior) for liquidity
-        $dv20Dates = DB::table('market_calendar')
+        $dv20Dates = DB::table('market_calendars')
             ->where('is_trading_day', 1)
-            ->where('cal_date', '<=', $eodDate)
-            ->orderBy('cal_date', 'desc')
+            ->where('trade_date', '<=', $eodDate)
+            ->orderBy('trade_date', 'desc')
             ->limit(20)
-            ->pluck('cal_date as trade_date')
+            ->pluck('trade_date')
             ->toArray();
 
         // dv20: average traded value (close * volume)
@@ -208,7 +208,7 @@ class WatchlistRepository
             $q->addSelect(DB::raw('NULL as roc5'));
         }
 
-        $q->where('t.is_deleted', 0)
+        $q->where('t.is_active', 1)
           ->whereNotNull('od.close')
           ->orderBy('t.ticker_code', 'asc');
 
@@ -216,100 +216,4 @@ class WatchlistRepository
             return (array) $r;
         })->toArray();
     }
-
-        /**
-     * Cari tanggal EOD terbaru yang "layak dipakai" (coverage canonical + indicators >= threshold).
-     * Fallback: tanggal terbaru yang ada di kedua tabel (intersection).
-     */
-    public function getLatestCommonEodDate(int $lookbackTradingDays = 15): ?string
-    {
-        $minCanon = (float) config('trade.watchlist.min_canonical_coverage_pct', 85.0);
-        $minInd   = (float) config('trade.watchlist.min_indicator_coverage_pct', 85.0);
-
-        $dates = DB::table('market_calendar')
-            ->where('is_trading_day', 1)
-            ->orderBy('cal_date', 'desc')
-            ->limit(max(1, $lookbackTradingDays))
-            ->pluck('cal_date as trade_date')
-            ->toArray();
-
-        foreach ($dates as $d) {
-            $cov = $this->coverageSnapshot((string)$d);
-            $canon = $cov['canonical_coverage_pct'] ?? null;
-            $ind   = $cov['indicators_coverage_pct'] ?? null;
-
-            if ($canon !== null && $ind !== null && (float)$canon >= $minCanon && (float)$ind >= $minInd) {
-                return (string)$d;
-            }
-        }
-
-        // Fallback: latest date that exists in both canonical & indicators (even if coverage low)
-        $fallback = DB::table('ticker_ohlc_daily as od')
-            ->join('ticker_indicators_daily as ti', function ($j) {
-                $j->on('ti.ticker_id', '=', 'od.ticker_id')
-                  ->on('ti.trade_date', '=', 'od.trade_date');
-            })
-            ->selectRaw('MAX(od.trade_date) as d')
-            ->value('d');
-
-        return $fallback ? (string)$fallback : null;
-    }
-
-    /**
-     * Snapshot coverage untuk EOD + Indicators pada tanggal tertentu.
-     * Dipakai WatchlistEngine untuk readiness gate dan missingTradingDates.
-     */
-    public function coverageSnapshot(string $eodDate): array
-    {
-        $total = (int) DB::table('tickers')->where('is_deleted', 0)->count();
-
-        $canon = (int) DB::table('ticker_ohlc_daily')
-            ->where('trade_date', $eodDate)
-            ->distinct('ticker_id')
-            ->count('ticker_id');
-
-        $ind = (int) DB::table('ticker_indicators_daily')
-            ->where('trade_date', $eodDate)
-            ->distinct('ticker_id')
-            ->count('ticker_id');
-
-        $canonPct = $total > 0 ? (100.0 * $canon / $total) : null;
-        $indPct   = $total > 0 ? (100.0 * $ind / $total) : null;
-
-        return [
-            'trade_date' => $eodDate,
-            'total_active_tickers' => $total,
-            'canonical_count' => $canon,
-            'indicators_count' => $ind,
-            'canonical_coverage_pct' => $canonPct,
-            'indicators_coverage_pct' => $indPct,
-        ];
-    }
-
-    public function maxCloseBetween(int $tickerId, string $fromDate, string $toDate): ?float
-    {
-        if ($tickerId <= 0) return null;
-        if ($fromDate === '' || $toDate === '') return null;
-
-        $v = DB::table('ticker_ohlc_daily')
-            ->where('ticker_id', $tickerId)
-            ->whereBetween('trade_date', [$fromDate, $toDate])
-            ->max('close');
-
-        return $v !== null ? (float)$v : null;
-    }
-
-    public function maxHighBetween(int $tickerId, string $fromDate, string $toDate): ?float
-    {
-        if ($tickerId <= 0) return null;
-        if ($fromDate === '' || $toDate === '') return null;
-
-        $v = DB::table('ticker_ohlc_daily')
-            ->where('ticker_id', $tickerId)
-            ->whereBetween('trade_date', [$fromDate, $toDate])
-            ->max('high');
-
-        return $v !== null ? (float)$v : null;
-    }
-
 }

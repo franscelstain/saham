@@ -5,6 +5,23 @@
 > - Detail Hard/Soft/Risk/Scoring per strategi ada di `policy/<policy>.md`.
 > - Aturan CONFIRM (intraday checks) ada di `scorecard.md`.
 > **Jika ada kalimat lain yang bertentangan, anggap tidak binding dan ikuti yang LOCKED.**
+> **Catatan Anti Salah Tafsir — `schema.md` & `strategi.md` adalah LIVING DOCS (bukan acuan normatif)**
+> - `docs/watchlist/schema.md` dan `docs/watchlist/strategi.md` adalah **catatan kondisi sistem saat ini** yang **wajib selalu diupdate** bila ada perubahan di code/DB/command/output yang belum tercatat.
+> - Jika ada gap antara implementasi dan dua dokumen tersebut, maka **yang dibetulkan adalah dokumennya** (supaya kembali sinkron), bukan memaksa implementasi mengikuti dokumen yang tertinggal.
+> - Dua dokumen itu **tidak meng-override** aturan **LOCKED** di dokumen ini; mereka berfungsi untuk **mencegah salah pakai** dan memudahkan operasional.
+>
+> **Ruang lingkup wajib masing-masing dokumen**
+> 1) `schema.md`:
+>    - Mencatat **semua tabel** yang dipakai Watchlist beserta **fungsi tabelnya**.
+>    - Mencatat **fungsi kolom** (kenapa ada, dipakai untuk apa).
+>    - Menandai sumber pengisian data: **manual oleh user** vs **otomatis oleh sistem**, termasuk:
+>      - dari **commands**,
+>      - dari proses terjadwal,
+>      - atau dari pipeline lain (mis. ingest/compute).
+> 2) `strategi.md`:
+>    - Mencatat **aktivitas operasional** Watchlist end-to-end (alur kerja).
+>    - Mencatat **commands** yang tersedia + urutan eksekusi + contoh pemakaian.
+>    - Menjadi **panduan penggunaan** saat aplikasi sudah jadi (runbook mini untuk operator/user).
 
 ## Glossary (LOCKED)
 

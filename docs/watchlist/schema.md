@@ -91,6 +91,11 @@ Orderbook optional (top-3):
 - `bid2`, `bid3`, `ask2`, `ask3` (DECIMAL|null)
 - `bid_lots1..3`, `ask_lots1..3` (INT|null)
 
+State untuk strict CONFIRM (retry budget, fail-soft):
+- `confirm_retry_count` (INT, default 0): jumlah DELAY yang sudah terjadi untuk ticker ini pada `trade_date` (lihat `docs/watchlist/scorecard.md` bagian Retry budget).
+- `confirm_last_checked_at` (DATETIME|null): timestamp terakhir CONFIRM memproses snapshot ini.
+- `confirm_next_check_at` (DATETIME|null): timestamp earliest re-check berikutnya (cooldown) yang dihitung evaluator.
+
 Index/constraint:
 - UNIQUE: (`trade_date`,`ticker_id`)
 - INDEX: (`trade_date`,`ticker_code`)

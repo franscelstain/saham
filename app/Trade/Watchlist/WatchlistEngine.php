@@ -36,6 +36,28 @@ use App\Trade\Watchlist\Scorecard\ExecutionEligibilityEvaluator;
  */
 class WatchlistEngine
 {
+    // =========================================================
+    // Policy thresholds (LOCKED by docs/watchlist/policy/*)
+    // NOTE: Do not read these from ENV. Docs are the contract.
+    // =========================================================
+
+    // WEEKLY_SWING (docs/watchlist/policy/weekly_swing.md)
+    private const WS_MIN_DV20_IDR = 5000000000.0; // Rp 5B
+    private const WS_MIN_RR       = 1.3;
+    private const WS_MIN_ATR_PCT  = 0.02;
+    private const WS_MAX_ATR_PCT  = 0.20;
+    private const WS_MAX_TICK_PCT = 0.015;
+    private const WS_TP2_R_MULT   = 2.0; // docs: TP2 = 2.0 * R
+
+    // DIVIDEND_SWING (docs/watchlist/policy/dividend_swing.md)
+    private const DS_MIN_RR                    = 1.2;
+    private const DS_MAX_STOP_PCT              = 0.06;
+    private const DS_MAX_EXTEND_ATR            = 1.0;
+    private const DS_BREAKOUT_MIN_VOL_RATIO    = 1.0;
+    private const DS_BREAKOUT_MIN_CLOSE_POS    = 0.70;
+    private const DS_PULLBACK_MAX_MA_DIST_ATR  = 0.5;
+    private const DS_PULLBACK_MIN_LOWER_WICK   = 0.30;
+    private const DS_PULLBACK_MIN_CLOSE_POS    = 0.60;
     private WatchlistRepository $watchRepo;
     private MarketBreadthRepository $breadthRepo;
     private MarketCalendarRepository $calRepo;
@@ -539,7 +561,10 @@ foreach ($rows as $i => $r) {
         if (($rval !== null && $rval < 1.8) || ($edge !== null && $edge < $minEdge)) {
             $rows[$i]['reason_codes'][] = 'DS_MIN_TRADE_VIABILITY_FAIL';
             $rows[$i]['reason_codes'] = array_values(array_unique($rows[$i]['reason_codes']));
-            $rows[$i]['_drop'] = true;
+            // Hard-rule fail: keep ticker for monitoring (Watch Only), but block new entry.
+            $rows[$i]['plan']['is_eligible_new_entry'] = false;
+            $rows[$i]['plan']['block_codes'][] = 'DS_MIN_TRADE_VIABILITY_FAIL';
+            $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
         }
         continue;
     }
@@ -557,7 +582,10 @@ foreach ($rows as $i => $r) {
         if ($rval !== null && $rval < 1.6) {
             $rows[$i]['reason_codes'][] = 'IL_MIN_TRADE_VIABILITY_FAIL';
             $rows[$i]['reason_codes'] = array_values(array_unique($rows[$i]['reason_codes']));
-            $rows[$i]['_drop'] = true;
+            // Hard-rule fail: keep ticker for monitoring (Watch Only), but block new entry.
+            $rows[$i]['plan']['is_eligible_new_entry'] = false;
+            $rows[$i]['plan']['block_codes'][] = 'IL_MIN_TRADE_VIABILITY_FAIL';
+            $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
         }
         continue;
     }
@@ -575,23 +603,16 @@ foreach ($rows as $i => $r) {
         if ($rval !== null && $rval < 2.0) {
             $rows[$i]['reason_codes'][] = 'PT_MIN_TRADE_VIABILITY_FAIL';
             $rows[$i]['reason_codes'] = array_values(array_unique($rows[$i]['reason_codes']));
-            $rows[$i]['_drop'] = true;
+            // Hard-rule fail: keep ticker for monitoring (Watch Only), but block new entry.
+            $rows[$i]['plan']['is_eligible_new_entry'] = false;
+            $rows[$i]['plan']['block_codes'][] = 'PT_MIN_TRADE_VIABILITY_FAIL';
+            $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
         }
         continue;
     }
 }
 
-// Remove dropped candidates
-$rows = array_values(array_filter($rows, function($r){
-    return empty($r['_drop']);
-}));
-
-// Re-rank after drops (deterministic)
-$rank = 1;
-foreach ($rows as $j => $r2) {
-    $rows[$j]['rank'] = $rank++;
-    if (isset($rows[$j]['_drop'])) unset($rows[$j]['_drop']);
-}
+// NOTE: Do not remove hard-rule fails. Mereka tetap ditampilkan untuk monitoring (Watch Only), sesuai docs/watchlist/watchlist.md.
 
 // Grouping per docs/watchlist/watchlist.md (pure EOD selection; no hard cap)
 $topPickMin = 0.70;
@@ -599,34 +620,65 @@ $topPickGap = 0.08;
 $secondaryMin = 0.55;
 $watchMin = 0.35;
 
-$maxScore = 0.0;
-foreach ($rows as $r0) {
-    $maxScore = max($maxScore, (float)($r0['score_total'] ?? 0));
+// Q = lolos hard rules policy + tradeability enabled (docs/watchlist/watchlist.md)
+$qIdx = [];
+foreach ($rows as $i => $r0) {
+    $tradeable = (bool)($r0['plan']['is_tradeable'] ?? true);
+    $elig = (bool)($r0['plan']['is_eligible_new_entry'] ?? true);
+    $hardLocks = (array)($r0['plan']['hard_lock_codes'] ?? []);
+    if ($tradeable && $elig && empty($hardLocks)) {
+        $qIdx[] = $i;
+    }
 }
-$scoreCutTop = max($topPickMin, $maxScore - $topPickGap);
+
+$maxScoreQ = 0.0;
+foreach ($qIdx as $i) {
+    $maxScoreQ = max($maxScoreQ, (float)($rows[$i]['score_total'] ?? 0));
+}
+$scoreCutTop = !empty($qIdx) ? max($topPickMin, $maxScoreQ - $topPickGap) : $topPickMin;
 
 $topPickIndices = [];
 
 foreach ($rows as $i => $r) {
-    // Hard locks are watch-only, regardless of score.
     $tradeable = (bool)($r['plan']['is_tradeable'] ?? true);
-    if (!$tradeable || !empty((array)($r['plan']['hard_lock_codes'] ?? []))) {
+    $hardLocks = (array)($r['plan']['hard_lock_codes'] ?? []);
+
+    // Avoid guards (tradeability disabled) → groups.avoid
+    if (!$tradeable || !empty($hardLocks)) {
+        $rows[$i]['group'] = 'avoid';
+        continue;
+    }
+
+    // NO_TRADE policy → groups.no_trade (monitoring only)
+    if (strtoupper((string)$policy) === 'NO_TRADE') {
+        $rows[$i]['group'] = 'no_trade';
+        continue;
+    }
+
+    $elig = (bool)($r['plan']['is_eligible_new_entry'] ?? true);
+    $st = (float)($r['score_total'] ?? 0);
+
+    if ($elig) {
+        if ($st >= $scoreCutTop) {
+            $rows[$i]['group'] = 'top_picks';
+            $topPickIndices[] = $i;
+            continue;
+        }
+        if ($st >= $secondaryMin) {
+            $rows[$i]['group'] = 'secondary';
+            continue;
+        }
+        if ($st >= $watchMin) {
+            $rows[$i]['group'] = 'watch_only';
+            continue;
+        }
+        // Below watch_min: still keep as watch_only for auditability.
         $rows[$i]['group'] = 'watch_only';
         continue;
     }
 
-    $st = (float)($r['score_total'] ?? 0);
-    if ($st >= $scoreCutTop) {
-        $rows[$i]['group'] = 'top_picks';
-        $topPickIndices[] = $i;
-    } elseif ($st >= $secondaryMin) {
-        $rows[$i]['group'] = 'secondary';
-    } elseif ($st >= $watchMin) {
-        $rows[$i]['group'] = 'watch_only';
-    } else {
-        // Below watch_min: still keep as watch_only for auditability.
-        $rows[$i]['group'] = 'watch_only';
-    }
+    // Failed hard rules policy: keep for monitoring as watch_only (never top/secondary).
+    $rows[$i]['group'] = ($st >= $watchMin) ? 'watch_only' : 'watch_only';
 }
 
 // Recommendations (allocations) use top-picks as the universe, but do NOT cap top-picks.
@@ -642,15 +694,19 @@ $recs = $this->buildRecommendations(
     $topPickIndices
 );
 
-// Build groups
+// Build groups (LOCKED keys: top_picks, secondary, watch_only, avoid, no_trade)
 $top = [];
 $secondary = [];
 $watch = [];
+$avoid = [];
+$noTrade = [];
 foreach ($rows as $r) {
     $g = (string)($r['group'] ?? 'watch_only');
-    if ($g === 'top_picks') $top[] = $r;
-    elseif ($g === 'secondary') $secondary[] = $r;
-    else $watch[] = $r;
+    if ($g === 'top_picks') { $top[] = $r; }
+    elseif ($g === 'secondary') { $secondary[] = $r; }
+    elseif ($g === 'avoid') { $avoid[] = $r; }
+    elseif ($g === 'no_trade') { $noTrade[] = $r; }
+    else { $watch[] = $r; }
 }
 
 $plan = [
@@ -659,7 +715,9 @@ $plan = [
     'groups_raw' => [
         'top_picks' => array_values($top),
         'secondary' => array_values($secondary),
-        'watch_only' => array_values($watch),
+		'watch_only' => array_values($watch),
+		'avoid' => array_values($avoid),
+		'no_trade' => array_values($noTrade),
     ],
 ];
 
@@ -702,6 +760,8 @@ $plan = [
                     'top_picks' => count($top),
                     'secondary' => count($secondary),
                     'watch_only' => count($watch),
+                    'avoid' => count($avoid),
+                    'no_trade' => count($noTrade),
                 ],
                 'notes' => $notes,
                 'session' => $session,
@@ -771,8 +831,8 @@ $plan = [
 	            'top_picks'  => $mapGroup((array)($groupsRaw['top_picks'] ?? [])),
 	            'secondary'  => $mapGroup((array)($groupsRaw['secondary'] ?? [])),
 	            'watch_only' => $mapGroup((array)($groupsRaw['watch_only'] ?? [])),
-            'avoid'      => [],
-            'no_trade'   => [],
+	            'avoid'      => $mapGroup((array)($groupsRaw['avoid'] ?? [])),
+	            'no_trade'   => $mapGroup((array)($groupsRaw['no_trade'] ?? [])),
         ];
 
         $recommendations = $this->mapRecommendations($p, $groupOut, $canonicalReady);
@@ -1428,52 +1488,8 @@ $plan = [
 	 * Check whether HH:MM:SS is inside any windows.
 	 * Window syntax: "HH:MM-HH:MM", and may use tokens "open"/"close".
 	 */
-	private function timeInAnyWindow(string $hhmmss, array $windows): bool
-	{
-	    $tMin = $this->toMinutes($hhmmss);
-	    if ($tMin === null) return false;
-	
-	    foreach ($windows as $w) {
-	        if (!is_string($w) || trim($w) === '') continue;
-	        $w = trim($w);
-	        if (strpos($w, '-') === false) continue;
-	        [$a, $b] = array_map('trim', explode('-', $w, 2));
-	        $a = $this->resolveWindowToken($a);
-	        $b = $this->resolveWindowToken($b);
-	        $aMin = $this->toMinutes($a);
-	        $bMin = $this->toMinutes($b);
-	        if ($aMin === null || $bMin === null) continue;
-	        if ($bMin <= $aMin) {
-	            // Defensive: treat invalid/overnight as no match.
-	            continue;
-	        }
-	        if ($tMin >= $aMin && $tMin < $bMin) return true;
-	    }
-	    return false;
-	}
-
-	private function resolveWindowToken(string $t): string
-	{
-	    $t = strtolower(trim($t));
-	    if ($t === 'open') return (string)$this->scorecardCfg->sessionOpenTimeDefault;
-	    if ($t === 'close') return (string)$this->scorecardCfg->sessionCloseTimeDefault;
-	    return $t;
-	}
-
-	/** @return int|null minutes since 00:00 */
-	private function toMinutes(string $hhmmOrIsoTime): ?int
-	{
-	    $t = $this->timeOnly($hhmmOrIsoTime);
-	    if ($t === '') return null;
-	    // HH:MM:SS
-	    if (!preg_match('/^(\d{2}):(\d{2})(?::\d{2})?$/', $t, $m)) return null;
-	    $hh = (int)$m[1];
-	    $mm = (int)$m[2];
-	    if ($hh < 0 || $hh > 23 || $mm < 0 || $mm > 59) return null;
-	    return $hh * 60 + $mm;
-	}
-
-	private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $checkedAt): string
+/** @return int|null minutes since 00:00 */
+private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $checkedAt): string
 	{
 	    $updatedAt = trim($updatedAt);
 	    if ($updatedAt !== '') return $updatedAt;
@@ -2181,12 +2197,12 @@ $plan = [
             // Policy spec: docs/watchlist/policy/weekly_swing.md
             // Hard rules (must pass to be eligible for new entry), plus deterministic plan levels.
 
-            $minDv20 = (float) env('WS_MIN_DV20_IDR', 5000000000);
-            $minAtrPct = (float) env('WS_MIN_ATR_PCT', 0.02);
-            $maxAtrPct = (float) env('WS_MAX_ATR_PCT', 0.20);
-            $maxTickPct = (float) env('WS_MAX_TICK_PCT', 0.015);
-            $minRr = (float) env('WS_MIN_RR', 1.3);
-            $tp2RMult = (float) env('WS_TP2_R_MULT', 3.0);
+            $minDv20 = self::WS_MIN_DV20_IDR;
+            $minAtrPct = self::WS_MIN_ATR_PCT;
+            $maxAtrPct = self::WS_MAX_ATR_PCT;
+            $maxTickPct = self::WS_MAX_TICK_PCT;
+            $minRr = self::WS_MIN_RR;
+            $tp2RMult = self::WS_TP2_R_MULT;
 
             $ma20 = $x['ma20'] ?? null;
             $ma50 = $x['ma50'] ?? null;
@@ -2393,7 +2409,7 @@ $plan = [
             }
 
             // Not-extended gate
-            $maxExtendAtr = (float) env('WATCHLIST_DS_MAX_EXTEND_ATR', 1.0);
+            $maxExtendAtr = self::DS_MAX_EXTEND_ATR;
             if ($atr14 > 0 && (($close - $ma20) > ($maxExtendAtr * $atr14))) {
                 $drop = true;
                 $reasonCodes[] = 'DS_PRICE_EXTENDED';
@@ -2406,14 +2422,14 @@ $plan = [
             $c = is_array($x['candle'] ?? null) ? (array)$x['candle'] : [];
             $lowerWick = (float)($c['lower_wick_pct'] ?? 0.0);
 
-            $breakoutMinVol = (float) env('WATCHLIST_DS_BREAKOUT_MIN_VOL_RATIO', 1.0);
+            $breakoutMinVol = self::DS_BREAKOUT_MIN_VOL_RATIO;
             $breakoutOk = ($close > $hh20)
-                && ($closePos >= 0.70)
+                && ($closePos >= self::DS_BREAKOUT_MIN_CLOSE_POS)
                 && ($volRatio !== null && is_numeric($volRatio) && (float)$volRatio >= $breakoutMinVol);
 
-            $pbMaxMaDistAtr = (float) env('WATCHLIST_DS_PULLBACK_MAX_MA_DIST_ATR', 0.5);
-            $pbMinLowerWick = (float) env('WATCHLIST_DS_PULLBACK_MIN_LOWER_WICK_RATIO', 0.30);
-            $pbMinClosePos = (float) env('WATCHLIST_DS_PULLBACK_MIN_CLOSE_POS', 0.60);
+            $pbMaxMaDistAtr = self::DS_PULLBACK_MAX_MA_DIST_ATR;
+            $pbMinLowerWick = self::DS_PULLBACK_MIN_LOWER_WICK;
+            $pbMinClosePos = self::DS_PULLBACK_MIN_CLOSE_POS;
             $pullbackOk = $trendOk
                 && ($atr14 > 0)
                 && (abs($close - $ma20) <= ($pbMaxMaDistAtr * $atr14))
@@ -2432,8 +2448,8 @@ $plan = [
             $res20 = $hh20 + $tickHh; // resistance_20 = hh20 + tick
             $setupOverride = ($close >= $res20) ? 'Breakout' : 'Pullback';
 
-            $minRr = (float) env('WATCHLIST_DS_MIN_RR', 1.2);
-            $maxStopPct = (float) env('WATCHLIST_DS_STOP_MAX_PCT', 0.06);
+            $minRr = self::DS_MIN_RR;
+            $maxStopPct = self::DS_MAX_STOP_PCT;
             $levels = $this->buildDividendSwingLevels($setupOverride, [
                 'close' => $close,
                 'low' => $low,
@@ -3342,102 +3358,7 @@ $plan = [
         return (bool) $res->ok;
     }
 
-    private function hasAllowedReasonPrefix(string $code): bool
-    {
-        foreach (['WS_','DS_','IL_','PT_','NT_','GL_'] as $p) {
-            if (strpos($code, $p) === 0) return true;
-        }
-        return false;
-    }
-
-    private function mapLegacyReasonCode(string $legacy, string $policyPrefix): ?string
-    {
-        $legacy = strtoupper(trim($legacy));
-        if ($legacy === '') return null;
-
-        // Global legacy mapping
-        $global = [
-            'EOD_NOT_READY' => 'GL_EOD_NOT_READY',
-            'EOD_STALE' => 'GL_EOD_STALE',
-            'MARKET_RISK_OFF' => 'GL_MARKET_RISK_OFF',
-            'POLICY_INACTIVE' => 'GL_POLICY_INACTIVE',
-        ];
-        if (isset($global[$legacy])) return $global[$legacy];
-
-        // Policy-scoped mapping
-        $pp = $policyPrefix;
-        if ($pp === 'GL') $pp = 'NT';
-
-        if ($legacy === 'GAP_UP_BLOCK') return $pp . '_GAP_UP_BLOCK';
-        if ($legacy === 'CHASE_BLOCK_DISTANCE_TOO_FAR') return $pp . '_CHASE_BLOCK_DISTANCE_TOO_FAR';
-
-        if ($legacy === 'MIN_EDGE_FAIL' || $legacy === 'FEE_IMPACT_HIGH') return $pp . '_MIN_TRADE_VIABILITY_FAIL';
-
-        if ($legacy === 'FRIDAY_EXIT_BIAS') return $pp . '_FRIDAY_EXIT_BIAS';
-        if ($legacy === 'WEEKEND_RISK_BLOCK') return $pp . '_FRIDAY_EXIT_BIAS';
-
-        if ($legacy === 'TIME_STOP_TRIGGERED' || $legacy === 'NO_FOLLOW_THROUGH') {
-            if ($pp === 'PT') return 'PT_TIME_STOP_T1';
-            return $pp . '_TIME_STOP_T2';
-        }
-        if ($legacy === 'TIME_STOP_T2') {
-            if ($pp === 'PT') return 'PT_TIME_STOP_T1';
-            return $pp . '_TIME_STOP_T2';
-        }
-        if ($legacy === 'TIME_STOP_T3') {
-            if ($pp === 'PT') return 'PT_TIME_STOP_T1';
-            return $pp . '_TIME_STOP_T3';
-        }
-
-        if ($legacy === 'VOLATILITY_HIGH') {
-            if ($pp === 'WS') return 'WS_VOL_HIGH';
-            if ($pp === 'DS') return 'DS_VOL_TOO_HIGH';
-            if ($pp === 'IL') return 'IL_VOL_TOO_HIGH';
-            if ($pp === 'PT') return 'PT_VOL_TOO_HIGH';
-            return $pp . '_VOL_HIGH';
-        }
-
-        if ($legacy === 'SETUP_EXPIRED') return $pp . '_SIGNAL_STALE';
-
-        return null;
-    }
-
-    private function normalizeLegacyReasonCodes(array $codes, string $policyPrefix, array &$debugRankCodes, bool &$hasAnyUnmapped): array
-    {
-        $out = [];
-        $unmapped = false;
-
-        foreach ($codes as $rc) {
-            if (!is_string($rc) || trim($rc) === '') continue;
-            $rc = strtoupper(trim($rc));
-
-            if ($this->hasAllowedReasonPrefix($rc)) {
-                $out[] = $rc;
-                continue;
-            }
-
-            $mapped = $this->mapLegacyReasonCode($rc, $policyPrefix);
-            if ($mapped !== null) {
-                $out[] = $mapped;
-                $debugRankCodes[] = $rc;
-            } else {
-                $debugRankCodes[] = $rc;
-                $unmapped = true;
-            }
-        }
-
-        $out = array_values(array_unique($out));
-        $debugRankCodes = array_values(array_unique(array_filter($debugRankCodes, function($x){ return is_string($x) && trim($x) !== ''; })));
-
-        if ($unmapped) {
-            $hasAnyUnmapped = true;
-            if (!in_array('GL_LEGACY_CODE_UNMAPPED', $out, true)) $out[] = 'GL_LEGACY_CODE_UNMAPPED';
-        }
-
-        return $out;
-    }
-
-    /**
+/**
      * @return array<int,float>
      */
     private function allocationWeights(int $n): array
@@ -3447,21 +3368,7 @@ $plan = [
         return [0.5, 0.3, 0.2];
     }
 
-    private function parseCapitalTotal($val): ?int
-    {
-        if ($val === null) return null;
-        if (is_int($val)) return $val > 0 ? $val : null;
-        if (is_float($val)) return $val > 0 ? (int) round($val) : null;
-        if (is_string($val)) {
-            $s = preg_replace('/[^0-9]/', '', $val);
-            if ($s === '') return null;
-            $n = (int)$s;
-            return $n > 0 ? $n : null;
-        }
-        return null;
-    }
-
-    /**
+/**
      * @return array{open_time:string,close_time:string,breaks:array<int,string>}
      */
     private function sessionForDate(string $date): array
@@ -3885,13 +3792,7 @@ private function isEodReady(array $coverage): bool
         ];
     }
 
-    private function tickSizeByPrice(float $price): int
-    {
-        // config-driven IDX tick ladder (docs/watchlist/watchlist.md Section 3)
-        return $this->tickRule->tickSize($price);
-    }
-
-    private function roundToTick(float $price, int $tick, string $dir): int
+private function roundToTick(float $price, int $tick, string $dir): int
     {
         if ($tick <= 0) $tick = 1;
         $x = $price / $tick;

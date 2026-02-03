@@ -104,6 +104,13 @@ VALUES
 ('2026-02-02', 1, 'BBCA', NOW(), 10000, 10005, 10000, 9950, 10000, 0.0005, NOW(), NOW());
 ```
 
+Field tambahan (opsional) untuk strict CONFIRM retry-budget (dipakai oleh command `watchlist:scorecard:check-live`):
+- `confirm_retry_count` (default 0)
+- `confirm_last_checked_at` (nullable)
+- `confirm_next_check_at` (nullable)
+
+Jika kamu insert manual tanpa field ini, sistem akan menganggap retry=0 dan tetap jalan; state retry akan diisi/update otomatis saat CONFIRM dijalankan (fail-soft).
+
 Jika punya top-3 orderbook:
 - isi `bid2,bid3,ask2,ask3` + `bid_lots1..3` + `ask_lots1..3`.
 
@@ -123,6 +130,13 @@ Output:
 - Eligibility check result, dan persist ke:
   - `watchlist_strategy_runs` (PLAN, upsert by unique key)
   - `watchlist_strategy_checks` (append)
+
+Selain itu, jika table `watchlist_intraday_snapshots` tersedia, sistem juga akan update state retry per ticker (best-effort):
+- `confirm_retry_count`
+- `confirm_last_checked_at`
+- `confirm_next_check_at`
+
+Tujuan: membatasi loop DELAY dan menegakkan cooldown/window sesuai `docs/watchlist/scorecard.md` (Retry budget & cooldown).
 
 Rujukan format snapshot JSON & result ada di `docs/watchlist/scorecard.md`.
 

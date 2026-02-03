@@ -63,7 +63,10 @@ Kontrak memakai 2 tanggal:
         "time": "09:20",
         "lots": 1,
         "plan_limit_price": 0,
-        "plan_price_cap": 0
+        "plan_price_cap": 0,
+        "plan_price_floor": null,
+        "trigger": "BREAKOUT: last_live >= plan_entry",
+        "reason": {"code":"WS_TRANCHE1","message":"...","severity":"INFO"}
       }
     ]
   }
@@ -79,23 +82,28 @@ Kontrak memakai 2 tanggal:
   "items": [
     {
       "ticker": "BBRI",
-      "action": "BUY|WAIT|SKIP",
-      "alloc_idr": 1000000,
-      "lots": 1,
+      "rank_ref": 1,
+      "weight_pct": 20.0,
+      "planned_lots": 1,
+      "estimated_cost_idr": 1000000,
+      "fee_included": true,
+      "reasons": [{"code":"...","message":"...","severity":"INFO"}],
+      "setup_type": "BREAKOUT|PULLBACK",
       "plan_entry": 0,
       "plan_stop": 0,
       "plan_tp1": 0,
-      "setup_type": "BREAKOUT|PULLBACK",
       "execution_slices": [
         {
           "n": 1,
           "time": "09:20",
           "lots": 1,
           "plan_limit_price": 0,
-          "plan_price_cap": 0
+          "plan_price_cap": 0,
+          "plan_price_floor": null,
+          "trigger": "BREAKOUT: last_live >= plan_entry",
+          "reason": {"code":"WS_TRANCHE1","message":"...","severity":"INFO"}
         }
-      ],
-      "reasons": [{"code":"...","message":"...","severity":"INFO"}]
+      ]
     }
   ],
   "cash_remaining_idr": 0
@@ -103,8 +111,8 @@ Kontrak memakai 2 tanggal:
 ```
 
 Catatan:
-- `lots` dan `alloc_idr` dapat `null` pada mode `A_NO_CAPITAL`.
-- `cash_remaining_idr` bisa `null` jika `canonical_ready = false`.
+- `planned_lots` dan `estimated_cost_idr` dapat `null` pada mode `A_NO_CAPITAL`.
+- `cash_remaining_idr` dapat `null` jika `canonical_ready = false`, atau jika sistem tidak memiliki angka `cash_remaining` dari engine.
 
 ## Confirm
 
@@ -121,6 +129,10 @@ Catatan:
       "eligible_now": true,
       "next_check_at": "09:20:42",
       "reasons": [{"code":"CF_OK","message":"...","severity":"INFO"}],
+      "retry": {
+        "retry_count": 0,
+        "max_retry_windows": 0
+      },
       "computed": {
         "gap_pct": 0.0123,
         "spread_pct": 0.0045,
