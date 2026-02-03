@@ -2,6 +2,17 @@
 
 Dokumen ini menjelaskan cara kerja **operasional** untuk menyempurnakan data Watchlist: langkah proses, urutan eksekusi, dan contoh command/query yang dipakai.
 
+> **STATUS (LIVING DOCS)**
+> Dokumen ini adalah panduan penggunaan Watchlist saat aplikasi sudah jadi. Jika ada perubahan di code/command/parameter/urutan eksekusi yang belum tercatat di sini, maka dokumen ini **wajib** diupdate agar operator/user tidak salah menjalankan.
+> Dokumen ini tidak mengubah aturan **LOCKED** di `docs/watchlist/watchlist.md`.
+
+## Daftar aktivitas (ringkas)
+1. Pastikan prasyarat data (calendar, tickers, OHLC, indicators, dividend events)
+2. Generate PLAN (preopen) via endpoint `/watchlist/preopen`
+3. (Opsional) Isi snapshot intraday untuk CONFIRM
+4. Jalankan CONFIRM via `watchlist:scorecard:check-live`
+5. Hitung scorecard via `watchlist:scorecard:compute`
+
 ## Konsep tanggal (WAJIB konsisten)
 - `asof_eod_date` = tanggal EOD yang dipakai membentuk kandidat (biasanya **hari bursa sebelumnya**).
 - `trade_date` (di preopen contract) = tanggal eksekusi yang dituju (next trading day dari `asof_eod_date`).
@@ -76,6 +87,10 @@ Output:
 Persistence (otomatis, fail-soft):
 - `watchlist_daily` menyimpan payload full per (`policy`,`trade_date`,`source`)
 - `watchlist_candidates` menyimpan kandidat per group (denormalized + json audit)
+
+### 2.1 Mode penggunaan (praktis)
+- **Mode A (no capital):** panggil preopen tanpa `capital_idr` → sistem hanya memberikan kandidat + plan level (tidak ada lots).
+- **Mode B (with capital):** panggil preopen dengan `capital_idr` → sistem menghasilkan `recommendations` + `execution_slices` (tranche).
 
 **Catatan penting:**
 - PLAN = murni dari EOD (`asof_eod_date`). Tidak boleh dimutasi oleh intraday.

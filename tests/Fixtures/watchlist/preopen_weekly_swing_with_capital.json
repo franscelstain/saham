@@ -1,0 +1,139 @@
+{
+  "meta": {
+    "policy": "WEEKLY_SWING",
+    "trade_date": "2026-01-31",
+    "asof_eod_date": "2026-01-30",
+    "canonical_ready": true,
+    "flags": [],
+    "reasons": []
+  },
+  "groups": {
+    "top_picks": [
+      {
+        "ticker": "BBCA",
+        "rank": 1,
+        "score_total": 0.8,
+        "reasons": [
+          {
+            "code": "WS_SIGNAL",
+            "message": "Setup breakout valid",
+            "severity": "info"
+          }
+        ],
+        "eod_bar": {
+          "asof_eod_date": "2026-01-30",
+          "open": 1000,
+          "high": 1050,
+          "low": 990,
+          "close": 1020,
+          "prev_close": 1000,
+          "gap_pct": 0.02,
+          "volume_shares": 1000000,
+          "value_idr": 1020000000
+        },
+        "ticker_plan": {
+          "setup_type": "BREAKOUT",
+          "plan_entry": 9000,
+          "plan_stop": 8700,
+          "plan_tp1": 9180,
+          "rr_est": 0.6,
+          "execution_slices": [
+            {
+              "n": 1,
+              "time": "09:20",
+              "lots": 1,
+              "plan_limit_price": 9000,
+              "plan_price_cap": 9200,
+              "plan_price_floor": null,
+              "trigger": "LIMIT",
+              "reason": {
+                "code": "PLAN_TR1",
+                "message": "Tranche 1",
+                "severity": "info"
+              }
+            },
+            {
+              "n": 2,
+              "time": "10:30",
+              "lots": 0,
+              "plan_limit_price": 9000,
+              "plan_price_cap": 9200,
+              "plan_price_floor": null,
+              "trigger": "LIMIT",
+              "reason": {
+                "code": "PLAN_TR2",
+                "message": "Tranche 2",
+                "severity": "info"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "secondary": [],
+    "watch_only": [],
+    "avoid": [],
+    "no_trade": []
+  },
+  "recommendations": {
+    "mode": "B_WITH_CAPITAL",
+    "capital_idr": 10000000,
+    "items": [
+      {
+        "ticker": "BBCA",
+        "rank_ref": 1,
+        "weight_pct": 1.0,
+        "planned_lots": 1,
+        "estimated_cost_idr": 901800,
+        "fee_included": true,
+        "reasons": [
+          {
+            "code": "WS_ALLOC_TOP1",
+            "message": "Allocated top pick",
+            "severity": "info"
+          }
+        ],
+        "setup_type": "BREAKOUT",
+        "plan_entry": 9000,
+        "plan_stop": 8700,
+        "plan_tp1": 9180,
+        "execution_slices": [
+          {
+            "n": 1,
+            "time": "09:20",
+            "lots": 1,
+            "plan_limit_price": 9000,
+            "plan_price_cap": 9200,
+            "plan_price_floor": null,
+            "trigger": "LIMIT",
+            "reason": {
+              "code": "REC_TR1",
+              "message": "Tranche 1",
+              "severity": "info"
+            }
+          },
+          {
+            "n": 2,
+            "time": "10:30",
+            "lots": 0,
+            "plan_limit_price": 9000,
+            "plan_price_cap": 9200,
+            "plan_price_floor": null,
+            "trigger": "LIMIT",
+            "reason": {
+              "code": "REC_TR2",
+              "message": "Tranche 2",
+              "severity": "info"
+            }
+          }
+        ]
+      }
+    ],
+    "cash_remaining_idr": 9098200
+  },
+  "confirm": {
+    "status": "none",
+    "checked_count": 0,
+    "by_ticker": {}
+  }
+}

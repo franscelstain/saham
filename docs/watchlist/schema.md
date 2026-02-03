@@ -2,6 +2,10 @@
 
 Dokumen ini mencatat **struktur database yang dipakai fitur Watchlist** (table/view/kolom) beserta fungsi tiap table & kolom dalam konteks Watchlist.
 
+> **STATUS (LIVING DOCS)**
+> Dokumen ini adalah catatan kondisi sistem saat ini. Jika ada perubahan di code/DB/command/output yang belum tercatat di sini, maka dokumen ini **wajib** diupdate agar kembali sinkron.
+> Dokumen ini membantu operasional dan audit; dokumen ini tidak mengubah aturan **LOCKED** di `docs/watchlist/watchlist.md`.
+
 **Batasan penting (LOCKED):**
 - Watchlist **hanya boleh merombak / membuat** table dengan prefix `watchlist_*`.
 - Table market data berikut **jangan dirombak** (watchlist hanya membaca):
@@ -18,6 +22,10 @@ Dokumen ini mencatat **struktur database yang dipakai fitur Watchlist** (table/v
 
 ### 1.1 `watchlist_daily`
 **Fungsi:** menyimpan **1 payload preopen contract** per policy + tanggal eksekusi (audit/replay).
+
+**Diisi oleh:**
+- **Otomatis (fail-soft)** saat endpoint `GET /watchlist/preopen` dipanggil (service akan upsert 1 row per `(policy, trade_date, source)`).
+- **Boleh manual** untuk kebutuhan debugging/replay, tapi normalnya tidak diperlukan.
 
 Kolom:
 - `watchlist_daily_id` (PK)
@@ -41,6 +49,10 @@ Relasi:
 
 ### 1.2 `watchlist_candidates`
 **Fungsi:** denormalisasi kandidat per ticker (per group) untuk query ringan (UI/audit), tetapi tetap menyimpan JSON full untuk replay.
+
+**Diisi oleh:**
+- **Otomatis (fail-soft)** bersamaan dengan penyimpanan `watchlist_daily` saat endpoint `GET /watchlist/preopen` dipanggil.
+- **Tidak diisi manual** (kecuali debugging), karena seharusnya selalu turunan dari payload contract.
 
 Kolom:
 - `watchlist_candidate_id` (PK)
@@ -76,6 +88,13 @@ Index/constraint:
 ### 1.3 `watchlist_intraday_snapshots`
 **Fungsi:** menyimpan snapshot live (bid/ask/last + optional top-3) untuk kebutuhan CONFIRM (scorecard check-live).
 
+**Diisi oleh:**
+- **Manual** (SQL insert) untuk tahap awal / demo.
+- **Otomatis** oleh integrasi broker/feed/scraper (di luar scope repo ini).
+
+**Diupdate oleh:**
+- Command `watchlist:scorecard:check-live` akan mengisi/menambah state retry (best-effort): `confirm_retry_count`, `confirm_last_checked_at`, `confirm_next_check_at`.
+
 Kolom:
 - `snapshot_id` (PK)
 - `trade_date` (DATE): tanggal eksekusi (harus sama dengan contract `meta.trade_date`)
@@ -105,6 +124,9 @@ Index/constraint:
 ### 1.4 `watchlist_strategy_runs`
 **Fungsi:** menyimpan PLAN (payload watchlist) untuk scorecard pipeline.
 
+**Diisi oleh:**
+- **Otomatis** oleh command `watchlist:scorecard:check-live` (upsert 1 row per `(asof_eod_date, exec_trade_date, policy, source)`).
+
 Kolom:
 - `run_id` (PK)
 - `trade_date` (DATE): **tanggal EOD plan** (legacy naming; di scorecard pipeline ini = `asof_eod_date`)
@@ -124,6 +146,9 @@ Index/constraint:
 ### 1.5 `watchlist_strategy_checks`
 **Fungsi:** menyimpan hasil CONFIRM (check-live) untuk sebuah run.
 
+**Diisi oleh:**
+- **Otomatis** oleh command `watchlist:scorecard:check-live` (append per eksekusi/check).
+
 Kolom:
 - `check_id` (PK)
 - `run_id` (FK → `watchlist_strategy_runs.run_id`, cascade delete)
@@ -140,6 +165,9 @@ Index:
 ### 1.6 `watchlist_scorecards`
 **Fungsi:** menyimpan metrik performa ringkas hasil evaluasi scorecard.
 
+**Diisi oleh:**
+- **Otomatis** oleh command `watchlist:scorecard:compute` (1 row per run).
+
 Kolom:
 - `scorecard_id` (PK)
 - `run_id` (FK → `watchlist_strategy_runs.run_id`, cascade delete, UNIQUE)
@@ -153,8 +181,13 @@ Kolom:
 
 ## 2) Table market data yang dibaca Watchlist (read-only)
 
+> Catatan: tabel-tabel market data di bawah **bukan** domain Watchlist. Watchlist hanya membaca.
+> Pengisiannya berasal dari pipeline Market Data + Compute EOD (lihat dokumen commands terkait).
+
 ### `tickers`
 Dipakai untuk mapping `ticker_id` ↔ `ticker_code` dan nama perusahaan (join dari `ticker_indicators_daily`).
+
+**Diisi oleh:** pipeline Market Data (import master ticker). Watchlist tidak mengubah.
 
 ### `ticker_ohlc_daily`
 Dipakai untuk:
@@ -162,10 +195,14 @@ Dipakai untuk:
 - candle sebelumnya untuk `prev_close`
 - DV20 (avg close*volume 20 hari trading sebelum `asof_eod_date`)
 
+**Diisi oleh:** pipeline Market Data (publish canonical EOD → `ticker_ohlc_daily`). Watchlist tidak mengubah.
+
 ### `ticker_indicators_daily`
 Dipakai untuk:
 - skor (`score_total`), label (`decision_code`, `signal_code`, `volume_label_code`), dan indikator (MA/RSI/ATR/dll)
 - filter valid/invalid (gate awal kandidat)
+
+**Diisi oleh:** pipeline Compute EOD (hasil compute indikator dari data canonical). Watchlist tidak mengubah.
 
 ### `market_calendars`
 Dipakai untuk:
@@ -185,6 +222,8 @@ Kolom minimal yang dibaca:
 - `trade_date` (DATE)
 - `is_trading_day` (BOOL/INT)
 
+**Diisi oleh:** manual/seed (sekali) atau pipeline kalender bursa. Watchlist tidak mengubah.
+
 ### `ticker_dividend_events`
 Dipakai khusus untuk policy **DIVIDEND_SWING**.
 
@@ -199,3 +238,7 @@ Kolom opsional (untuk derived/scoring):
 - `cum_date` (DATE|null)
 - `cash_dividend` (DECIMAL|null)
 - `dividend_yield_est` (DECIMAL|null)
+
+**Diisi oleh:**
+- Otomatis oleh proses corporate action (jika ada integrasi), **atau**
+- Manual (SQL insert) untuk tahap awal/POC (lihat `docs/watchlist/strategi.md`).

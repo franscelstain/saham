@@ -42,7 +42,11 @@ class WatchlistLotSizingRegressionTest extends TestCase
 
             $this->assertSame($expected, (int) $a['estimated_cost']);
 
-            $remaining = max(0, $remaining - $expected);
+            // R2 guard ensures allocations never overspend remaining cash.
+            $this->assertLessThanOrEqual($expected, $remaining, 'estimated_cost must not exceed remaining cash');
+
+            $remaining = $remaining - $expected;
+            $this->assertGreaterThanOrEqual(0, $remaining);
             $this->assertSame($remaining, (int) $a['remaining_cash']);
         }
 

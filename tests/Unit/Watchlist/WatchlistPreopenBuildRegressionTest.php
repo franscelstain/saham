@@ -17,6 +17,7 @@ use App\Trade\Pricing\TickRule;
 use App\Trade\Support\TradeClockConfig;
 use App\Trade\Watchlist\CandidateDerivedMetricsBuilder;
 use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
+use App\Trade\Watchlist\Config\ScorecardConfig;
 use App\Trade\Watchlist\Contracts\PolicyDocLocator;
 use App\Trade\Watchlist\WatchlistEngine;
 use Tests\TestCase;
@@ -87,7 +88,15 @@ class WatchlistPreopenBuildRegressionTest extends TestCase
             8.0,
             0.02,
             0.02,
-            0.75
+            0.75,
+            true,
+            [
+                'WEEKLY_SWING' => [
+                    'max_gap_up_pct' => 0.03,
+                    'max_chase_from_close_pct' => 0.02,
+                    'max_spread_pct' => 0.015,
+                ],
+            ]
         );
 
         $tickRule = new TickRule(new TickLadderConfig([
@@ -100,8 +109,10 @@ class WatchlistPreopenBuildRegressionTest extends TestCase
             ['tick' => 100],
         ]));
 
-        $feeCfg = new FeeConfig(0.0015, 0.0025, 0.0, 0.0, 0.0);
+        // include slippage to keep cost formulas aligned with engine invariants
+        $feeCfg = new FeeConfig(0.0015, 0.0025, 0.0, 0.0, 0.0005);
         $clockCfg = new TradeClockConfig('Asia/Jakarta', 16, 0);
+        $scorecardCfg = new ScorecardConfig(false, 0.01, 0.015, 0.004, '09:00', '15:50');
         $metricsBuilder = new CandidateDerivedMetricsBuilder($cfg);
 
         $candidate = new CandidateInput([
@@ -213,6 +224,7 @@ class WatchlistPreopenBuildRegressionTest extends TestCase
                 case FeeConfig::class: $args[] = $feeCfg; break;
                 case TradeClockConfig::class: $args[] = $clockCfg; break;
                 case WatchlistPolicyConfig::class: $args[] = $cfg; break;
+                case ScorecardConfig::class: $args[] = $scorecardCfg; break;
                 case PolicyDocLocator::class: $args[] = $policyDocs; break;
                 case CandidateDerivedMetricsBuilder::class: $args[] = $metricsBuilder; break;
                 default:
