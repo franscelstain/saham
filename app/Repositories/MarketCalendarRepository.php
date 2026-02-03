@@ -18,25 +18,35 @@ class MarketCalendarRepository
 
     public function isTradingDay(string $date): bool
     {
-        $row = DB::table('market_calendar')
-            ->select(['cal_date', 'is_trading_day'])
-            ->where('cal_date', $date)
-            ->first();
+        if (!$this->tableExists()) return false;
+        try {
+            $row = DB::table('market_calendar')
+                ->select(['cal_date', 'is_trading_day'])
+                ->where('cal_date', $date)
+                ->first();
 
-        if (!$row) return false;
-        return ((int)$row->is_trading_day) === 1;
+            if (!$row) return false;
+            return ((int)$row->is_trading_day) === 1;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public function previousTradingDate(string $date): ?string
     {
-        $row = DB::table('market_calendar')
-            ->select(['cal_date'])
-            ->where('is_trading_day', 1)
-            ->where('cal_date', '<', $date)
-            ->orderByDesc('cal_date')
-            ->first();
+        if (!$this->tableExists()) return null;
+        try {
+            $row = DB::table('market_calendar')
+                ->select(['cal_date'])
+                ->where('is_trading_day', 1)
+                ->where('cal_date', '<', $date)
+                ->orderByDesc('cal_date')
+                ->first();
 
-        return $row ? $row->cal_date : null;
+            return $row ? (string)$row->cal_date : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
@@ -44,16 +54,21 @@ class MarketCalendarRepository
      */
     public function tradingDatesBetween(string $from, string $to): array
     {
-        $rows = DB::table('market_calendar')
-            ->where('is_trading_day', 1)
-            ->where('cal_date', '>=', $from)
-            ->where('cal_date', '<=', $to)
-            ->orderBy('cal_date')
-            ->pluck('cal_date');
+        if (!$this->tableExists()) return [];
+        try {
+            $rows = DB::table('market_calendar')
+                ->where('is_trading_day', 1)
+                ->where('cal_date', '>=', $from)
+                ->where('cal_date', '<=', $to)
+                ->orderBy('cal_date')
+                ->pluck('cal_date');
 
-        $out = [];
-        foreach ($rows as $d) $out[] = (string) $d;
-        return $out;
+            $out = [];
+            foreach ($rows as $d) $out[] = (string) $d;
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /**
@@ -63,18 +78,23 @@ class MarketCalendarRepository
     {
         $n = max(1, (int) $n);
 
-        $rows = DB::table('market_calendar')
-            ->select(['cal_date'])
-            ->where('is_trading_day', 1)
-            ->where('cal_date', '<=', $endDate)
-            ->orderByDesc('cal_date')
-            ->limit($n)
-            ->get();
+        if (!$this->tableExists()) return $endDate;
+        try {
+            $rows = DB::table('market_calendar')
+                ->select(['cal_date'])
+                ->where('is_trading_day', 1)
+                ->where('cal_date', '<=', $endDate)
+                ->orderByDesc('cal_date')
+                ->limit($n)
+                ->get();
 
-        if ($rows->count() === 0) return $endDate;
+            if ($rows->count() === 0) return $endDate;
 
-        $last = $rows->last();
-        return (string) $last->cal_date;
+            $last = $rows->last();
+            return (string) $last->cal_date;
+        } catch (\Throwable $e) {
+            return $endDate;
+        }
     }
 
     // Alias for older naming
@@ -85,14 +105,19 @@ class MarketCalendarRepository
 
     public function nextTradingDay(string $date): ?string
     {
-        $row = DB::table('market_calendar')
-            ->select(['cal_date'])
-            ->where('is_trading_day', 1)
-            ->where('cal_date', '>', $date)
-            ->orderBy('cal_date')
-            ->first();
+        if (!$this->tableExists()) return null;
+        try {
+            $row = DB::table('market_calendar')
+                ->select(['cal_date'])
+                ->where('is_trading_day', 1)
+                ->where('cal_date', '>', $date)
+                ->orderBy('cal_date')
+                ->first();
 
-        return $row ? (string)$row->cal_date : null;
+            return $row ? (string)$row->cal_date : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
@@ -101,31 +126,43 @@ class MarketCalendarRepository
      */
     public function addTradingDays(string $startDate, int $n): ?string
     {
+        if (!$this->tableExists()) {
+            // Fail-soft when calendar not available.
+            return $n === 0 ? $startDate : null;
+        }
         if ($n === 0) return $startDate;
         if ($n > 0) {
+            try {
+                $rows = DB::table('market_calendar')
+                    ->select(['cal_date'])
+                    ->where('is_trading_day', 1)
+                    ->where('cal_date', '>', $startDate)
+                    ->orderBy('cal_date')
+                    ->limit($n)
+                    ->get();
+                if ($rows->count() === 0) return null;
+                $last = $rows->last();
+                return (string)$last->cal_date;
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        $n = abs($n);
+        try {
             $rows = DB::table('market_calendar')
                 ->select(['cal_date'])
                 ->where('is_trading_day', 1)
-                ->where('cal_date', '>', $startDate)
-                ->orderBy('cal_date')
+                ->where('cal_date', '<', $startDate)
+                ->orderByDesc('cal_date')
                 ->limit($n)
                 ->get();
             if ($rows->count() === 0) return null;
             $last = $rows->last();
             return (string)$last->cal_date;
+        } catch (\Throwable $e) {
+            return null;
         }
-
-        $n = abs($n);
-        $rows = DB::table('market_calendar')
-            ->select(['cal_date'])
-            ->where('is_trading_day', 1)
-            ->where('cal_date', '<', $startDate)
-            ->orderByDesc('cal_date')
-            ->limit($n)
-            ->get();
-        if ($rows->count() === 0) return null;
-        $last = $rows->last();
-        return (string)$last->cal_date;
     }
 
     /**
@@ -133,12 +170,17 @@ class MarketCalendarRepository
      */
     public function getCalendarRow(string $date): ?array
     {
-        $row = DB::table('market_calendar')
-            ->where('cal_date', $date)
-            ->first();
+        if (!$this->tableExists()) return null;
+        try {
+            $row = DB::table('market_calendar')
+                ->where('cal_date', $date)
+                ->first();
 
-        if (!$row) return null;
-        return (array) $row;
+            if (!$row) return null;
+            return (array) $row;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
 }

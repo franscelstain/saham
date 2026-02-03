@@ -1402,7 +1402,8 @@ $plan = [
 				if ($tickerId > 0) {
 				    // Persist retry state only when it changes (preopen can be called repeatedly).
 				    if ($retryCount !== $prevRetry || ((string)($nextCheckAtIso ?? '') !== $prevNext)) {
-				        $this->intradaySnapshots->updateConfirmRetryState((string)($p['exec_trade_date'] ?? ''), $tickerId, $retryCount, $checkedAtIso, $nextCheckAtIso);
+				        // Repository is the persistence layer for retry state.
+				        $this->intraRepo->updateConfirmRetryState((string)($p['exec_trade_date'] ?? ''), $tickerId, $retryCount, $checkedAtIso, $nextCheckAtIso);
 				    }
 				}
 

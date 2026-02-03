@@ -14,7 +14,7 @@ Dokumen ini mencatat **struktur database yang dipakai fitur Watchlist** (table/v
   - `ticker_indicators_daily`
   - `ticker_dividend_events`
   - `md_runs`, `md_raw_eod`, `md_canonical_eod`, `md_candidate_validations`
-  - `market_calendars`
+  - `market_calendar`
 
 ---
 
@@ -204,10 +204,10 @@ Dipakai untuk:
 
 **Diisi oleh:** pipeline Compute EOD (hasil compute indikator dari data canonical). Watchlist tidak mengubah.
 
-### `market_calendars`
+### `market_calendar`
 Dipakai untuk:
 - menentukan **previous trading day** (prev candle)
-- menentukan **next trading day** dari `asof_eod_date` (jadi `trade_date` eksekusi)
+- menentukan **next trading day** dari `asof_eod_date` (jadi `cal_date` eksekusi)
 - mengambil **prior N trading dates** untuk agregasi teknikal (berbasis tanggal bursa sebelum `asof_eod_date`):
   - `hh50` = highest high 50 hari (LOOKBACK_50)
   - `hh20` = highest high 20 hari (LOOKBACK_20)
@@ -219,7 +219,7 @@ Dipakai untuk:
   - `roc5` = (close_now - close_5ago) / close_5ago — momentum jangka pendek untuk `INTRADAY_LIGHT`
 
 Kolom minimal yang dibaca:
-- `trade_date` (DATE)
+- `cal_date` (DATE)
 - `is_trading_day` (BOOL/INT)
 
 **Diisi oleh:** manual/seed (sekali) atau pipeline kalender bursa. Watchlist tidak mengubah.

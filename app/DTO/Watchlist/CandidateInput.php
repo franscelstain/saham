@@ -18,6 +18,17 @@ class CandidateInput extends BaseDto
 
     // Previous close (for gap)
     public ?float $prevClose;
+    public ?float $prevOpen;
+    public ?float $prevHigh;
+    public ?float $prevLow;
+
+    // Indicators - classification + score (docs/watchlist)
+    public ?float $scoreTotal;
+    public ?int $decisionCode;
+    public ?int $signalCode;
+    public ?int $volumeLabelCode;
+    public ?int $signalAgeDays;
+    public ?float $volSma20;
 
     // Indicators
     public ?float $ma20;
@@ -57,7 +68,17 @@ class CandidateInput extends BaseDto
         $this->close = isset($data['close']) && is_numeric($data['close']) ? (float)$data['close'] : null;
         $this->volume = isset($data['volume']) && is_numeric($data['volume']) ? (float)$data['volume'] : null;
 
+        $this->prevOpen = isset($data['prev_open']) && is_numeric($data['prev_open']) ? (float)$data['prev_open'] : null;
+        $this->prevHigh = isset($data['prev_high']) && is_numeric($data['prev_high']) ? (float)$data['prev_high'] : null;
+        $this->prevLow  = isset($data['prev_low']) && is_numeric($data['prev_low']) ? (float)$data['prev_low'] : null;
         $this->prevClose = isset($data['prev_close']) && is_numeric($data['prev_close']) ? (float)$data['prev_close'] : null;
+
+        $this->scoreTotal = isset($data['score_total']) && is_numeric($data['score_total']) ? (float)$data['score_total'] : null;
+        $this->decisionCode = isset($data['decision_code']) && is_numeric($data['decision_code']) ? (int)$data['decision_code'] : null;
+        $this->signalCode = isset($data['signal_code']) && is_numeric($data['signal_code']) ? (int)$data['signal_code'] : null;
+        $this->volumeLabelCode = isset($data['volume_label_code']) && is_numeric($data['volume_label_code']) ? (int)$data['volume_label_code'] : null;
+        $this->signalAgeDays = isset($data['signal_age_days']) && is_numeric($data['signal_age_days']) ? (int)$data['signal_age_days'] : null;
+        $this->volSma20 = isset($data['vol_sma20']) && is_numeric($data['vol_sma20']) ? (float)$data['vol_sma20'] : null;
 
         $this->ma20 = isset($data['ma20']) && is_numeric($data['ma20']) ? (float)$data['ma20'] : null;
         $this->ma50 = isset($data['ma50']) && is_numeric($data['ma50']) ? (float)$data['ma50'] : null;
@@ -69,7 +90,10 @@ class CandidateInput extends BaseDto
         $this->support20d = isset($data['support_20d']) && is_numeric($data['support_20d']) ? (float)$data['support_20d'] : null;
         $this->resistance20d = isset($data['resistance_20d']) && is_numeric($data['resistance_20d']) ? (float)$data['resistance_20d'] : null;
 
-        $this->dv20 = isset($data['dv20']) && is_numeric($data['dv20']) ? (float)$data['dv20'] : null;
+        // Repo may provide dv20 or dv20_idr (legacy naming).
+        if (isset($data['dv20']) && is_numeric($data['dv20'])) $this->dv20 = (float)$data['dv20'];
+        elseif (isset($data['dv20_idr']) && is_numeric($data['dv20_idr'])) $this->dv20 = (float)$data['dv20_idr'];
+        else $this->dv20 = null;
 
         $this->hh20 = isset($data['hh20']) && is_numeric($data['hh20']) ? (float)$data['hh20'] : null;
         $this->ll5 = isset($data['ll5']) && is_numeric($data['ll5']) ? (float)$data['ll5'] : null;
@@ -93,12 +117,21 @@ class CandidateInput extends BaseDto
             'low' => $this->low,
             'close' => $this->close,
             'volume' => $this->volume,
+            'prev_open' => $this->prevOpen,
+            'prev_high' => $this->prevHigh,
+            'prev_low' => $this->prevLow,
             'prev_close' => $this->prevClose,
+            'score_total' => $this->scoreTotal,
+            'decision_code' => $this->decisionCode,
+            'signal_code' => $this->signalCode,
+            'volume_label_code' => $this->volumeLabelCode,
+            'signal_age_days' => $this->signalAgeDays,
             'ma20' => $this->ma20,
             'ma50' => $this->ma50,
             'ma200' => $this->ma200,
             'rsi14' => $this->rsi14,
             'atr14' => $this->atr14,
+            'vol_sma20' => $this->volSma20,
             'vol_ratio' => $this->volRatio,
             'support_20d' => $this->support20d,
             'resistance_20d' => $this->resistance20d,

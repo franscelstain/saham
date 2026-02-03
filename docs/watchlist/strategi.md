@@ -24,7 +24,7 @@ Dokumen ini menjelaskan cara kerja **operasional** untuk menyempurnakan data Wat
 ## 0) Prasyarat data
 Watchlist **membaca** data berikut sebelum bisa menghasilkan output yang valid:
 
-1. `market_calendars` terisi lengkap.
+1. `market_calendar` terisi lengkap (kolom tanggal: `cal_date`).
 2. `tickers` terisi.
 3. `ticker_ohlc_daily` terisi untuk `asof_eod_date` (dan beberapa hari sebelumnya untuk DV20 + prev candle).
 4. `ticker_indicators_daily` terisi untuk `asof_eod_date` (hasil compute-eod).
@@ -35,7 +35,7 @@ Khusus `INTRADAY_LIGHT`:
   - LOOKBACK_10 untuk `hh10` (highest high 10 hari)
   - LOOKBACK_3 untuk `ll3` (lowest low 3 hari)
   - LOOKBACK_5 untuk `close_5ago` → hitung `roc5`
-- Karena semua lookback berbasis **trading day**, `market_calendars` wajib lengkap agar mapping tanggalnya benar.
+- Karena semua lookback berbasis **trading day**, `market_calendar` wajib lengkap agar mapping tanggalnya benar.
 
 Jika salah satu kosong, watchlist tetap bisa mengembalikan payload, tapi biasanya `canonical_ready=false` dan/atau hasil akan banyak `NO_TRADE`.
 
@@ -100,7 +100,7 @@ Catatan tambahan `INTRADAY_LIGHT`:
 - PLAN tetap dibangun dari EOD (`asof_eod_date`), tapi policy ini memakai agregasi tambahan dari histori OHLC berbasis trading day:
   - `hh10` dan `ll3` (min/max dari prior trading dates)
   - `roc5` (momentum dari close 5 trading days lalu)
-- Semua derivasi tersebut dilakukan di layer query (repository) menggunakan `market_calendars` untuk mengambil tanggal bursa yang tepat.
+- Semua derivasi tersebut dilakukan di layer query (repository) menggunakan `market_calendar` untuk mengambil tanggal bursa yang tepat.
 
 ---
 
