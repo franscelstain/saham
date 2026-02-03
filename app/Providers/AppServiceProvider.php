@@ -93,7 +93,9 @@ class AppServiceProvider extends ServiceProvider
                 (float) config('trade.watchlist.liq.dv20_b_min', 5000000000),
                 (float) config('trade.watchlist.corporate_action.suspect_ratio_min', 0.55),
                 (float) config('trade.watchlist.corporate_action.suspect_ratio_max', 1.80),
-                (float) config('trade.watchlist.candle.long_wick_pct', 0.55)
+                (float) config('trade.watchlist.candle.long_wick_pct', 0.55),
+                (bool) config('trade.watchlist.confirm.enabled', true),
+                (array) config('trade.watchlist.confirm.guards', [])
             );
         });
 

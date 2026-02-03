@@ -3,7 +3,8 @@
 namespace App\DTO\Watchlist\Scorecard;
 
 /**
- * Eligibility check result for one run at one checkpoint.
+ * Eligibility check output.
+ * Output schema is LOCKED by docs/watchlist/scorecard.md.
  * PHP 7.3 compatible.
  */
 class EligibilityCheckDto
@@ -16,35 +17,36 @@ class EligibilityCheckDto
     public $execDate;
     /** @var string */
     public $checkedAt;
-    /** @var string */
-    public $checkpoint;
+
     /** @var EligibilityResultDto[] */
     public $results;
+
     /** @var string|null */
     public $defaultRecommendationTicker;
     /** @var string|null */
     public $defaultRecommendationWhy;
 
-    /**
-     * @param string $policy
-     * @param string $tradeDate
-     * @param string $execDate
-     * @param string $checkedAt
-     * @param string $checkpoint
-     * @param EligibilityResultDto[] $results
-     * @param string|null $defaultTicker
-     * @param string|null $defaultWhy
-     */
-    public function __construct($policy, $tradeDate, $execDate, $checkedAt, $checkpoint, array $results, $defaultTicker, $defaultWhy)
-    {
+    /** @var string|null */
+    public $planRefStrategyRunId;
+
+    public function __construct(
+        $policy,
+        $tradeDate,
+        $execDate,
+        $checkedAt,
+        array $results,
+        $defaultRecommendationTicker = null,
+        $defaultRecommendationWhy = null,
+        $planRefStrategyRunId = null
+    ) {
         $this->policy = (string)$policy;
         $this->tradeDate = (string)$tradeDate;
         $this->execDate = (string)$execDate;
         $this->checkedAt = (string)$checkedAt;
-        $this->checkpoint = (string)$checkpoint;
         $this->results = array_values($results);
-        $this->defaultRecommendationTicker = ($defaultTicker === null || $defaultTicker === '') ? null : (string)$defaultTicker;
-        $this->defaultRecommendationWhy = ($defaultWhy === null || $defaultWhy === '') ? null : (string)$defaultWhy;
+        $this->defaultRecommendationTicker = $defaultRecommendationTicker === null ? null : (string)$defaultRecommendationTicker;
+        $this->defaultRecommendationWhy = $defaultRecommendationWhy === null ? null : (string)$defaultRecommendationWhy;
+        $this->planRefStrategyRunId = $planRefStrategyRunId === null ? null : (string)$planRefStrategyRunId;
     }
 
     /**
@@ -52,24 +54,28 @@ class EligibilityCheckDto
      */
     public function toArray()
     {
-        $results = [];
+        $rows = [];
         foreach ($this->results as $r) {
-            if ($r instanceof EligibilityResultDto) $results[] = $r->toArray();
+            if ($r instanceof EligibilityResultDto) $rows[] = $r->toArray();
         }
 
-        $default = null;
-        if ($this->defaultRecommendationTicker !== null) {
-            $default = ['ticker' => $this->defaultRecommendationTicker, 'why' => (string)$this->defaultRecommendationWhy];
-        }
-
-        return [
+        $a = [
+            'checked_at' => $this->checkedAt,
             'policy' => $this->policy,
             'trade_date' => $this->tradeDate,
-            'exec_trade_date' => $this->execDate,
-            'checked_at' => $this->checkedAt,
-            'checkpoint' => $this->checkpoint,
-            'results' => $results,
-            'default_recommendation' => $default,
+            'plan_ref' => [
+                'strategy_run_id' => $this->planRefStrategyRunId,
+            ],
+            'results' => array_values($rows),
         ];
+
+        if ($this->defaultRecommendationTicker !== null && $this->defaultRecommendationTicker !== '') {
+            $a['default_recommendation'] = [
+                'ticker_code' => strtoupper(trim($this->defaultRecommendationTicker)),
+                'why' => $this->defaultRecommendationWhy,
+            ];
+        }
+
+        return $a;
     }
 }

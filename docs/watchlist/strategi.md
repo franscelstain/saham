@@ -1,176 +1,168 @@
-# TradeAxis Watchlist Policies — Bedanya & Strategi Biar Sama-Sama Profit
+# Watchlist Operasional
 
-Dokumen ini menjelaskan perbedaan tiap **policy** watchlist di TradeAxis dan cara eksekusinya supaya *masing-masing* punya peluang profit yang realistis.
+Dokumen ini menjelaskan cara kerja **operasional** untuk menyempurnakan data Watchlist: langkah proses, urutan eksekusi, dan contoh command/query yang dipakai.
 
-> Prinsip utama: **policy = kerangka kerja**. Profit datang dari **disiplin eksekusi** (window, anti-chasing, cut loss/time stop, sizing).
+## Konsep tanggal (WAJIB konsisten)
+- `asof_eod_date` = tanggal EOD yang dipakai membentuk kandidat (biasanya **hari bursa sebelumnya**).
+- `trade_date` (di preopen contract) = tanggal eksekusi yang dituju (next trading day dari `asof_eod_date`).
 
----
-
-## 1) WEEKLY_SWING
-
-### Tujuan
-Swing **2–7 hari bursa**. Entry ideal dari setup EOD yang kuat, dieksekusi disiplin di jam tertentu.
-
-### Ciri Utama
-- Fokus “mingguan”, bukan intraday.
-- Menghindari entry pada hari yang rawan/kurang efisien.
-
-### Rule Pembeda (inti)
-- **No new entry:** **Senin & Jumat** (`WS_DOW_NO_ENTRY`)
-- Entry window default: **09:20–10:30** dan **13:35–14:30**
-- **Anti-chasing:** jika harga eksekusi > `close*(1+2%)` → **WATCH_ONLY**
-- **Gap-up guard:** jika preopen > `close*(1+3%)` → **WATCH_ONLY**
-- Ada **time stop** (T+2 / T+3) kalau tidak follow-through
-
-### Strategi Profit yang Realistis
-1. Entry cuma di **window**, pakai **limit**, jangan ngejar.
-2. Prioritaskan kandidat yang statusnya **NEW ENTRY eligible**, bukan WATCH_ONLY.
-3. Jika sampai **T+2 belum jalan** (misal belum +1% atau gagal follow-through), **keluar sesuai rule**.
-4. Jangan “mengubah trade jadi investasi” hanya karena belum naik.
+> Contoh: jika EOD terakhir adalah Jumat 2026-01-30, maka `asof_eod_date=2026-01-30` dan `trade_date` biasanya Senin 2026-02-02 (jika tidak libur).
 
 ---
 
-## 2) DIVIDEND_SWING
+## 0) Prasyarat data
+Watchlist **membaca** data berikut sebelum bisa menghasilkan output yang valid:
 
-### Tujuan
-Main peluang **dividen + swing pendek**, tapi dengan pagar ketat supaya tidak terjebak gap/event risk.
+1. `market_calendars` terisi lengkap.
+2. `tickers` terisi.
+3. `ticker_ohlc_daily` terisi untuk `asof_eod_date` (dan beberapa hari sebelumnya untuk DV20 + prev candle).
+4. `ticker_indicators_daily` terisi untuk `asof_eod_date` (hasil compute-eod).
+5. Khusus policy `DIVIDEND_SWING`: `ticker_dividend_events` terisi (minimal `ticker_id` + `ex_date`).
 
-### Ciri Utama
-- Bukan “dividend capture nekat”.
-- Butuh data event + snapshot yang valid.
+Khusus `INTRADAY_LIGHT`:
+- Butuh histori OHLC yang cukup untuk mengambil **prior trading dates** sebelum `asof_eod_date`:
+  - LOOKBACK_10 untuk `hh10` (highest high 10 hari)
+  - LOOKBACK_3 untuk `ll3` (lowest low 3 hari)
+  - LOOKBACK_5 untuk `close_5ago` → hitung `roc5`
+- Karena semua lookback berbasis **trading day**, `market_calendars` wajib lengkap agar mapping tanggalnya benar.
 
-### Rule Pembeda (inti)
-- Event gate: `cum_date` harus dalam **3–12 trading days ke depan**
-- **Preopen snapshot wajib**; kalau tidak ada → **WATCH_ONLY** (`DS_PREOPEN_PRICE_MISSING`)
-- **Anti-chasing lebih ketat:** 1.5%
-- **Gap-up guard lebih ketat:** 2%
-- Breakout diblok bila sudah “late-cycle” (mis. `days_to_cum <= 4`)
+Jika salah satu kosong, watchlist tetap bisa mengembalikan payload, tapi biasanya `canonical_ready=false` dan/atau hasil akan banyak `NO_TRADE`.
 
-### Strategi Profit yang Realistis
-1. Jangan paksa entry kalau snapshot/preopen belum ada. Itu bukan bug, itu guard.
-2. Main aman: cari swing **sebelum ex-date** (profit dari run-up, bukan berharap “capture”).
-3. Pilih yang “worth it”: yield kecil biasanya bikin edge tipis (biaya + slippage bisa makan).
+Khusus `DIVIDEND_SWING`:
+- Policy **wajib** punya event dividen berdasarkan `ex_date` (window T+2..T+12 trading days dari `trade_date` eksekusi).
+- Jika event tidak ada, kandidat akan gugur dengan reason `DS_EVENT_MISSING`.
 
----
+Contoh INSERT minimal (manual) untuk event dividen:
+```sql
+INSERT INTO ticker_dividend_events
+(ticker_id, ex_date, cum_date, cash_dividend, dividend_yield_est, created_at, updated_at)
+VALUES
+(1, '2026-02-10', '2026-02-07', 120.00, 0.0123, NOW(), NOW());
+```
 
-## 3) INTRADAY_LIGHT
-
-### Tujuan
-Intraday cepat (maks ±3 jam). Bukan scalping brutal, tapi “momentum ringan”.
-
-### Ciri Utama
-- Hanya valid kalau snapshot intraday/preopen tersedia.
-- Liquidity harus top.
-
-### Rule Pembeda (inti)
-- **Snapshot intraday wajib**; tanpa itu → invalid/ditahan (`IL_SNAPSHOT_MISSING`)
-- Liquidity bucket **A saja**
-- ATR% dibatasi (mis. <= 6%)
-- **Anti-chasing super ketat:** 1%
-- **Gap guard:** 1.5%
-- Wajib **flat sebelum close**
-
-### Strategi Profit yang Realistis
-1. Pakai saat kamu **siap mantengin**. Kalau tidak bisa, jangan.
-2. Biasanya **1 posisi saja** (max_positions=1).
-3. Entry di window, exit cepat kalau tidak jalan (time stop 60–90 menit).
-4. Tujuannya win-rate dan disiplin, bukan cari 10% sehari.
+Catatan khusus Dividend Swing:
+- Watchlist memilih event berdasarkan **`ex_date`** (bukan `cum_date`).
+- Window yang dipakai: **T+2..T+12 trading days** dari `trade_date` eksekusi.
 
 ---
 
-## 4) POSITION_TRADE
+## 1) Pipeline data EOD (ringkas)
+Watchlist tidak membangun EOD sendiri. Pastikan pipeline market data & compute-eod sudah jalan.
 
-### Tujuan
-Trend-follow **2–8 minggu**. Lebih jarang trade, lebih “stabil” kalau market trend.
+Rujukan detail command ada di `docs/commands.md` (bagian Market Data + Compute EOD).
 
-### Ciri Utama
-- Butuh trend yang benar-benar sehat.
-- Target RR lebih tinggi.
-
-### Rule Pembeda (inti)
-- Trend gate keras: `close > MA200` dan `MA50 > MA200`
-- RR minimum biasanya lebih tinggi (>= 2.0 kalau level lengkap)
-- Bisa ada partial TP + trailing (mis. ATR 2.5)
-- Default **tidak pyramiding** (tidak menambah posisi bertahap)
-
-### Strategi Profit yang Realistis
-1. Jangan dipakai untuk target mingguan. Ini buat **market yang sedang risk-on/trending**.
-2. Masuk rapi, lalu biarkan trailing bekerja.
-3. Hindari overtrade. Position trade menang karena “winner dibiarkan panjang”.
+Minimal (gambaran):
+1. Import RAW EOD
+2. Rebuild canonical
+3. Publish canonical ke `ticker_ohlc_daily`
+4. Compute indikator ke `ticker_indicators_daily`
 
 ---
 
-## 5) NO_TRADE
+## 2) Generate PLAN preopen (endpoint)
+Endpoint:
+- `GET /watchlist/preopen?policy=WEEKLY_SWING&capital_idr=5000000`
 
-### Tujuan
-Proteksi modal: **tidak membuka posisi baru**.
+Query params:
+- `policy` (opsional; default dari config `trade.watchlist.policy_default`)
+- `capital_idr` (opsional; jika kosong → Mode A (no capital))
+- `risk_per_trade_pct` (opsional)
+- `asof_eod_date` (opsional; override tanggal EOD yang dipakai)
+- `now_ts` (opsional; untuk testing deterministik)
 
-### Kapan Dipakai
-- Data EOD/canonical belum beres.
-- Market regime risk-off / breadth jelek.
-- Trigger proteksi sistem aktif.
+Output:
+- strict preopen contract sesuai `docs/watchlist/preopen.md`.
 
-### “Strategi Profit”
-Profit di sini artinya **tidak rugi** saat probabilitas jelek.
-- Kalau ada posisi existing → fokus **reduce/exit/trailing**, bukan tambah.
+Persistence (otomatis, fail-soft):
+- `watchlist_daily` menyimpan payload full per (`policy`,`trade_date`,`source`)
+- `watchlist_candidates` menyimpan kandidat per group (denormalized + json audit)
 
----
+**Catatan penting:**
+- PLAN = murni dari EOD (`asof_eod_date`). Tidak boleh dimutasi oleh intraday.
+- CONFIRM = layer tambahan, tidak menghapus kandidat.
 
-# Cara Biar Semua Policy Punya Peluang Profit (aturan main universal)
-
-## A) Pilih policy sesuai kondisi & komitmen waktu
-- Bisa mantengin? → **INTRADAY_LIGHT**
-- Mau swing 2–7 hari? → **WEEKLY_SWING**
-- Ada event dividen valid + snapshot ada? → **DIVIDEND_SWING**
-- Market trend rapi? → **POSITION_TRADE**
-- Data/market jelek? → **NO_TRADE**
-
-## B) Jangan lawan reason codes
-Kalau output WATCH_ONLY karena:
-- `*_GAP_UP_BLOCK`
-- `*_CHASE_BLOCK`
-- `*_PREOPEN_PRICE_MISSING`
-itu bukan “saran halus”. Itu **pagar** supaya kamu tidak beli di tempat bodoh.
-
-## C) Entry cuma di execution window
-Tujuannya:
-- mengurangi slippage
-- menghindari opening chaos
-- disiplin plan > emosional
-
-## D) Cut cepat kalau setup tidak jalan (time stop)
-Pola konsisten:
-- loser kecil
-- winner dibiarkan
-
-Kalau tidak jalan sesuai skenario, **keluar**. Jangan ubah thesis.
-
-## E) Hormati sizing/max positions policy
-- Weekly/Dividend biasanya max 2
-- Intraday 1
-- Position 3
-Tujuannya mencegah overexposure & mental overload.
+Catatan tambahan `INTRADAY_LIGHT`:
+- PLAN tetap dibangun dari EOD (`asof_eod_date`), tapi policy ini memakai agregasi tambahan dari histori OHLC berbasis trading day:
+  - `hh10` dan `ll3` (min/max dari prior trading dates)
+  - `roc5` (momentum dari close 5 trading days lalu)
+- Semua derivasi tersebut dilakukan di layer query (repository) menggunakan `market_calendars` untuk mengambil tanggal bursa yang tepat.
 
 ---
 
-# Checklist Cepat Saat Membaca Output Preopen
+## 3) Isi snapshot intraday (untuk CONFIRM)
+CONFIRM membandingkan PLAN dengan kondisi live. Snapshot live disimpan di `watchlist_intraday_snapshots`.
 
-1. Pastikan `policy_id`/`policy_code` sesuai yang kamu panggil.
-2. Lihat status:
-   - **NEW_ENTRY eligible** → kandidat eksekusi
-   - **WATCH_ONLY / NO_TRADE** → kandidat pantau / jangan entry
-3. Cek `trade_disabled_reason` (atau reason serupa).
-4. Cek `eligibility_block_codes` untuk tahu “kenapa” diblok.
-5. Eksekusi hanya kalau:
-   - tidak kena gap/chase block
-   - data snapshot ada (khusus IL/DS)
-   - masih dalam window eksekusi
+Ada 2 pola pengisian:
+1) Manual insert (paling simpel untuk awal)
+2) Otomatis (scraper/broker feed) — di luar scope repo ini
+
+Contoh INSERT minimal (manual):
+```sql
+INSERT INTO watchlist_intraday_snapshots
+(trade_date, ticker_id, ticker_code, checked_at, bid1, ask1, last, open, open_or_last_exec, spread_pct, created_at, updated_at)
+VALUES
+('2026-02-02', 1, 'BBCA', NOW(), 10000, 10005, 10000, 9950, 10000, 0.0005, NOW(), NOW());
+```
+
+Jika punya top-3 orderbook:
+- isi `bid2,bid3,ask2,ask3` + `bid_lots1..3` + `ask_lots1..3`.
 
 ---
 
-## Catatan
-Dokumen ini mengikuti konsep guardrails yang umum ada di `docs/watchlist/*`. Nama field output bisa sedikit berbeda tergantung schema versi kamu, tapi intinya sama:
-- **policy → rules**
-- **reason codes → diagnosis**
-- **window + guard + time stop → mesin disiplin**
+## 4) Jalankan CONFIRM (check-live)
+Command:
+- `php artisan watchlist:scorecard:check-live --trade-date=<ASOF_EOD_DATE> --exec-date=<TRADE_DATE> --policy=<POLICY> --input=<snapshot.json>`
 
+Keterangan opsi:
+- `--trade-date` = **asof_eod_date** (EOD plan date)
+- `--exec-date` = **trade_date** (execution date)
+- `--policy` = policy code
+- `--input` = file JSON snapshot (atau STDIN)
+
+Output:
+- Eligibility check result, dan persist ke:
+  - `watchlist_strategy_runs` (PLAN, upsert by unique key)
+  - `watchlist_strategy_checks` (append)
+
+Rujukan format snapshot JSON & result ada di `docs/watchlist/scorecard.md`.
+
+---
+
+## 5) Hitung scorecard (compute)
+Command:
+- `php artisan watchlist:scorecard:compute --trade-date=<ASOF_EOD_DATE> --exec-date=<TRADE_DATE> --policy=<POLICY>`
+
+Tujuan:
+- hitung metrik ringkas (feasible_rate, fill_rate, dll)
+- persist ke `watchlist_scorecards` (1 row per run)
+
+Dependency:
+- butuh hasil `check-live`
+- butuh OHLC untuk `exec_date` tersedia (agar fill-rate akurat)
+
+---
+
+## 6) Query cepat untuk audit
+
+Ambil payload PLAN terbaru:
+```sql
+SELECT * FROM watchlist_daily
+WHERE policy='WEEKLY_SWING'
+ORDER BY watchlist_daily_id DESC
+LIMIT 1;
+```
+
+Ambil Top Picks (ranked):
+```sql
+SELECT ticker, rank, score_total, plan_entry, plan_stop, plan_tp1
+FROM watchlist_candidates
+WHERE policy='WEEKLY_SWING' AND trade_date='2026-02-02' AND group_code='TOP_PICKS'
+ORDER BY rank ASC;
+```
+
+Cek apakah snapshot intraday sudah ada:
+```sql
+SELECT COUNT(*) as n
+FROM watchlist_intraday_snapshots
+WHERE trade_date='2026-02-02';
+```

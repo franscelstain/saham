@@ -493,10 +493,10 @@ Nilai di bawah ini dipilih agar:
 
 | Policy | CF_SPREAD_MAX_PCT | CF_MAX_CHASE_PCT | CF_BREAKOUT_BAND_PCT | CF_GAP_UP_BLOCK_PCT | CF_MAX_RETRY_WINDOWS |
 |---|---:|---:|---:|---:|---:|
-| INTRADAY_LIGHT | 0.005 | 0.008 | 0.003 | 0.025 | 1 |
-| WEEKLY_SWING   | 0.006 | 0.010 | 0.004 | 0.030 | 2 |
-| DIVIDEND_SWING | 0.006 | 0.010 | 0.004 | 0.030 | 2 |
-| POSITION_TRADE | 0.006 | 0.008 | 0.003 | 0.030 | 2 |
+| INTRADAY_LIGHT | 0.010 | 0.006 | 0.004 | 0.010 | 1 |
+| WEEKLY_SWING   | 0.006 | 0.010 | 0.004 | 0.015 | 2 |
+| DIVIDEND_SWING | 0.006 | 0.008 | 0.004 | 0.012 | 2 |
+| POSITION_TRADE | 0.008 | 0.012 | 0.004 | 0.018 | 2 |
 | NO_TRADE       | (n/a) | (n/a) | (n/a) | (n/a) | (n/a) |
 
 Catatan NO_TRADE (LOCKED):

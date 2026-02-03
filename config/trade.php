@@ -142,168 +142,143 @@ return [
         ],
     ],
     'watchlist' => [
-        // Cutoff untuk menentukan apakah EOD hari ini dianggap sudah "ready" untuk dipakai sebagai as_of_trade_date.
-        // Jika kosong, engine akan fallback ke trade.clock.eod_cutoff.
-        'eod_cutoff_time' => env('WATCHLIST_EOD_CUTOFF_TIME', ''),
-        // Strategy policy (explicit). Default = WEEKLY_SWING.
-        'policy_default' => env('WATCHLIST_POLICY_DEFAULT', 'AUTO'),
-        // Supported policies (CSV), ex: "WEEKLY_SWING,DIVIDEND_SWING"
-        'supported_policies' => array_values(array_filter(array_map('trim', explode(',', (string) env('WATCHLIST_SUPPORTED_POLICIES', 'WEEKLY_SWING'))))),
-        // Strict contract validation (docs/watchlist/watchlist.md)
-        'strict_enabled' => env('WATCHLIST_STRICT_ENABLED', true),
+        // Default policy if query param missing
+        'policy_default' => env('WATCHLIST_POLICY_DEFAULT', 'WEEKLY_SWING'),
 
-        // Policy docs root (optional, for environments where docs folder isn't shipped).
-        // - If empty, system will auto-detect using base_path()/fallback.
-        // - If strict=true and root can't be found, watchlist will fail fast.
-        'policy_docs' => [
-            'root' => env('WATCHLIST_POLICY_DOCS_ROOT', ''),
-            'strict' => env('WATCHLIST_POLICY_DOCS_STRICT', false),
+        // EOD cutoff time (HH:MM) to decide whether to use today's canonical (if available)
+        'eod_cutoff_time' => env('WATCHLIST_EOD_CUTOFF_TIME', ''),
+
+        // Market regime (global locks)
+        'market_regime_enabled' => env('WATCHLIST_MARKET_REGIME_ENABLED', true),
+        'market_regime_thresholds' => [
+            'risk_off_max_breadth_pct' => (float) env('WATCHLIST_RISK_OFF_MAX_BREADTH_PCT', 0.35),
+            'risk_on_min_breadth_pct' => (float) env('WATCHLIST_RISK_ON_MIN_BREADTH_PCT', 0.55),
         ],
-        // Default session times if market_calendar doesn't provide them
-        'session_default' => [
-            'open_time' => env('WATCHLIST_SESSION_OPEN', '09:00'),
-            'close_time' => env('WATCHLIST_SESSION_CLOSE', '15:50'),
-            'breaks' => [],
-        ],
-        // Policy precedence when no explicit policy is requested
-        'policy_precedence' => ['DIVIDEND_SWING', 'INTRADAY_LIGHT', 'POSITION_TRADE', 'WEEKLY_SWING'],
-        'bucket_top_min_score' => env('WATCHLIST_BUCKET_TOP_MIN_SCORE', 60),
-        'bucket_watch_min_score' => env('WATCHLIST_BUCKET_WATCH_MIN_SCORE', 35),
-        'expiry_aging_from_days' => env('WATCHLIST_EXPIRY_AGING_FROM_DAYS', 2), // label banding umur (buat UI)
-        'expiry_apply_to_decisions' => [4, 5], // default: Perlu Konfirmasi (4) & Layak Beli (5)
-        'expiry_enabled' => env('WATCHLIST_EXPIRY_ENABLED', true),
-        'expiry_max_age_days' => env('WATCHLIST_EXPIRY_MAX_AGE_DAYS', 3), // max umur sinyal (hari). 0 = hari pertama muncul.
-        'explain_verbose' => env('WATCHLIST_EXPLAIN_VERBOSE', false),
-        'min_value_est' => env('WATCHLIST_MIN_VALUE_EST', 1000000000),        
+
+        // Freshness and readiness gates
+        'max_stale_trading_days' => (int) env('WATCHLIST_MAX_STALE_TRADING_DAYS', 1),
+        'min_canonical_coverage_pct' => (float) env('WATCHLIST_MIN_CANONICAL_COVERAGE_PCT', 85.0),
+        'min_indicator_coverage_pct' => (float) env('WATCHLIST_MIN_INDICATOR_COVERAGE_PCT', 85.0),
+
+        // Auto-position-trade fallback (optional)
+        'auto_position_trade_enabled' => env('WATCHLIST_AUTO_POSITION_TRADE_ENABLED', false),
 
         // Liquidity proxy (dv20 = SMA20 of close*volume over 20 prior trading days; exclude today)
         'liq' => [
             'dv20_a_min' => (float) env('WATCHLIST_DV20_A_MIN', 20000000000), // >= 20B
             'dv20_b_min' => (float) env('WATCHLIST_DV20_B_MIN', 5000000000),  // >= 5B
-            // dv20 minimal agar bucket B dianggap cukup liquid untuk match (selain bucket C).
-            'dv20_low_match_min' => (float) env('WATCHLIST_DV20_LOW_MATCH_MIN', 5000000000),
-            'min_for_top_picks' => (string) env('WATCHLIST_LIQ_MIN_FOR_TOP_PICKS', 'B'), // A or B
-
-            // Candidate gate (Hard filter): allow A/B/C by default (U/unknown is rejected).
-            // Override via env as CSV, ex: "A,B".
-            'allowed_candidate_buckets' => array_values(array_filter(array_map('trim', explode(',', (string) env('WATCHLIST_LIQ_ALLOWED_CANDIDATE_BUCKETS', 'A,B,C'))))),
-            // Minimal dv20 to include as candidate (0 = allow all allowed buckets).
-            'dv20_candidate_min' => (float) env('WATCHLIST_DV20_CANDIDATE_MIN', 0),
         ],
 
-        // Corporate action gate (split/reverse split/unadjusted events) - heuristic
-        // Tujuan: cegah indikator palsu saat seri harga belum adj.
+        // Corporate action gate (heuristic)
         'corporate_action' => [
             'suspect_ratio_min' => (float) env('WATCHLIST_CA_SUSPECT_RATIO_MIN', 0.55),
             'suspect_ratio_max' => (float) env('WATCHLIST_CA_SUSPECT_RATIO_MAX', 1.80),
         ],
 
-        // Candle structure flags (computed from EOD candle + previous EOD candle)
+        // Candle heuristics
         'candle' => [
-            'long_wick_pct' => (float) env('WATCHLIST_CANDLE_LONG_WICK_PCT', 0.55),
+            'long_wick_pct' => (float) env('WATCHLIST_LONG_WICK_PCT', 0.55),
         ],
 
-        // Persistence (optional)
-        'persistence' => [
-            'enabled' => (bool) env('WATCHLIST_PERSISTENCE_ENABLED', true),
-        ],
-        'preopen_cache_seconds' => env('WATCHLIST_PREOPEN_CACHE_SECONDS', 15),
-        // Jika data EOD terakhir terlalu basi (diukur dalam trading days), jangan keluarkan rekomendasi BUY.
-        'max_stale_trading_days' => env('WATCHLIST_MAX_STALE_TRADING_DAYS', 1),
-
-        // Coverage gate: minimal coverage agar EOD dianggap "ready".
-        // Kalau coverage di bawah threshold, sistem akan emit NO_TRADE (EOD_NOT_READY).
-        'min_canonical_coverage_pct' => env('WATCHLIST_MIN_CANONICAL_COVERAGE_PCT', 85),
-        'min_indicator_coverage_pct' => env('WATCHLIST_MIN_INDICATOR_COVERAGE_PCT', 85),
-
-        // Optional: auto-open position (paper/real) dari hasil watchlist
-        'auto_position_trade_enabled' => env('WATCHLIST_AUTO_POSITION_TRADE_ENABLED', false),
-
-        // Market context / regime (risk_on / neutral / risk_off)
-        // Dipakai untuk gating rekomendasi saat breadth sedang risk_off.
-        'market_regime_enabled' => env('WATCHLIST_MARKET_REGIME_ENABLED', true),
-        'market_regime_block_buy_on_risk_off' => env('WATCHLIST_MARKET_REGIME_BLOCK_BUY_ON_RISK_OFF', true),
-        'market_regime_thresholds' => [
-            // OK dari user: risk_on jika above>=55, align>=45, rsi>=50
-            'risk_on' => [
-                'above_ma200' => env('WATCHLIST_MR_RISK_ON_ABOVE_MA200', 55),
-                'ma_alignment' => env('WATCHLIST_MR_RISK_ON_MA_ALIGN', 45),
-                'avg_rsi14' => env('WATCHLIST_MR_RISK_ON_AVG_RSI', 50),
+        // CONFIRM (intraday snapshot-based)
+        'confirm' => [
+            'enabled' => env('WATCHLIST_CONFIRM_ENABLED', true),
+            'guards' => [
+                'WEEKLY_SWING' => [
+                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_GAP_UP_PCT', 0.03),
+                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_CHASE_FROM_CLOSE_PCT', 0.02),
+                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_SPREAD_PCT', 0.002),
+                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_WS_MIN_BID1_LOTS', 10),
+                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_WS_MIN_ASK1_LOTS', 10),
+                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.02),
+                ],
+                'DIVIDEND_SWING' => [
+                    // LOCKED by docs/watchlist/policy/dividend_swing.md
+                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_GAP_UP_PCT', 0.03),
+                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_CHASE_FROM_CLOSE_PCT', 0.015),
+                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_SPREAD_PCT', 0.0025),
+                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_DS_MIN_BID1_LOTS', 8),
+                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_DS_MIN_ASK1_LOTS', 8),
+                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.03),
+                ],
+                'INTRADAY_LIGHT' => [
+                    // Locked by docs/watchlist/scorecard.md
+                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_GAP_UP_PCT', 0.025),
+                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_CHASE_FROM_CLOSE_PCT', 0.008),
+                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_SPREAD_PCT', 0.005),
+                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_IL_MIN_BID1_LOTS', 15),
+                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_IL_MIN_ASK1_LOTS', 15),
+                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.003),
+                ],
+                'POSITION_TRADE' => [
+                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_GAP_UP_PCT', 0.06),
+                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_CHASE_FROM_CLOSE_PCT', 0.04),
+                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_SPREAD_PCT', 0.004),
+                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_PT_MIN_BID1_LOTS', 5),
+                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_PT_MIN_ASK1_LOTS', 5),
+                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.04),
+                ],
             ],
-            // OK dari user: risk_off jika above<=40, align<=30, rsi<=45
-            'risk_off' => [
-                'above_ma200' => env('WATCHLIST_MR_RISK_OFF_ABOVE_MA200', 40),
-                'ma_alignment' => env('WATCHLIST_MR_RISK_OFF_MA_ALIGN', 30),
-                'avg_rsi14' => env('WATCHLIST_MR_RISK_OFF_AVG_RSI', 45),
-            ],
         ],
-        'ranking_enabled' => env('WATCHLIST_RANKING_ENABLED', true),
-        'ranking_penalty_plan_invalid' => env('WATCHLIST_RANKING_PENALTY_PLAN_INVALID', 30),
-        'ranking_penalty_rr_below_min' => env('WATCHLIST_RANKING_PENALTY_RR_BELOW_MIN', 20),
-        'ranking_rr_min' => env('WATCHLIST_RANKING_RR_MIN', 1.2), // Minimal RR TP2 biar kandidat gak ngaco (soft: bukan filter, tapi penalty)
-        // Weight v1 (simple)
-        'ranking_signal_weights' => [
-            5 => 18,
-            4 => 12,
-            6 => 10,
-            7 => 8,
-            3 => 6,
-            2 => 4,
-            1 => 0,
-            8 => -10,
-            9 => -15,
-            10 => -25,
-            0 => -3,
-        ],
-        'ranking_weights' => [
-            'setup_ok' => 40,
-            'setup_confirm' => 25,
 
-            'decision_5' => 20, // Layak Beli
-            'decision_4' => 10, // Perlu Konfirmasi
-
-            'volume_strong_burst' => 15, // code 7 (Strong Burst / Breakout)
-            'volume_burst' => 10,        // code 6 (Volume Burst / Accumulation)
-            'volume_early' => 5,         // code 5 (Early Interest)
-
-            'fresh_age_0' => 10,
-            'fresh_age_1' => 7,
-            'fresh_age_2' => 4,
-
-            'aging' => -8,
-            'expired' => -25,
-
-            'liq_5b' => 10,
-            'liq_2b' => 6,
-            'liq_1b' => 3,
-
-            'rr_ge_2' => 15,
-            'rr_ge_15' => 10,
-            'rr_ge_12' => 5,
-            'rr_lt_min_penalty' => -15,
-        ],
-        'rsi_max' => env('TRADE_RSI_MAX_BUY', 70),
-        'rsi_confirm_from' => env('TRADE_RSI_WARN', 66),
-        'top_picks_max' => env('WATCHLIST_TOP_PICKS_MAX', 5),
-        'top_picks_min_score' => env('WATCHLIST_TOP_PICKS_MIN_SCORE', 60),
-        'top_picks_require_not_expired' => env('WATCHLIST_TOP_PICKS_REQUIRE_NOT_EXPIRED', true),
-        'top_picks_require_setup_ok' => env('WATCHLIST_TOP_PICKS_REQUIRE_SETUP_OK', true),
-
-        // Execution Check + Scorecard (docs/watchlist/scorecard.md)
+        // SCORECARD / CONFIRM STRICT (docs/watchlist/scorecard.md)
+        // NOTE: This is the preferred config source for CONFIRM.
         'scorecard' => [
-            // Default guards used when candidate doesn't carry explicit guard.
-            'max_chase_pct_default' => (float) env('WATCHLIST_SC_MAX_CHASE_PCT', 0.01),
-            'gap_up_block_pct_default' => (float) env('WATCHLIST_SC_GAP_UP_BLOCK_PCT', 0.015),
-            'spread_max_pct_default' => (float) env('WATCHLIST_SC_SPREAD_MAX_PCT', 0.004),
+            'include_watch_only' => (bool) env('WATCHLIST_SCORECARD_INCLUDE_WATCH_ONLY', false),
+            // Defaults (LOCKED by docs/watchlist/scorecard.md)
+            // NOTE: Per-policy overrides below are the real source; these defaults are only fallbacks.
+            'max_chase_pct_default' => (float) env('WATCHLIST_SCORECARD_MAX_CHASE_PCT_DEFAULT', 0.010),
+            'gap_up_block_pct_default' => (float) env('WATCHLIST_SCORECARD_GAP_UP_BLOCK_PCT_DEFAULT', 0.015),
+            'spread_max_pct_default' => (float) env('WATCHLIST_SCORECARD_SPREAD_MAX_PCT_DEFAULT', 0.006),
+            'breakout_band_pct_default' => (float) env('WATCHLIST_SCORECARD_BREAKOUT_BAND_PCT_DEFAULT', 0.004),
+            'max_retry_windows_default' => (int) env('WATCHLIST_SCORECARD_MAX_RETRY_WINDOWS_DEFAULT', 2),
 
-            // By default, scorecard evaluates only top_picks + secondary.
-            'include_watch_only' => (bool) env('WATCHLIST_SC_INCLUDE_WATCH_ONLY', false),
+            'stale_tol_pct' => (float) env('WATCHLIST_SCORECARD_STALE_TOL_PCT', 0.003),
+            'max_snapshot_age_sec' => (int) env('WATCHLIST_SCORECARD_MAX_SNAPSHOT_AGE_SEC', 30),
+            'retry_cooldown_sec' => (int) env('WATCHLIST_SCORECARD_RETRY_COOLDOWN_SEC', 30),
+            'session_open_time_default' => env('WATCHLIST_SCORECARD_SESSION_OPEN_TIME_DEFAULT', '09:00'),
+            'session_close_time_default' => env('WATCHLIST_SCORECARD_SESSION_CLOSE_TIME_DEFAULT', '16:00'),
 
-            // Session time defaults used by scorecard window parsing.
-            // Supports window tokens like "15:15-close" in docs/watchlist/scorecard.md.
-            // You can override via snapshot JSON keys: session_open_time/session_close_time.
-            'session_open_time_default' => env('WATCHLIST_SC_SESSION_OPEN', '09:00'),
-            'session_close_time_default' => env('WATCHLIST_SC_SESSION_CLOSE', '15:50'),
+            // Per-policy overrides + windows.
+            // Window syntax: "HH:MM-HH:MM", token "open"/"close" allowed.
+            'policy_overrides' => [
+                'WEEKLY_SWING' => [
+                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_WS_MAX_CHASE_PCT', 0.010),
+                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_WS_GAP_UP_BLOCK_PCT', 0.015),
+                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_WS_SPREAD_MAX_PCT', 0.006),
+                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_WS_BREAKOUT_BAND_PCT', 0.004),
+                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_WS_MAX_RETRY_WINDOWS', 2),
+                    'entry_windows' => ['09:20-10:15','13:35-14:15'],
+                    'avoid_windows' => ['09:00-09:20','11:30-13:30','15:15-16:00'],
+                ],
+                'DIVIDEND_SWING' => [
+                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_DS_MAX_CHASE_PCT', 0.008),
+                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_DS_GAP_UP_BLOCK_PCT', 0.012),
+                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_DS_SPREAD_MAX_PCT', 0.006),
+                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_DS_BREAKOUT_BAND_PCT', 0.004),
+                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_DS_MAX_RETRY_WINDOWS', 2),
+                    'entry_windows' => ['09:20-10:15','13:35-14:15'],
+                    'avoid_windows' => ['09:00-09:20','11:30-13:30','15:15-16:00'],
+                ],
+                'POSITION_TRADE' => [
+                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_PT_MAX_CHASE_PCT', 0.012),
+                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_PT_GAP_UP_BLOCK_PCT', 0.018),
+                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_PT_SPREAD_MAX_PCT', 0.008),
+                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_PT_BREAKOUT_BAND_PCT', 0.004),
+                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_PT_MAX_RETRY_WINDOWS', 2),
+                    'entry_windows' => ['09:20-10:15','13:35-14:15'],
+                    'avoid_windows' => ['09:00-09:20','11:30-13:30','15:15-16:00'],
+                ],
+                'INTRADAY_LIGHT' => [
+                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_IL_MAX_CHASE_PCT', 0.006),
+                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_IL_GAP_UP_BLOCK_PCT', 0.010),
+                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_IL_SPREAD_MAX_PCT', 0.010),
+                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_IL_BREAKOUT_BAND_PCT', 0.004),
+                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_IL_MAX_RETRY_WINDOWS', 1),
+                    'entry_windows' => ['09:05-09:45','13:35-14:10'],
+                    'avoid_windows' => ['09:00-09:05','11:30-13:30','15:00-16:00'],
+                ],
+            ],
         ],
     ],
 

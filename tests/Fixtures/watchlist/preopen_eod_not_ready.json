@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "policy": "WEEKLY_SWING",
+    "trade_date": "2026-01-31",
+    "asof_eod_date": "2026-01-30",
+    "canonical_ready": false,
+    "flags": [
+      "EOD_NOT_READY"
+    ],
+    "reasons": [
+      {
+        "code": "GL_EOD_NOT_READY",
+        "message": "EOD canonical belum siap.",
+        "severity": "ERROR"
+      }
+    ]
+  },
+  "groups": {
+    "top_picks": [],
+    "secondary": [],
+    "watch_only": [],
+    "avoid": [],
+    "no_trade": []
+  },
+  "recommendations": {
+    "mode": "B_WITH_CAPITAL",
+    "capital_idr": 5000000,
+    "items": [],
+    "cash_remaining_idr": 5000000
+  },
+  "confirm": {
+    "status": "none",
+    "checked_count": 0,
+    "by_ticker": {}
+  }
+}

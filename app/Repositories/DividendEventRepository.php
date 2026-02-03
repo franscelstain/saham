@@ -18,17 +18,20 @@ class DividendEventRepository
             return [];
         }
 
+        // LOCKED by docs/watchlist/policy/dividend_swing.md:
+        // Event window uses ex_date (T+2..T+12 trading days relative to exec_trade_date)
         $rows = DB::table('ticker_dividend_events')
-            ->whereBetween('cum_date', [$fromDate, $toDate])
-            ->orderBy('cum_date')
+            ->whereNotNull('ex_date')
+            ->whereBetween('ex_date', [$fromDate, $toDate])
+            ->orderBy('ex_date')
             ->get();
 
         $out = [];
         foreach ($rows as $r) {
             $tid = (int)($r->ticker_id ?? 0);
             if ($tid <= 0) continue;
-            // pick nearest cum_date per ticker
-            if (!isset($out[$tid]) || ((string)$r->cum_date) < (string)$out[$tid]['cum_date']) {
+            // pick nearest ex_date per ticker
+            if (!isset($out[$tid]) || ((string)$r->ex_date) < (string)$out[$tid]['ex_date']) {
                 $out[$tid] = [
                     'ticker_id' => $tid,
                     'cum_date' => $r->cum_date ? (string)$r->cum_date : null,

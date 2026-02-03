@@ -2,230 +2,314 @@
 
 namespace App\Repositories;
 
-use App\DTO\Watchlist\CandidateInput;
 use Illuminate\Support\Facades\DB;
 
 class WatchlistRepository
 {
-    public function getEodCandidates(?string $eodDate = null): array
+    /**
+     * Get EOD candidates for watchlist scoring.
+     *
+     * Important (LOCKED by docs/watchlist/policy/*.md):
+     * - WEEKLY_SWING needs highest_high(20) and lowest_low(5) computed using data **before** trade_date.
+     * - We compute those once per run using market_calendar to get the prior N trading dates and
+     *   joining aggregated subqueries (no per-ticker queries).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getEodCandidates(string $eodDate): array
     {
-        if (!$eodDate) {
-            // Use the latest date where BOTH indicators and canonical OHLC are available.
-            $eodDate = $this->getLatestCommonEodDate();
-        }
-
-        // previous trading day (for gap risk / prev candle)
-        $prevDate = (string) (DB::table('market_calendar')
+        // --- trading dates ---
+        // prevDate is the most recent trading day BEFORE eodDate.
+        $prevDate = DB::table('market_calendar')
             ->where('is_trading_day', 1)
             ->where('cal_date', '<', $eodDate)
-            ->max('cal_date') ?? '');
+            ->orderBy('cal_date', 'desc')
+            ->value('cal_date as trade_date');
 
-        // dv20 dates: last 20 trading days BEFORE eodDate (exclude today)
+        // Prior 20 trading dates BEFORE eodDate (exclude eodDate)
+        $prev20Dates = DB::table('market_calendar')
+            ->where('is_trading_day', 1)
+            ->where('cal_date', '<', $eodDate)
+            ->orderBy('cal_date', 'desc')
+            ->limit(20)
+            ->pluck('cal_date as trade_date')
+            ->toArray();
+
+        // Prior 50 trading dates BEFORE eodDate (exclude eodDate) for longer resistance reference
+        $prev50Dates = DB::table('market_calendar')
+            ->where('is_trading_day', 1)
+            ->where('cal_date', '<', $eodDate)
+            ->orderBy('cal_date', 'desc')
+            ->limit(50)
+            ->pluck('cal_date as trade_date')
+            ->toArray();
+
+        // Prior 5 trading dates BEFORE eodDate
+        $prev5Dates = array_slice($prev20Dates, 0, 5);
+
+        // Prior 10 / 3 trading dates BEFORE eodDate (for INTRADAY_LIGHT)
+        $prev10Dates = array_slice($prev20Dates, 0, 10);
+        $prev3Dates  = array_slice($prev20Dates, 0, 3);
+
+        // ROC5 base date: 5th prior trading day (oldest element in prev5Dates)
+        $roc5Date = null;
+        if (!empty($prev5Dates)) {
+            $roc5Date = $prev5Dates[count($prev5Dates) - 1];
+        }
+
+        // ROC base date: 20th prior trading day (oldest element in prev20Dates)
+        $rocDate = null;
+        if (!empty($prev20Dates)) {
+            $rocDate = $prev20Dates[count($prev20Dates) - 1];
+        }
+
+        // dv20 dates: includes eodDate + previous 19 days (existing behavior) for liquidity
         $dv20Dates = DB::table('market_calendar')
             ->where('is_trading_day', 1)
-            ->where('cal_date', '<', $eodDate)
-            ->orderByDesc('cal_date')
+            ->where('cal_date', '<=', $eodDate)
+            ->orderBy('cal_date', 'desc')
             ->limit(20)
-            ->pluck('cal_date')
-            ->all();
+            ->pluck('cal_date as trade_date')
+            ->toArray();
 
+        // dv20: average traded value (close * volume)
+        $dv20Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, AVG(close * volume) as dv20')
+            ->whereIn('trade_date', $dv20Dates)
+            ->groupBy('ticker_id');
 
-        // dv20 = avg(close*volume) for those dates
-        $dv20Sub = null;
-        if (!empty($dv20Dates)) {
-            $dv20Sub = DB::table('ticker_ohlc_daily')
-                ->select([
-                    'ticker_id',
-                    DB::raw('AVG(close * volume) as dv20'),
-                ])
-                ->where('is_deleted', 0)
-                ->whereIn('trade_date', $dv20Dates)
-                ->groupBy('ticker_id');
-        }
+        // Weekly Swing helpers:
+        // - hh20: max(high) over prior 20 trading days (exclude eodDate)
+        // - ll5 : min(low) over prior 5 trading days (exclude eodDate)
+        $hh20Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, MAX(high) as hh20')
+            ->whereIn('trade_date', $prev20Dates)
+            ->groupBy('ticker_id');
 
-        $q = DB::table('ticker_indicators_daily as ti')
-            ->join('tickers as t', function($join) {
-                $join->on('ti.ticker_id', '=', 't.ticker_id')
-                     ->where('t.is_deleted', 0);
+        // Intraday Light helpers:
+        // - hh10: max(high) over prior 10 trading days (exclude eodDate)
+        // - ll3 : min(low) over prior 3 trading days (exclude eodDate)
+        $hh10Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, MAX(high) as hh10')
+            ->whereIn('trade_date', $prev10Dates)
+            ->groupBy('ticker_id');
+
+        $ll3Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, MIN(low) as ll3')
+            ->whereIn('trade_date', $prev3Dates)
+            ->groupBy('ticker_id');
+
+        // Dividend Swing helper:
+        // - hh50: max(high) over prior 50 trading days (exclude eodDate)
+        $hh50Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, MAX(high) as hh50')
+            ->whereIn('trade_date', $prev50Dates)
+            ->groupBy('ticker_id');
+
+        $ll5Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, MIN(low) as ll5')
+            ->whereIn('trade_date', $prev5Dates)
+            ->groupBy('ticker_id');
+
+        $q = DB::table('tickers as t')
+            ->join('ticker_ohlc_daily as od', function ($j) use ($eodDate) {
+                $j->on('od.ticker_id', '=', 't.ticker_id')
+                  ->where('od.trade_date', '=', $eodDate);
             })
-            // canonical OHLC
-            ->leftJoin('ticker_ohlc_daily as od', function($join) use ($eodDate) {
-                $join->on('ti.ticker_id', '=', 'od.ticker_id')
-                     ->where('od.is_deleted', 0)
-                     ->where('od.trade_date', '=', $eodDate);
+            ->leftJoin('ticker_indicators_daily as ti', function ($j) use ($eodDate) {
+                $j->on('ti.ticker_id', '=', 't.ticker_id')
+                  ->where('ti.trade_date', '=', $eodDate);
             })
-            // prev candle (canonical)
-            ->leftJoin('ticker_ohlc_daily as od_prev', function($join) use ($prevDate) {
-                $join->on('ti.ticker_id', '=', 'od_prev.ticker_id')
-                     ->where('od_prev.is_deleted', 0)
-                     ->where('od_prev.trade_date', '=', $prevDate);
+            ->leftJoin('ticker_ohlc_daily as od_prev', function ($j) use ($prevDate) {
+                $j->on('od_prev.ticker_id', '=', 't.ticker_id')
+                  ->where('od_prev.trade_date', '=', $prevDate);
+            })
+            ->leftJoinSub($dv20Sub, 'dv', function ($j) {
+                $j->on('dv.ticker_id', '=', 't.ticker_id');
+            })
+            ->leftJoinSub($hh20Sub, 'hh', function ($j) {
+                $j->on('hh.ticker_id', '=', 't.ticker_id');
+            })
+            ->leftJoinSub($hh10Sub, 'hh10', function ($j) {
+                $j->on('hh10.ticker_id', '=', 't.ticker_id');
+            })
+            ->leftJoinSub($hh50Sub, 'hh50', function ($j) {
+                $j->on('hh50.ticker_id', '=', 't.ticker_id');
+            })
+            ->leftJoinSub($ll5Sub, 'll', function ($j) {
+                $j->on('ll.ticker_id', '=', 't.ticker_id');
+            })
+            ->leftJoinSub($ll3Sub, 'll3', function ($j) {
+                $j->on('ll3.ticker_id', '=', 't.ticker_id');
             });
 
-        if ($dv20Sub) {
-            $q = $q->leftJoinSub($dv20Sub, 'dv', function($join) {
-                $join->on('ti.ticker_id', '=', 'dv.ticker_id');
+        if ($rocDate !== null) {
+            $q->leftJoin('ticker_ohlc_daily as od_roc', function ($j) use ($rocDate) {
+                $j->on('od_roc.ticker_id', '=', 't.ticker_id')
+                  ->where('od_roc.trade_date', '=', $rocDate);
             });
         }
-        $select = [
+
+        if ($roc5Date !== null) {
+            $q->leftJoin('ticker_ohlc_daily as od_roc5', function ($j) use ($roc5Date) {
+                $j->on('od_roc5.ticker_id', '=', 't.ticker_id')
+                  ->where('od_roc5.trade_date', '=', $roc5Date);
+            });
+        }
+
+        $q->select([
             't.ticker_id',
             't.ticker_code',
-            't.company_name',
 
-            // OHLC (prefer canonical ticker_ohlc_daily)
-            DB::raw('COALESCE(od.open, ti.open) as open'),
-            DB::raw('COALESCE(od.high, ti.high) as high'),
-            DB::raw('COALESCE(od.low, ti.low) as low'),
-            DB::raw('COALESCE(od.close, ti.close) as close'),
-            DB::raw('COALESCE(od.volume, ti.volume) as volume'),
+            // OHLC (trade_date)
+            'od.open', 'od.high', 'od.low', 'od.close', 'od.volume',
 
-            // adjusted / corporate action hints
-            DB::raw('COALESCE(od.adj_close, ti.adj_close) as adj_close'),
-            'ti.ca_hint',
-            'ti.ca_event',
-            'ti.is_valid',
-            'ti.invalid_reason',
-
-            // prev candle
-            DB::raw('od_prev.open as prev_open'),
-            DB::raw('od_prev.high as prev_high'),
-            DB::raw('od_prev.low as prev_low'),
+            // Previous close (for gap)
             DB::raw('od_prev.close as prev_close'),
 
-            'ti.ma20',
-            'ti.ma50',
-            'ti.ma200',
+            // Indicators (may be null)
+            'ti.score_total',
+            'ti.signal_code',
+            'ti.signal_age_days',
+            'ti.ma20', 'ti.ma50', 'ti.ma200',
             'ti.rsi14',
+            'ti.atr14',
             'ti.vol_sma20',
             'ti.vol_ratio',
-            'ti.atr14',
             'ti.support_20d',
             'ti.resistance_20d',
 
-            // decision/signal/volume label
-            'ti.score_total',
-            'ti.decision_code',
-            'ti.signal_code',
-            'ti.volume_label_code',
+            // Liquidity
+            DB::raw('dv.dv20 as dv20'),
 
-            // expiry fields
-            'ti.signal_first_seen_date',
-            'ti.signal_age_days',
+            // Weekly Swing helpers
+            DB::raw('hh.hh20 as hh20'),
+            DB::raw('hh50.hh50 as hh50'),
+            DB::raw('ll.ll5 as ll5'),
 
-            'ti.trade_date',
+            // Intraday Light helpers
+            DB::raw('hh10.hh10 as hh10'),
+            DB::raw('ll3.ll3 as ll3'),
+        ]);
 
-            // old proxy (still useful)
-            DB::raw('(COALESCE(od.close, ti.close) * COALESCE(od.volume, ti.volume)) as value_est'),
-        ];
-
-        if ($dv20Sub) {
-            $select[] = DB::raw('dv.dv20 as dv20');
-            $select[] = DB::raw("NULL as liq_bucket");
+        if ($rocDate !== null) {
+            $q->addSelect(DB::raw('od_roc.close as close_20ago'));
+            $q->addSelect(DB::raw('CASE WHEN od_roc.close IS NOT NULL AND od_roc.close > 0 THEN (od.close / od_roc.close) - 1 ELSE NULL END as roc20'));
         } else {
-            $select[] = DB::raw('NULL as dv20');
-            $select[] = DB::raw("'U' as liq_bucket");
+            $q->addSelect(DB::raw('NULL as close_20ago'));
+            $q->addSelect(DB::raw('NULL as roc20'));
         }
 
-        $rows = $q->where('ti.is_deleted', 0)
-            ->where('ti.trade_date', $eodDate)
-            ->select($select)
-            ->get();
+        if ($roc5Date !== null) {
+            $q->addSelect(DB::raw('od_roc5.close as close_5ago'));
+            $q->addSelect(DB::raw('CASE WHEN od_roc5.close IS NOT NULL AND od_roc5.close > 0 THEN (od.close / od_roc5.close) - 1 ELSE NULL END as roc5'));
+        } else {
+            $q->addSelect(DB::raw('NULL as close_5ago'));
+            $q->addSelect(DB::raw('NULL as roc5'));
+        }
 
-        return $rows->map(fn($r) => new CandidateInput((array) $r))->all();
+        $q->where('t.is_deleted', 0)
+          ->whereNotNull('od.close')
+          ->orderBy('t.ticker_code', 'asc');
+
+        return $q->get()->map(function ($r) {
+            return (array) $r;
+        })->toArray();
     }
 
-    /** Latest indicators date. */
-    public function getLatestIndicatorsEodDate(): string
+        /**
+     * Cari tanggal EOD terbaru yang "layak dipakai" (coverage canonical + indicators >= threshold).
+     * Fallback: tanggal terbaru yang ada di kedua tabel (intersection).
+     */
+    public function getLatestCommonEodDate(int $lookbackTradingDays = 15): ?string
     {
-        return (string) DB::table('ticker_indicators_daily')
-            ->where('is_deleted', 0)
-            ->max('trade_date');
-    }
+        $minCanon = (float) config('trade.watchlist.min_canonical_coverage_pct', 85.0);
+        $minInd   = (float) config('trade.watchlist.min_indicator_coverage_pct', 85.0);
 
-    /** Latest canonical OHLC date. */
-    public function getLatestCanonicalEodDate(): string
-    {
-        return (string) DB::table('ticker_ohlc_daily')
-            ->where('is_deleted', 0)
-            ->max('trade_date');
-    }
+        $dates = DB::table('market_calendar')
+            ->where('is_trading_day', 1)
+            ->orderBy('cal_date', 'desc')
+            ->limit(max(1, $lookbackTradingDays))
+            ->pluck('cal_date as trade_date')
+            ->toArray();
 
-    /** Latest date where both indicators & canonical OHLC exist (simple min of max dates). */
-    public function getLatestCommonEodDate(): string
-    {
-        $ind = $this->getLatestIndicatorsEodDate();
-        $ohlc = $this->getLatestCanonicalEodDate();
+        foreach ($dates as $d) {
+            $cov = $this->coverageSnapshot((string)$d);
+            $canon = $cov['canonical_coverage_pct'] ?? null;
+            $ind   = $cov['indicators_coverage_pct'] ?? null;
 
-        if ($ind === '') return $ohlc;
-        if ($ohlc === '') return $ind;
+            if ($canon !== null && $ind !== null && (float)$canon >= $minCanon && (float)$ind >= $minInd) {
+                return (string)$d;
+            }
+        }
 
-        return ($ohlc < $ind) ? $ohlc : $ind;
-    }
+        // Fallback: latest date that exists in both canonical & indicators (even if coverage low)
+        $fallback = DB::table('ticker_ohlc_daily as od')
+            ->join('ticker_indicators_daily as ti', function ($j) {
+                $j->on('ti.ticker_id', '=', 'od.ticker_id')
+                  ->on('ti.trade_date', '=', 'od.trade_date');
+            })
+            ->selectRaw('MAX(od.trade_date) as d')
+            ->value('d');
 
-    /** Coverage snapshot for a given date. */
-    public function coverageSnapshot(string $tradeDate): array
-    {
-        $total = (int) DB::table('tickers')->where('is_deleted', 0)->count();
-        $ind = (int) DB::table('ticker_indicators_daily')
-            ->where('is_deleted', 0)
-            ->where('trade_date', $tradeDate)
-            ->count();
-        $ohlc = (int) DB::table('ticker_ohlc_daily')
-            ->where('is_deleted', 0)
-            ->where('trade_date', $tradeDate)
-            ->count();
-
-        $indPct = ($total > 0) ? round(($ind / $total) * 100, 2) : null;
-        $ohlcPct = ($total > 0) ? round(($ohlc / $total) * 100, 2) : null;
-
-        return [
-            'trade_date' => $tradeDate,
-            'total_active_tickers' => $total,
-            'indicators_rows' => $ind,
-            'canonical_ohlc_rows' => $ohlc,
-            'indicators_coverage_pct' => $indPct,
-            'canonical_coverage_pct' => $ohlcPct,
-        ];
+        return $fallback ? (string)$fallback : null;
     }
 
     /**
-     * Max close between dates (inclusive) for one ticker.
-     * Used for position trailing stop computations.
+     * Snapshot coverage untuk EOD + Indicators pada tanggal tertentu.
+     * Dipakai WatchlistEngine untuk readiness gate dan missingTradingDates.
      */
+    public function coverageSnapshot(string $eodDate): array
+    {
+        $total = (int) DB::table('tickers')->where('is_deleted', 0)->count();
+
+        $canon = (int) DB::table('ticker_ohlc_daily')
+            ->where('trade_date', $eodDate)
+            ->distinct('ticker_id')
+            ->count('ticker_id');
+
+        $ind = (int) DB::table('ticker_indicators_daily')
+            ->where('trade_date', $eodDate)
+            ->distinct('ticker_id')
+            ->count('ticker_id');
+
+        $canonPct = $total > 0 ? (100.0 * $canon / $total) : null;
+        $indPct   = $total > 0 ? (100.0 * $ind / $total) : null;
+
+        return [
+            'trade_date' => $eodDate,
+            'total_active_tickers' => $total,
+            'canonical_count' => $canon,
+            'indicators_count' => $ind,
+            'canonical_coverage_pct' => $canonPct,
+            'indicators_coverage_pct' => $indPct,
+        ];
+    }
+
     public function maxCloseBetween(int $tickerId, string $fromDate, string $toDate): ?float
     {
         if ($tickerId <= 0) return null;
         if ($fromDate === '' || $toDate === '') return null;
 
-        try {
-            $v = DB::table('ticker_ohlc_daily')
-                ->where('is_deleted', 0)
-                ->where('ticker_id', $tickerId)
-                ->whereBetween('trade_date', [$fromDate, $toDate])
-                ->max('close');
-            return ($v !== null) ? (float)$v : null;
-        } catch (\Throwable $e) {
-            return null;
-        }
+        $v = DB::table('ticker_ohlc_daily')
+            ->where('ticker_id', $tickerId)
+            ->whereBetween('trade_date', [$fromDate, $toDate])
+            ->max('close');
+
+        return $v !== null ? (float)$v : null;
     }
 
-    /**
-     * Max high between dates (inclusive) for one ticker.
-     * Used for checking whether TP1 has been touched.
-     */
     public function maxHighBetween(int $tickerId, string $fromDate, string $toDate): ?float
     {
         if ($tickerId <= 0) return null;
         if ($fromDate === '' || $toDate === '') return null;
 
-        try {
-            $v = DB::table('ticker_ohlc_daily')
-                ->where('is_deleted', 0)
-                ->where('ticker_id', $tickerId)
-                ->whereBetween('trade_date', [$fromDate, $toDate])
-                ->max('high');
-            return ($v !== null) ? (float)$v : null;
-        } catch (\Throwable $e) {
-            return null;
-        }
+        $v = DB::table('ticker_ohlc_daily')
+            ->where('ticker_id', $tickerId)
+            ->whereBetween('trade_date', [$fromDate, $toDate])
+            ->max('high');
+
+        return $v !== null ? (float)$v : null;
     }
+
 }

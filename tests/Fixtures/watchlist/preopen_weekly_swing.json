@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "policy": "WEEKLY_SWING",
+    "trade_date": "2026-01-31",
+    "asof_eod_date": "2026-01-30",
+    "canonical_ready": true,
+    "flags": [],
+    "reasons": []
+  },
+  "groups": {
+    "top_picks": [],
+    "secondary": [],
+    "watch_only": [],
+    "avoid": [],
+    "no_trade": []
+  },
+  "recommendations": {
+    "mode": "A_NO_CAPITAL",
+    "capital_idr": null,
+    "items": [],
+    "cash_remaining_idr": null
+  },
+  "confirm": {
+    "status": "none",
+    "checked_count": 0,
+    "by_ticker": {}
+  }
+}

@@ -1,33 +1,42 @@
 {
-  "trade_date": "2026-01-26",
-  "exec_trade_date": "2026-01-27",
-  "policy": "WEEKLY_SWING",
-  "recommendation": {"mode": "BUY_ONLY"},
-  "meta": {"generated_at": "2026-01-26T16:05:00+07:00"},
+  "trade_date": "2026-01-30",
+  "exec_trade_date": "2026-01-30",
+  "policy": {"selected": "WEEKLY_SWING"},
+  "recommendation": {"mode": "WITH_CAPITAL"},
+  "meta": {"generated_at": "2026-01-30T08:50:00+07:00"},
   "groups": {
     "top_picks": [
       {
-        "ticker": "BBCA",
+        "ticker": "ASII",
         "rank": 1,
-        "score": 80,
+        "score": 85,
         "has_position": false,
-        "entry_trigger": 9000,
-        "entry_band": {"low": 8950, "high": 9100},
-        "guards": {
-          "max_chase_pct": 0.03,
-          "gap_up_block_pct": 0.015,
-          "spread_max_pct": 0.01
-        },
-        "timing": {
-          "entry_windows": ["open-close"],
-          "avoid_windows": ["12:00-13:00"]
-        },
+        "entry_trigger": 6000,
+        "entry_band": {"low": 5950, "high": 6050},
+        "guards": {"max_chase_pct": 0.01, "gap_up_block_pct": 0.015, "spread_max_pct": 0.004},
+        "timing": {"entry_window": "open-close", "avoid_window": ""},
         "slices": 1,
         "slice_pct": [1.0],
-        "reason_codes": []
+        "plan": {"setup_type": "PULLBACK", "entry": 6000, "stop": 5850, "tp1": 6200, "rr_est": 1.5, "entry_band": {"low": 5950, "high": 6050}},
+        "execution_slices": [{"tranche": 1, "lots": 100, "plan_limit_price": 6000, "plan_price_cap": 6060}]
       }
     ],
-    "secondary": [],
+    "secondary": [
+      {
+        "ticker": "BBCA",
+        "rank": 2,
+        "score": 75,
+        "has_position": false,
+        "entry_trigger": 10000,
+        "entry_band": {"low": 9950, "high": 10050},
+        "guards": {"max_chase_pct": 0.01, "gap_up_block_pct": 0.015, "spread_max_pct": 0.004},
+        "timing": {"entry_window": "open-close", "avoid_window": ""},
+        "slices": 1,
+        "slice_pct": [1.0],
+        "plan": {"setup_type": "PULLBACK", "entry": 10000, "stop": 9800, "tp1": 10400, "rr_est": 1.2, "entry_band": {"low": 9950, "high": 10050}},
+        "execution_slices": [{"tranche": 1, "lots": 100, "plan_limit_price": 10000, "plan_price_cap": 10050}]
+      }
+    ],
     "watch_only": []
   }
 }

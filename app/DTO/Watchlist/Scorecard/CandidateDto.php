@@ -4,6 +4,7 @@ namespace App\DTO\Watchlist\Scorecard;
 
 /**
  * Scorecard candidate DTO.
+ * Keeps backward compatibility with legacy watchlist payloads, but can also carry strict CONFIRM plan fields.
  * PHP 7.3 compatible.
  */
 class CandidateDto
@@ -31,21 +32,36 @@ class CandidateDto
     /** @var string[] */
     public $reasonCodes;
 
-    /**
-     * @param string $ticker
-     * @param bool $hasPosition
-     * @param int $score
-     * @param int $rank
-     * @param int|null $entryTrigger
-     * @param EntryBandDto $entryBand
-     * @param CandidateGuardsDto $guards
-     * @param CandidateTimingDto $timing
-     * @param int $slices
-     * @param float[] $slicePct
-     * @param string[] $reasonCodes
-     */
-    public function __construct($ticker, $hasPosition, $score, $rank, $entryTrigger, EntryBandDto $entryBand, CandidateGuardsDto $guards, CandidateTimingDto $timing, $slices, array $slicePct, array $reasonCodes)
-    {
+    // --- strict CONFIRM plan fields ---
+    /** @var string */
+    public $setupType;
+    /** @var float|null */
+    public $stopPrice;
+    /** @var float|null */
+    public $tp1Price;
+    /** @var float|null */
+    public $rrEst;
+    /** @var array<int,array<string,mixed>> */
+    public $executionSlices;
+
+    public function __construct(
+        $ticker,
+        $hasPosition,
+        $score,
+        $rank,
+        $entryTrigger,
+        EntryBandDto $entryBand,
+        CandidateGuardsDto $guards,
+        CandidateTimingDto $timing,
+        $slices,
+        array $slicePct,
+        array $reasonCodes,
+        $setupType = '',
+        $stopPrice = null,
+        $tp1Price = null,
+        $rrEst = null,
+        array $executionSlices = []
+    ) {
         $this->ticker = (string)$ticker;
         $this->hasPosition = (bool)$hasPosition;
         $this->score = (int)$score;
@@ -57,6 +73,12 @@ class CandidateDto
         $this->slices = (int)$slices;
         $this->slicePct = array_values($slicePct);
         $this->reasonCodes = array_values($reasonCodes);
+
+        $this->setupType = strtoupper(trim((string)$setupType));
+        $this->stopPrice = ($stopPrice === null) ? null : (float)$stopPrice;
+        $this->tp1Price = ($tp1Price === null) ? null : (float)$tp1Price;
+        $this->rrEst = ($rrEst === null) ? null : (float)$rrEst;
+        $this->executionSlices = array_values($executionSlices);
     }
 
     /**
@@ -75,11 +97,19 @@ class CandidateDto
         $guardsArr = (is_array($a['guards'] ?? null)) ? $a['guards'] : [];
         $bandArr = (is_array($a['entry_band'] ?? null)) ? $a['entry_band'] : [];
 
-        $entryTrigger = $a['entry_trigger'] ?? ($levels['entry_trigger_price'] ?? null);
+        // strict payload may wrap plan under ticker_plan
+        $tickerPlan = (is_array($a['ticker_plan'] ?? null)) ? $a['ticker_plan'] : [];
+        $planArr = (is_array($a['plan'] ?? null)) ? $a['plan'] : (is_array($tickerPlan['plan'] ?? null) ? $tickerPlan['plan'] : []);
+
+        $entryTrigger = $a['entry_trigger'] ?? ($planArr['entry'] ?? ($levels['entry_trigger_price'] ?? null));
         $entryTrigger = is_numeric($entryTrigger) ? (int)$entryTrigger : null;
 
         $low = $bandArr['low'] ?? ($a['entry_limit_low'] ?? ($levels['entry_limit_low'] ?? null));
         $high = $bandArr['high'] ?? ($a['entry_limit_high'] ?? ($levels['entry_limit_high'] ?? null));
+        // strict can also provide entry band inside plan
+        if ($low === null && isset($planArr['entry_band']['low'])) $low = $planArr['entry_band']['low'];
+        if ($high === null && isset($planArr['entry_band']['high'])) $high = $planArr['entry_band']['high'];
+
         $band = EntryBandDto::fromArray(['low' => $low, 'high' => $high]);
 
         $sizing = (is_array($a['sizing'] ?? null)) ? $a['sizing'] : [];
@@ -119,10 +149,62 @@ class CandidateDto
 
         $hasPos = (bool)($a['has_position'] ?? ($pos['has_position'] ?? false));
 
+        $setupType = (string)($a['setup_type'] ?? ($planArr['setup_type'] ?? ($tickerPlan['setup_type'] ?? '')));
+        $stop = isset($planArr['stop']) && is_numeric($planArr['stop']) ? (float)$planArr['stop'] : null;
+        $tp1 = isset($planArr['tp1']) && is_numeric($planArr['tp1']) ? (float)$planArr['tp1'] : null;
+        $rr = isset($planArr['rr_est']) && is_numeric($planArr['rr_est']) ? (float)$planArr['rr_est'] : null;
+
+        $execSlices = $a['execution_slices'] ?? ($tickerPlan['execution_slices'] ?? null);
+        if (!is_array($execSlices)) $execSlices = [];
+
+        // Normalize execution_slices objects
+        $normSlices = [];
+        foreach ($execSlices as $s) {
+            if (!is_array($s)) continue;
+            $tranche = isset($s['tranche']) ? (int)$s['tranche'] : (count($normSlices) + 1);
+            $lots = isset($s['lots']) && is_numeric($s['lots']) ? (int)$s['lots'] : null;
+            $pl = isset($s['plan_limit_price']) && is_numeric($s['plan_limit_price']) ? (float)$s['plan_limit_price'] : null;
+            $cap = isset($s['plan_price_cap']) && is_numeric($s['plan_price_cap']) ? (float)$s['plan_price_cap'] : null;
+            $normSlices[] = [
+                'tranche' => $tranche,
+                'lots' => $lots,
+                'plan_limit_price' => $pl,
+                'plan_price_cap' => $cap,
+            ];
+        }
+
+        // If absent, synthesize a single tranche from entry_trigger and guards.max_chase_pct
+        if (empty($normSlices) && $entryTrigger !== null) {
+            $cap = (float)$entryTrigger * (1.0 + (float)$guards->maxChasePct);
+            $normSlices[] = [
+                'tranche' => 1,
+                'lots' => null,
+                'plan_limit_price' => (float)$entryTrigger,
+                'plan_price_cap' => $cap,
+            ];
+        }
+
         $slicePct = array_map('floatval', array_values($slicePct));
         $reasonCodes = array_map('strval', $reasonCodes);
 
-        return new self($ticker, $hasPos, $score, $rank, $entryTrigger, $band, $guards, $timing, $slices, $slicePct, $reasonCodes);
+        return new self(
+            $ticker,
+            $hasPos,
+            $score,
+            $rank,
+            $entryTrigger,
+            $band,
+            $guards,
+            $timing,
+            $slices,
+            $slicePct,
+            $reasonCodes,
+            $setupType,
+            $stop,
+            $tp1,
+            $rr,
+            $normSlices
+        );
     }
 
     /**
@@ -130,7 +212,7 @@ class CandidateDto
      */
     public function toArray()
     {
-        return [
+        $a = [
             'ticker' => $this->ticker,
             'has_position' => (bool)$this->hasPosition,
             'score' => (int)$this->score,
@@ -143,5 +225,22 @@ class CandidateDto
             'slice_pct' => array_values($this->slicePct),
             'reason_codes' => array_values($this->reasonCodes),
         ];
+
+        if ($this->setupType !== '' || $this->stopPrice !== null || $this->tp1Price !== null || $this->rrEst !== null) {
+            $a['plan'] = [
+                'setup_type' => $this->setupType !== '' ? $this->setupType : null,
+                'entry' => $this->entryTrigger,
+                'stop' => $this->stopPrice,
+                'tp1' => $this->tp1Price,
+                'rr_est' => $this->rrEst,
+                'entry_band' => $this->entryBand->toArray(),
+            ];
+        }
+
+        if (!empty($this->executionSlices)) {
+            $a['execution_slices'] = array_values($this->executionSlices);
+        }
+
+        return $a;
     }
 }

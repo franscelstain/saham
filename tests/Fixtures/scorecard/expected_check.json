@@ -1,25 +1,142 @@
 {
+  "checked_at": "2026-01-30T09:05:00+07:00",
   "policy": "WEEKLY_SWING",
-  "trade_date": "2026-01-26",
-  "exec_trade_date": "2026-01-27",
-  "checked_at": "2026-01-27T09:05:00+07:00",
-  "checkpoint": "OPEN",
+  "trade_date": "2026-01-30",
+  "plan_ref": {
+    "strategy_run_id": "1"
+  },
   "results": [
     {
-      "ticker": "BBCA",
+      "ticker_code": "ASII",
+      "decision": "APPROVE",
       "eligible_now": true,
-      "flags": [],
-      "computed": {
-        "gap_pct": 0.0056179775280898875,
-        "spread_pct": 0.0005555555555555556,
-        "chase_pct": 0.0
+      "reasons": [
+        {
+          "code": "CF_OK",
+          "message": "Sesuai guard CONFIRM.",
+          "severity": "INFO"
+        }
+      ],
+      "plan": {
+        "setup_type": "PULLBACK",
+        "entry_trigger": 6000,
+        "stop_price": 5850,
+        "tp1_price": 6200,
+        "rr_est": 1.5,
+        "guards": {
+          "max_chase_pct": 0.01,
+          "gap_up_block_pct": 0.015,
+          "spread_max_pct": 0.004,
+          "breakout_band_pct": 0.005
+        },
+        "execution_slices": [
+          {
+            "tranche": 1,
+            "lots": 100,
+            "plan_limit_price": 6000,
+            "plan_price_cap": 6060
+          }
+        ]
       },
-      "reasons": [],
-      "notes": "In-window, chase OK, gap OK, spread OK"
+      "computed": {
+        "gap_pct": 0.005,
+        "spread_pct": 0,
+        "chase_pct": 0,
+        "snapshot_age_sec": 0
+      },
+      "live": {
+        "last": 6000,
+        "bid1": 6000,
+        "ask1": 6000,
+        "open": 6030,
+        "prev_close_plan": 6000,
+        "prev_close_live": 6000,
+        "snapshot_age_sec": 0
+      },
+      "recommended_orders": [
+        {
+          "tranche": 1,
+          "lots": 100,
+          "action": "PLACE_LIMIT",
+          "reason_code": "CF_PRICE_AT_ASK1_WITHIN_CAP",
+          "recommended_limit_price": 6000,
+          "inputs_used": {
+            "ask1": 6000,
+            "plan_price_cap": 6060,
+            "plan_limit_price": 6000,
+            "spread_pct": 0,
+            "snapshot_age_sec": 0
+          }
+        }
+      ]
+    },
+    {
+      "ticker_code": "BBCA",
+      "decision": "REJECT",
+      "eligible_now": false,
+      "reasons": [
+        {
+          "code": "CF_CHASE_BLOCK",
+          "message": "Harga ask melewati price cap.",
+          "severity": "BLOCK"
+        }
+      ],
+      "plan": {
+        "setup_type": "PULLBACK",
+        "entry_trigger": 10000,
+        "stop_price": 9800,
+        "tp1_price": 10400,
+        "rr_est": 1.2,
+        "guards": {
+          "max_chase_pct": 0.01,
+          "gap_up_block_pct": 0.015,
+          "spread_max_pct": 0.004,
+          "breakout_band_pct": 0.005
+        },
+        "execution_slices": [
+          {
+            "tranche": 1,
+            "lots": 100,
+            "plan_limit_price": 10000,
+            "plan_price_cap": 10050
+          }
+        ]
+      },
+      "computed": {
+        "gap_pct": 0.005,
+        "spread_pct": 0,
+        "chase_pct": 0.01,
+        "snapshot_age_sec": 0
+      },
+      "live": {
+        "last": 10100,
+        "bid1": 10100,
+        "ask1": 10100,
+        "open": 10050,
+        "prev_close_plan": 10000,
+        "prev_close_live": 10000,
+        "snapshot_age_sec": 0
+      },
+      "recommended_orders": [
+        {
+          "tranche": 1,
+          "lots": 100,
+          "action": "WAIT",
+          "reason_code": "CF_CHASE_BLOCK",
+          "recommended_limit_price": null,
+          "inputs_used": {
+            "ask1": 10100,
+            "plan_price_cap": 10050,
+            "plan_limit_price": 10000,
+            "spread_pct": 0,
+            "snapshot_age_sec": 0
+          }
+        }
+      ]
     }
   ],
   "default_recommendation": {
-    "ticker": "BBCA",
-    "why": "eligible_now && best_rank_in_top_picks"
+    "ticker_code": "ASII",
+    "why": "decision=APPROVE && best_rank_in_top_picks"
   }
 }

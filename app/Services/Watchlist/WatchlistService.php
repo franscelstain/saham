@@ -39,25 +39,21 @@ class WatchlistService
      */
     public function preopenContract(array $opts = []): array
     {
-        $payload = $this->engine->build($opts);
+        $both = $this->engine->buildBoth($opts);
+        $payload = $both['contract'];
 
         // Persist snapshot (docs/watchlist: audit & replay). Fail-soft if DB isn't ready.
         try {
-            $tradeDate = (string)($payload['trade_date'] ?? '');
-            $pol = (string)($payload['policy']['selected'] ?? '');
+	            // Strict preopen contract (docs/watchlist/preopen.md)
+	            $tradeDate = (string)($payload['meta']['trade_date'] ?? '');
+	            $pol = (string)($payload['meta']['policy'] ?? ($opts['policy'] ?? ''));
             // Keep source label stable for CLI tooling (watchlist:scorecard:* defaults).
             $source = 'preopen_contract' . ($pol !== '' ? '_' . strtolower($pol) : '');
             if ($tradeDate !== '') {
-                $dailyId = $this->persistRepo->saveDailySnapshot($tradeDate, $payload, $source);
-                $this->persistRepo->saveCandidates($dailyId, $tradeDate, (array)($payload['groups'] ?? []));
-
-                // Also persist as a scorecard "strategy run" (plan). Fail-soft.
-                if ($this->scorecard) {
-                    if ($this->scorecardCfg) {
-                        $dto = StrategyRunDto::fromPayloadArray($payload, 0, $this->scorecardCfg);
-                        $this->scorecard->saveStrategyRunDto($dto, $source);
-                    }
-                }
+	                $dailyId = $this->persistRepo->saveDailySnapshot($tradeDate, $payload, $source);
+	                $meta = (array)($payload['meta'] ?? []);
+	                $groups = (array)($payload['groups'] ?? []);
+	                $this->persistRepo->saveCandidatesFromContract($dailyId, $meta, $groups);
             }
         } catch (\Throwable $e) {
             // ignore persistence errors

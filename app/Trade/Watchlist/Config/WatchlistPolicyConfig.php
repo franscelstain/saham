@@ -29,6 +29,9 @@ final class WatchlistPolicyConfig
     private float $caSuspectMax;
     private float $candleLongWickPct;
 
+    private bool $confirmEnabled;
+    private array $confirmGuards;
+
     public function __construct(
         string $policyDefault,
         ?string $eodCutoffTimeOverride,
@@ -42,7 +45,9 @@ final class WatchlistPolicyConfig
         float $dv20BMin,
         float $caSuspectMin,
         float $caSuspectMax,
-        float $candleLongWickPct
+        float $candleLongWickPct,
+        bool $confirmEnabled,
+        array $confirmGuards
     ) {
         $this->policyDefault = $policyDefault;
         $this->eodCutoffTimeOverride = $eodCutoffTimeOverride;
@@ -57,6 +62,9 @@ final class WatchlistPolicyConfig
         $this->caSuspectMin = max(0.0, $caSuspectMin);
         $this->caSuspectMax = max(0.0, $caSuspectMax);
         $this->candleLongWickPct = max(0.0, min(1.0, $candleLongWickPct));
+
+        $this->confirmEnabled = $confirmEnabled;
+        $this->confirmGuards = $confirmGuards;
     }
 
     public function policyDefault(): string { return $this->policyDefault; }
@@ -77,4 +85,8 @@ final class WatchlistPolicyConfig
     public function caSuspectMin(): float { return $this->caSuspectMin; }
     public function caSuspectMax(): float { return $this->caSuspectMax; }
     public function candleLongWickPct(): float { return $this->candleLongWickPct; }
+
+    public function confirmEnabled(): bool { return $this->confirmEnabled; }
+    public function confirmGuards(): array { return $this->confirmGuards; }
+
 }

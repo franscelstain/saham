@@ -1,16 +1,26 @@
 {
-  "checked_at": "2026-01-27T09:05:00+07:00",
-  "checkpoint": "OPEN",
+  "checked_at": "2026-01-30T09:05:00+07:00",
+  "checkpoint": "AJAIB",
   "session_open_time": "09:00",
   "session_close_time": "15:50",
   "tickers": [
     {
+      "ticker": "ASII",
+      "bid": 6000,
+      "ask": 6000,
+      "last": 6000,
+      "open": 6030,
+      "prev_close_plan": 6000,
+      "prev_close_live": 6000
+    },
+    {
       "ticker": "BBCA",
-      "prev_close": 8900,
-      "open": 8950,
-      "last": 9000,
-      "bid": 8995,
-      "ask": 9000
+      "bid": 10100,
+      "ask": 10100,
+      "last": 10100,
+      "open": 10050,
+      "prev_close_plan": 10000,
+      "prev_close_live": 10000
     }
   ]
 }

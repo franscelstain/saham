@@ -6,6 +6,70 @@ use App\Trade\Explain\LabelCatalog;
 
 class ReasonCatalog
 {
+    /**
+     * Generic message resolver used by watchlist strict contract.
+     * Keep this stable and user-facing.
+     */
+    public static function getMessage(string $code = ''): string
+    {
+        $code = trim($code);
+        if ($code === '') return '';
+
+        // Watchlist global / confirm reasons (docs/watchlist/*)
+        $wl = [
+            'GL_EOD_NOT_READY' => 'EOD canonical belum siap.',
+
+            'CF_OK' => 'Sesuai guard CONFIRM.',
+
+            // --- CONFIRM (strict) ---
+            'CF_PLAN_INPUT_MISSING' => 'Data PLAN minimum tidak lengkap.',
+            'CF_LIVE_INPUT_MISSING' => 'Data LIVE minimum tidak lengkap.',
+            'CF_LIVE_BOOK_INVALID' => 'Data orderbook tidak valid.',
+            'CF_LIVE_SNAPSHOT_STALE' => 'Snapshot LIVE tidak sinkron atau terlalu tua.',
+            'CF_NOT_IN_ENTRY_WINDOW' => 'Di luar entry window.',
+            'CF_IN_AVOID_WINDOW' => 'Sedang berada di avoid window.',
+            'CF_BREAKOUT_TOO_EXTENDED' => 'Breakout terlalu jauh (overextended) dari entry.',
+            'CF_BREAKOUT_BELOW_ENTRY' => 'Breakout belum mencapai entry (masih di bawah).',
+            'CF_GAP_UP_BLOCK' => 'Gap-up terlalu besar dibanding prev close PLAN.',
+            'CF_SPREAD_TOO_WIDE' => 'Spread terlalu lebar.',
+            'CF_MAX_RETRY_REACHED' => 'Batas retry DELAY tercapai.',
+
+            // Price intent / audit
+            'CF_PRICE_AT_ASK1_WITHIN_CAP' => 'Harga di ask1 dan masih dalam batas cap.',
+            'CF_PRICE_CLAMPED_TO_PLAN_LIMIT' => 'Harga dijepit ke plan limit (lebih konservatif).',
+            'CF_PRICE_CLAMPED_TO_CAP' => 'Harga dijepit ke price cap (anti ngejar).',
+            'CF_NO_BOOK' => 'Orderbook tidak lengkap.',
+            'CF_SPREAD_BLOCK' => 'Spread terlalu lebar.',
+            'CF_CHASE_BLOCK' => 'Harga ask melewati price cap.',
+            'CF_SKIP_NO_LOTS' => 'Tidak ada lots untuk tranche ini.',
+            'CF_NO_SLICES' => 'Tidak ada tranche yang bisa dievaluasi.',
+
+            'CF_DECISION_NOT_APPROVE' => 'Keputusan bukan APPROVE; eksekusi diblokir.',
+
+            // Intraday Light (docs/watchlist/policy/intraday_light.md)
+            'IL_CONFIRM_REQUIRED' => 'Wajib dilakukan CONFIRM intraday sebelum eksekusi.',
+            'IL_DATA_INCOMPLETE' => 'Data belum lengkap untuk Intraday Light.',
+            'IL_LIQ_TOO_LOW' => 'Likuiditas (DV20) di bawah minimum Intraday Light.',
+            'IL_VOL_BAND_FAIL' => 'Volatilitas (ATR%) di luar band Intraday Light.',
+            'IL_VOL_BAND_LOW' => 'ATR% terlalu rendah (gerak terlalu sempit).',
+            'IL_VOL_BAND_HIGH' => 'ATR% terlalu tinggi (terlalu liar).',
+            'IL_NO_SETUP' => 'Tidak ada setup Intraday Light yang valid (breakout/continuation).',
+            'IL_STOP_TOO_WIDE' => 'Stop terlalu lebar untuk Intraday Light.',
+            'IL_RR_TOO_LOW' => 'RR terlalu rendah untuk Intraday Light.',
+            'IL_R_INVALID_R_LE_0' => 'R tidak valid (<= 0).',
+            'IL_R_INVALID_R_LT_TICK' => 'R tidak valid (< tick).',
+            'IL_VOL_CONFIRM' => 'Volume cukup untuk konfirmasi.',
+            'IL_VOL_STRONG' => 'Volume kuat (konfirmasi lebih tinggi).',
+            'IL_CLEAN_CANDLE' => 'Candle bersih (close dekat high, wick kecil).',
+            'IL_RSI_OVERHEAT' => 'RSI terlalu panas (risk blow-off).',
+            'IL_BLOWOFF_RISK' => 'Risiko blow-off (terlalu overbought).',
+            'IL_CHAOS_RISK' => 'Risiko chaos (ATR tinggi + wick besar).',
+        ];
+        if (isset($wl[$code])) return $wl[$code];
+
+        return self::rankReasonMessage($code, []);
+    }
+
     public static function rankReasonCatalog(): array
     {
         // Ini “kamus tetap” untuk UI (code => message).

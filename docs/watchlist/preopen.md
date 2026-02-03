@@ -1,213 +1,157 @@
-# preopen.md (LOCKED)
+# WATCHLIST Preopen Contract (LOCKED)
 
-Dokumen ini mendefinisikan **output standar** endpoint/fitur `watchlist/preopen` untuk semua policy.
-Tujuan: UI/DTO stabil, dan seluruh strategi berbagi schema yang sama. Perbedaan policy hanya pada isi (threshold, ranking, setup, guards).
+Dokumen ini mendefinisikan output JSON dari endpoint `GET /watchlist/preopen`.
 
-## Prinsip inti (LOCKED)
+## Catatan tanggal
 
-1. **PLAN = EOD-only** (data kemarin, `asof_eod_date`). PLAN **tidak boleh** dimodifikasi oleh CONFIRM.
-2. **CONFIRM opsional & terpisah**. CONFIRM hanya memberi keputusan live dan rekomendasi harga/eksekusi **bounded** oleh PLAN.
-3. **Tidak ada filler/placeholder**. Semua ticker yang tampil sudah lolos `Universe filter` + aturan group masing-masing.
-4. **Tidak ada hard cap tersembunyi**. Jumlah item dinamis berbasis kualitas sinyal.
-5. **Reasons selalu object**: `{code, message, severity?}`. Message disediakan oleh layer aplikasi (mis. `app/Trade/Explain`).
+Kontrak memakai 2 tanggal:
+- `meta.trade_date` = tanggal eksekusi (hari bursa yang sedang/akan dieksekusi).
+- `meta.asof_eod_date` = tanggal EOD yang dipakai untuk scoring/ranking (biasanya hari bursa sebelumnya).
 
----
+## Top-level schema
 
-## Output schema (LOCKED)
-
-### Root
 ```json
 {
-  "meta": { ... },
-  "groups": { ... },
-  "recommendations": { ... },
-  "confirm": { ... }
+  "meta": {
+    "policy": "WEEKLY_SWING|DIVIDEND_SWING|POSITION_TRADE|INTRADAY_LIGHT|NO_TRADE",
+    "trade_date": "YYYY-MM-DD",
+    "asof_eod_date": "YYYY-MM-DD",
+    "canonical_ready": true,
+    "flags": ["EOD_NOT_READY"],
+    "reasons": [{"code":"GL_EOD_NOT_READY","message":"...","severity":"ERROR"}]
+  },
+  "groups": {
+    "top_picks": [/* TickerItem */],
+    "secondary": [/* TickerItem */],
+    "watch_only": [/* TickerItem */],
+    "avoid": [],
+    "no_trade": []
+  },
+  "recommendations": {/* Recommendations */},
+  "confirm": {/* Confirm */}
 }
 ```
 
-### meta (LOCKED)
+## TickerItem
+
 ```json
 {
-  "policy": "WEEKLY_SWING|DIVIDEND_SWING|POSITION_TRADE|INTRADAY_LIGHT|NO_TRADE",
-  "trade_date": "YYYY-MM-DD",
-  "asof_eod_date": "YYYY-MM-DD",
-  "canonical_ready": true,
-  "flags": [],
-  "reasons": []
+  "ticker": "BBRI",
+  "rank": 1,
+  "score_total": 74.5,
+  "reasons": [{"code":"MOM_RSI_OK","message":"...","severity":"INFO"}],
+  "eod_bar": {
+    "asof_eod_date": "YYYY-MM-DD",
+    "open": 0,
+    "high": 0,
+    "low": 0,
+    "close": 0,
+    "prev_close": 0,
+    "gap_pct": 0.0123,
+    "volume_shares": 0,
+    "value_idr": 0
+  },
+  "ticker_plan": {
+    "setup_type": "BREAKOUT|PULLBACK",
+    "plan_entry": 0,
+    "plan_stop": 0,
+    "plan_tp1": 0,
+    "rr_est": 1.5,
+    "execution_slices": [
+      {
+        "n": 1,
+        "time": "09:20",
+        "lots": 1,
+        "plan_limit_price": 0,
+        "plan_price_cap": 0
+      }
+    ]
+  }
 }
 ```
 
-- Jika `canonical_ready == false`:
-  - `recommendations.items = []` (wajib)
-  - `groups.*` tetap dihitung untuk monitoring, dan `flags` memuat `EOD_NOT_READY` + reason `GL_EOD_NOT_READY`.
-
-### groups (LOCKED)
-```json
-{
-  "top_picks":   [ <TickerItem> ],
-  "secondary":   [ <TickerItem> ],
-  "watch_only":  [ <TickerItem> ],
-  "avoid":       [ <TickerAvoidItem> ],
-  "no_trade":    [ <TickerNoTradeItem> ]
-}
-```
-
-### recommendations (LOCKED)
-`recommendations` adalah rencana eksekusi beli untuk hari itu (berdasarkan policy aktif).
-- Mode A: capital tidak diberikan → lots = null, tapi harga PLAN tetap ada.
-- Mode B: capital diberikan → lots integer + estimasi biaya.
+## Recommendations
 
 ```json
 {
   "mode": "A_NO_CAPITAL|B_WITH_CAPITAL",
   "capital_idr": 5000000,
-  "items": [ <RecommendationItem> ],
-  "cash_remaining_idr": 12345
+  "items": [
+    {
+      "ticker": "BBRI",
+      "action": "BUY|WAIT|SKIP",
+      "alloc_idr": 1000000,
+      "lots": 1,
+      "plan_entry": 0,
+      "plan_stop": 0,
+      "plan_tp1": 0,
+      "setup_type": "BREAKOUT|PULLBACK",
+      "execution_slices": [
+        {
+          "n": 1,
+          "time": "09:20",
+          "lots": 1,
+          "plan_limit_price": 0,
+          "plan_price_cap": 0
+        }
+      ],
+      "reasons": [{"code":"...","message":"...","severity":"INFO"}]
+    }
+  ],
+  "cash_remaining_idr": 0
 }
 ```
 
-### confirm (LOCKED)
-CONFIRM hanya muncul jika user melakukan input snapshot.
+Catatan:
+- `lots` dan `alloc_idr` dapat `null` pada mode `A_NO_CAPITAL`.
+- `cash_remaining_idr` bisa `null` jika `canonical_ready = false`.
+
+## Confirm
+
+`confirm` digunakan untuk menilai kelayakan eksekusi intraday berdasarkan snapshot LIVE dan guard dari `docs/watchlist/scorecard.md`.
+
 ```json
 {
   "status": "none|partial|complete",
   "checked_count": 0,
   "by_ticker": {
-    "PGAS": <ConfirmResult>
+    "BBRI": {
+      "checked_at": "09:20:12",
+      "decision": "APPROVE|DELAY|REJECT",
+      "eligible_now": true,
+      "next_check_at": "09:20:42",
+      "reasons": [{"code":"CF_OK","message":"...","severity":"INFO"}],
+      "computed": {
+        "gap_pct": 0.0123,
+        "spread_pct": 0.0045,
+        "chase_pct": 0.0030,
+        "snapshot_age_sec": 8
+      },
+      "recommended_orders": [
+        {
+          "n": 1,
+          "time_window": "09:20",
+          "action": "PLACE_LIMIT|WAIT|SKIP",
+          "lots": 1,
+          "plan_limit_price": 0,
+          "plan_price_cap": 0,
+          "recommended_limit_price": 0,
+          "reasons": [{"code":"CF_PRICE_AT_ASK1_WITHIN_CAP","message":"...","severity":"INFO"}],
+          "inputs_used": {
+            "ask_best": 0,
+            "bid_best": 0,
+            "spread_pct": 0.0045,
+            "snapshot_age_sec": 8
+          }
+        }
+      ]
+    }
   }
 }
 ```
 
----
+Aturan praktis:
+- `decision=APPROVE` hanya jika ada minimal 1 tranche `action=PLACE_LIMIT`.
+- `decision=DELAY` dipakai untuk kondisi yang bisa membaik (contoh: snapshot stale atau chase melewati cap).
+- `decision=REJECT` dipakai untuk kondisi yang tidak layak dieksekusi saat ini (contoh: gap-up terlalu besar, spread terlalu lebar, breakout overextended).
 
-## Common objects (LOCKED)
-
-### Reasons object (LOCKED)
-```json
-{ "code": "WS_RR_OK", "message": "RR estimasi memenuhi minimum.", "severity": "INFO" }
-```
-
-### eod_bar (INFO, recommended)
-Ringkas OHLCV EOD untuk konteks UI/audit.
-```json
-{
-  "asof_eod_date": "YYYY-MM-DD",
-  "open": 1000, "high": 1050, "low": 990, "close": 1020,
-  "prev_close": 1005,
-  "gap_pct": 0.0149,
-  "volume_shares": 123456789,
-  "value_idr": 123456789000
-}
-```
-
-### TickerItem (groups) (LOCKED)
-```json
-{
-  "ticker": "PGAS",
-  "rank": 1,
-  "score_total": 0.86,
-  "reasons": [ <Reason> ],
-  "eod_bar": { ... },
-  "ticker_plan": <TickerPlan>
-}
-```
-
-### TickerPlan (PLAN, EOD-only) (LOCKED)
-```json
-{
-  "setup_type": "PULLBACK|BREAKOUT",
-  "plan_entry": 2090,
-  "plan_stop": 2020,
-  "plan_tp1": 2180,
-  "rr_est": 1.29,
-  "execution_slices": [ <ExecutionSlicePlan> ]
-}
-```
-
-### ExecutionSlicePlan (PLAN tranche) (LOCKED)
-Harga PLAN wajib ada walau capital kosong.
-```json
-{
-  "n": 1,
-  "time": "09:20",
-  "lots": 6,
-  "plan_limit_price": 2090,
-  "plan_price_cap": 2090,
-  "plan_price_floor": null,
-  "trigger": "PULLBACK: last_live <= plan_entry",
-  "reason": { "code": "WS_TRANCHE1_BASE", "message": "Tranche awal.", "severity": "INFO" }
-}
-```
-
-### RecommendationItem (LOCKED)
-```json
-{
-  "ticker": "PGAS",
-  "rank_ref": 1,
-  "weight_pct": 0.60,
-  "planned_lots": 10,
-  "estimated_cost_idr": 2310500,
-  "fee_included": true,
-  "reasons": [ <Reason> ],
-  "setup_type": "PULLBACK",
-  "plan_entry": 2090, "plan_stop": 2020, "plan_tp1": 2180,
-  "execution_slices": [ <ExecutionSlicePlan> ]
-}
-```
-
----
-
-## Harga tranche: PLAN vs CONFIRM (LOCKED)
-
-### PLAN price intent (EOD-only)
-- **PULLBACK**:
-  - `plan_limit_price = plan_entry`
-  - `plan_price_cap = plan_entry` (no-chase)
-- **BREAKOUT**:
-  - `plan_limit_price = plan_entry`
-  - `plan_price_cap = round_up(plan_entry * (1 + CF_MAX_CHASE_PCT_policy))`
-
-Policy hanya boleh override nilai `CF_MAX_CHASE_PCT_policy` dan window/jam eksekusi, bukan rumus.
-
-### CONFIRM recommended price (live, bounded)
-Untuk setiap tranche yang dieksekusi, CONFIRM menghasilkan rekomendasi limit price **tanpa mengubah PLAN**.
-
-Aturan deterministik:
-- ambil `ask_best = ask1` dari orderbook (Top-N).
-- jika `ask_best > plan_price_cap` → `action = WAIT` atau `REJECT`, reason `CF_CHASE_BLOCK`.
-- jika lolos:
-  - **PULLBACK**: `recommended_limit_price = min(plan_limit_price, ask_best, plan_price_cap)`
-  - **BREAKOUT**:  `recommended_limit_price = min(ask_best, plan_price_cap)`
-
-### ConfirmResult (LOCKED)
-```json
-{
-  "checked_at": "09:20:12",
-  "decision": "APPROVE|DELAY|REJECT",
-  "eligible_now": true,
-  "reasons": [ <Reason> ],
-  "computed": { "spread_pct": 0.0048, "snapshot_age_sec": 8 },
-  "recommended_orders": [ <ConfirmOrder> ]
-}
-```
-
-### ConfirmOrder (per tranche, LOCKED)
-```json
-{
-  "n": 1,
-  "time_window": "09:20",
-  "action": "PLACE_LIMIT|WAIT|SKIP",
-  "lots": 6,
-  "plan_limit_price": 2090,
-  "plan_price_cap": 2090,
-  "recommended_limit_price": 2090,
-  "reasons": [ <Reason> ],
-  "inputs_used": { "ask1": 2090, "bid1": 2080, "spread_pct": 0.0048, "snapshot_age_sec": 8 }
-}
-```
-
----
-
-## Policy-specific behavior
-Detail hard rules, ranking, default execution mode, dan policy overrides ada di `policy/*.md`.
-`preopen.md` hanya mengunci schema output + kontrak PLAN/CONFIRM lintas policy.

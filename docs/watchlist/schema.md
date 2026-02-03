@@ -1,253 +1,196 @@
-# Watchlist Scorecard Schema (TradeAxis) — Detailed Column Semantics
+# Watchlist DB Schema
 
-Dokumen ini menjelaskan schema yang dipakai fitur **Watchlist Scorecard**: penyimpanan **plan EOD**, **checkpoint intraday** (manual/otomatis), dan **rekap scorecard** untuk evaluasi strategi.
+Dokumen ini mencatat **struktur database yang dipakai fitur Watchlist** (table/view/kolom) beserta fungsi tiap table & kolom dalam konteks Watchlist.
 
-Fokus dokumen ini bukan hanya “arti kolom”, tapi juga:
-- **Sumber data** (job/command/user input)
-- **Aturan hitung/derivasi**
-- **Invariants** (harus selalu benar)
-- **Kapan di-update** (EOD vs intraday vs after-close)
-- **Kegunaan praktis** (UI/report/debug)
-
----
-
-## Prinsip desain
-
-- **Plan deterministik**: output Watchlist EOD disimpan sebagai snapshot (`watchlist_strategy_runs.payload_json`) supaya evaluasi bisa diulang (replay) walau logic berubah.
-- **Checkpoint granular**: setiap kali kamu cek (09:20/10:00/13:40) simpan snapshot & hasil evaluasi (`watchlist_strategy_checks`).
-- **Rekap cepat**: scorecard agregat per policy/hari disimpan terpisah (`watchlist_scorecards`) untuk dashboard dan analisis.
+**Batasan penting (LOCKED):**
+- Watchlist **hanya boleh merombak / membuat** table dengan prefix `watchlist_*`.
+- Table market data berikut **jangan dirombak** (watchlist hanya membaca):
+  - `tickers`
+  - `ticker_ohlc_daily`
+  - `ticker_indicators_daily`
+  - `ticker_dividend_events`
+  - `md_runs`, `md_raw_eod`, `md_canonical_eod`, `md_candidate_validations`
+  - `market_calendars`
 
 ---
 
-# 1) `watchlist_strategy_runs`
+## 1) Table persistence Watchlist
 
-**Fungsi:** menyimpan **snapshot plan EOD** per `policy` untuk satu `trade_date` yang akan dieksekusi pada `exec_trade_date`.
+### 1.1 `watchlist_daily`
+**Fungsi:** menyimpan **1 payload preopen contract** per policy + tanggal eksekusi (audit/replay).
 
-**Sumber data:** dibuat otomatis saat Watchlist menghasilkan output final (EOD publish), idealnya di step yang sama dengan publish JSON.
-
-**Kapan update:** sekali per policy per hari (idempotent).
-
-### Kolom inti
-
-- `id` (PK)
-  - Identifier run.
-
-- `trade_date` (date)
-  - Tanggal basis EOD (hari sinyal dihitung & rekomendasi dibuat).
-
-- `exec_trade_date` (date)
-  - Tanggal eksekusi target (umumnya next trading day).
-
-- `policy_code` (varchar(32))
-  - Kode policy/strategi (mis. `WEEKLY_SWING`, `DIVIDEND_SWING`, dll).
-
-- `policy_version` (varchar(32), nullable)
-  - Versi dokumen/engine policy saat run dibuat (untuk perbandingan lintas versi).
-
-- `source` (varchar(32), nullable)
-  - Asal data (contoh: `canonical`, `fallback`, `mixed`).
-
-- `payload_json` (json/jsonb/longtext)
-  - Snapshot output plan policy tersebut.
-  - **Minimal wajib memuat**:
-    - `trade_date`, `exec_date`, `policy`
-    - `groups.top_picks[]`, `groups.secondary[]`, `groups.watch_only[]`
-    - per ticker: `entry`, `timing.entry_windows`, `timing.avoid_windows`, `guards`, `slices/slice_pct`, `reason_codes`
-
+Kolom:
+- `watchlist_daily_id` (PK)
+- `policy` (STRING): kode policy, contoh `WEEKLY_SWING`.
+- `trade_date` (DATE): **tanggal eksekusi** (contract `meta.trade_date`).
+- `asof_eod_date` (DATE): **tanggal EOD** yang dipakai untuk membentuk kandidat (contract `meta.asof_eod_date`).
+- `canonical_ready` (BOOL): status kesiapan canonical EOD pada saat generate.
+- `source` (STRING): label sumber penyimpanan (default `preopen_contract_<policy>`).
+- `generated_at` (DATETIME|null): waktu generate payload (best-effort).
+- `payload_json` (JSON): **payload preopen contract full**.
 - `created_at`, `updated_at`
 
-### Invariants (wajib benar)
+Index/constraint:
+- UNIQUE: (`policy`,`trade_date`,`source`)
+- INDEX: (`trade_date`,`policy`), (`asof_eod_date`,`policy`)
 
-- Unik: kombinasi `(trade_date, policy_code, source)` atau `(exec_trade_date, policy_code, source)` harus unik (pilih salah satu sebagai unique index).
-- `payload_json.policy` harus sama dengan `policy_code`.
-- `groups.top_picks`, `secondary`, `watch_only` hanya berisi **kandidat** (bukan semua ticker).
-
-### Index yang disarankan
-- Unique: `(trade_date, policy_code, source)`
-- Query cepat:
-  - `(exec_trade_date, policy_code)`
-  - `(trade_date)`
-
-### Contoh payload minimal
-```json
-{
-  "trade_date": "2026-01-26",
-  "exec_date": "2026-01-27",
-  "policy": "WEEKLY_SWING",
-  "meta": { "generated_at": "2026-01-26T20:15:00+07:00" },
-  "groups": { "top_picks": [], "secondary": [], "watch_only": [] }
-}
-```
+Relasi:
+- 1 row `watchlist_daily` → banyak `watchlist_candidates`.
 
 ---
 
-# 2) `watchlist_strategy_checks`
+### 1.2 `watchlist_candidates`
+**Fungsi:** denormalisasi kandidat per ticker (per group) untuk query ringan (UI/audit), tetapi tetap menyimpan JSON full untuk replay.
 
-**Fungsi:** menyimpan hasil **cek intraday** terhadap `strategy_run` pada satu waktu (`checked_at`).  
-Ini adalah *log* yang jadi sumber utama untuk menghitung **feasible_rate** (eligible_now rate), debugging, dan audit.
+Kolom:
+- `watchlist_candidate_id` (PK)
+- `watchlist_daily_id` (FK → `watchlist_daily.watchlist_daily_id`, cascade delete)
+- `policy` (STRING)
+- `trade_date` (DATE): tanggal eksekusi
+- `asof_eod_date` (DATE): tanggal plan (EOD)
+- `group_code` (STRING): `TOP_PICKS | SECONDARY | WATCH_ONLY | AVOID | NO_TRADE`
+- `ticker` (STRING): ticker code, contoh `BBCA`
+- `rank` (INT|null): urutan ranking dalam group (1..n)
+- `score_total` (DECIMAL|null): skor akhir (untuk sorting/audit)
 
-**Sumber data:**
-- Manual input (Ajaib) → user memasukkan snapshot (last/open/prev_close/bid/ask).
-- Otomatis (opsional) → job intraday hanya untuk kandidat.
+Denormalized PLAN:
+- `setup_type` (STRING|null): `PULLBACK | BREAKOUT`
+- `plan_entry` (INT|null)
+- `plan_stop` (INT|null)
+- `plan_tp1` (INT|null)
+- `rr_est` (DECIMAL|null)
 
-**Kapan update:** banyak kali per hari (per checkpoint).
+JSON audit:
+- `reasons_json` (JSON|null): array reason objects (dari contract `reasons`).
+- `eod_bar_json` (JSON|null): object EOD bar (dari contract `eod_bar`).
+- `ticker_plan_json` (JSON|null): object ticker plan full (dari contract `ticker_plan`).
+- `created_at`, `updated_at`
 
-### Kolom inti
-
-- `id` (PK)
-
-- `strategy_run_id` (FK)
-  - Relasi ke `watchlist_strategy_runs.id`.
-
-- `checked_at` (timestamp)
-  - Jam WIB ketika snapshot diambil.
-
-- `phase` (varchar(24), nullable)
-  - Label checkpoint, contoh:
-    - `PREOPEN`
-    - `IN_WINDOW`
-    - `POSTWINDOW`
-    - `EOD_CLOSE`
-
-- `ticker_code` (varchar(16))
-  - Ticker yang dicek.
-
-- `snapshot_json` (json/jsonb)
-  - Data observasi intraday (manual/otomatis). Minimal:
-    - `last`, `open`, `prev_close`
-    - ideal: `bid`, `ask`, `high`, `low`, `vol`
-
-- `result_json` (json/jsonb)
-  - Output evaluasi rule:
-    - `eligible_now` (bool)
-    - `blocked_by[]` (reason codes)
-    - `computed.gap_pct`, `computed.spread_pct`, `computed.chase_pct`
-    - `in_entry_window` (bool)
-
-- `created_at`
-
-### Invariants (wajib benar)
-
-- `strategy_run_id` harus valid.
-- `ticker_code` harus ada di salah satu group kandidat run (top/secondary/watch_only).
-- `checked_at` harus berada pada `exec_trade_date` yang sama dengan run (kecuali phase `PREOPEN` yang boleh sebelum open).
-- `result_json.eligible_now == true` hanya jika semua guard terpenuhi (window, gap, spread, chase, dsb).
-
-### Index yang disarankan
-- `(strategy_run_id, checked_at)`
-- `(exec_trade_date)` via join atau denormalisasi (opsional)
-- `(ticker_code, checked_at)` untuk audit per ticker
-
-### Contoh snapshot/result
-```json
-// snapshot_json
-{ "last": 1235, "open": 1220, "prev_close": 1210, "bid": 1230, "ask": 1235 }
-
-// result_json
-{ "eligible_now": true, "blocked_by": [], "computed": { "gap_pct": 0.0083, "spread_pct": 0.0040 } }
-```
+Index/constraint:
+- UNIQUE: (`watchlist_daily_id`,`group_code`,`ticker`)
+- INDEX: (`policy`,`trade_date`,`group_code`,`rank`)
+- INDEX: (`ticker`,`asof_eod_date`)
 
 ---
 
-# 3) `watchlist_scorecards`
+### 1.3 `watchlist_intraday_snapshots`
+**Fungsi:** menyimpan snapshot live (bid/ask/last + optional top-3) untuk kebutuhan CONFIRM (scorecard check-live).
 
-**Fungsi:** menyimpan **rekap agregat** hasil evaluasi untuk 1 `strategy_run` (atau per policy per hari).  
-Ini adalah bahan dashboard “berapa % rekomendasi bisa dieksekusi” dan “berapa yang menyentuh entry slice”.
+Kolom:
+- `snapshot_id` (PK)
+- `trade_date` (DATE): tanggal eksekusi (harus sama dengan contract `meta.trade_date`)
+- `ticker_id` (BIGINT): refer ke `tickers.ticker_id`
+- `ticker_code` (STRING)
+- `checked_at` (DATETIME|null): kapan snapshot diambil
 
-**Sumber data:** job/command `scorecard:compute` setelah close, atau periodik.
+Harga utama:
+- `bid1`, `ask1`, `last`, `open`, `open_or_last_exec` (DECIMAL|null)
+- `spread_pct` (DECIMAL|null): best-effort (0..1)
 
-**Kapan update:** minimal sekali per run (bisa overwrite versi terbaru).
+Orderbook optional (top-3):
+- `bid2`, `bid3`, `ask2`, `ask3` (DECIMAL|null)
+- `bid_lots1..3`, `ask_lots1..3` (INT|null)
 
-### Kolom inti
-
-- `id` (PK)
-
-- `strategy_run_id` (FK)
-  - Relasi ke `watchlist_strategy_runs.id`.
-
-- `metrics_json` (json/jsonb)
-  - Struktur metrik (bebas tapi harus konsisten). Minimal v1:
-    - `counts.candidates`
-    - `counts.checked`
-    - `counts.eligible_now`
-    - `feasible_rate` (eligible_now/checked)
-    - `fill_rate` (filled_slices/total_slices)
-  - Opsional:
-    - `outcome_rate` (butuh data exit/portfolio)
-
-- `computed_at` (timestamp, nullable)
-  - Kapan scorecard dihitung.
-
-- `created_at`
-
-### Invariants (wajib benar)
-
-- `feasible_rate` harus konsisten dengan `counts`.
-- `fill_rate` harus konsisten dengan definisi slice triggers.
-- `metrics_json.policy` (bila disimpan) harus sama dengan policy dari run.
-
-### Index yang disarankan
-- Unique: `(strategy_run_id)` (satu scorecard per run; update overwrite)
-- Query cepat: join run → filter `(exec_trade_date, policy_code)`
-
-### Definisi metrik v1 (wajib konsisten)
-- `feasible_rate = eligible_now_count / checked_candidates`
-- `fill_rate = filled_slices / total_slices` (pakai high/low harian jika tidak ada urutan intraday)
-- `outcome_rate` boleh `null` sampai ada data transaksi/exit.
+Index/constraint:
+- UNIQUE: (`trade_date`,`ticker_id`)
+- INDEX: (`trade_date`,`ticker_code`)
 
 ---
 
-## 4) Tabel terkait (existing) — konteks Watchlist & Scorecard
+### 1.4 `watchlist_strategy_runs`
+**Fungsi:** menyimpan PLAN (payload watchlist) untuk scorecard pipeline.
 
-Bagian ini bukan tabel baru di scorecard, tapi sering dipakai sebagai input/pelengkap.
+Kolom:
+- `run_id` (PK)
+- `trade_date` (DATE): **tanggal EOD plan** (legacy naming; di scorecard pipeline ini = `asof_eod_date`)
+- `exec_trade_date` (DATE): tanggal eksekusi
+- `policy` (STRING)
+- `source` (STRING)
+- `generated_at` (DATETIME|null)
+- `payload_json` (JSON): payload plan full
+- `created_at`, `updated_at`
 
-### 4.1 `watchlist_daily` + `watchlist_candidates`
-**Fungsi:** penyimpanan output watchlist “operasional” untuk UI (daftar kandidat, ranking, alasan).  
-`watchlist_strategy_runs` adalah snapshot policy-level; sementara `watchlist_daily/candidates` adalah bentuk operasional yang lebih granular.
-
-**Sumber data:** EOD watchlist run.
-
-### 4.2 `watchlist_intraday_snapshots`
-**Fungsi:** (opsional) snapshot intraday otomatis untuk kandidat yang dipantau.
-- Jika belum ada ingestion otomatis, kamu bisa skip tabel ini dan pakai manual input ke `watchlist_strategy_checks`.
-
-### 4.3 `ticker_status_daily`
-**Fungsi:** status harian ticker (suspensi, notasi khusus, warning, dll) sebagai guard/flag.
-- Diisi otomatis dari ingestion status (atau manual seed jika sumber belum ada).
-
-### 4.4 `ticker_dividend_events`
-**Fungsi:** event dividen (cum/ex/record/payment) untuk policy `DIVIDEND_SWING`.
-- Idealnya diisi otomatis dari source data dividen; manual input boleh sebagai seed.
-
-### 4.5 `market_calendar` (kolom baru: `session_open_time`, `session_close_time`, `breaks_json`)
-**Fungsi:** sumber “jam bursa” untuk menentukan entry/avoid windows secara konsisten.
-- `breaks_json` menyimpan interval istirahat/auction (format JSON).
-
-**Sumber data:** umumnya manual seed (kalender jarang berubah), lalu dipakai runtime.
+Index/constraint:
+- UNIQUE: (`trade_date`,`exec_trade_date`,`policy`,`source`)
+- INDEX: (`exec_trade_date`,`policy`)
 
 ---
 
-## 5) Siapa yang mengisi apa (ringkas)
+### 1.5 `watchlist_strategy_checks`
+**Fungsi:** menyimpan hasil CONFIRM (check-live) untuk sebuah run.
 
-- `watchlist_strategy_runs` → **otomatis** saat EOD watchlist publish.
-- `watchlist_strategy_checks` → **manual** (Ajaib) pada v1, bisa jadi **otomatis** jika ada intraday snapshot job.
-- `watchlist_scorecards` → **otomatis** dari job compute (after close / besok pagi).
-- `ticker_dividend_events`, `ticker_status_daily` → otomatis jika ada importer; kalau belum, bisa manual seed minimal.
-- `market_calendar.*time/breaks_json` → biasanya **manual seed**.
+Kolom:
+- `check_id` (PK)
+- `run_id` (FK → `watchlist_strategy_runs.run_id`, cascade delete)
+- `checked_at` (DATETIME)
+- `snapshot_json` (JSON): input live snapshot (sesuai docs/watchlist/scorecard.md)
+- `result_json` (JSON): output eligibility check
+- `created_at`, `updated_at`
 
----
-
-## 6) Contract test checklist (schema-level)
-
-Minimal checks yang wajib lulus:
-- `watchlist_strategy_runs.payload_json` memuat `groups.top_picks|secondary|watch_only`.
-- `watchlist_strategy_checks.ticker_code` selalu termasuk kandidat dari run.
-- `watchlist_scorecards.metrics_json` punya `counts` dan `feasible_rate` konsisten.
+Index:
+- (`run_id`,`checked_at`)
 
 ---
 
-## 7) Catatan implementasi (praktis)
+### 1.6 `watchlist_scorecards`
+**Fungsi:** menyimpan metrik performa ringkas hasil evaluasi scorecard.
 
-- Untuk MariaDB: gunakan `LONGTEXT` untuk JSON bila tidak pakai JSON type.
-- Pastikan semua JSON disimpan UTF‑8 tanpa BOM.
-- Jangan simpan 900 ticker di watch_only; watchlist adalah kandidat, bukan universe dump.
+Kolom:
+- `scorecard_id` (PK)
+- `run_id` (FK → `watchlist_strategy_runs.run_id`, cascade delete, UNIQUE)
+- `feasible_rate` (DECIMAL|null)
+- `fill_rate` (DECIMAL|null)
+- `outcome_rate` (DECIMAL|null)
+- `payload_json` (JSON|null): detail metrics tambahan
+- `created_at`, `updated_at`
+
+---
+
+## 2) Table market data yang dibaca Watchlist (read-only)
+
+### `tickers`
+Dipakai untuk mapping `ticker_id` ↔ `ticker_code` dan nama perusahaan (join dari `ticker_indicators_daily`).
+
+### `ticker_ohlc_daily`
+Dipakai untuk:
+- OHLC canonical untuk `asof_eod_date`
+- candle sebelumnya untuk `prev_close`
+- DV20 (avg close*volume 20 hari trading sebelum `asof_eod_date`)
+
+### `ticker_indicators_daily`
+Dipakai untuk:
+- skor (`score_total`), label (`decision_code`, `signal_code`, `volume_label_code`), dan indikator (MA/RSI/ATR/dll)
+- filter valid/invalid (gate awal kandidat)
+
+### `market_calendars`
+Dipakai untuk:
+- menentukan **previous trading day** (prev candle)
+- menentukan **next trading day** dari `asof_eod_date` (jadi `trade_date` eksekusi)
+- mengambil **prior N trading dates** untuk agregasi teknikal (berbasis tanggal bursa sebelum `asof_eod_date`):
+  - `hh50` = highest high 50 hari (LOOKBACK_50)
+  - `hh20` = highest high 20 hari (LOOKBACK_20)
+  - `hh10` = highest high 10 hari (LOOKBACK_10) — dipakai oleh `INTRADAY_LIGHT` untuk gate breakout
+  - `ll10` = lowest low 10 hari (LOOKBACK_10)
+  - `ll5`  = lowest low 5 hari (LOOKBACK_5)
+  - `ll3`  = lowest low 3 hari (LOOKBACK_3) — dipakai oleh `INTRADAY_LIGHT` untuk anchor stop (tight)
+  - `close_5ago` = close pada 5 trading days sebelum `asof_eod_date` (LOOKBACK_5)
+  - `roc5` = (close_now - close_5ago) / close_5ago — momentum jangka pendek untuk `INTRADAY_LIGHT`
+
+Kolom minimal yang dibaca:
+- `trade_date` (DATE)
+- `is_trading_day` (BOOL/INT)
+
+### `ticker_dividend_events`
+Dipakai khusus untuk policy **DIVIDEND_SWING**.
+
+Fungsi:
+- memilih event dividen terdekat berdasarkan **`ex_date`** dalam window T+2..T+12 trading days dari `exec_trade_date`.
+
+Kolom minimal yang dibaca:
+- `ticker_id`
+- `ex_date` (DATE)
+
+Kolom opsional (untuk derived/scoring):
+- `cum_date` (DATE|null)
+- `cash_dividend` (DECIMAL|null)
+- `dividend_yield_est` (DECIMAL|null)
