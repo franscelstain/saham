@@ -88,6 +88,9 @@ Catatan: `score_total` adalah float dalam range **[0..1]**.
 
 ## Recommendations
 
+> **Catatan (ANTI SALAH TAFSIR)**
+> - `weight_pct` adalah **fraction 0..1** (contoh: 0.20 = 20%). UI boleh menampilkan dalam persen, tapi payload tetap 0..1.
+
 ```json
 {
   "mode": "A_NO_CAPITAL|B_WITH_CAPITAL",
@@ -96,7 +99,7 @@ Catatan: `score_total` adalah float dalam range **[0..1]**.
     {
       "ticker": "BBRI",
       "rank_ref": 1,
-      "weight_pct": 20.0,
+      "weight_pct": 0.20,
       "planned_lots": 1,
       "estimated_cost_idr": 1000000,
       "fee_included": true,

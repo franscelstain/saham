@@ -3380,6 +3380,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 $targetNoCap = max(0, $targetNoCap);
 
                 $allocsNoCap = [];
+                $selectedIdxNoCap = [];
                 $skippedNoCap = [];
                 $skippedMap = [];
 
@@ -3432,6 +3433,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                     }
 
                     // Keep allocation template fields null in Mode A.
+                    $selectedIdxNoCap[] = $idx;
                     $allocsNoCap[] = [
                         'ticker_code' => (string)($c['ticker_code'] ?? ''),
                         'alloc_pct' => null,
@@ -3440,6 +3442,16 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                         'lots_recommended' => null,
                         'estimated_cost' => null,
                     ];
+                }
+
+                // Mode A still requires deterministic weight_pct per docs (selection-only, no sizing).
+                if (!empty($selectedIdxNoCap)) {
+                    $w = $this->computeRecommendationWeights($selectedIdxNoCap, $candidates);
+                    foreach ($w as $i => $pct) {
+                        if (isset($allocsNoCap[$i])) {
+                            $allocsNoCap[$i]['alloc_pct'] = $pct;
+                        }
+                    }
                 }
 
                 return [

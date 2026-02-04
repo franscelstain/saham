@@ -521,78 +521,44 @@ Jika `score_total` sama, urutan final ditentukan:
 3) `tick_pct` lebih rendah
 4) `ticker_code` A→Z
 
-### Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED, dynamic)
+### Execution slices (template) (LOCKED)
 
-Tujuan: setiap ticker di `Top Picks` dan `Secondary` memiliki rencana eksekusi bertahap yang **deterministik** (tanpa intraday) dan bisa **adaptif** berdasarkan risk/reward dari hasil PLAN.
+Tujuan: menyediakan rencana eksekusi bertahap yang **deterministik** di level PLAN (EOD-only), namun **tidak mengubah** semantik kandidat.
 
-Kontrak:
-- Mini strategy hanya ditambahkan pada `groups.top_picks[]` dan `groups.secondary[]`.
-- Mini strategy dihitung **setelah** PLAN (entry/stop/tp1/rr_est) valid, sehingga tranching berasal dari hasil proses, bukan asumsi.
-- `mini_tranches_pct[]` selalu berbasis persentase (tidak butuh capital).
-- Jika `capital` ada dan ticker masuk `recommendations`, maka `mini_tranches_lots[]` **harus** copy dari `recommendations.tranches` (single source), bukan dihitung ulang.
-- Jika ticker tidak masuk `recommendations`, maka `mini_tranches_lots=null`.
+Kontrak (lihat schema lengkap di `docs/watchlist/preopen.md`):
+- Setiap item kandidat **boleh** memiliki `ticker_plan.execution_slices[]` sebagai **template** (berbasis persentase).
+- `execution_slices[].pct` adalah fraction **[0..1]** dan totalnya ~1.0 (boleh ada pembulatan).
+- `execution_slices[].lots`:
+  - **NULL** untuk semua kandidat yang **bukan** bagian dari `recommendations.items[]` (termasuk `watch_only`).
+  - **Wajib integer** hanya untuk `recommendations.items[]` saat Mode B (`capital` tersedia) dan ticker feasible min 1 lot.
+- Dengan kata lain: **lots adalah output sizing recommendations**, bukan “order” untuk semua kandidat.
 
-#### Proses penentuan tranche profile (LOCKED)
-
-Input yang dipakai (EOD-only):
-- `rr_est` (dari PLAN)
-- `atr_pct`, `tick_pct` (risk metrics)
-- `flags` (optional): `GAP_RISK_HIGH`, `CA_EVENT_NEAR` (jika tersedia)
-
-Step 1 — Risk bucket (LOCKED)
-- `risk_bucket = HIGH` jika salah satu true:
-  - `atr_pct >= 0.12`
-  - `tick_pct >= 0.012`
-  - `flags` mengandung `GAP_RISK_HIGH` atau `CA_EVENT_NEAR`
-- `risk_bucket = LOW` jika semua true:
-  - `atr_pct <= 0.07`
-  - `tick_pct <= 0.008`
-  - tidak ada flag risk di atas
-- Selain itu: `risk_bucket = MED`
-
-Step 2 — Reward bucket (LOCKED)
-- `reward_bucket = HIGH` jika `rr_est >= 1.8`
-- `reward_bucket = LOW` jika `rr_est < 1.3`
-- Selain itu: `reward_bucket = MED`
-
-Step 3 — Profile selection per policy (LOCKED)
-- Weekly Swing / Dividend Swing / Position Trade:
-  - Jika `risk_bucket=HIGH` → profile `CONSERVATIVE`
-  - Else jika `reward_bucket=HIGH` dan `risk_bucket=LOW` → profile `AGGRESSIVE`
-  - Else → profile `DEFAULT`
-- Intraday Light:
-  - Jika `risk_bucket=HIGH` → profile `CONSERVATIVE`
-  - Else jika `reward_bucket=HIGH` → profile `AGGRESSIVE`
-  - Else → profile `DEFAULT`
-- NO_TRADE: tidak ada mini strategy
-
-Step 4 — Profile → tranche pct (LOCKED)
-- Untuk WS/DS/PT (2 tranche):
-  - `CONSERVATIVE`: 50/50
-  - `DEFAULT`: 60/40
-  - `AGGRESSIVE`: 70/30
-- Untuk IL (2 tranche):
-  - `CONSERVATIVE`: 60/40
-  - `DEFAULT`: 70/30
-  - `AGGRESSIVE`: 80/20
-
-Timing hint (LOCKED):
-- tranche1: `09:20`
-- tranche2: `10:30`
-
-Output tambahan (audit):
-- `mini_tranche_profile` (string): `CONSERVATIVE` | `DEFAULT` | `AGGRESSIVE`
-- `mini_tranche_rule` (string): contoh `EOD_TRANCHE_RULE_V1`
+Catatan:
+- UI boleh menampilkan template slices untuk `Top Picks/Secondary` agar user paham rencana scale-in/out,
+  tetapi **jangan** menafsirkan `lots=null` sebagai rekomendasi beli.
 
 ### Dua mode deterministik: tanpa capital vs dengan capital
+
+#### Reason codes untuk Recommendations (minimal, LOCKED)
+Agar recommendations dapat diaudit dan dijelaskan di UI, gunakan subset berikut (jangan berkembang jadi ratusan kode):
+- `RECO_CAPITAL_MISSING` — Mode A, ticker dipilih tapi lots/cost tidak dihitung.
+- `RECO_ALREADY_HELD_SKIP` — ticker dilewati karena sudah ada posisi terbuka.
+- `RECO_TARGET_SLOTS_FULL` — exposure cap tercapai (target slot hari ini = 0 atau sudah penuh).
+- `RECO_SKIPPED_BLOCKED` — ticker tidak feasible karena hard lock / tradeability false / block codes.
+- `RECO_INSUFFICIENT_CASH_MIN_LOT` — Mode B, cash tidak cukup untuk beli min 1 lot setelah fee/slippage.
+
+Catatan kompatibilitas:
+- Jika implementasi saat ini masih memakai kode legacy non-RECO (mis. `GL_ALREADY_HELD`), UI boleh memetakan itu ke reason di atas,
+  tetapi kontrak baru untuk recommendations sebaiknya memakai `RECO_*`.
+
 **Mode A: capital missing / null / <=0**
 - `planned_lots = null`, `estimated_cost = null`
 - `execution.tranches[].planned_lots = null`
 - `execution.tranches[].plan_limit_price` + `execution.tranches[].plan_price_cap` tetap **wajib ada** (harga tetap disarankan).
-- reason global minimal: `RECO_CAPITAL_MISSING_LOTS_NULL`
+- reason minimal untuk Mode A: `RECO_CAPITAL_MISSING` (ticker dipilih, lots/cost = null)
 **Mode B: capital tersedia**
 - lots dihitung deterministik (lihat kontrak Allocation → lots).
-- ticker yang tidak feasible min 1 lot → drop dari recommendations (reason `RECO_TICKER_DROPPED_INFEASIBLE_MIN_LOT`).
+- ticker yang tidak feasible min 1 lot → drop dari recommendations (reason `RECO_INSUFFICIENT_CASH_MIN_LOT`).
 - jika semua drop → `recommendations=[]`.
 
 ### Score scale contract (LOCKED)
@@ -672,7 +638,7 @@ Agar tidak tembus modal akibat tranche harga lebih tinggi:
 Untuk setiap ticker i (urut ranking):
 1) `lots_i = floor(budget_i / est_cost_per_lot_i)`
 Hard rule:
-- Jika `lots_i < 1` → **DROP ticker** dari `recommendations` (reason `RECO_TICKER_DROPPED_INFEASIBLE_MIN_LOT`)
+- Jika `lots_i < 1` → **DROP ticker** dari `recommendations` (reason `RECO_INSUFFICIENT_CASH_MIN_LOT`)
 - Setelah drop:
   - lakukan **renormalize weights** pada ticker tersisa (sum weights = 1.0),
   - lalu ulangi langkah B–D sampai stabil (tidak ada drop baru).
@@ -731,110 +697,13 @@ Catatan:
 
 ---
 
-## Micro Strategy (per-ticker execution template)
+## Execution template per ticker (LOCKED)
 
-Selain `recommendations[]` (paket multi-ticker), setiap ticker pada output group
-**Top Picks / Secondary / Watch Only** boleh memiliki `micro_strategy` berupa template eksekusi untuk ticker itu saja.
+Konsep “micro/mini strategy” dipresentasikan sebagai `ticker_plan.execution_slices[]` (lihat `docs/watchlist/preopen.md`).
+Dokumen ini **tidak** mengulang schema field agar tidak terjadi duplikasi/konflik; yang dikunci di sini hanya semantik:
+- `execution_slices` adalah template berbasis persentase.
+- `lots` hanya muncul untuk `recommendations.items[]` saat Mode B (capital tersedia).
 
-Prinsip:
-- `micro_strategy` **bukan universal**; harus mengikuti rule policy aktif.
-- Jika policy tidak mendukung atau data tidak cukup → `micro_strategy = null` + reason jelas.
-- `micro_strategy` tidak boleh memindahkan ticker antar group. Watch Only tetap Watch Only.
-
-### 1) Kapan `micro_strategy` boleh dibuat (hard preconditions)
-`micro_strategy` hanya boleh dibuat jika:
-1) ticker punya `setup_type` valid dari policy (minimal `{BREAKOUT, PULLBACK}`),
-2) PLAN level valid: `plan.entry`, `plan.stop` ada dan `R = entry-stop` lulus kontrak global (`R > 0` dan `R >= tick`),
-3) ticker **bukan Avoid**,
-4) policy mengizinkan execution mode tersebut (lihat mapping di bawah).
-
-Jika gagal → `micro_strategy = null` dan tambahkan salah satu reason:
-- `MICRO_STRATEGY_UNAVAILABLE_POLICY`
-- `MICRO_STRATEGY_DATA_INSUFFICIENT`
-- `MICRO_STRATEGY_R_INVALID`
-- `MICRO_STRATEGY_AVOID`
-### 2) Dua mode: tanpa capital vs dengan capital (sama dengan Recommendations)
-**Mode A: capital missing**
-- `planned_lots = null`, `estimated_cost = null`
-- Tranche % dan plan price tetap ada (tanpa asumsi).
-- reason: `MICRO_CAPITAL_MISSING_LOTS_NULL`
-**Mode B: capital tersedia**
-- Hitung `planned_lots` integer per tranche berdasarkan porsi capital ticker (lihat aturan sizing di bagian Recommendations).
-- Jika min 1 lot tidak feasible → `micro_strategy = null` dengan reason `MICRO_INFEASIBLE_MIN_LOT`. Sizing mengikuti kontrak **Allocation → lots (LOCKED)** di bagian Recommendations.
-  (Jangan memaksakan lots=0 sebagai filler.)
-
-### 3) Schema ringkas `micro_strategy`
-```json
-micro_strategy: {
-  mode: "ONE_SHOT" | "2_TRANCHE" | "3_TRANCHE",
-  eligible_now: boolean,
-  trigger_needed?: string,     // wajib untuk Watch Only
-  weights_pct: 100,            // selalu 100 karena 1 ticker
-  tranches: [
-    { tranche_pct, planned_lots, plan_limit_price, plan_price_cap, plan_price_floor?, when, condition, reasons[] }
-  ],
-  reasons[]                     // reason global micro_strategy
-}
-```
-### 4) Policy-aware execution mapping (default)
-Mapping ini dipakai untuk menentukan `mode` dan `tranches` bila policy mengizinkan.
-
-- **Weekly Swing**
-  - BREAKOUT → `2_TRANCHE` (60/40)
-  - PULLBACK → `3_TRANCHE` (50/30/20)
-
-- **Position Trade**
-  - BREAKOUT → `2_TRANCHE` (60/40)
-  - PULLBACK → `3_TRANCHE` (50/30/20)
-
-- **Dividend Swing**
-  - default → `ONE_SHOT` (100%)
-  - staging dinonaktifkan by default (window event sempit + gap risk)
-
-- **Intraday Light**
-  - default → `ONE_SHOT` (100%)
-  - staging dinonaktifkan by default (stop ketat + confirm ketat)
-
-- **No Trade**
-  - tidak punya micro strategy
-
-### 5) Watch Only behavior (wajib ketat)
-Untuk ticker di **Watch Only**:
-- `eligible_now = false`
-- `trigger_needed` wajib menjelaskan hard rule yang belum terpenuhi (mis. “close belum breakout resistance_20d”).
-- `micro_strategy` hanya template “jika trigger terjadi”, bukan sinyal beli hari ini.
-
-### 6) CONFIRM separation
-Jam dan data intraday tidak boleh masuk PLAN:
-- `when` hanya `D0/D1/D2` di PLAN.
-- Jika perlu jam/snapshot → taruh di CONFIRM dan jangan mengubah `micro_strategy` PLAN.
-
-### Canonical readiness handling (EOD_NOT_READY)
-- recommendations=[]; groups tetap dihitung; flags+reason global wajib.
-
----
-
-## Risk-based sizing (optional, feature-flag)
-
-Default allocation sekarang berbasis feasibility (capital → lots) dan cukup untuk v1.
-Jika kamu ingin sizing lebih “trader-grade” (menghindari stop terlalu lebar), tambahkan opsi **feature flag**:
-
-### Flag
-- `SIZING_MODE = FEASIBILITY` (default)
-- `SIZING_MODE = RISK_BUDGET` (opsional)
-
-### RISK_BUDGET rule (LOCKED jika diaktifkan)
-- `risk_budget = capital * RISK_PCT` (mis. 1%–2%, kamu yang kunci)
-- `risk_per_lot = R * LOT_SIZE` (R dalam IDR per share)
-- `lots_i = floor(risk_budget / risk_per_lot)`
-- Lalu tetap cek feasibility biaya:
-  - `max_cost = lots_i * est_cost_per_lot_i`
-  - jika `max_cost > budget_i` → turunkan lots sampai feasible
-- Jika `lots_i < 1` → drop ticker (seperti kontrak Allocation → lots)
-
-Catatan:
-- Ini opsional; jangan aktifkan tanpa menetapkan `RISK_PCT`.
-- Mode ini menjaga posisi tidak kebesaran saat stop jauh.
 
 ---
 
