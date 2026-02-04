@@ -2,7 +2,8 @@
 - Semua field `reasons` di seluruh output (groups, recommendations, confirm) **wajib** berupa array object:
   - `code` (string, machine-stable)
   - `message` (string, 1 kalimat, user-facing)
-  - `severity` (optional enum: `INFO|WARN|BLOCK`)
+  - `severity` (optional enum: `INFO|WARN|ERROR`)  
+  `BLOCK` adalah istilah legacy dan diperlakukan sama dengan `ERROR`.
 - `code` tetap wajib dikirim untuk audit/log.
 - `message` disediakan oleh layer aplikasi (mis. `app/Trade/Explain`), bukan oleh dokumen ini.
 
@@ -17,7 +18,8 @@
 Semua `reasons[]` di CONFIRM harus berupa object:
 - `code` (stable)
 - `message` (1 kalimat, untuk UI)
-- `severity` (opsional): `INFO | WARN | BLOCK`
+- `severity` (opsional): `INFO | WARN | ERROR`  
+`BLOCK` adalah istilah legacy dan diperlakukan sama dengan `ERROR`.
 
 Mapping `code -> message` adalah tanggung jawab layer aplikasi (mis. `app/Trade/Explain`). CONFIRM output wajib menyertakan `message` agar operator tidak perlu menghafal code.
 

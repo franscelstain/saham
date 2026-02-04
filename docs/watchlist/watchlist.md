@@ -355,9 +355,11 @@ Rules:
 
 ## Implementation Notes (non-normative)
 
-### Mismatch audit (opsional tapi sangat dianjurkan)
-Jika `ticker_indicators_daily` juga menyimpan OHLC dan nilainya tidak sama dengan `ticker_ohlc_daily` pada `(ticker_id, trade_date)`,
-anggap indikator untuk baris itu **invalid** dan pakai OHLC dari `ticker_ohlc_daily` saja. Catat reason `IND_OHLC_MISMATCH`.
+### Mismatch audit (deprecated)
+Saat ini watchlist memakai **single source of truth** untuk OHLC, yaitu `ticker_ohlc_daily`. `ticker_indicators_daily` tidak dianggap sebagai sumber OHLC.
+Karena itu kondisi mismatch OHLC **tidak relevan** dan rule `IND_OHLC_MISMATCH` **tidak aktif**.
+
+> Catatan: `IND_OHLC_MISMATCH` tetap di-reserve untuk masa depan jika suatu saat indikator membawa salinan OHLC dari sumber lain dan perlu audit sinkronisasi.
 
 ---
 
@@ -385,7 +387,9 @@ candidate pool recommendations (setelah cutoff), lalu baru melakukan konversi ke
 Semua `reasons[]` yang muncul di output (global/policy/confirm) harus berupa **object**, bukan string code saja:
 - `code` (stable, machine-readable)
 - `message` (1 kalimat, user-facing, audit-friendly)
-- `severity` (opsional): `INFO | WARN | BLOCK`
+- `severity` (opsional): `INFO | WARN | ERROR`
+
+`BLOCK` adalah istilah legacy dan diperlakukan sama dengan `ERROR` (maksudnya: menghambat eligibility).
 
 **Sumber kebenaran message ada di kode** (mis. `app/Trade/Explain`). Dokumen ini hanya mengunci bentuk payload dan kewajiban `message` hadir.
 
@@ -838,7 +842,9 @@ Agar tidak ada salah tafsir, bagian ini hanya merangkum poin yang sering bikin k
 Semua `reasons` di seluruh output (meta, groups, recommendations, confirm) **wajib** berupa array of object:
 - `code` (string, machine-stable)
 - `message` (string, 1 kalimat, user-facing)
-- `severity` (optional enum): `INFO|WARN|BLOCK|ERROR`
+- `severity` (optional enum): `INFO|WARN|ERROR`
+
+`BLOCK` adalah istilah legacy dan diperlakukan sama dengan `ERROR`.
 
 ### Score (LOCKED)
 - `score_total` adalah **float [0..1]**.
