@@ -169,6 +169,14 @@ return [
             'dv20_b_min' => (float) env('WATCHLIST_DV20_B_MIN', 5000000000),  // >= 5B
         ],
 
+        // Universe hard gates (docs/watchlist/watchlist.md)
+        'universe' => [
+            'min_price' => (float) env('WATCHLIST_UNIVERSE_MIN_PRICE', 50),
+            'min_dv20_idr' => (float) env('WATCHLIST_UNIVERSE_MIN_DV20_IDR', 2000000000),
+            'min_turnover20_idr' => (float) env('WATCHLIST_UNIVERSE_MIN_TURNOVER20_IDR', 2000000000),
+            'max_atr_pct_universe' => (float) env('WATCHLIST_UNIVERSE_MAX_ATR_PCT', 0.20),
+        ],
+
         // Corporate action gate (heuristic)
         'corporate_action' => [
             'suspect_ratio_min' => (float) env('WATCHLIST_CA_SUSPECT_RATIO_MIN', 0.55),

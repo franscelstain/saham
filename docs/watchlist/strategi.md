@@ -111,6 +111,22 @@ Ada 2 pola pengisian:
 1) Manual insert (paling simpel untuk awal)
 2) Otomatis (scraper/broker feed) — di luar scope repo ini
 
+Alternatif praktis (tanpa SQL):
+3) Ingest JSON manual via command (upsert by trade_date+ticker_id):
+```bash
+php artisan watchlist:intraday:ingest --trade-date=2026-02-02 --input=snapshot.json
+```
+
+Contoh `snapshot.json`:
+```json
+{
+  "checked_at": "09:20:00",
+  "tickers": [
+    {"ticker": "BBCA", "bid1": 10000, "ask1": 10005, "last": 10000, "open": 9950, "bid_lots1": 20, "ask_lots1": 15}
+  ]
+}
+```
+
 Contoh INSERT minimal (manual):
 ```sql
 INSERT INTO watchlist_intraday_snapshots

@@ -252,7 +252,7 @@ class WatchlistRepository
 
         // dv20_idr: average traded value (close * volume) for last 20 trading days (include eodDate)
         $dv20Sub = DB::table('ticker_ohlc_daily')
-            ->selectRaw('ticker_id, AVG(close * volume) as dv20_idr')
+            ->selectRaw('ticker_id, CASE WHEN COUNT(*) >= 20 THEN AVG(close * volume) ELSE NULL END as dv20_idr, CASE WHEN COUNT(*) >= 20 THEN AVG(close * volume) ELSE NULL END as turnover20_idr, COUNT(*) as dv20_n')
             ->whereIn('trade_date', $dv20Dates)
             ->groupBy('ticker_id');
 
@@ -363,7 +363,8 @@ class WatchlistRepository
 
             // Liquidity (LOCKED naming: dv20_idr)
             DB::raw('dv.dv20_idr as dv20_idr'),
-            DB::raw('NULL as turnover20_idr'),
+            DB::raw('dv.turnover20_idr as turnover20_idr'),
+            DB::raw('dv.dv20_n as dv20_n'),
 
             // Lookback helpers
             DB::raw('hh.hh20 as hh20'),
@@ -395,8 +396,15 @@ class WatchlistRepository
             ->whereNotNull('od.close')
             ->orderBy('t.ticker_code', 'asc');
 
-        return $q->get()->map(function ($r) {
-            return new CandidateInput((array) $r);
-        })->toArray();
+        // IMPORTANT: return DTO objects, not arrays.
+        // CandidateDerivedMetricsBuilder::enrich() expects CandidateInput.
+        // Using Collection::toArray() would call CandidateInput::toArray() and
+        // convert each DTO into an array, causing a TypeError.
+        return $q->get()
+            ->map(function ($r) {
+                return new CandidateInput((array) $r);
+            })
+            ->values()
+            ->all();
     }
 }

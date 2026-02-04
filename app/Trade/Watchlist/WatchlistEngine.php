@@ -672,13 +672,13 @@ foreach ($rows as $i => $r) {
             $rows[$i]['group'] = 'watch_only';
             continue;
         }
-        // Below watch_min: still keep as watch_only for auditability.
-        $rows[$i]['group'] = 'watch_only';
+        // Below WATCH_ONLY_MIN_SCORE: exclude from groups output (docs/watchlist/watchlist.md).
+        $rows[$i]['group'] = 'excluded';
         continue;
     }
 
-    // Failed hard rules policy: keep for monitoring as watch_only (never top/secondary).
-    $rows[$i]['group'] = ($st >= $watchMin) ? 'watch_only' : 'watch_only';
+    // Failed hard rules policy: may appear as watch_only only if score meets WATCH_ONLY_MIN_SCORE.
+    $rows[$i]['group'] = ($st >= $watchMin) ? 'watch_only' : 'excluded';
 }
 
 // Recommendations (allocations) use top-picks as the universe, but do NOT cap top-picks.
@@ -702,6 +702,7 @@ $avoid = [];
 $noTrade = [];
 foreach ($rows as $r) {
     $g = (string)($r['group'] ?? 'watch_only');
+    if ($g === 'excluded') continue;
     if ($g === 'top_picks') { $top[] = $r; }
     elseif ($g === 'secondary') { $secondary[] = $r; }
     elseif ($g === 'avoid') { $avoid[] = $r; }
@@ -866,6 +867,27 @@ $plan = [
 
 	    $reasonCodes = array_values(array_unique(array_filter((array)($row['reason_codes'] ?? []), 'is_string')));
 	    $reasons = $this->buildReasonObjects($reasonCodes);
+
+	    // Allow internal rows to provide richer reason objects (e.g., missing_fields details).
+	    if (isset($row['reasons']) && is_array($row['reasons'])) {
+	        $map = [];
+	        foreach ($reasons as $rr) {
+	            if (is_array($rr) && isset($rr['code'])) {
+	                $map[(string)$rr['code']] = $rr;
+	            }
+	        }
+	        foreach ((array)$row['reasons'] as $cr) {
+	            if (!is_array($cr)) continue;
+	            $c = (string)($cr['code'] ?? '');
+	            if ($c === '') continue;
+	            $map[$c] = [
+	                'code' => $c,
+	                'message' => (string)($cr['message'] ?? $c),
+	                'severity' => (string)($cr['severity'] ?? 'INFO'),
+	            ];
+	        }
+	        $reasons = array_values($map);
+	    }
 
 	    $eodBar = $this->buildEodBar($row, $asofEodDate);
 	    $tickerPlan = $this->buildTickerPlan($row, $policy);
@@ -1714,10 +1736,12 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         $tickerCode = (string)($r['ticker_code'] ?? '');
         $companyName = (string)($r['company_name'] ?? '');
 
-        $close = (float)($r['close'] ?? 0);
-        $open = (float)($r['open'] ?? 0);
-        $high = (float)($r['high'] ?? 0);
-        $low  = (float)($r['low'] ?? 0);
+        // Keep OHLC as nullable first; Universe Filter must DROP missing/invalid data (docs/watchlist/watchlist.md).
+        $close = (isset($r['close']) && is_numeric($r['close'])) ? (float)$r['close'] : null;
+        $open  = (isset($r['open']) && is_numeric($r['open'])) ? (float)$r['open'] : null;
+        $high  = (isset($r['high']) && is_numeric($r['high'])) ? (float)$r['high'] : null;
+        $low   = (isset($r['low']) && is_numeric($r['low'])) ? (float)$r['low'] : null;
+        $volume = (isset($r['volume']) && is_numeric($r['volume'])) ? (float)$r['volume'] : null;
 
         $ma20 = $r['ma20'] ?? null;
         $ma50 = $r['ma50'] ?? null;
@@ -1728,6 +1752,50 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         $liqBucket = (string)($r['liq_bucket'] ?? 'U');
         $dv20 = $r['dv20'] ?? null;
         $setupType = $this->setupClassifier->classify($ci);
+
+        // Universe Filter (GLOBAL hard rules) — DROP jika data tidak lengkap / indikator missing.
+        // Kontrak: ticker gagal Universe tidak boleh muncul di groups.* (docs/watchlist/watchlist.md).
+        if ($tickerId <= 0 || $tickerCode === '') return null;
+
+        // Data readiness gate: OHLCV wajib valid.
+        if ($close === null || $open === null || $high === null || $low === null || $volume === null) return null;
+        if ($close <= 0 || $open <= 0 || $high <= 0 || $low <= 0 || $volume <= 0) return null;
+
+        // Basic OHLC sanity.
+        if ($high < max($open, $close) || $low > min($open, $close) || $low > $high) return null;
+
+        // Indicator readiness gate: scoring + ATR must exist.
+        if (!isset($r['score_total']) || !is_numeric($r['score_total'])) return null;
+        if ($atr14 === null || !is_numeric($atr14) || (float)$atr14 <= 0) return null;
+
+        // Universe gates (docs/watchlist/watchlist.md): liquidity, price sanity, extreme volatility.
+        $minPrice = (float)config('trade.watchlist.universe.min_price', 50);
+        $maxAtrPct = (float)config('trade.watchlist.universe.max_atr_pct_universe', 0.20);
+        $minDv20 = (float)config('trade.watchlist.universe.min_dv20_idr', 2000000000);
+        $minTurnover20 = (float)config('trade.watchlist.universe.min_turnover20_idr', 2000000000);
+
+        if ($close < $minPrice) return null;
+
+        $atrPctUniverse = ($close > 0 && $atr14 !== null && is_numeric($atr14)) ? ((float)$atr14 / (float)$close) : null;
+        if ($atrPctUniverse === null) return null;
+        if ($atrPctUniverse > $maxAtrPct) return null;
+
+        // Liquidity gate (dv20_idr preferred, else turnover20_idr fallback) — both in IDR, same scale.
+        $dv20Raw = $r['dv20'] ?? null;
+        $turnover20Raw = $r['turnover20'] ?? ($r['turnover20_idr'] ?? null);
+        $dv20Val = (is_numeric($dv20Raw) ? (float)$dv20Raw : null);
+        $turnover20Val = (is_numeric($turnover20Raw) ? (float)$turnover20Raw : null);
+
+        if ($dv20Val !== null) {
+            if ($dv20Val < $minDv20) return null;
+        } elseif ($turnover20Val !== null) {
+            if ($turnover20Val < $minTurnover20) return null;
+        } else {
+            return null;
+        }
+
+        // Effective liquidity passed into policy layer (dv20 preferred, else turnover20 fallback).
+        $dv20 = ($dv20Val !== null) ? $dv20Val : $turnover20Val;
 
         // derived candle metrics (docs/watchlist/watchlist.md Section 2.5)
         $candle = $this->deriveCandleMetrics($open, $high, $low, $close);
@@ -1812,24 +1880,70 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             ],
             $reasonCodes
         );
-        
-        if (($policyRes['drop'] ?? false) === true) {
-            // Never DROP silently: keep candidate as WATCH_ONLY with score_total=0 for auditability.
-            $reasonCodes = (array)($policyRes['reason_codes'] ?? $reasonCodes);
-            $scoreTotal = 0.0;
-            $entryStyle = (string)($policyRes['entry_style'] ?? 'Default');
-            $eligBlockCodes = array_values(array_unique(array_merge((array)($policyRes['eligibility_block_codes'] ?? []), ['GL_POLICY_DROP'])));
-            $tradeDisabled = true;
-        } else {
-            $reasonCodes = (array)($policyRes['reason_codes'] ?? $reasonCodes);
-            if (isset($policyRes['score_total']) && is_numeric($policyRes['score_total'])) {
-                $scoreTotal = (float)$policyRes['score_total'];
-            } else {
-                $scoreTotal = (isset($r['score_total']) && is_numeric($r['score_total'])) ? (float)$r['score_total'] : 0.0;
-            }
-            $entryStyle = (string)($policyRes['entry_style'] ?? 'Default');
-            $eligBlockCodes = (array)($policyRes['eligibility_block_codes'] ?? []);
-        }
+
+		// IMPORTANT (docs/watchlist/watchlist.md):
+		// - Hard-rule FAIL must NOT remove the ticker from PLAN output.
+		// - PLAN_INVALID must be EXCLUDED from this policy output.
+		$reasonCodes = (array)($policyRes['reason_codes'] ?? $reasonCodes);
+		$eligBlockCodes = (array)($policyRes['eligibility_block_codes'] ?? []);
+
+		if (PlanInvalidClassifier::any($reasonCodes)) {
+			return null; // EXCLUDE (PLAN_INVALID) for this policy
+		}
+
+		$policyHardFail = (($policyRes['drop'] ?? false) === true);
+
+		// Score is for ranking/grouping. On hard-rule FAIL, keep the base score (do not force 0).
+		if (!$policyHardFail && isset($policyRes['score_total']) && is_numeric($policyRes['score_total'])) {
+			$scoreTotal = (float)$policyRes['score_total'];
+		} else {
+			$scoreTotal = (isset($r['score_total']) && is_numeric($r['score_total'])) ? (float)$r['score_total'] : 0.0;
+		}
+
+		$entryStyle = (string)($policyRes['entry_style'] ?? 'Default');
+		if ($policyHardFail) {
+			// Ensure we actually block eligibility even if policy forgot to populate block codes.
+			if (empty($eligBlockCodes)) {
+				$eligBlockCodes[] = ($this->policyPrefix($policy) . '_HARD_RULE_FAIL');
+			}
+		}
+
+		// Enrich reason message when policy input is missing (docs/watchlist/watchlist.md).
+		$customReasons = [];
+		if (in_array('GL_POLICY_INPUT_MISSING', $reasonCodes, true)) {
+			$missing = [];
+			$req = [];
+			if ($policy === 'WEEKLY_SWING') $req = ['ma20','ma50','hh20','ll5','dv20_idr','atr14'];
+			elseif ($policy === 'DIVIDEND_SWING') $req = ['ma20','ma50','hh20','hh50','ll5','atr14','div_event.ex_date'];
+			elseif ($policy === 'INTRADAY_LIGHT') $req = ['dv20_idr','atr_pct','vol_ratio','hh10','ll3','roc5'];
+			elseif ($policy === 'POSITION_TRADE') $req = ['ma200','ma50'];
+			foreach ($req as $k) {
+				if ($k === 'dv20_idr') {
+					// $dv20 is already normalized (dv20 or turnover20 fallback) after universe gate.
+					if (!isset($dv20) || !is_numeric($dv20) || (float)$dv20 <= 0) $missing[] = $k;
+				} elseif ($k === 'atr_pct') {
+					$ap = ($atr14 !== null && $close > 0) ? ((float)$atr14 / (float)$close) : null;
+					if ($ap === null || $ap <= 0) $missing[] = $k;
+				} elseif ($k === 'div_event.ex_date') {
+					$ev = $divEventsByTicker[$tickerId] ?? null;
+					$ex = (is_array($ev) ? ($ev['ex_date'] ?? null) : (is_object($ev) ? ($ev->ex_date ?? null) : null));
+					if ($ex === null || (string)$ex === '') $missing[] = $k;
+				} else {
+					$val = $r[$k] ?? null;
+					if ($val === null || $val === '') {
+						$missing[] = $k;
+					}
+				}
+			}
+			$missing = array_values(array_unique(array_filter($missing, 'is_string')));
+			if (!empty($missing)) {
+				$customReasons[] = [
+					'code' => 'GL_POLICY_INPUT_MISSING',
+					'message' => 'Policy input missing. missing_fields=[' . implode(',', $missing) . ']',
+					'severity' => 'ERROR',
+				];
+			}
+		}
 
         // Policy may override setup_type for deterministic plan (e.g. WEEKLY_SWING).
         $setupType = (string)($policyRes['setup_type'] ?? $setupType);
@@ -1839,6 +1953,10 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             : $this->buildLevels($setupType, $r);
         // close_price is required for CONFIRM (gap/chase computations); keep inside levels for easy access
         $levels['close_price'] = (int) round((float)$close);
+		if ($policyHardFail) {
+			// Make it explicit for UI: hard-rule fail means monitoring only.
+			$levels['entry_type'] = 'WATCH_ONLY';
+		}
         if ($tradeDisabled) {
             $levels['entry_type'] = 'WATCH_ONLY';
         }
@@ -1940,6 +2058,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             'score_total' => max(0.0, min(1.0, (float)$scoreTotal)),
             'confidence' => (string)($policyRes['confidence'] ?? 'Medium'),
             'reason_codes' => array_values(array_unique($reasonCodes)),
+
+            'reasons' => $customReasons,
 
             'ticker_flags' => $tickerFlags,
 
@@ -2311,7 +2431,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 $condA = ($close >= $ma20f) && ($ma20f >= $ma50f);
                 $condB = ($close >= $resistance20) && ($ma20f >= $ma50f);
                 if (!$condA && !$condB) {
-                    // Not eligible for new entry under WEEKLY_SWING, but keep as watch_only (no public reason code).
+                    $reasonCodes[] = 'WS_TREND_GATE_FAIL';
                     $blockCodes[] = 'WS_TREND_GATE_FAIL';
                 }
             }
@@ -2339,6 +2459,12 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             } elseif ((float)$tickPct > $maxTickPct) {
                 $reasonCodes[] = 'WS_MAX_TICK_PCT';
                 $blockCodes[] = 'WS_MAX_TICK_PCT';
+            }
+
+            // Hard-rule fails => DROP immediately (gugur dari kandidat policy ini).
+            if (!empty($blockCodes)) {
+                $drop = true;
+                return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, $blockCodes);
             }
 
             // Build plan levels (deterministic, EOD-only)
@@ -2554,7 +2680,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_TP1_NOT_ABOVE_ENTRY']);
             }
 
-            $rrEst = ($tp1 - $entry) / max(1.0, (float)$R);
+            $rrEst = ($tp1 - $entry) / (float)$R;
             if ($rrEst < $minRr) {
                 $drop = true;
                 $reasonCodes[] = 'DS_RR_TOO_LOW';

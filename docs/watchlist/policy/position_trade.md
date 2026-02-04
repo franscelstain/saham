@@ -44,6 +44,11 @@ Dipakai untuk membatasi TP dan mendeteksi “near resistance” secara determini
 
 ---
 
+## Semantik hasil rule (ANTI SALAH TAFSIR)
+- Fail pada Hard Rules policy ini berarti **NOT_QUALIFIED** (masuk `watch_only`) untuk policy ini, bukan “hilang dari watchlist”.
+- Hanya **PLAN_INVALID** (mis. `R<=0`, `R<tick`, `TP1<=entry`) yang dianggap **EXCLUDE** untuk policy ini.
+
+
 ## 1) Input minimum (PLAN, EOD-only)
 Wajib:
 - OHLCV
@@ -51,7 +56,7 @@ Wajib:
 - `atr14`, `atr_pct`
 - `highest_high(50)`, `lowest_low(50)`
 
-Jika missing → DROP `PT_DATA_INCOMPLETE`.
+Jika missing → **NOT_QUALIFIED** (masuk `watch_only`) `PT_DATA_INCOMPLETE`.
 
 ---
 
@@ -59,23 +64,23 @@ Jika missing → DROP `PT_DATA_INCOMPLETE`.
 ### 2.1 Trend gate (wajib)
 Wajib:
 - `close > ma200` **dan** `ma50 > ma200`
-Jika gagal → DROP `PT_TREND_NOT_OK`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `PT_TREND_NOT_OK`.
 
 ### 2.2 Setup gate
 Salah satu:
 - Breakout_50 (A.1 N=50, dengan vol_ratio policy default)
 - Pullback_to_MA50 (A.2 dengan MA=ma50)
-Jika gagal → DROP `PT_NO_SETUP`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `PT_NO_SETUP`.
 
 ### 2.3 Volatility feasibility
 Wajib:
 - `atr_pct <= PT_MAX_ATR_PCT` (default 0.12)
-Jika gagal → DROP `PT_VOL_TOO_HIGH`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `PT_VOL_TOO_HIGH`.
 
 ### 2.4 Stop feasibility
 Wajib:
 - `stop_distance_pct <= PT_MAX_STOP_PCT` (default 0.12)
-Jika gagal → DROP `PT_STOP_TOO_WIDE`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `PT_STOP_TOO_WIDE`.
 
 ### 2.5 RR gate (LOCKED)
 
@@ -86,7 +91,7 @@ Definisi:
 - `rr_est = (plan.tp1 - plan.entry) / R`  (kontrak global)
 
 Binding check:
-- Wajib `rr_est >= PT_MIN_RR`, jika gagal → DROP `PT_RR_TOO_LOW`.
+- Wajib `rr_est >= PT_MIN_RR`, jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `PT_RR_TOO_LOW`.
 
 Catatan:
 - Policy ini **tidak** mendefinisikan formula TP1 terpisah di hard rules. Satu-satunya sumber kebenaran untuk `plan.tp1` adalah PLAN locked.
@@ -230,7 +235,7 @@ Satu pendekatan final:
 - `plan.stop = round_down(min(low(trade_date), support_10) - tick)`
 
 Validasi:
-- `R = plan.entry - plan.stop` harus lulus kontrak global (`R > 0` dan `R >= tick`), jika tidak → DROP (`PT_R_INVALID_*`).
+- `R = plan.entry - plan.stop` harus lulus kontrak global (`R > 0` dan `R >= tick`), jika tidak → **EXCLUDE (PLAN_INVALID)** (`PT_R_INVALID_*`).
 
 ### TP1 / RR (GLOBAL-consistent) (LOCKED)
 
@@ -247,9 +252,9 @@ Cap TP1 (anti over-optimistic) **hanya untuk PULLBACK**:
 - Jika `setup_type = BREAKOUT` → `plan.tp1 = round_down(tp1_raw)` (tanpa cap)
 
 Validasi:
-- Wajib `plan.tp1 > plan.entry` (kalau tidak → DROP `PT_TP1_NOT_ABOVE_ENTRY`)
+- Wajib `plan.tp1 > plan.entry` (kalau tidak → **EXCLUDE (PLAN_INVALID)** `PT_TP1_NOT_ABOVE_ENTRY`)
 - `rr_est = (plan.tp1 - plan.entry) / R`
-- Binding check: `rr_est >= PT_MIN_RR` (kalau tidak → DROP `PT_RR_TOO_LOW`)
+- Binding check: `rr_est >= PT_MIN_RR` (kalau tidak → **NOT_QUALIFIED** (masuk `watch_only`) `PT_RR_TOO_LOW`)
 ### TP2 (opsional, management target) (LOCKED jika diisi)
 - `plan.tp2 = round_down(plan.entry + (PT_TP2_R_MULT * R))` (opsional; bukan untuk RR gate)
 

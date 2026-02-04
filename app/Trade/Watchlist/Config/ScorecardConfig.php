@@ -55,12 +55,12 @@ class ScorecardConfig
         $this->sessionOpenTimeDefault = (string)$sessionOpenTimeDefault;
         $this->sessionCloseTimeDefault = (string)$sessionCloseTimeDefault;
 
-        // defaults for strict
-        $this->staleTolPct = 0.002;
-        $this->maxSnapshotAgeSec = 60;
-        $this->retryCooldownSec = 15;
-        $this->breakoutBandPctDefault = 0.008;
-        $this->maxRetryWindowsDefault = 3;
+        // defaults for strict (LOCKED by docs/watchlist/scorecard.md)
+        $this->staleTolPct = 0.003;
+        $this->maxSnapshotAgeSec = 30;
+        $this->retryCooldownSec = 30;
+        $this->breakoutBandPctDefault = 0.004;
+        $this->maxRetryWindowsDefault = 2;
 
         $this->overridesByPolicy = [];
     }
@@ -75,9 +75,9 @@ class ScorecardConfig
             (bool)($cfg['include_watch_only'] ?? false),
             (float)($cfg['max_chase_pct_default'] ?? 0.01),
             (float)($cfg['gap_up_block_pct_default'] ?? 0.015),
-            (float)($cfg['spread_max_pct_default'] ?? 0.004),
+            (float)($cfg['spread_max_pct_default'] ?? 0.006),
             (string)($cfg['session_open_time_default'] ?? '09:00'),
-            (string)($cfg['session_close_time_default'] ?? '15:50')
+            (string)($cfg['session_close_time_default'] ?? '16:00')
         );
 
         // strict knobs (optional)

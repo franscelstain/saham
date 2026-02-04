@@ -53,41 +53,46 @@ Wajib:
 Opsional:
 - `cash_dividend` / `yield_est` (ranking)
 
-Jika event tidak tersedia → DROP `DS_EVENT_MISSING`.
+Jika event tidak tersedia → **NOT_QUALIFIED** (masuk `watch_only` untuk policy ini) `DS_EVENT_MISSING`.
 
 ---
 
-## 2) Hard Rules (gagal = gugur)
+## 2) Hard Rules (wajib lolos untuk NEW ENTRY)
+
+**Jika gagal Hard Rules di bawah ini:** ticker tetap boleh tampil untuk monitoring, tetapi statusnya **NOT_QUALIFIED** → `plan.is_eligible_new_entry=false` dan masuk group `watch_only` (lihat `watchlist.md`).
+
+**Kecuali** rule yang membuat PLAN tidak valid (mis. `R<=0`, `R<tick`, `TP1<=entry`). Kasus itu adalah **PLAN_INVALID** dan dianggap **EXCLUDE**.
+
 ### 2.1 Event window gate
-`days_to_ex = trading_days_between(exec_trade_date, ex_date)  // require exec_trade_date < ex_date else DROP DS_TOO_LATE_EXDATE`
+`days_to_ex = trading_days_between(exec_trade_date, ex_date)  // require exec_trade_date < ex_date else NOT_QUALIFIED DS_TOO_LATE_EXDATE`
 Wajib:
 - `DS_MIN_DAYS_TO_EX <= days_to_ex <= DS_MAX_DAYS_TO_EX`
 Default:
 - `DS_MIN_DAYS_TO_EX = 2`
 - `DS_MAX_DAYS_TO_EX = 12`
-Jika gagal → DROP `DS_OUTSIDE_EVENT_WINDOW`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `DS_OUTSIDE_EVENT_WINDOW`.
 
 ### 2.2 Trend sanity
 Wajib:
 - `trend_ok = (close >= ma20) OR (ma20 >= ma50)`
-Jika gagal → DROP `DS_TREND_WEAK`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `DS_TREND_WEAK`.
 
 ### 2.3 Not-extended gate
 Wajib:
 - `(close - ma20) <= DS_MAX_EXTEND_ATR * atr14`
 Default `DS_MAX_EXTEND_ATR = 1.0`
-Jika gagal → DROP `DS_PRICE_EXTENDED`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `DS_PRICE_EXTENDED`.
 
 ### 2.4 Stop feasibility
 Wajib:
 - `stop_distance_pct <= DS_MAX_STOP_PCT` (default 0.06)
-Jika gagal → DROP `DS_STOP_TOO_WIDE`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `DS_STOP_TOO_WIDE`.
 
 ### 2.5 Setup gate (minimal harus ada)
 Salah satu:
 - Pullback_to_MA20 (A.2)
 - Breakout_20 (A.1) **hanya jika** tidak extended (2.3 tetap wajib)
-Jika tidak ada → DROP `DS_NO_SETUP`.
+Jika tidak ada → **NOT_QUALIFIED** (masuk `watch_only`) `DS_NO_SETUP`.
 
 ---
 
@@ -179,12 +184,12 @@ Dividend Swing membutuhkan entry **sebelum** `ex_date`.
 
 ### Hard gates
 - Wajib: `exec_trade_date < ex_date`
-  - Jika `exec_trade_date >= ex_date` → **DROP** (`DS_TOO_LATE_EXDATE`)
+  - Jika `exec_trade_date >= ex_date` → **NOT_QUALIFIED** (`DS_TOO_LATE_EXDATE`)
 - Hitung:
-  - `days_to_ex = trading_days_between(exec_trade_date, ex_date)  // require exec_trade_date < ex_date else DROP DS_TOO_LATE_EXDATE`
+  - `days_to_ex = trading_days_between(exec_trade_date, ex_date)  // require exec_trade_date < ex_date else NOT_QUALIFIED DS_TOO_LATE_EXDATE`
   - Definisi global: `trading_days_between(a,b)` menghitung trading day `a < d <= b`
   - Jadi jika `exec_trade_date` sehari bursa sebelum `ex_date`, `days_to_ex = 1`
-  - Jika `exec_trade_date == ex_date`, `days_to_ex = 0` (dan ini sudah DROP oleh rule di atas)
+  - Jika `exec_trade_date == ex_date`, `days_to_ex = 0` (dan ini sudah NOT_QUALIFIED oleh rule di atas)
 
 ### Window rule
 - Lolos window jika: `DS_MIN_DAYS_TO_EX <= days_to_ex <= DS_MAX_DAYS_TO_EX`
@@ -217,7 +222,7 @@ Diputuskan satu pendekatan (no “atau”):
 - `plan.stop = round_down(min(low(trade_date), support_5) - tick)`
 
 Validasi:
-- `R = plan.entry - plan.stop` harus lulus kontrak global (`R > 0` dan `R >= tick`), jika tidak → DROP (`DS_R_INVALID_*`).
+- `R = plan.entry - plan.stop` harus lulus kontrak global (`R > 0` dan `R >= tick`), jika tidak → **EXCLUDE (PLAN_INVALID)** (`DS_R_INVALID_*`).
 
 ### TP1 / RR (GLOBAL-consistent) (LOCKED)
 
@@ -236,9 +241,9 @@ TP1 cap (anti over-optimistic, **tidak boleh membuat RR = 0**):
 
 Aturan:
 - `plan.tp1 = round_down(min(tp1_raw, tp1_cap))`
-- Wajib `plan.tp1 > plan.entry` (kalau tidak → DROP `DS_TP1_NOT_ABOVE_ENTRY`)
+- Wajib `plan.tp1 > plan.entry` (kalau tidak → **EXCLUDE (PLAN_INVALID)** `DS_TP1_NOT_ABOVE_ENTRY`)
 - `rr_est = (plan.tp1 - plan.entry) / R`
-- Binding check: `rr_est >= DS_MIN_RR` (kalau tidak → DROP `DS_RR_TOO_LOW`)
+- Binding check: `rr_est >= DS_MIN_RR` (kalau tidak → **NOT_QUALIFIED** (masuk `watch_only`) `DS_RR_TOO_LOW`)
 ### TP2 (opsional, management target) (LOCKED jika diisi)
 - `plan.tp2 = round_down(plan.entry + (DS_TP2_R_MULT * R))` (opsional, tidak dipakai untuk RR gate)
 

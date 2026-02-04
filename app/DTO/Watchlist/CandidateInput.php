@@ -42,6 +42,7 @@ class CandidateInput extends BaseDto
 
     // Liquidity (IDR)
     public ?float $dv20;
+    public ?float $turnover20;
 
     // Weekly Swing helpers (computed from OHLC before trade_date)
     public ?float $hh20;
@@ -95,6 +96,11 @@ class CandidateInput extends BaseDto
         elseif (isset($data['dv20_idr']) && is_numeric($data['dv20_idr'])) $this->dv20 = (float)$data['dv20_idr'];
         else $this->dv20 = null;
 
+        // Repo may provide turnover20 or turnover20_idr (same scale IDR) as fallback liquidity metric.
+        if (isset($data['turnover20']) && is_numeric($data['turnover20'])) $this->turnover20 = (float)$data['turnover20'];
+        elseif (isset($data['turnover20_idr']) && is_numeric($data['turnover20_idr'])) $this->turnover20 = (float)$data['turnover20_idr'];
+        else $this->turnover20 = null;
+
         $this->hh20 = isset($data['hh20']) && is_numeric($data['hh20']) ? (float)$data['hh20'] : null;
         $this->ll5 = isset($data['ll5']) && is_numeric($data['ll5']) ? (float)$data['ll5'] : null;
         $this->roc20 = isset($data['roc20']) && is_numeric($data['roc20']) ? (float)$data['roc20'] : null;
@@ -136,6 +142,7 @@ class CandidateInput extends BaseDto
             'support_20d' => $this->support20d,
             'resistance_20d' => $this->resistance20d,
             'dv20' => $this->dv20,
+            'turnover20' => $this->turnover20,
             'hh20' => $this->hh20,
             'll5' => $this->ll5,
             'roc20' => $this->roc20,

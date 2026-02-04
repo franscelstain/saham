@@ -130,6 +130,8 @@ class WatchlistPreopenBuildRegressionTest extends TestCase
             'rsi14' => 55,
             'atr14' => 25,
             'vol_ratio' => 1.1,
+            'hh20' => 1050,
+            'll5' => 980,
             'dv20' => 50_000_000_000,
         ]);
         // Required by LabelCatalog::decision/signal/volumeLabel which have strict int types.

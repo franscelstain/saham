@@ -6,7 +6,10 @@ use App\DTO\Watchlist\Scorecard\EligibilityCheckDto;
 use App\DTO\Watchlist\Scorecard\EligibilityResultDto;
 use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
 use App\DTO\Watchlist\Scorecard\StrategyRunDto;
+use App\Repositories\TickerRepository;
 use App\Repositories\TickerOhlcDailyRepository;
+use App\Repositories\WatchlistPersistenceRepository;
+use App\Repositories\IntradaySnapshotRepository;
 use App\Support\Clock;
 use App\Trade\Watchlist\Config\ScorecardConfig;
 use App\Trade\Watchlist\Scorecard\ExecutionEligibilityEvaluator;
@@ -29,6 +32,12 @@ class WatchlistScorecardService
     private $calculator;
     /** @var TickerOhlcDailyRepository */
     private $ohlcRepo;
+    /** @var WatchlistPersistenceRepository */
+    private $persistRepo;
+    /** @var IntradaySnapshotRepository */
+    private $intradayRepo;
+    /** @var TickerRepository */
+    private $tickerRepo;
     /** @var ScorecardConfig */
     private $cfg;
     /** @var Clock */
@@ -41,6 +50,9 @@ class WatchlistScorecardService
         ExecutionEligibilityEvaluator $evaluator,
         ScorecardMetricsCalculator $calculator,
         TickerOhlcDailyRepository $ohlcRepo,
+        WatchlistPersistenceRepository $persistRepo,
+        IntradaySnapshotRepository $intradayRepo,
+        TickerRepository $tickerRepo,
         ScorecardConfig $cfg,
         Clock $clock
     ) {
@@ -50,19 +62,105 @@ class WatchlistScorecardService
         $this->evaluator = $evaluator;
         $this->calculator = $calculator;
         $this->ohlcRepo = $ohlcRepo;
+        $this->persistRepo = $persistRepo;
+        $this->intradayRepo = $intradayRepo;
+        $this->tickerRepo = $tickerRepo;
         $this->cfg = $cfg;
         $this->clock = $clock;
     }
 
-    /**
-     * Save / upsert strategy run (plan) from watchlist contract payload.
-     */
     /**
      * Save / upsert strategy run (plan) from a DTO.
      */
     public function saveStrategyRunDto(StrategyRunDto $dto, string $source = 'watchlist'): int
     {
         return $this->runRepo->upsertFromDto($dto, $source);
+    }
+
+    /**
+     * Ensure strategy run exists for check-live.
+     *
+     * If missing, we try to bootstrap it from the persisted preopen contract in watchlist_daily
+     * using the same (policy, exec_date, source) key. This keeps the operator flow simple:
+     * preopen => check-live, without requiring a separate "save plan" command.
+     */
+    private function ensureStrategyRunExists(string $tradeDate, string $execDate, string $policy, string $source): void
+    {
+        $existing = $this->runRepo->getRunDto($tradeDate, $execDate, $policy, $source);
+        if ($existing) return;
+
+        // Try to hydrate from persisted preopen contract.
+        $contract = $this->persistRepo->findDailyContract($execDate, $policy, $source, $tradeDate);
+        if (!is_array($contract)) return;
+
+        $meta = is_array($contract['meta'] ?? null) ? $contract['meta'] : [];
+        $groups = is_array($contract['groups'] ?? null) ? $contract['groups'] : [];
+        $rec = is_array($contract['recommendation'] ?? null) ? $contract['recommendation'] : [];
+
+        $payload = [
+            'trade_date' => (string)($meta['asof_eod_date'] ?? $tradeDate),
+            'exec_trade_date' => (string)($meta['trade_date'] ?? $execDate),
+            'policy' => (string)($meta['policy'] ?? $policy),
+            'recommendation' => $rec,
+            'meta' => ['generated_at' => (string)($meta['generated_at'] ?? '')],
+            'generated_at' => (string)($meta['generated_at'] ?? ''),
+            'groups' => [
+                'top_picks' => is_array($groups['top_picks'] ?? null) ? $groups['top_picks'] : [],
+                'secondary' => is_array($groups['secondary'] ?? null) ? $groups['secondary'] : [],
+                'watch_only' => is_array($groups['watch_only'] ?? null) ? $groups['watch_only'] : [],
+            ],
+        ];
+
+        // Upsert plan. Fail-soft: we don't throw if persistence missing.
+        try {
+            $dto = StrategyRunDto::fromPayloadArray($payload, 0, $this->cfg);
+            $this->runRepo->upsertFromDto($dto, $source);
+        } catch (\Throwable $e) {
+            // ignore: check-live will throw later if still missing
+        }
+    }
+
+    /**
+     * Best-effort update retry state columns on watchlist_intraday_snapshots.
+     *
+     * docs/watchlist/schema.md + docs/watchlist/scorecard.md: confirm_retry_count/confirm_last_checked_at/confirm_next_check_at
+     */
+    private function bestEffortUpdateIntradayRetryState(string $execDate, LiveSnapshotDto $snapshot, EligibilityCheckDto $resultDto): void
+    {
+        $codes = [];
+        foreach ($resultDto->results as $r) {
+            if (is_object($r) && isset($r->tickerCode)) {
+                $c = strtoupper(trim((string)$r->tickerCode));
+                if ($c !== '') $codes[] = $c;
+            }
+        }
+        $codes = array_values(array_unique($codes));
+        if (empty($codes)) return;
+
+        $map = $this->tickerRepo->resolveIdsByCodes($codes);
+        if (empty($map)) return;
+
+        $checkedAt = (string)$snapshot->checkedAt;
+        foreach ($resultDto->results as $r) {
+            if (!$r instanceof EligibilityResultDto) continue;
+            $code = strtoupper(trim((string)$r->tickerCode));
+            if ($code === '' || !isset($map[$code])) continue;
+
+            $tickerId = (int)$map[$code];
+            $next = $r->nextCheckAt !== null ? (string)$r->nextCheckAt : null;
+
+            $computed = is_array($r->computed) ? $r->computed : [];
+            $retry = isset($computed['retry_count']) && is_numeric($computed['retry_count']) ? (int)$computed['retry_count'] : 0;
+
+            // Update only if it is relevant (DELAY / next_check_at exists / retry_count advanced)
+            if ($r->decision === 'DELAY' || $next !== null || $retry > 0) {
+                try {
+                    $this->intradayRepo->updateConfirmRetryState($execDate, $tickerId, $retry, $checkedAt, $next);
+                } catch (\Throwable $e) {
+                    // best-effort
+                }
+            }
+        }
     }
 
     /**
@@ -142,12 +240,16 @@ class WatchlistScorecardService
      */
     public function checkLiveDto(string $tradeDate, string $execDate, string $policy, LiveSnapshotDto $snapshot, string $source = 'watchlist'): EligibilityCheckDto
     {
+        // If run missing, attempt to auto-hydrate from watchlist_daily (preopen persistence)
+        $this->ensureStrategyRunExists($tradeDate, $execDate, $policy, $source);
+
         $run = $this->runRepo->getRunDto($tradeDate, $execDate, $policy, $source);
-        if (!$run) {
-            throw new \RuntimeException("strategy run not found: $tradeDate/$execDate/$policy (source=$source)");
-        }
+        if (!$run) throw new \RuntimeException("strategy run not found: $tradeDate/$execDate/$policy (source=$source)");
 
         $resultDto = $this->evaluator->evaluate($run, $snapshot, $this->cfg);
+
+        // Update retry state (fail-soft)
+        $this->bestEffortUpdateIntradayRetryState($execDate, $snapshot, $resultDto);
 
         if ($run->runId > 0) {
             $this->checkRepo->insertCheckFromDto($run->runId, $snapshot, $resultDto);

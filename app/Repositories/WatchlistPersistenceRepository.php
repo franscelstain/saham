@@ -158,4 +158,33 @@ class WatchlistPersistenceRepository
             DB::table('watchlist_candidates')->insert($rows);
         }
     }
+
+    /**
+     * Find a previously persisted strict preopen contract.
+     *
+     * @param string $execDate execution date (trade_date in preopen contract)
+     * @param string $policy policy code
+     * @param string $source source key (default preopen_contract_<policy>)
+     * @param string|null $asofEodDate optional filter for asof_eod_date
+     * @return array<string,mixed>|null
+     */
+    public function findDailyContract(string $execDate, string $policy, string $source, ?string $asofEodDate = null): ?array
+    {
+        $q = DB::table('watchlist_daily')
+            ->select(['payload_json'])
+            ->where('policy', strtoupper(trim($policy)))
+            ->where('trade_date', $execDate)
+            ->where('source', (string)$source)
+            ->orderByDesc('watchlist_daily_id');
+
+        if ($asofEodDate !== null && $asofEodDate !== '') {
+            $q->where('asof_eod_date', $asofEodDate);
+        }
+
+        $row = $q->first();
+        if (!$row || !isset($row->payload_json) || $row->payload_json === null) return null;
+
+        $decoded = json_decode((string)$row->payload_json, true);
+        return is_array($decoded) ? $decoded : null;
+    }
 }

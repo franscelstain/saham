@@ -45,4 +45,34 @@ class TickerRepository
 
         return $row && isset($row->ticker_id) ? (int) $row->ticker_id : null;
     }
+
+    /**
+     * Resolve ticker_id by ticker_code for many tickers.
+     *
+     * @param array<int,string> $tickerCodes
+     * @return array<string,int> map ticker_code => ticker_id
+     */
+    public function resolveIdsByCodes(array $tickerCodes): array
+    {
+        $codes = [];
+        foreach ($tickerCodes as $c) {
+            $c = strtoupper(trim((string)$c));
+            if ($c !== '') $codes[$c] = true;
+        }
+        $codes = array_keys($codes);
+        if (empty($codes)) return [];
+
+        $rows = DB::table('tickers')
+            ->select(['ticker_id','ticker_code'])
+            ->where('is_deleted', 0)
+            ->whereIn('ticker_code', $codes)
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (!isset($r->ticker_code) || !isset($r->ticker_id)) continue;
+            $out[(string)$r->ticker_code] = (int)$r->ticker_id;
+        }
+        return $out;
+    }
 }

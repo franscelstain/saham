@@ -94,4 +94,39 @@ class IntradaySnapshotRepository
             return false;
         }
     }
+
+    /**
+     * Upsert intraday snapshot for (trade_date, ticker_id).
+     *
+     * @param array<string,mixed> $fields
+     */
+    public function upsertSnapshot(string $tradeDate, int $tickerId, string $tickerCode, array $fields): void
+    {
+        if ($tickerId <= 0) return;
+        if (!$this->tableExists('watchlist_intraday_snapshots')) return;
+
+        $now = now();
+        $payload = [
+            'trade_date' => $tradeDate,
+            'ticker_id' => $tickerId,
+            'ticker_code' => strtoupper(trim($tickerCode)),
+            'updated_at' => $now,
+        ];
+        // whitelist columns to avoid silent schema drift
+        $allow = [
+            'checked_at','bid1','ask1','last','open','open_or_last_exec','spread_pct',
+            'bid2','bid3','ask2','ask3',
+            'bid_lots1','bid_lots2','bid_lots3','ask_lots1','ask_lots2','ask_lots3',
+        ];
+        foreach ($allow as $k) {
+            if (array_key_exists($k, $fields)) {
+                $payload[$k] = $fields[$k];
+            }
+        }
+
+        DB::table('watchlist_intraday_snapshots')->updateOrInsert(
+            ['trade_date' => $tradeDate, 'ticker_id' => $tickerId],
+            array_merge(['created_at' => $now], $payload)
+        );
+    }
 }

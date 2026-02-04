@@ -32,13 +32,21 @@ Kontrak memakai 2 tanggal:
 }
 ```
 
+
+## Catatan score_total
+
+- `score_total` adalah float **range [0..1]** (bukan 0..100).
+- Jika UI mau tampilkan persentase, UI yang mengalikan `score_total*100`.
+
 ## TickerItem
+
+Catatan: `score_total` adalah float dalam range **[0..1]**.
 
 ```json
 {
   "ticker": "BBRI",
   "rank": 1,
-  "score_total": 74.5,
+  "score_total": 0.745,
   "reasons": [{"code":"MOM_RSI_OK","message":"...","severity":"INFO"}],
   "eod_bar": {
     "asof_eod_date": "YYYY-MM-DD",

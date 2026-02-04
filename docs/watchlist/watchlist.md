@@ -27,17 +27,42 @@
 
 Istilah inti yang dipakai lintas dokumen. Semua definisi di bawah bersifat **binding**.
 
-- `trade_date` = tanggal eksekusi hari ini (PLAN dihitung dari EOD hari sebelumnya).
-- `asof_eod_date` = tanggal EOD yang dipakai untuk PLAN.
+- `asof_eod_date` = tanggal **EOD canonical** yang dipakai untuk PLAN (basis scoring & level).
+- `exec_trade_date` = tanggal eksekusi (hari bursa saat order dilakukan).
+- `trade_date` = **nama field yang ambigu**. Jangan dipakai sebagai istilah konsep.
+  - Di **preopen contract** (`docs/watchlist/preopen.md`): `meta.trade_date` **= exec_trade_date** (hari eksekusi).
+  - Di **internal payload/DB** tertentu: `trade_date` sering berarti **asof_eod_date** (hari EOD basis PLAN).
+  - Di dokumen ini, gunakan istilah **`exec_trade_date`** dan **`asof_eod_date`** agar tidak salah tafsir.
 - `dv20_idr` = rata-rata **nilai transaksi harian** 20 hari (IDR). Dipakai sebagai metrik likuiditas utama.
 - `turnover20_idr` = fallback metrik likuiditas (IDR). **Jika tidak tersedia → treat missing** (jangan dihitung dari asumsi).
 - `atr14` = ATR 14 hari (IDR).
 - `atr_pct` = `atr14 / close` (range [0..1]).
 - `tick_pct` = `tick_size / close` (range [0..1]).
-- `R` = `plan_entry - plan_stop` (IDR). Kontrak global: `R <= 0` → DROP, `R < tick` → DROP.
+- `R` = `plan_entry - plan_stop` (IDR). Kontrak global: `R <= 0` atau `R < tick` → **PLAN_INVALID** → **EXCLUDE** untuk policy tersebut.
 - `rr_est` = `(plan_tp1 - plan_entry) / R` (tanpa magic number).
 - `score_total` = skor final per policy, **range [0..1]**.
 - `reasons[]` = array object `{code,message,severity?}` (lihat section Reasons object).
+
+## Semantik hasil evaluasi (ANTI SALAH TAFSIR) (LOCKED)
+
+Di semua dokumen Watchlist, istilah di bawah **wajib konsisten**:
+
+- **EXCLUDE (GLOBAL / Universe)**: ticker **keluar dari Universe** → **tidak tampil** di output watchlist untuk policy apa pun.
+  - Dipakai untuk hard gate lintas-policy: data tidak lengkap, lookback tidak cukup, price terlalu rendah, likuiditas minimum tidak terpenuhi, ATR% chaos, dll.
+  - Reason code prefix umumnya `GL_*` (global).
+- **NOT_QUALIFIED (Policy hard rules fail)**: ticker **lolos Universe** tapi **tidak qualified untuk NEW ENTRY** pada policy itu.
+  - Ticker **tetap boleh tampil** sebagai **`watch_only`** untuk monitoring (audit + peluang jadi qualified besok).
+  - Bentuk output: `plan.is_eligible_new_entry=false` + `plan.block_codes[]` berisi kode penyebab.
+- **AVOID (Risk / Tradeability lock)**: ticker tetap tampil, tapi disarankan dihindari untuk eksekusi (mis. suspend/FCA/notasi X, risk chaos).
+  - Bentuk output: group `avoid`, `tradeability=TRADE_DISABLED` atau `risk=AVOID`, dengan `reasons[]`.
+- **PLAN_INVALID (feasibility gagal)**: ticker tidak bisa dibuatkan PLAN yang valid (contoh `R<=0` atau `R<tick`, TP1 tidak di atas entry).
+  - Kontrak global menganggap ini **EXCLUDE** untuk policy tersebut (dan biasanya membuat ticker tidak layak muncul sebagai kandidat BUY).
+  - Reason code: `*_R_INVALID_*`, `*_TP1_NOT_ABOVE_ENTRY`, dsb.
+
+Catatan penting:
+- Kata **“DROP/gugur”** di policy docs **hanya boleh dipakai** untuk **EXCLUDE (GLOBAL)** atau **PLAN_INVALID** (dan sebisa mungkin diganti istilah EXCLUDE agar tidak ambigu).
+- Untuk hard rules biasa (trend/rr/liquidity band) gunakan istilah **NOT_QUALIFIED** (masuk `watch_only`), bukan “DROP”.
+
 
 ## Global Contract (wajib lintas policy)
 
@@ -45,9 +70,9 @@ Bagian ini adalah **kontrak universal**. Semua policy wajib patuh. Policy **tida
 
 ### 1) Data readiness & canonical consistency
 - **Source of truth OHLC:** gunakan `ticker_ohlc_daily` sebagai kebenaran OHLC. `ticker_indicators_daily` adalah **turunan**.
-- **Canonical ready gate:** jika data EOD untuk `trade_date` belum final/canonical → **wajib** `recommendations = []` (No Trade untuk eksekusi). Namun **groups** (Top Picks/Secondary/Watch Only/Avoid) tetap boleh dihitung untuk monitoring, dengan flag global `EOD_NOT_READY` dan reason `GL_EOD_NOT_READY`.
-- **Satu `trade_date` yang sama:** semua ticker dinilai pada tanggal EOD yang sama (PLAN).
-- **Run consistency (jika ada `run_id`):** pada `trade_date`, hasil scoring wajib pakai run yang sama (canonical). Jika OHLC berbeda antar run → dianggap belum ready.
+- **Canonical ready gate:** jika data EOD untuk `asof_eod_date` belum final/canonical → **wajib** `recommendations = []` (No Trade untuk eksekusi). Namun **groups** (Top Picks/Secondary/Watch Only/Avoid) tetap boleh dihitung untuk monitoring, dengan flag global `EOD_NOT_READY` dan reason `GL_EOD_NOT_READY`.
+- **Satu `asof_eod_date` yang sama:** semua ticker dinilai pada tanggal EOD yang sama (basis PLAN).
+- **Run consistency (jika ada `run_id`):** pada `asof_eod_date`, hasil scoring wajib pakai run yang sama (canonical). Jika OHLC berbeda antar run → dianggap belum ready.
 
 ### 2) Window & lookback definition (anti-bias)
 
@@ -58,11 +83,11 @@ Definisi **wajib**:
 - `trading_days_between(a, b)` = jumlah **trading days** `d` sehingga `a < d <= b`.
   - Artinya: **exclude** `a`, **include** `b` jika `b` adalah trading day.
 - Jika `a == b` → hasil = `0`.
-- Jika `a > b` → **invalid**. Implementasi wajib mengembalikan `null` (bukan negatif). Untuk dividend gate, kondisi ini → DROP reason khusus.
+- Jika `a > b` → **invalid**. Implementasi wajib mengembalikan `null` (bukan negatif). Untuk gate berbasis event (mis. Dividend Swing), kondisi ini → **NOT_QUALIFIED** untuk policy tersebut (reason khusus).
 
 Konsekuensi untuk dividend:
 - Entry harus terjadi **sebelum** `ex_date`, jadi wajib `exec_trade_date < ex_date`.
-- Jika `exec_trade_date >= ex_date` → DROP (`DS_TOO_LATE_EXDATE`).
+- Jika `exec_trade_date >= ex_date` → **NOT_QUALIFIED** untuk policy Dividend Swing (`DS_TOO_LATE_EXDATE`).
 
 #### Contract: `highest_high(N)` / `lowest_low(N)` (GLOBAL, non-negotiable)
 Untuk menghindari hasil beda antar modul/versi, definisi ini **wajib sama** di seluruh engine:
@@ -85,8 +110,8 @@ Untuk mencegah “magic number” dan RR yang ngawur:
 
 - `tick = tick_size(entry_price)` (dari tick ladder).
 - `R = entry_price - stop_price`.
-- Jika `R <= 0` → **DROP** (`R_INVALID_NONPOSITIVE`).
-- Jika `R < tick` → **DROP** (`R_INVALID_LT_TICK`) karena risk terlalu kecil dan rawan rounding.
+- Jika `R <= 0` → **EXCLUDE (PLAN_INVALID)** (`R_INVALID_NONPOSITIVE`).
+- Jika `R < tick` → **EXCLUDE (PLAN_INVALID)** (`R_INVALID_LT_TICK`) karena risk terlalu kecil dan rawan rounding.
 - `rr_est = (tp1_price - entry_price) / R` (tanpa `max(R, 1)`).
 
 #### Contract enforcement: RR definition (GLOBAL)
@@ -185,8 +210,8 @@ Universe Filter berlaku untuk semua policy dan dievaluasi sebelum policy rules.
 
 Output dari tahap ini: `UniverseEligible`.
 
-### 2.1 Data readiness gate (DROP)
-DROP jika:
+### 2.1 Data readiness gate (EXCLUDE / Universe)
+EXCLUDE jika:
 - OHLCV EOD untuk `trade_date` tidak lengkap/invalid
 - indikator minimum yang dipakai engine tidak tersedia (lookback tidak cukup)
 Reason codes:
@@ -198,7 +223,7 @@ Rule:
 Reason code:
 - `GL_EOD_NOT_READY`
 Catatan:
-- Ini bukan “DROP”, tapi global lock terhadap recommendations (SOP: jangan entry pakai data setengah matang).
+- Ini bukan “EXCLUDE”, tapi global lock terhadap recommendations (SOP: jangan entry pakai data setengah matang).
 
 ### 2.3 Tradeability gate (TRADE_DISABLED, not DROP)
 
@@ -210,7 +235,7 @@ Aturan (LOCKED):
 - Special notation `X` → `tradeability = TRADE_DISABLED`, group = `Avoid`, reason `GL_SPECIAL_NOTATION_X`.
 - Special notation `E` → **tidak disable**, tetap tradeable; tambahkan warning reason `GL_SPECIAL_NOTATION_E` (group ditentukan oleh hasil policy/risk).
 
-### 2.4 Liquidity gate (DROP)
+### 2.4 Liquidity gate (EXCLUDE / Universe)
 
 Wajib memenuhi minimal likuiditas EOD (LOCKED).
 Universe Filter adalah minimum untuk masuk universe; tiap policy boleh menetapkan threshold yang lebih ketat (lebih tinggi) dan itu dievaluasi di policy hard rules.
@@ -225,24 +250,24 @@ Universe Filter adalah minimum untuk masuk universe; tiap policy boleh menetapka
 
 #### Aturan deterministik (LOCKED)
 1) Jika `dv20_idr` tersedia (not null) → gunakan `dv20_idr` sebagai satu-satunya metrik:
-   - Wajib `dv20_idr >= MIN_DV20_IDR`, jika gagal → DROP `GL_LIQ_TOO_LOW`.
+   - Wajib `dv20_idr >= MIN_DV20_IDR`, jika gagal → **EXCLUDE** `GL_LIQ_TOO_LOW`.
 2) Jika `dv20_idr` missing (null) dan `turnover20_idr` tersedia → gunakan `turnover20_idr` sebagai fallback:
-   - Wajib `turnover20_idr >= MIN_TURNOVER20_IDR`, jika gagal → DROP `GL_LIQ_TOO_LOW`.
-3) Jika **keduanya missing** → DROP `GL_LIQ_METRIC_MISSING`.
+   - Wajib `turnover20_idr >= MIN_TURNOVER20_IDR`, jika gagal → **EXCLUDE** `GL_LIQ_TOO_LOW`.
+3) Jika **keduanya missing** → **EXCLUDE** `GL_LIQ_METRIC_MISSING`.
 
 Catatan:
 - Jika sistem kamu mengisi `turnover20_idr = dv20_idr`, itu sah (alias), tapi bukan perhitungan engine.
 
-### 2.5 Price sanity gate (DROP)
-DROP jika:
+### 2.5 Price sanity gate (EXCLUDE / Universe)
+EXCLUDE jika:
 - `close < MIN_PRICE`
 Reason:
 - `GL_PRICE_TOO_LOW`
 Default (rekomendasi awal):
 - `MIN_PRICE = 50`
-### 2.6 Extreme volatility guard (DROP, konservatif)
+### 2.6 Extreme volatility guard (EXCLUDE / Universe, konservatif)
 Tujuan: buang ticker chaos ekstrem yang merusak semua strategi.
-DROP jika:
+EXCLUDE jika:
 - `atr_pct > MAX_ATR_PCT_UNIVERSE`
 Reason:
 - `GL_VOL_TOO_HIGH`
@@ -321,7 +346,7 @@ Namespace:
 Rules:
 - deterministik (reproducible)
 - tidak tergantung urutan iterasi
-- minimal 1 reason utama saat DROP / trade_disabled / avoid / no_trade
+- minimal 1 reason utama saat **EXCLUDE** / trade_disabled / avoid / no_trade
 
 ### Data aktif
 - `is_deleted = 0` berarti data aktif (belum dihapus). Nilai selain itu dianggap tidak aktif.
@@ -439,7 +464,7 @@ Jika kamu butuh menampilkan alternatif strategi (2–3 opsi) tanpa memecah DTO u
 - Tidak ada filler/placeholder.
 
 ### Canonical EOD not ready (hard)
-Jika canonical EOD belum ready pada `trade_date`:
+Jika canonical EOD belum ready pada `asof_eod_date`:
 - `recommendations = []` (**wajib**).
 - Groups (Top Picks/Secondary/Watch Only/Avoid) tetap dihitung untuk monitoring dengan `flags:["EOD_NOT_READY"]` + reason global `GL_EOD_NOT_READY`.
 
@@ -449,9 +474,13 @@ Bagian ini menambah guardrail operasional agar output stabil dan audit-able, tan
 
 #### 1) Data completeness gate (EOD-only)
 - Engine wajib memvalidasi `Input minimum (PLAN)` dari policy aktif.
-- Jika ada field minimum yang missing/null → DROP ticker sebelum scoring.
+- Jika ada field minimum policy yang missing/null → **NOT_QUALIFIED** untuk policy tersebut (masuk `watch_only`, bukan hilang).
   - Reason code global: `GL_POLICY_INPUT_MISSING`
   - `reasons[]` wajib menyebut `missing_fields=[...]`.
+
+Catatan penting (GL_POLICY_INPUT_MISSING):
+- Ini **bukan** Universe gate. Universe gate (EXCLUDE) hanya untuk missing yang bersifat global (mis. OHLCV invalid, lookback < 20 untuk dv20/indicator inti).
+- `GL_POLICY_INPUT_MISSING` artinya: ticker lolos Universe, tetapi policy aktif tidak bisa dinilai karena input policy tidak lengkap. Output tetap tampil sebagai `watch_only` untuk monitoring.
 
 #### 2) Corporate action / event risk (EOD-only, optional)
 Jika dataset menyediakan event/corporate-action (mis. `ex_date`, `rights_date`, `suspension_flag`):
@@ -798,93 +827,34 @@ Catatan:
 ## Appendices (binding)
 ## Appendix A — Output schema (DTO)
 
-### Output schema (DTO) (LOCKED)
+### Satu kontrak JSON (LOCKED)
+
+**Schema JSON yang benar-benar dikunci ada di `docs/watchlist/preopen.md`.**
+Dokumen `watchlist.md` ini mengunci **semantik** (EXCLUDE/NOT_QUALIFIED/AVOID/PLAN_INVALID), Universe filter, grouping, dan rules lintas-policy.
+
+Agar tidak ada salah tafsir, bagian ini hanya merangkum poin yang sering bikin konflik.
 
 ### Reasons object (LOCKED)
-- Semua field `reasons` di seluruh output (groups, recommendations, confirm) **wajib** berupa array object:
-  - `code` (string, machine-stable)
-  - `message` (string, 1 kalimat, user-facing)
-  - `severity` (optional enum: `INFO|WARN|BLOCK`)
-- `code` tetap wajib dikirim untuk audit/log.
-- `message` disediakan oleh layer aplikasi (mis. `app/Trade/Explain`), bukan oleh dokumen ini.
+Semua `reasons` di seluruh output (meta, groups, recommendations, confirm) **wajib** berupa array of object:
+- `code` (string, machine-stable)
+- `message` (string, 1 kalimat, user-facing)
+- `severity` (optional enum): `INFO|WARN|BLOCK|ERROR`
 
-Tujuan: satu kontrak output yang sama untuk semua policy. Policy hanya mengubah isi kandidat/plan/score, bukan bentuk JSON.
+### Score (LOCKED)
+- `score_total` adalah **float [0..1]**.
+  - UI boleh menampilkan sebagai persentase (`score_total * 100`) tapi **nilai yang dikirim tetap [0..1]**.
 
-#### Root object
+### Model tanggal (LOCKED)
+- Pada **preopen contract**:
+  - `meta.trade_date` = **`exec_trade_date`** (tanggal eksekusi)
+  - `meta.asof_eod_date` = tanggal EOD canonical untuk PLAN
 
-Wajib ada field berikut:
+### Semantik outcome (LOCKED)
+- **Universe EXCLUDE** → ticker tidak tampil di groups.
+- **PLAN_INVALID** → ticker di-EXCLUDE untuk policy tersebut (tidak tampil sebagai kandidat BUY).
+- **NOT_QUALIFIED** → ticker tampil di `groups.watch_only` dengan `plan.is_eligible_new_entry=false` + `plan.block_codes[]`.
+- **AVOID / TRADE_DISABLED / NO_TRADE** → ticker bisa tampil di group terkait untuk audit.
 
-- `meta` (object)
-  - `trade_date` (YYYY-MM-DD): tanggal EOD yang dipakai untuk PLAN (kemarin).
-  - `policy` (string): nama policy aktif (`WEEKLY_SWING`, `DIVIDEND_SWING`, `POSITION_TRADE`, `INTRADAY_LIGHT`, `NO_TRADE`).
-  - `canonical_ready` (bool)
-  - `fee_included` (bool)
-  - `flags` (string[]): flag global (mis. `EOD_NOT_READY`)
-  - `reasons` (string[]): reason code global (mis. `GL_EOD_NOT_READY`)
-
-- `groups` (object)
-  - `top_picks` (TickerPlan[])
-  - `secondary` (TickerPlan[])
-  - `watch_only` (TickerPlan[])
-  - `avoid` (TickerPlan[])
-  - `no_trade` (TickerPlan[])  *(boleh kosong untuk policy selain NO_TRADE; atau dipakai untuk menampung ticker yang ditandai “NO_TRADE” oleh classifier)*
-
-- `recommendations` (RecommendationPlan[])
-  - Wajib selalu ada, tapi boleh `[]`.
-
-#### TickerPlan (untuk groups.*)
-
-Setiap item `TickerPlan` wajib punya:
-
-- `ticker_code` (string)
-- `score_total` (float)
-- `setup_type` (string|null): `PULLBACK` / `BREAKOUT` (atau null jika policy tidak memakai)
-- `plan` (object)
-  - `entry` (int|null)
-  - `stop` (int|null)
-  - `tp1` (int|null)
-  - `tp2` (int|null) *(opsional; boleh null)*
-  - `r` (int|null)
-  - `rr_est` (float|null)
-- `risk` (object)
-  - `atr_pct` (float|null)
-  - `tick_pct` (float|null)
-  - `dv20_idr` (int|null)
-- `flags` (string[]) *(boleh kosong)*
-- `reasons` (string[]): reason code audit-able (DROP/AVOID/WATCH) dari global + policy
-
-Tambahan untuk Top Picks & Secondary (mini strategy, non-breaking):
-
-- `mini_tranches_pct` (array of object|null)
-  - Hanya untuk `groups.top_picks` dan `groups.secondary`.
-  - Format: `{ "at": "HH:MM", "pct": float, "reason": string }`
-  - `pct` berada di range (0..1], total pct = 1.0.
-
-- `mini_tranches_lots` (array of object|null)
-  - Opsional, hanya jika ticker tersebut **ada di `recommendations`** (Mode B / capital ada).
-  - Format: `{ "at": "HH:MM", "lots": int, "reason": string }`
-  - Nilai lots di sini **harus** disalin dari `recommendations.tranches` (single source), bukan dihitung ulang.
-
-Catatan:
-- `groups.*` boleh berisi plan null jika policy tidak menghasilkan plan (mis. NO_TRADE), tapi shape tetap sama.
-
-#### RecommendationPlan (rencana eksekusi beli)
-
-Setiap item `RecommendationPlan` wajib punya:
-
-- `ticker_code` (string)
-- `planned_lots` (int|null)
-  - Mode A (capital missing): null.
-  - Mode B (capital ada): integer >= 1.
-- `estimated_cost` (int|null)  *(include fee jika `meta.fee_included=true`)*
-- `weight_pct` (float|null)
-- `tranches` (array of object) *(boleh kosong jika planned_lots null)*
-  - `{ "at": "HH:MM", "lots": int, "reason": string }`
-- `reasons` (string[]): minimal 1, audit-able
-- `ref_plan` (object|null): snapshot plan yang dipakai (entry/stop/tp1/rr_est) agar rekomendasi bisa diaudit tanpa join.
-
-Backward-compatibility:
-- Jika implementasi sekarang belum punya `ref_plan`/`tranches`, field boleh ada tapi null/[]; jangan mengubah tipe field secara breaking.
 
 ## Appendix B — Reason code registry
 
@@ -1011,7 +981,7 @@ Tujuan: setiap perubahan engine/threshold harus lolos checklist ini agar output 
 - Skenario: breakout level berubah jika include trade_date → harus FAIL test.
 
 3) **RR definition**
-- Jika `R <= 0` atau `R < tick` → DROP reason jelas (tidak ada magic number).
+- Jika `R <= 0` atau `R < tick` → **EXCLUDE (PLAN_INVALID)** dengan reason jelas (tidak ada magic number).
 
 4) **Canonical not ready**
 - `meta.canonical_ready=false` → `recommendations=[]` wajib, groups tetap dihitung + flag/reason global.

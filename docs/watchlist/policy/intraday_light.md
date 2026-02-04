@@ -44,6 +44,11 @@ Dipakai untuk membatasi TP dan mendeteksi “near resistance” secara determini
 
 ---
 
+## Semantik hasil rule (ANTI SALAH TAFSIR)
+- Fail pada Hard Rules policy ini berarti **NOT_QUALIFIED** (masuk `watch_only`) untuk policy ini, bukan “hilang dari watchlist”.
+- Hanya **PLAN_INVALID** (mis. `R<=0`, `R<tick`, `TP1<=entry`) yang dianggap **EXCLUDE** untuk policy ini.
+
+
 ## 1) Input minimum (PLAN, EOD-only)
 Wajib:
 - OHLCV
@@ -52,7 +57,7 @@ Wajib:
 - `ma20` (wajib)
 - (opsional tapi disarankan) `close_pos`, wick ratios
 
-Jika missing → DROP `IL_DATA_INCOMPLETE`.
+Jika missing → **NOT_QUALIFIED** (masuk `watch_only`) `IL_DATA_INCOMPLETE`.
 
 ---
 
@@ -61,7 +66,7 @@ Jika missing → DROP `IL_DATA_INCOMPLETE`.
 Wajib lebih ketat dari universe:
 - `dv20_idr >= IL_MIN_DV20_IDR`
 Default `IL_MIN_DV20_IDR = 3000000000` (Rp 3B)
-Jika gagal → DROP `IL_LIQ_TOO_LOW`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `IL_LIQ_TOO_LOW`.
 
 ### 2.2 Volatility band
 Wajib:
@@ -69,7 +74,7 @@ Wajib:
 Default:
 - IL_MIN_ATR_PCT = 0.02
 - IL_MAX_ATR_PCT = 0.15
-Jika gagal → DROP `IL_VOL_BAND_FAIL` (subreason: TOO_LOW/TOO_HIGH).
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `IL_VOL_BAND_FAIL` (subreason: TOO_LOW/TOO_HIGH).
 
 ### 2.3 Momentum setup gate (EOD)
 Minimal salah satu:
@@ -80,17 +85,17 @@ Minimal salah satu:
   - close_pos >= 0.80
   - upper_wick/range <= 0.25
   - vol_ratio >= 1.0  (hard minimal)
-Jika gagal → DROP `IL_NO_SETUP`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `IL_NO_SETUP`.
 
 ### 2.4 Stop feasibility
 Wajib:
 - stop_distance_pct <= IL_MAX_STOP_PCT (default 0.02)
-Jika gagal → DROP `IL_STOP_TOO_WIDE`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `IL_STOP_TOO_WIDE`.
 
 ### 2.5 RR gate
 Wajib:
 - rr_est >= IL_MIN_RR (default 1.0)
-Jika gagal → DROP `IL_RR_TOO_LOW`.
+Jika gagal → **NOT_QUALIFIED** (masuk `watch_only`) `IL_RR_TOO_LOW`.
 
 ---
 
@@ -216,14 +221,14 @@ Intraday Light defaultnya **ONE_SHOT** dan staging disabled. Walau eksekusi intr
 - `plan.stop = round_down(min(low(trade_date), ll3) - tick)`
 
 Validasi:
-- `R = plan.entry - plan.stop` harus lulus kontrak global (`R > 0` dan `R >= tick`), jika tidak → DROP (`IL_R_INVALID_*`).
+- `R = plan.entry - plan.stop` harus lulus kontrak global (`R > 0` dan `R >= tick`), jika tidak → **EXCLUDE (PLAN_INVALID)** (`IL_R_INVALID_*`).
 
 ### TP1 / RR (GLOBAL-consistent)
 - `plan.tp1 = round_down(plan.entry + (IL_TP1_R_MULT * R))`
 - `rr_est = (plan.tp1 - plan.entry) / R` (GLOBAL)
 
 Hard rule (optional jika kamu ingin ketat):
-- Wajib `rr_est >= IL_MIN_RR` → DROP (`IL_RR_TOO_LOW`)
+- Wajib `rr_est >= IL_MIN_RR` → **NOT_QUALIFIED** (masuk `watch_only`) (`IL_RR_TOO_LOW`)
 
 Default parameter:
 - `IL_TP1_R_MULT = 1.0`

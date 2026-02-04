@@ -10,7 +10,12 @@
 - Gaya entry: `setup_type ∈ {BREAKOUT, PULLBACK}` (ditentukan deterministik oleh rules PLAN) pada uptrend yang tradeable.
 - Target cuan realistis: 2%–6% (tergantung ATR/likuiditas), dengan stop disiplin.
 
-## 2) Hard Rules (wajib lolos)
+## 2) Hard Rules (wajib lolos untuk NEW ENTRY)
+
+**Jika gagal Hard Rules di bawah ini:** ticker tetap boleh tampil untuk monitoring, tetapi statusnya **NOT_QUALIFIED** → `plan.is_eligible_new_entry=false` dan masuk group `watch_only` (lihat `watchlist.md`).
+
+**Kecuali** rule yang jelas membuat PLAN tidak valid (contoh `R<=0`, `R<tick`). Kasus itu adalah **PLAN_INVALID** dan dianggap **EXCLUDE**.
+
 ### 2.1 Trend / structure gate (locked)
 Wajib memenuhi salah satu kondisi berikut:
 - Uptrend baseline: `close >= ma20` **dan** `ma20 >= ma50`
@@ -27,14 +32,14 @@ Definisi:
 
 ### 2.3 Stop validity (locked)
 PLAN wajib menghasilkan `R = entry-stop` yang valid:
-- jika `R <= 0` → DROP (`WS_R_INVALID_NONPOSITIVE`)
-- jika `R < tick` → DROP (`WS_R_INVALID_LT_TICK`)
+- jika `R <= 0` → **EXCLUDE (PLAN_INVALID)** (`WS_R_INVALID_NONPOSITIVE`)
+- jika `R < tick` → **EXCLUDE (PLAN_INVALID)** (`WS_R_INVALID_LT_TICK`)
 
 ### 2.4 RR gate (locked, GLOBAL-consistent)
 RR gate Weekly Swing memakai **TP1** (bukan TP2).
 
 - `rr_est = (tp1 - entry) / R` (**tanpa** fallback seperti `max(R,1)`)
-- Wajib `rr_est >= WS_MIN_RR` → DROP (`WS_RR_TOO_LOW`)
+- Wajib `rr_est >= WS_MIN_RR` → **NOT_QUALIFIED** (masuk `watch_only`) (`WS_RR_TOO_LOW`)
 
 Catatan:
 - `plan.tp2` opsional untuk management target, bukan untuk RR gate.
@@ -73,8 +78,8 @@ Satu pendekatan final:
 
 Validasi (kontrak global):
 - `R = plan.entry - plan.stop`
-- Jika `R <= 0` → DROP (`WS_R_INVALID_NONPOSITIVE`)
-- Jika `R < tick` → DROP (`WS_R_INVALID_LT_TICK`)
+- Jika `R <= 0` → **EXCLUDE (PLAN_INVALID)** (`WS_R_INVALID_NONPOSITIVE`)
+- Jika `R < tick` → **EXCLUDE (PLAN_INVALID)** (`WS_R_INVALID_LT_TICK`)
 
 ### TP1 / RR (GLOBAL-consistent)
 - `plan.tp1 = round_down(plan.entry + (WS_MIN_RR * R))`
