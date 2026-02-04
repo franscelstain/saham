@@ -3367,14 +3367,70 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 
             // If caller does not provide capital, we still produce PLAN (pure EOD selection) without allocations.
             if ($capitalTotal === null) {
+                // Mode A: no capital sizing. Still return a ranked list of recommended tickers
+                // so UI/users can see what the system would pick (docs/watchlist/watchlist.md).
+                $targetNoCap = min($maxToday, $maxPos);
+                $targetNoCap = max(0, $targetNoCap);
+
+                $allocsNoCap = [];
+                $skippedNoCap = [];
+                $skippedMap = [];
+
+                $addSkip = function (array $row) use (&$skippedNoCap, &$skippedMap): void {
+                    $tk = (string)($row['ticker_code'] ?? '');
+                    if ($tk === '') return;
+                    if (isset($skippedMap[$tk])) return;
+                    $skippedMap[$tk] = true;
+                    $skippedNoCap[] = $row;
+                };
+
+                foreach ($topPickIndices as $idx) {
+                    if ($targetNoCap > 0 && count($allocsNoCap) >= $targetNoCap) break;
+                    $c = $candidates[$idx] ?? null;
+                    if (!$c) continue;
+
+                    // Hard locks never get recommendations.
+                    if (!empty($c['plan']['hard_lock_codes'] ?? [])) {
+                        $addSkip([
+                            'ticker_code' => (string)($c['ticker_code'] ?? ''),
+                            'reason_code' => (string)($c['plan']['hard_lock_codes'][0] ?? 'GL_HARD_LOCK'),
+                            'alloc_budget' => null,
+                            'entry_price_ref' => (int)($c['levels']['entry_trigger_price'] ?? 0),
+                        ]);
+                        continue;
+                    }
+
+                    // Must be eligible for new entry.
+                    if (isset($c['plan']) && array_key_exists('is_eligible_new_entry', $c['plan']) && !$c['plan']['is_eligible_new_entry']) {
+                        $rc = (string)(($c['plan']['block_codes'][0] ?? null) ?: ($this->policyPrefix($policy) . '_BLOCKED'));
+                        $addSkip([
+                            'ticker_code' => (string)($c['ticker_code'] ?? ''),
+                            'reason_code' => $rc,
+                            'alloc_budget' => null,
+                            'entry_price_ref' => (int)($c['levels']['entry_trigger_price'] ?? 0),
+                        ]);
+                        continue;
+                    }
+
+                    // Keep allocation template fields null in Mode A.
+                    $allocsNoCap[] = [
+                        'ticker_code' => (string)($c['ticker_code'] ?? ''),
+                        'alloc_pct' => null,
+                        'alloc_budget' => null,
+                        'entry_price_ref' => (int)($c['levels']['entry_trigger_price'] ?? 0),
+                        'lots_recommended' => null,
+                        'estimated_cost' => null,
+                    ];
+                }
+
                 return [
                     'mode' => 'PLAN',
                     'risk_per_trade_pct' => $riskPct,
                     'capital_total' => null,
                     'cash_remaining' => null,
                     'max_positions_today' => (int)($policyMeta['max_positions_today'] ?? 0),
-                    'allocations' => [],
-                    'skipped' => [],
+                    'allocations' => $allocsNoCap,
+                    'skipped' => $skippedNoCap,
                 ];
             }
 
