@@ -682,13 +682,11 @@ foreach ($rows as $i => $r) {
 }
 
 // Recommendations (allocations) use top-picks as the universe, but do NOT cap top-picks.
-$hasOpenPositions = !empty($openPositions);
-
 $recs = $this->buildRecommendations(
     $policy,
     $policyMeta,
     $globalLockCodes,
-    $hasOpenPositions,
+    $openPositions,
     $capitalTotal,
     $rows,
     $topPickIndices
@@ -3350,7 +3348,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             string $policy,
             array $policyMeta,
             array $globalLockCodes,
-            bool $hasOpenPositions,
+            array $openPositions,
             ?int $capitalTotal,
             array &$candidates,
             array $topPickIndices
@@ -3365,11 +3363,20 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             $allocs = [];
             $skipped = [];
 
+            $openCount = 0;
+            if (!empty($openPositions)) {
+                // $openPositions is keyed by ticker_id
+                $openCount = count($openPositions);
+            }
+            $hasOpenPositions = ($openCount > 0);
+
             // If caller does not provide capital, we still produce PLAN (pure EOD selection) without allocations.
             if ($capitalTotal === null) {
                 // Mode A: no capital sizing. Still return a ranked list of recommended tickers
                 // so UI/users can see what the system would pick (docs/watchlist/watchlist.md).
-                $targetNoCap = min($maxToday, $maxPos);
+                // Exposure control: if there are already open positions, reduce how many NEW positions we propose today.
+                // target_today = min(max_positions_today, max_positions - open_positions_count)
+                $targetNoCap = min($maxToday, max(0, $maxPos - $openCount));
                 $targetNoCap = max(0, $targetNoCap);
 
                 $allocsNoCap = [];
@@ -3388,6 +3395,18 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                     if ($targetNoCap > 0 && count($allocsNoCap) >= $targetNoCap) break;
                     $c = $candidates[$idx] ?? null;
                     if (!$c) continue;
+
+                    // Already-held positions are not NEW recommendations.
+                    $tid = (int)($c['ticker_id'] ?? 0);
+                    if ($tid > 0 && isset($openPositions[$tid])) {
+                        $addSkip([
+                            'ticker_code' => (string)($c['ticker_code'] ?? ''),
+                            'reason_code' => 'GL_ALREADY_HELD',
+                            'alloc_budget' => null,
+                            'entry_price_ref' => (int)($c['levels']['entry_trigger_price'] ?? 0),
+                        ]);
+                        continue;
+                    }
 
                     // Hard locks never get recommendations.
                     if (!empty($c['plan']['hard_lock_codes'] ?? [])) {
@@ -3460,7 +3479,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 ];
             }
 
-            $target = min($maxToday, $maxPos);
+            // Exposure control: limit NEW positions by total max_positions minus already-open positions.
+            $target = min($maxToday, max(0, $maxPos - $openCount));
             $target = max(0, $target);
 
             if ($target <= 0 || empty($topPickIndices)) {
@@ -3493,6 +3513,18 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             foreach ($topPickIndices as $idx) {
                 $c = $candidates[$idx] ?? null;
                 if (!$c) continue;
+
+                // Do not allocate NEW entries for tickers already held.
+                $tid = (int)($c['ticker_id'] ?? 0);
+                if ($tid > 0 && isset($openPositions[$tid])) {
+                    $addSkip([
+                        'ticker_code' => (string)($c['ticker_code'] ?? ''),
+                        'reason_code' => 'GL_ALREADY_HELD',
+                        'alloc_budget' => null,
+                        'entry_price_ref' => (int)($c['levels']['entry_trigger_price'] ?? 0),
+                    ]);
+                    continue;
+                }
 
                 // Hard locks never get allocations.
                 if (!empty($c['plan']['hard_lock_codes'] ?? [])) {

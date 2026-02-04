@@ -312,6 +312,13 @@ Jika UI butuh limit, itu **hanya limit publish** (config) dan harus eksplisit (b
 ## 5) Recommendations (PLAN execution plan)
 Recommendations adalah rencana eksekusi beli hari itu (bukan sekadar ranking).
 
+### Exposure vs posisi yang sudah ada
+Recommendations hanya menghitung **NEW entry**. Jika ticker sudah memiliki posisi terbuka (open position), maka:
+- ticker tersebut **tidak boleh** masuk Recommendations sebagai NEW entry.
+- target jumlah NEW entry hari ini dihitung:
+  `target_today = min(max_positions_today, max_positions - open_positions_count)`.
+  Jika hasilnya <= 0, maka mode menjadi `CARRY_ONLY` (jika ada posisi terbuka) atau `NO_TRADE`.
+
 Rules:
 1. Hanya boleh berisi ticker yang lolos **universe + hard rules policy** dan tidak trade_disabled.
 2. Harus mempertimbangkan `capital`, lot size, tick rounding, dan fee sehingga:
