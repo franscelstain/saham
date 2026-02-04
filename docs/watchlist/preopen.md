@@ -69,7 +69,7 @@ Catatan: `score_total` adalah float dalam range **[0..1]**.
       {
         "n": 1,
         "time": "09:20",
-        "lots": 1,
+        "lots": null,
         "plan_limit_price": 0,
         "plan_price_cap": 0,
         "plan_price_floor": null,
@@ -80,6 +80,11 @@ Catatan: `score_total` adalah float dalam range **[0..1]**.
   }
 }
 ```
+
+> **Catatan (ANTI SALAH TAFSIR)**
+> - `ticker_plan.execution_slices[]` boleh selalu ada sebagai **template rencana eksekusi**.
+> - Field `execution_slices[].lots` **boleh `null`** jika ticker **bukan** bagian dari `recommendations` (atau mode A tanpa capital).
+> - Hanya untuk item di `recommendations.items[]`, `execution_slices[].lots` harus berupa angka lot yang sudah dialokasikan.
 
 ## Recommendations
 

@@ -1750,7 +1750,9 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         $atr14 = $r['atr14'] ?? null;
         $volRatio = $r['vol_ratio'] ?? null;
         $liqBucket = (string)($r['liq_bucket'] ?? 'U');
-        $dv20 = $r['dv20'] ?? null;
+        // Liquidity is stored as IDR metrics in repo output (dv20_idr / turnover20_idr).
+        // $dv20 will be set later after Universe gates (dv20 preferred, else turnover20 fallback).
+        $dv20 = null;
         $setupType = $this->setupClassifier->classify($ci);
 
         // Universe Filter (GLOBAL hard rules) — DROP jika data tidak lengkap / indikator missing.
@@ -1781,8 +1783,9 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         if ($atrPctUniverse > $maxAtrPct) return null;
 
         // Liquidity gate (dv20_idr preferred, else turnover20_idr fallback) — both in IDR, same scale.
-        $dv20Raw = $r['dv20'] ?? null;
-        $turnover20Raw = $r['turnover20'] ?? ($r['turnover20_idr'] ?? null);
+        // Backward-compat keys: dv20/turnover20 may appear in older fixtures.
+        $dv20Raw = $r['dv20_idr'] ?? ($r['dv20'] ?? null);
+        $turnover20Raw = $r['turnover20_idr'] ?? ($r['turnover20'] ?? null);
         $dv20Val = (is_numeric($dv20Raw) ? (float)$dv20Raw : null);
         $turnover20Val = (is_numeric($turnover20Raw) ? (float)$turnover20Raw : null);
 

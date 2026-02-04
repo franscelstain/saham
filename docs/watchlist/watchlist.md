@@ -484,7 +484,7 @@ Bagian ini menambah guardrail operasional agar output stabil dan audit-able, tan
 
 Catatan penting (GL_POLICY_INPUT_MISSING):
 - Ini **bukan** Universe gate. Universe gate (EXCLUDE) hanya untuk missing yang bersifat global (mis. OHLCV invalid, lookback < 20 untuk dv20/indicator inti).
-- `GL_POLICY_INPUT_MISSING` artinya: ticker lolos Universe, tetapi policy aktif tidak bisa dinilai karena input policy tidak lengkap. Output tetap tampil sebagai `watch_only` untuk monitoring.
+- `GL_POLICY_INPUT_MISSING` artinya: ticker lolos Universe, tetapi policy aktif tidak bisa dinilai karena input policy tidak lengkap. Output tetap tampil sebagai `watch_only` untuk monitoring **selama** skor memenuhi `WATCH_ONLY_MIN_SCORE` (lihat Threshold defaults). Jika skor di bawah batas tersebut, ticker boleh **tidak ditampilkan** untuk mengurangi noise.
 
 #### 2) Corporate action / event risk (EOD-only, optional)
 Jika dataset menyediakan event/corporate-action (mis. `ex_date`, `rights_date`, `suspension_flag`):
@@ -497,6 +497,9 @@ Tanpa intraday hari ini, gap risk hanya boleh di-approx dari EOD historis jika m
 Jika dataset menyediakan metrik seperti `gap_pct_20_max` / `gap_rate_20` / `gap_open_prevclose_pct`:
 - Engine boleh menambah flag `GAP_RISK_HIGH` dan menurunkan ranking atau memindahkan ke `Avoid`.
 Jika metrik gap tidak tersedia → treat missing.
+
+
+> **Status implementasi saat ini (2026-02):** Guardrail `CA_EVENT_NEAR` dan `GAP_RISK_HIGH` **belum diaktifkan** di engine (no-op). Dokumen ini hanya mengunci **semantik** bila nanti diaktifkan.
 
 #### 4) Fee model / lot size / tick ladder (single source)
 - Lot size & tick ladder wajib single source (global config), dan semua modul harus pakai definisi yang sama.
