@@ -129,7 +129,8 @@ class WatchlistEngine
      * @param array{
      *   eod_date?:string|null,
      *   policy?:string|null,
-     *   capital_total?:int|float|string|null,
+     *   capital_idr?:int|float|string|null,
+     *   risk_per_trade_pct?:int|float|string|null,
      *   now_ts?:string|null
      * } $opts
      */
@@ -497,7 +498,7 @@ $netEdgePct = function(int $entry, int $lotSize, ?int $profitNet) {
     return round($profitNet / $cost, 4);
 };
 
-$capitalTotal = $opts['capital_total'] ?? null;
+$capitalTotal = $opts['capital_idr'] ?? ($opts['capital_total'] ?? null); // legacy fallback: capital_total
 
 $topPickIndices = [];
 foreach ($rows as $i => $r) {
@@ -1270,8 +1271,9 @@ $plan = [
 	{
 	    $recs = (array)($p['plan']['recommendations'] ?? []);
 	    $capital = null;
-	    if (isset($recs['capital_total']) && is_numeric($recs['capital_total'])) {
-	        $capital = (int)round((float)$recs['capital_total']);
+	    $capRaw = $recs['capital_idr'] ?? ($recs['capital_total'] ?? null); // legacy fallback
+	    if ($capRaw !== null && is_numeric($capRaw)) {
+	        $capital = (int)round((float)$capRaw);
 	    }
 	
 	    $mode = ($capital === null || $capital <= 0) ? 'A_NO_CAPITAL' : 'B_WITH_CAPITAL';
@@ -1375,8 +1377,8 @@ $plan = [
 	        'items' => array_values($items),
 	        'reasons' => $topReasons,
 	        'skipped' => array_values($skipped),
-	        'cash_remaining_idr' => ($canonicalReady && isset($recs['cash_remaining']) && is_numeric($recs['cash_remaining']))
-	            ? (int)round((float)$recs['cash_remaining'])
+	        'cash_remaining_idr' => ($canonicalReady && (isset($recs['cash_remaining_idr']) || isset($recs['cash_remaining'])) && is_numeric($recs['cash_remaining_idr'] ?? $recs['cash_remaining']))
+	            ? (int)round((float)($recs['cash_remaining_idr'] ?? $recs['cash_remaining']))
 	            : null,
 	    ];
 	}
@@ -3753,8 +3755,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 return [
                     'mode' => 'PLAN',
                     'risk_per_trade_pct' => $riskPct,
-                    'capital_total' => null,
-                    'cash_remaining' => null,
+                    'capital_idr' => null,
+                    'cash_remaining_idr' => null,
                     'max_positions_today' => (int)($policyMeta['max_positions_today'] ?? 0),
                     'allocations' => $allocsNoCap,
                     'skipped' => $skippedNoCap,
@@ -3766,8 +3768,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 return [
                     'mode' => $hasOpenPositions ? 'CARRY_ONLY' : 'NO_TRADE',
                     'risk_per_trade_pct' => $riskPct,
-                    'capital_total' => $capitalTotal,
-                    'cash_remaining' => $capitalTotal,
+                    'capital_idr' => $capitalTotal,
+                    'cash_remaining_idr' => $capitalTotal,
                     'max_positions_today' => 0,
                     'allocations' => [],
                     'skipped' => [],
@@ -3779,8 +3781,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 return [
                     'mode' => $mode,
                     'risk_per_trade_pct' => $riskPct,
-                    'capital_total' => $capitalTotal,
-                    'cash_remaining' => $capitalTotal,
+                    'capital_idr' => $capitalTotal,
+                    'cash_remaining_idr' => $capitalTotal,
                     'max_positions_today' => 0,
                     'allocations' => [],
                     'skipped' => [],
@@ -3795,8 +3797,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 return [
                     'mode' => $hasOpenPositions ? 'CARRY_ONLY' : 'NO_TRADE',
                     'risk_per_trade_pct' => $riskPct,
-                    'capital_total' => $capitalTotal,
-                    'cash_remaining' => $capitalTotal,
+                    'capital_idr' => $capitalTotal,
+                    'cash_remaining_idr' => $capitalTotal,
                     'max_positions_today' => 0,
                     'allocations' => [],
                     'skipped' => [],
@@ -3877,8 +3879,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 return [
                     'mode' => $hasOpenPositions ? 'CARRY_ONLY' : 'NO_TRADE',
                     'risk_per_trade_pct' => $riskPct,
-                    'capital_total' => $capitalTotal,
-                    'cash_remaining' => $capitalTotal,
+                    'capital_idr' => $capitalTotal,
+                    'cash_remaining_idr' => $capitalTotal,
                     'max_positions_today' => 0,
                     'allocations' => [],
                     'skipped' => $skipped,
@@ -4133,8 +4135,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             return [
                 'mode' => $mode,
                 'risk_per_trade_pct' => $riskPct,
-                'capital_total' => $capitalTotal,
-                'cash_remaining' => $cashRemaining,
+                'capital_idr' => $capitalTotal,
+                'cash_remaining_idr' => $cashRemaining,
                 // cap for the day (policy meta), not the count we managed to allocate
                 'max_positions_today' => $maxToday,
                 'allocations_count' => $nAlloc,

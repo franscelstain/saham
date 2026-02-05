@@ -33,7 +33,9 @@ Kolom:
 - `trade_date` (DATE): **tanggal eksekusi** (contract `meta.trade_date`).
 - `asof_eod_date` (DATE): **tanggal EOD** yang dipakai untuk membentuk kandidat (contract `meta.asof_eod_date`).
 - `canonical_ready` (BOOL): status kesiapan canonical EOD pada saat generate.
-- `source` (STRING): label sumber penyimpanan (default `preopen_contract_<policy>`).
+- `source` (STRING): label sumber penyimpanan.
+  - Default kolom (migration): `preopen_contract`
+  - Praktik Watchlist: `preopen_contract_<policy_lower>` (contoh: `preopen_contract_weekly_swing`) agar jelas per policy.
 - `generated_at` (DATETIME|null): waktu generate payload (best-effort).
 - `payload_json` (JSON): **payload preopen contract full**.
 - `created_at`, `updated_at`
@@ -203,6 +205,17 @@ Dipakai untuk:
 - filter valid/invalid (gate awal kandidat)
 
 **Diisi oleh:** pipeline Compute EOD (hasil compute indikator dari data canonical). Watchlist tidak mengubah.
+
+### `ticker_status_daily`
+Dipakai untuk filter/gate tambahan seperti status suspend, not-for-trade, atau flag lain yang menonaktifkan eksekusi untuk `trade_date` tertentu (dipakai oleh Universe/Global gate di WatchlistEngine).
+
+**Diisi oleh:** pipeline Market Data / corporate actions / manual seed (tergantung implementasi). Watchlist tidak mengubah.
+
+Kolom minimal yang dibaca (best-effort, lihat `App\Repositories\TickerStatusRepository`):
+- `ticker_id`
+- `asof_date` (DATE)
+- `status_code` (STRING) / flag status
+
 
 ### `market_calendar`
 Dipakai untuk:

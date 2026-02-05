@@ -32,7 +32,7 @@ class WatchlistService
      * @param array{
      *   eod_date?:string|null,
      *   policy?:string|null,
-     *   capital_total?:int|float|string|null,
+     *   capital_idr?:int|float|string|null,
      *   risk_per_trade_pct?:int|float|string|null,
      *   now_ts?:string|null
      * } $opts
