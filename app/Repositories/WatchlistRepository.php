@@ -273,6 +273,16 @@ class WatchlistRepository
             ->whereIn('trade_date', $prev3Dates)
             ->groupBy('ticker_id');
 
+        $ll10Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, MIN(low) as ll10')
+            ->whereIn('trade_date', $prev10Dates)
+            ->groupBy('ticker_id');
+
+        $ll50Sub = DB::table('ticker_ohlc_daily')
+            ->selectRaw('ticker_id, MIN(low) as ll50')
+            ->whereIn('trade_date', $prev50Dates)
+            ->groupBy('ticker_id');
+
         // Dividend Swing helper: highest_high(50) prior 50 trading days (exclude eodDate)
         $hh50Sub = DB::table('ticker_ohlc_daily')
             ->selectRaw('ticker_id, MAX(high) as hh50')
@@ -315,6 +325,12 @@ class WatchlistRepository
             })
             ->leftJoinSub($ll3Sub, 'll3', function ($j) {
                 $j->on('ll3.ticker_id', '=', 't.ticker_id');
+            })
+            ->leftJoinSub($ll10Sub, 'll10', function ($j) {
+                $j->on('ll10.ticker_id', '=', 't.ticker_id');
+            })
+            ->leftJoinSub($ll50Sub, 'll50', function ($j) {
+                $j->on('ll50.ticker_id', '=', 't.ticker_id');
             });
 
         if ($rocDate !== null) {
@@ -374,6 +390,8 @@ class WatchlistRepository
             // Intraday Light helpers
             DB::raw('hh10.hh10 as hh10'),
             DB::raw('ll3.ll3 as ll3'),
+            DB::raw('ll10.ll10 as ll10'),
+            DB::raw('ll50.ll50 as ll50'),
         ]);
 
         if ($rocDate !== null) {

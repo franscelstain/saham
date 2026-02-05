@@ -590,66 +590,196 @@ foreach ($rows as $i => $r) {
         continue;
     }
 
-    if ($policy === 'POSITION_TRADE') {
-        if ($entry === null || $sl === null || $tp1 === null) {
-            $rows[$i]['plan']['is_eligible_new_entry'] = false;
-            $rows[$i]['plan']['block_codes'][] = 'PT_LEVELS_INCOMPLETE';
-            $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
-            $rows[$i]['reason_codes'][] = 'PT_LEVELS_INCOMPLETE';
-            $rows[$i]['reason_codes'] = array_values(array_unique($rows[$i]['reason_codes']));
-            continue;
+        if ($policy === 'POSITION_TRADE') {
+            // Spec: docs/watchlist/policy/position_trade.md (LOCKED)
+
+            // Input minimum (PLAN, EOD-only)
+            $req = ['ma50','ma200','atr14','atr_pct','hh50','ll50','ll10','vol_ratio'];
+            if (!$requiredOk($req)) {
+                $reasonCodes[] = 'PT_DATA_INCOMPLETE';
+                $blockCodes[] = 'PT_DATA_INCOMPLETE';
+                $res = $this->policyRes(false, 0.0, 'WATCH_ONLY', 'Low', $reasonCodes, $blockCodes, $sizeAdj, $shiftEntryWindows);
+                $res['score_total'] = 0.0;
+                $res['setup_type'] = 'PULLBACK';
+                return $res;
+            }
+
+            $ma50  = (float)$x['ma50'];
+            $ma200 = (float)$x['ma200'];
+            $atr14 = (float)$x['atr14'];
+            $atrPctF = (float)$x['atr_pct'];
+            $hh50 = (float)$x['hh50'];
+            $ll50 = (float)$x['ll50'];
+            $ll10 = (float)$x['ll10'];
+            $volRatio = (float)$x['vol_ratio'];
+
+            // 2.1 Trend gate
+            $trendOk = ($close > $ma200 && $ma50 > $ma200);
+            if (!$trendOk) {
+                $reasonCodes[] = 'PT_TREND_NOT_OK';
+                $blockCodes[] = 'PT_TREND_NOT_OK';
+            }
+
+            // 2.3 Volatility feasibility
+            if ($atrPctF > 0.12) {
+                $reasonCodes[] = 'PT_VOL_TOO_HIGH';
+                $blockCodes[] = 'PT_VOL_TOO_HIGH';
+            }
+
+            // Candle helpers
+            $c = $x['candle'] ?? null;
+            $closePos = is_array($c) ? (float)($c['close_pos'] ?? 0.0) : 0.0;
+            $lowerWickPct = is_array($c) ? (float)($c['lower_wick_pct'] ?? 0.0) : 0.0;
+
+            // resistance/support helpers
+            $tick = (int)($x['tick'] ?? $this->tickRule->tickSize(max(1.0, $close)));
+            if ($tick <= 0) $tick = 1;
+
+            $res50 = $hh50 + (float)$tick; // resistance_50 = highest_high(50) + tick
+            $support10 = $ll10;            // support_10 = lowest_low(10)
+
+            // Setup type (LOCKED)
+            $setupType = ($close >= ($res50 - (float)$tick)) ? 'BREAKOUT' : 'PULLBACK';
+
+            // A.1 Breakout_50 validity
+            $breakoutValid = (
+                $close > $hh50
+                && $closePos >= 0.70
+                && $volRatio >= 1.30
+            );
+
+            // A.2 Pullback_to_MA50 validity
+            $pullbackValid = (
+                $trendOk
+                && $atr14 > 0
+                && abs($close - $ma50) <= (0.5 * $atr14)
+                && (float)($x['close'] ?? 0) > (float)($x['open'] ?? 0)
+                && $lowerWickPct >= 0.30
+                && $closePos >= 0.60
+            );
+
+            // 2.2 Setup gate
+            if (!$breakoutValid && !$pullbackValid) {
+                $reasonCodes[] = 'PT_NO_SETUP';
+                $blockCodes[] = 'PT_NO_SETUP';
+            }
+
+            // PLAN levels (locked)
+            $levels = $this->buildPositionTradeLevels($setupType, [
+                'close' => (float)($x['close'] ?? 0),
+                'low' => (float)($x['low'] ?? 0),
+                'hh50' => $hh50,
+                'll10' => $ll10,
+                'tick' => $tick,
+            ], 2.0, 3.0);
+
+            $entry = (int)($levels['entry_trigger_price'] ?? 0);
+            $sl    = (int)($levels['stop_loss_price'] ?? 0);
+            $tp1   = (int)($levels['tp1_price'] ?? 0);
+
+            // PLAN_INVALID checks
+            $R = $entry - $sl;
+            if ($R <= 0) {
+                return $this->policyRes(true, 0.0, 'WATCH_ONLY', 'Low', array_merge($reasonCodes, ['PT_R_INVALID_NONPOSITIVE']), ['PT_R_INVALID_NONPOSITIVE']);
+            }
+            if ($R < $tick) {
+                return $this->policyRes(true, 0.0, 'WATCH_ONLY', 'Low', array_merge($reasonCodes, ['PT_R_INVALID_LT_TICK']), ['PT_R_INVALID_LT_TICK']);
+            }
+            if ($tp1 <= $entry) {
+                return $this->policyRes(true, 0.0, 'WATCH_ONLY', 'Low', array_merge($reasonCodes, ['PT_TP1_NOT_ABOVE_ENTRY']), ['PT_TP1_NOT_ABOVE_ENTRY']);
+            }
+
+            $stopPct = ($entry > 0) ? ((float)$R / (float)$entry) : 1.0;
+            // 2.4 Stop feasibility
+            if ($stopPct > 0.12) {
+                $reasonCodes[] = 'PT_STOP_TOO_WIDE';
+                $blockCodes[] = 'PT_STOP_TOO_WIDE';
+            }
+
+            // 2.5 RR gate
+            $rrEst = ($tp1 - $entry) / (float)$R;
+            if ($rrEst < 2.0) {
+                $reasonCodes[] = 'PT_RR_TOO_LOW';
+                $blockCodes[] = 'PT_RR_TOO_LOW';
+            }
+
+            // 4) Risk Rules (Avoid)
+            if ($rsi !== null && (float)$rsi >= 80.0 && $volRatio >= 2.0 && $closePos >= 0.80) {
+                $reasonCodes[] = 'PT_BLOWOFF_RISK';
+                // Mark as hard lock (avoid group) using tradeability off downstream.
+                $blockCodes[] = 'PT_BLOWOFF_RISK';
+            }
+            $nearResPct = ($res50 > 0 && $close > 0) ? (($res50 - $close) / $close) : null;
+            if ($nearResPct !== null && $nearResPct <= 0.02) {
+                $reasonCodes[] = 'PT_NEAR_RESISTANCE';
+                $blockCodes[] = 'PT_NEAR_RESISTANCE';
+            }
+            if ($atrPctF > 0.15) {
+                $reasonCodes[] = 'PT_ATR_SHOCK';
+                $blockCodes[] = 'PT_ATR_SHOCK';
+            }
+
+            // --- Scoring (0..1) ---
+            $trendRatio = ($ma200 > 0) ? ($ma50 / $ma200) : 0.0;
+            $sTrend = $this->clamp01(($trendRatio - 0.95) / (1.10 - 0.95));
+
+            $dist = ($close > 0) ? (($res50 - $close) / $close) : 0.0;
+            // closer to breakout level is better; dist<=-0.02 => 1, dist>=0.03 => 0
+            $sStructure = $this->clamp01((0.03 - $dist) / (0.03 - (-0.02)));
+
+            $sPattern = 0.30;
+            if ($breakoutValid) {
+                $sPattern = 0.85;
+                if ($closePos >= 0.85) $sPattern = 0.95;
+            } elseif ($pullbackValid) {
+                $sPattern = 0.80;
+                if ($lowerWickPct >= 0.45 && $closePos >= 0.75) $sPattern = 0.90;
+            }
+
+            $sVolume = $this->clamp01(($volRatio - 1.0) / (3.0 - 1.0));
+
+            $sStop = 1.0 - $this->norm01((float)$stopPct, 0.01, 0.12);
+            $sAtr  = 1.0 - $this->norm01((float)$atrPctF, 0.01, 0.12);
+            $sRisk = $this->clamp01(0.5 * $sStop + 0.5 * $sAtr);
+
+            $scoreTotal = $this->clamp01(
+                0.30 * $sTrend
+                + 0.25 * $sStructure
+                + 0.15 * $sPattern
+                + 0.15 * $sVolume
+                + 0.15 * $sRisk
+            );
+
+            // Soft labels
+            if ($trendRatio >= 1.05) $reasonCodes[] = 'PT_TREND_STRONG';
+            if ($breakoutValid && $closePos >= 0.80) $reasonCodes[] = 'PT_CLOSE_STRONG';
+            if ($rsi !== null && (float)$rsi >= 78.0) $reasonCodes[] = 'PT_OVERHEAT';
+
+            $confidence = ($scoreTotal >= 0.75) ? 'High' : (($scoreTotal >= 0.55) ? 'Med' : 'Low');
+
+            // Execution mapping hint
+            $setupTypeForPlan = $setupType; // BREAKOUT | PULLBACK
+
+            $entryStyle = ($setupTypeForPlan === 'BREAKOUT') ? 'BREAKOUT' : 'PULLBACK';
+
+            $res = $this->policyRes(false, $scoreTotal * 100.0, $entryStyle, $confidence, $reasonCodes, $blockCodes, $sizeAdj, $shiftEntryWindows);
+            $res['score_total'] = $scoreTotal;
+            $res['setup_type'] = $setupTypeForPlan;
+            $res['levels'] = $levels;
+            $res['derived'] = [
+                'resistance_50' => (int)round($res50),
+                'support_10' => (int)round($support10),
+                'atr_pct' => round($atrPctF, 4),
+                'rr_est' => round($rrEst, 4),
+                'stop_pct' => round($stopPct, 4),
+                'trend_ratio' => round($trendRatio, 4),
+                'vol_ratio' => round($volRatio, 4),
+                'close_pos' => round($closePos, 4),
+            ];
+            return $res;
         }
-        $rval = $rr((int)$entry, (int)$sl, (int)$tp1);
-        if ($rval !== null && $rval < 2.0) {
-            $rows[$i]['reason_codes'][] = 'PT_MIN_TRADE_VIABILITY_FAIL';
-            $rows[$i]['reason_codes'] = array_values(array_unique($rows[$i]['reason_codes']));
-            // Hard-rule fail: keep ticker for monitoring (Watch Only), but block new entry.
-            $rows[$i]['plan']['is_eligible_new_entry'] = false;
-            $rows[$i]['plan']['block_codes'][] = 'PT_MIN_TRADE_VIABILITY_FAIL';
-            $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
-        }
-        continue;
-    }
-}
 
-// NOTE: Do not remove hard-rule fails. Mereka tetap ditampilkan untuk monitoring (Watch Only), sesuai docs/watchlist/watchlist.md.
-
-// Grouping per docs/watchlist/watchlist.md (pure EOD selection; no hard cap)
-$topPickMin = 0.70;
-$topPickGap = 0.08;
-$secondaryMin = 0.55;
-$watchMin = 0.35;
-
-// Q = lolos hard rules policy + tradeability enabled (docs/watchlist/watchlist.md)
-$qIdx = [];
-foreach ($rows as $i => $r0) {
-    $tradeable = (bool)($r0['plan']['is_tradeable'] ?? true);
-    $elig = (bool)($r0['plan']['is_eligible_new_entry'] ?? true);
-    $hardLocks = (array)($r0['plan']['hard_lock_codes'] ?? []);
-    if ($tradeable && $elig && empty($hardLocks)) {
-        $qIdx[] = $i;
-    }
-}
-
-$maxScoreQ = 0.0;
-foreach ($qIdx as $i) {
-    $maxScoreQ = max($maxScoreQ, (float)($rows[$i]['score_total'] ?? 0));
-}
-$scoreCutTop = !empty($qIdx) ? max($topPickMin, $maxScoreQ - $topPickGap) : $topPickMin;
-
-$topPickIndices = [];
-
-foreach ($rows as $i => $r) {
-    $tradeable = (bool)($r['plan']['is_tradeable'] ?? true);
-    $hardLocks = (array)($r['plan']['hard_lock_codes'] ?? []);
-
-    // Avoid guards (tradeability disabled) → groups.avoid
-    if (!$tradeable || !empty($hardLocks)) {
-        $rows[$i]['group'] = 'avoid';
-        continue;
-    }
-
-    // NO_TRADE policy → groups.no_trade (monitoring only)
+        // NO_TRADE policy → groups.no_trade (monitoring only)
     if (strtoupper((string)$policy) === 'NO_TRADE') {
         $rows[$i]['group'] = 'no_trade';
         continue;
@@ -1141,6 +1271,38 @@ $plan = [
 	    }
 	
 	    $mode = ($capital === null || $capital <= 0) ? 'A_NO_CAPITAL' : 'B_WITH_CAPITAL';
+	    $policy = (string)($p['policy']['selected'] ?? '');
+
+	    $topReasons = [];
+	    $skipped = [];
+	    if ($canonicalReady) {
+	        // Translate internal skipped rows to minimal RECO_* reason codes for UI audit.
+	        foreach ((array)($recs['skipped'] ?? []) as $s) {
+	            if (!is_array($s)) continue;
+	            $ticker = (string)($s['ticker_code'] ?? ($s['ticker'] ?? ''));
+	            if ($ticker === '') continue;
+	
+	            $rc = (string)($s['reason_code'] ?? '');
+	            $mapped = $this->mapRecoReasonCode($rc, $policy);
+	            $skipped[] = [
+	                'ticker' => $ticker,
+	                'reason' => [
+	                    'code' => $mapped,
+	                    'message' => $this->defaultRecoReasonMessage($mapped, $rc),
+	                    'severity' => 'WARN',
+	                ],
+	            ];
+	        }
+
+	        // Exposure cap reached (no new slots today).
+	        if (!empty($recs) && isset($recs['max_positions_today']) && (int)$recs['max_positions_today'] <= 0) {
+	            $topReasons[] = [
+	                'code' => 'RECO_TARGET_SLOTS_FULL',
+	                'message' => 'Exposure cap tercapai: tidak ada slot posisi baru untuk hari ini.',
+	                'severity' => 'WARN',
+	            ];
+	        }
+	    }
 	
 	    $items = [];
 	    if ($canonicalReady) {
@@ -1170,6 +1332,15 @@ $plan = [
 	            $stop = $plan ? (int)($plan['plan_stop'] ?? 0) : 0;
 	            $tp1 = $plan ? (int)($plan['plan_tp1'] ?? 0) : 0;
 
+	            $itemReasons = $ref ? (array)($ref['reasons'] ?? []) : [];
+	            if ($mode === 'A_NO_CAPITAL') {
+	                $itemReasons[] = [
+	                    'code' => 'RECO_CAPITAL_MISSING',
+	                    'message' => 'Mode A: capital tidak tersedia, lots/cost tidak dihitung.',
+	                    'severity' => 'INFO',
+	                ];
+	            }
+
 	            $items[] = [
 	                'ticker' => $ticker,
 	                'rank_ref' => $rankRef,
@@ -1181,7 +1352,7 @@ $plan = [
 	                'plan_entry' => $entry,
 	                'plan_stop' => $stop,
 	                'plan_tp1' => $tp1,
-	                'reasons' => $ref ? (array)($ref['reasons'] ?? []) : [],
+	                'reasons' => $itemReasons,
                 'execution_slices' => (isset($a['execution_slices']) && is_array($a['execution_slices']))
                     ? (array)$a['execution_slices']
                     : $this->buildExecutionSlices(
@@ -1198,10 +1369,42 @@ $plan = [
 	        'mode' => $mode,
 	        'capital_idr' => $capital,
 	        'items' => array_values($items),
+	        'reasons' => $topReasons,
+	        'skipped' => array_values($skipped),
 	        'cash_remaining_idr' => ($canonicalReady && isset($recs['cash_remaining']) && is_numeric($recs['cash_remaining']))
 	            ? (int)round((float)$recs['cash_remaining'])
 	            : null,
 	    ];
+	}
+
+	private function mapRecoReasonCode(string $reasonCode, string $policy): string
+	{
+	    $rc = strtoupper($reasonCode);
+	    if ($rc === 'GL_ALREADY_HELD') return 'RECO_ALREADY_HELD_SKIP';
+	
+	    // Policy-specific insufficient cash codes.
+	    if (strpos($rc, 'INSUFFICIENT_CASH') !== false) return 'RECO_INSUFFICIENT_CASH_MIN_LOT';
+
+	    // Blocked/lock codes.
+	    if ($rc === 'GL_HARD_LOCK' || strpos($rc, 'LOCK') !== false) return 'RECO_SKIPPED_BLOCKED';
+	    if (strpos($rc, 'BLOCK') !== false) return 'RECO_SKIPPED_BLOCKED';
+
+	    // Default: still treat as blocked.
+	    return 'RECO_SKIPPED_BLOCKED';
+	}
+
+	private function defaultRecoReasonMessage(string $mapped, string $raw): string
+	{
+	    switch ($mapped) {
+	        case 'RECO_ALREADY_HELD_SKIP':
+	            return 'Dilewati: sudah ada posisi terbuka.';
+	        case 'RECO_INSUFFICIENT_CASH_MIN_LOT':
+	            return 'Tidak feasible: cash tidak cukup untuk beli minimal 1 lot (setelah fee/slippage).';
+	        case 'RECO_SKIPPED_BLOCKED':
+	            return 'Tidak feasible: blocked/hard lock/tradeability false.';
+	        default:
+	            return 'Dilewati: '.$raw;
+	    }
 	}
 
 	/** @return array<string,mixed> */
@@ -3168,6 +3371,85 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             'tick_size' => $tickEntry > 0 ? $tickEntry : null,
         ];
     }
+
+    /**
+     * POSITION_TRADE deterministic levels (EOD-only).
+     * Spec: docs/watchlist/policy/position_trade.md
+     *
+     * - resistance_50 = hh50 + tick
+     * - entry:
+     *   - BREAKOUT: round_up(resistance_50)
+     *   - PULLBACK: round_up(close)
+     * - stop: round_down(min(low, ll10) - tick)
+     * - tp1_raw = entry + (minRR * (entry - stop))
+     * - cap TP1 (PULLBACK only): min(tp1_raw, resistance_50)
+     * - tp2 optional: entry + (tp2RMult * R)
+     */
+    private function buildPositionTradeLevels(string $setupType, array $ctx, float $minRr, float $tp2RMult): array
+    {
+        $close = (float)($ctx['close'] ?? 0);
+        $low   = (float)($ctx['low'] ?? 0);
+        $hh50  = $ctx['hh50'] ?? null;
+        $ll10  = $ctx['ll10'] ?? null;
+
+        if ($close <= 0 || $low <= 0) {
+            return [
+                'entry_trigger_price' => null,
+                'stop_loss_price' => null,
+                'tp1_price' => null,
+                'tp2_price' => null,
+                'tick_size' => null,
+            ];
+        }
+
+        $tick = (int)($ctx['tick'] ?? $this->tickRule->tickSize(max(1.0, $close)));
+        if ($tick <= 0) $tick = 1;
+
+        $res50 = null;
+        if ($hh50 !== null && is_numeric($hh50) && (float)$hh50 > 0) {
+            $res50 = (float)$hh50 + (float)$tick;
+        }
+
+        $isBreakout = (strcasecmp($setupType, 'BREAKOUT') === 0);
+
+        // Entry
+        if ($isBreakout && $res50 !== null) {
+            $entry = (float)$this->tickRule->roundUp($res50);
+        } else {
+            $entry = (float)$this->tickRule->roundUp($close);
+        }
+
+        // Stop
+        $minLow = $low;
+        if ($ll10 !== null && is_numeric($ll10) && (float)$ll10 > 0) {
+            $minLow = min($minLow, (float)$ll10);
+        }
+        $stopRaw = $minLow - (float)$tick;
+        $sl = (float)$this->tickRule->roundDown($stopRaw);
+
+        $tp1 = null;
+        $tp2 = null;
+        $R = $entry - $sl;
+        if ($entry > 0 && $sl > 0 && $R > 0) {
+            $tp1Raw = $entry + ($minRr * $R);
+            if (!$isBreakout && $res50 !== null) {
+                $tp1Raw = min($tp1Raw, (float)$res50);
+            }
+            $tp1 = (float)$this->tickRule->roundDown($tp1Raw);
+            $tp2 = (float)$this->tickRule->roundDown($entry + ($tp2RMult * $R));
+        }
+
+        $tickEntry = (int)$this->tickRule->tickSize(max(1.0, $entry));
+
+        return [
+            'entry_trigger_price' => (int)round($entry),
+            'stop_loss_price' => (int)round($sl),
+            'tp1_price' => $tp1 !== null ? (int)round((float)$tp1) : null,
+            'tp2_price' => $tp2 !== null ? (int)round((float)$tp2) : null,
+            'tick_size' => $tickEntry > 0 ? $tickEntry : null,
+        ];
+    }
+
 
 
 

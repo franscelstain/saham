@@ -62,7 +62,7 @@ class PreopenContractValidator
     private function validateRecommendations($r, string $path): void
     {
         $this->assertIsArray($r, $path);
-        $this->assertExactKeys($r, ['mode','capital_idr','items','cash_remaining_idr'], $path);
+        $this->assertExactKeys($r, ['mode','capital_idr','items','reasons','skipped','cash_remaining_idr'], $path);
 
         $this->assertIsString($r['mode'], $path.'.mode');
 
@@ -74,6 +74,27 @@ class PreopenContractValidator
         foreach ($r['items'] as $i => $it) {
             $this->validateRecommendationItem($it, $path.'.items['.$i.']');
         }
+
+        // recommendations-level reasons (e.g. exposure cap)
+        $this->assertIsArray($r['reasons'], $path.'.reasons');
+        foreach ($r['reasons'] as $i => $rs) {
+            $this->validateReason($rs, $path.'.reasons['.$i.']');
+        }
+
+        // skipped tickers for UI audit
+        $this->assertIsArray($r['skipped'], $path.'.skipped');
+        foreach ($r['skipped'] as $i => $s) {
+            $this->validateRecommendationSkip($s, $path.'.skipped['.$i.']');
+        }
+    }
+
+    private function validateRecommendationSkip($s, string $path): void
+    {
+        $this->assertIsArray($s, $path);
+        $this->assertExactKeys($s, ['ticker','reason'], $path);
+
+        $this->assertIsString($s['ticker'], $path.'.ticker');
+        $this->validateReason($s['reason'], $path.'.reason');
     }
 
     private function validateConfirm($c, string $path): void

@@ -95,6 +95,9 @@ Catatan: `score_total` adalah float dalam range **[0..1]**.
 {
   "mode": "A_NO_CAPITAL|B_WITH_CAPITAL",
   "capital_idr": 5000000,
+  "reasons": [
+    {"code":"RECO_TARGET_SLOTS_FULL","message":"...","severity":"WARN"}
+  ],
   "items": [
     {
       "ticker": "BBRI",
@@ -120,6 +123,12 @@ Catatan: `score_total` adalah float dalam range **[0..1]**.
           "reason": {"code":"WS_TRANCHE1","message":"...","severity":"INFO"}
         }
       ]
+    }
+  ],
+  "skipped": [
+    {
+      "ticker": "BBRI",
+      "reason": {"code":"RECO_ALREADY_HELD_SKIP","message":"...","severity":"WARN"}
     }
   ],
   "cash_remaining_idr": 0

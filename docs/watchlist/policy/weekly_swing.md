@@ -136,18 +136,19 @@ Semua sub-score dihitung 0..1 dan di-clamp.
 
 `score_total = clamp(Σ(w_i*s_i), 0, 1)`
 
-## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED, dynamic)
+## Execution slices (EOD-only) (LOCKED)
 
-Policy ini memakai rule global **EOD_TRANCHE_RULE_V1** (lihat `watchlist.md` → Mini strategy).
-Mapping profile → tranche pct (2 tranche):
-- `CONSERVATIVE`: 50/50
-- `DEFAULT`: 60/40
-- `AGGRESSIVE`: 70/30
+Konsep “mini strategy” **tidak** lagi memakai field `mini_tranches_*`.
+Ia dipresentasikan sebagai `ticker_plan.execution_slices[]` (lihat kontrak schema di `docs/watchlist/preopen.md`).
 
-Timing hint (LOCKED): tranche1 `09:20`, tranche2 `10:30`.
+Yang dikunci di policy ini hanya **semantik** (schema dirujuk ke `preopen.md`, tidak didobel di sini):
+- `execution_slices` adalah **template** berbasis persentase (fraction 0..1).
+- `execution_slices[].lots` **hanya** boleh terisi untuk ticker yang masuk `recommendations.items[]` saat Mode B (capital tersedia).
 
-Catatan:
-- `mini_tranches_lots` hanya boleh muncul jika ticker ada di `recommendations` (copy dari `recommendations.tranches`).
+Execution mode default mengikuti global rules di `docs/watchlist/watchlist.md` (section “Execution mode”):
+- Weekly Swing:
+  - BREAKOUT → 2 tranche (60/40)
+  - PULLBACK → 3 tranche (50/30/20)
 
 ## Invalidation & monitoring (EOD-only)
 - Setelah entry terjadi, posisi invalid jika daily close <= plan_stop (exit by stop, EOD-only).

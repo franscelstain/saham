@@ -261,18 +261,24 @@ Validasi:
 Default parameter:
 - `PT_TP2_R_MULT = 3.0`
 
-## Mini strategy (Top Picks & Secondary) (EOD-only) (LOCKED, dynamic)
+## Execution slices (Top Picks & Secondary) (EOD-only) (LOCKED)
 
-Policy ini memakai rule global **EOD_TRANCHE_RULE_V1** (lihat `watchlist.md` → Mini strategy).
-Mapping profile → tranche pct (2 tranche):
-- `CONSERVATIVE`: 50/50
-- `DEFAULT`: 60/40
-- `AGGRESSIVE`: 70/30
+Policy ini **tidak** memakai `mini_strategy` / `mini_tranches_*` lagi.
 
-Timing hint (LOCKED): tranche1 `09:20`, tranche2 `10:30`.
+- Bentuk eksekusi memakai kontrak global: `ticker_plan.execution_slices[]`.
+- Struktur output (schema) **tidak didobel di policy**. Lihat `docs/watchlist/preopen.md`.
 
-Catatan:
-- `mini_tranches_lots` hanya boleh muncul jika ticker ada di `recommendations` (copy dari `recommendations.tranches`).
+Mapping setup → profile (dipakai oleh engine Recommendations):
+- `setup_type = BREAKOUT` → 2 slice **60/40**
+- `setup_type = PULLBACK` → 3 slice **50/30/20**
+
+Aturan lot:
+- `execution_slices[].lots` hanya boleh terisi untuk ticker yang masuk `recommendations.items[]` (Mode B, ada capital).
+- Selain itu `lots = null` (template saja).
+
+Timing hint (non-binding):
+- slice pertama: `09:20`
+- slice berikutnya: `10:30` (dan `13:30` jika 3-slice)
 
 ## Invalidation & monitoring (EOD-only)
 - Setelah entry: invalid jika daily close <= plan_stop (EOD-only).
