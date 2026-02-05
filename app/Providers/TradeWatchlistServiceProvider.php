@@ -7,6 +7,7 @@ use App\Support\SystemClock;
 use App\Trade\Watchlist\Contracts\PolicyDocLocator;
 use App\Trade\Watchlist\Config\ScorecardConfig;
 use App\Trade\Watchlist\Services\FsPolicyDocLocator;
+use App\Trade\Watchlist\WatchlistPolicyCodes;
 use Illuminate\Support\ServiceProvider;
 
 class TradeWatchlistServiceProvider extends ServiceProvider
@@ -24,11 +25,11 @@ class TradeWatchlistServiceProvider extends ServiceProvider
                 $root,
                 $strict,
                 [
-                    'WEEKLY_SWING' => 'weekly_swing.md',
-                    'DIVIDEND_SWING' => 'dividend_swing.md',
-                    'INTRADAY_LIGHT' => 'intraday_light.md',
-                    'POSITION_TRADE' => 'position_trade.md',
-                    'NO_TRADE' => 'no_trade.md',
+                    WatchlistPolicyCodes::WEEKLY_SWING   => 'weekly_swing.md',
+                    WatchlistPolicyCodes::DIVIDEND_SWING => 'dividend_swing.md',
+                    WatchlistPolicyCodes::INTRADAY_LIGHT => 'intraday_light.md',
+                    WatchlistPolicyCodes::POSITION_TRADE => 'position_trade.md',
+                    WatchlistPolicyCodes::NO_TRADE       => 'no_trade.md',
                 ]
             );
         });

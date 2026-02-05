@@ -168,7 +168,7 @@ public function buildInternal(array $opts = []): array
             $requestedPolicy = strtoupper($this->cfg->policyDefault());
         }
 
-        $allowedPolicies = ['WEEKLY_SWING','DIVIDEND_SWING','INTRADAY_LIGHT','POSITION_TRADE','NO_TRADE'];
+        $allowedPolicies = \App\Trade\Watchlist\WatchlistPolicyCodes::all();
         if (!in_array($requestedPolicy, $allowedPolicies, true)) {
             $requestedPolicy = 'WEEKLY_SWING';
         }

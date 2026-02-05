@@ -28,7 +28,9 @@ class CreateTickersTable extends Migration
         // Optional tapi lebih "mirip" DDL kamu:
         // kalau kamu mau updated_at auto-update saat row diupdate (MySQL ON UPDATE CURRENT_TIMESTAMP)
         // Laravel tidak set ini otomatis di schema builder lama, jadi pakai raw SQL.
-        DB::statement("ALTER TABLE `tickers` MODIFY `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+        if (DB::getDriverName() === "mysql") {
+            DB::statement("ALTER TABLE `tickers` MODIFY `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+        }
     }
 
     /**
