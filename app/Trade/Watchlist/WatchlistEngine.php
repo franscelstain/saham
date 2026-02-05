@@ -781,37 +781,100 @@ foreach ($rows as $i => $r) {
             return $res;
         }
 
-        // NO_TRADE policy → groups.no_trade (monitoring only)
-    if (strtoupper((string)$policy) === 'NO_TRADE') {
-        $rows[$i]['group'] = 'no_trade';
-        continue;
+        // Grouping semantics (LOCKED) per docs/watchlist/watchlist.md
+        // NOTE: We only set provisional flags here; final grouping is computed after this loop
+        // because it depends on S0 (top score) from Q.
+        if (strtoupper((string)$policy) === 'NO_TRADE') {
+            $rows[$i]['group'] = 'no_trade';
+            continue;
+        }
+
+        $elig = (bool)($r['plan']['is_eligible_new_entry'] ?? true);
+        $tradeDisabled = (bool)($r['timing']['trade_disabled'] ?? false);
+
+        if ($tradeDisabled) {
+            $rows[$i]['group'] = 'avoid';
+            continue;
+        }
+
+        // candidate: passed policy hard rules (eligible for new entry) and tradeability enabled
+        $rows[$i]['group'] = $elig ? 'candidate' : 'watch_candidate';
     }
 
-    $elig = (bool)($r['plan']['is_eligible_new_entry'] ?? true);
-    $st = (float)($r['score_total'] ?? 0);
+    // ---- Final grouping pass (LOCKED) ----
+    // U = all rows (already Universe-passed).
+    // Q = rows where group == 'candidate' (policy hard rules pass) and tradeability enabled.
 
-    if ($elig) {
-        if ($st >= $scoreCutTop) {
-            $rows[$i]['group'] = 'top_picks';
-            $topPickIndices[] = $i;
-            continue;
-        }
-        if ($st >= $secondaryMin) {
-            $rows[$i]['group'] = 'secondary';
-            continue;
-        }
-        if ($st >= $watchMin) {
-            $rows[$i]['group'] = 'watch_only';
-            continue;
-        }
-        // Below WATCH_ONLY_MIN_SCORE: exclude from groups output (docs/watchlist/watchlist.md).
-        $rows[$i]['group'] = 'excluded';
-        continue;
+    $TOPPICK_MIN_SCORE = 0.70;
+    $TOPPICK_SCORE_GAP = 0.08;
+    $SECONDARY_MIN_SCORE = 0.55;
+    $WATCH_ONLY_MIN_SCORE = 0.35;
+
+    $qIdx = [];
+    foreach ($rows as $idx => $rrr) {
+        if ((string)($rrr['group'] ?? '') === 'candidate') $qIdx[] = (int)$idx;
     }
 
-    // Failed hard rules policy: may appear as watch_only only if score meets WATCH_ONLY_MIN_SCORE.
-    $rows[$i]['group'] = ($st >= $watchMin) ? 'watch_only' : 'excluded';
-}
+    // Sort Q (LOCKED): score desc, dv20 desc, atr_pct asc, tick_pct asc, ticker_code asc
+    $cmpQ = function(int $a, int $b) use ($rows): int {
+        $ra = $rows[$a];
+        $rb = $rows[$b];
+        $sa = (isset($ra['score_total']) && is_numeric($ra['score_total'])) ? (float)$ra['score_total'] : -INF;
+        $sb = (isset($rb['score_total']) && is_numeric($rb['score_total'])) ? (float)$rb['score_total'] : -INF;
+        if ($sa != $sb) return ($sa > $sb) ? -1 : 1;
+
+        $dva = (isset($ra['derived']['dv20_idr']) && is_numeric($ra['derived']['dv20_idr'])) ? (float)$ra['derived']['dv20_idr'] : -INF;
+        $dvb = (isset($rb['derived']['dv20_idr']) && is_numeric($rb['derived']['dv20_idr'])) ? (float)$rb['derived']['dv20_idr'] : -INF;
+        if ($dva != $dvb) return ($dva > $dvb) ? -1 : 1;
+
+        $atra = (isset($ra['derived']['atr_pct']) && is_numeric($ra['derived']['atr_pct'])) ? (float)$ra['derived']['atr_pct'] : INF;
+        $atrb = (isset($rb['derived']['atr_pct']) && is_numeric($rb['derived']['atr_pct'])) ? (float)$rb['derived']['atr_pct'] : INF;
+        if ($atra != $atrb) return ($atra < $atrb) ? -1 : 1;
+
+        $tpa = (isset($ra['derived']['tick_pct']) && is_numeric($ra['derived']['tick_pct'])) ? (float)$ra['derived']['tick_pct'] : INF;
+        $tpb = (isset($rb['derived']['tick_pct']) && is_numeric($rb['derived']['tick_pct'])) ? (float)$rb['derived']['tick_pct'] : INF;
+        if ($tpa != $tpb) return ($tpa < $tpb) ? -1 : 1;
+
+        $ca = (string)($ra['ticker_code'] ?? '');
+        $cb = (string)($rb['ticker_code'] ?? '');
+        return strcmp($ca, $cb);
+    };
+
+    $S0 = null;
+    $topCut = $TOPPICK_MIN_SCORE;
+    if (!empty($qIdx)) {
+        usort($qIdx, $cmpQ);
+        $best = $rows[$qIdx[0]];
+        $S0 = (isset($best['score_total']) && is_numeric($best['score_total'])) ? (float)$best['score_total'] : 0.0;
+        $topCut = max($TOPPICK_MIN_SCORE, $S0 - $TOPPICK_SCORE_GAP);
+    }
+
+    $topPickIndices = [];
+    foreach ($rows as $idx => $rrr) {
+        $g = (string)($rrr['group'] ?? 'watch_candidate');
+        if ($g === 'no_trade' || $g === 'avoid') {
+            // keep
+            continue;
+        }
+
+        $st = (isset($rrr['score_total']) && is_numeric($rrr['score_total'])) ? (float)$rrr['score_total'] : 0.0;
+
+        if ($g === 'candidate') {
+            if ($st >= $topCut) {
+                $rows[$idx]['group'] = 'top_picks';
+                $topPickIndices[] = (int)$idx;
+            } elseif ($st >= $SECONDARY_MIN_SCORE) {
+                $rows[$idx]['group'] = 'secondary';
+            } elseif ($st >= $WATCH_ONLY_MIN_SCORE) {
+                $rows[$idx]['group'] = 'watch_only';
+            } else {
+                $rows[$idx]['group'] = 'excluded';
+            }
+        } else {
+            // watch_candidate: failed hard rules; still can appear as watch_only if score meets WATCH_ONLY_MIN_SCORE
+            $rows[$idx]['group'] = ($st >= $WATCH_ONLY_MIN_SCORE) ? 'watch_only' : 'excluded';
+        }
+    }
 
 // Recommendations (allocations) use top-picks as the universe, but do NOT cap top-picks.
 $recs = $this->buildRecommendations(
