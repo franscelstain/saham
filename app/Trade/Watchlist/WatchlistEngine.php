@@ -810,6 +810,11 @@ foreach ($rows as $i => $r) {
     $SECONDARY_MIN_SCORE = 0.55;
     $WATCH_ONLY_MIN_SCORE = 0.35;
 
+    // Recommendations cutoff (LOCKED) per docs/watchlist/watchlist.md
+    // cut = max(MIN_RECO_SCORE, S0 - RECO_SCORE_GAP)
+    $MIN_RECO_SCORE = 0.70;
+    $RECO_SCORE_GAP = 0.05;
+
     $qIdx = [];
     foreach ($rows as $idx => $rrr) {
         if ((string)($rrr['group'] ?? '') === 'candidate') $qIdx[] = (int)$idx;
@@ -849,6 +854,19 @@ foreach ($rows as $i => $r) {
         $topCut = max($TOPPICK_MIN_SCORE, $S0 - $TOPPICK_SCORE_GAP);
     }
 
+    // Recommendation pool (LOCKED): use Q and apply cutoff.
+    // Q already excludes avoid/no_trade and includes only eligible "candidate" rows.
+    $recoCut = max($MIN_RECO_SCORE, (($S0 !== null) ? ($S0 - $RECO_SCORE_GAP) : $MIN_RECO_SCORE));
+    $recoIndices = [];
+    foreach ($qIdx as $idx) {
+        $rrr = $rows[$idx] ?? null;
+        if (!$rrr) continue;
+        $st = (isset($rrr['score_total']) && is_numeric($rrr['score_total'])) ? (float)$rrr['score_total'] : 0.0;
+        if ($st >= $recoCut) {
+            $recoIndices[] = (int)$idx;
+        }
+    }
+
     $topPickIndices = [];
     foreach ($rows as $idx => $rrr) {
         $g = (string)($rrr['group'] ?? 'watch_candidate');
@@ -876,7 +894,7 @@ foreach ($rows as $i => $r) {
         }
     }
 
-// Recommendations (allocations) use top-picks as the universe, but do NOT cap top-picks.
+// Recommendations (allocations) use reco pool (Q + cutoff) per docs/watchlist/watchlist.md.
 $recs = $this->buildRecommendations(
     $policy,
     $policyMeta,
@@ -884,7 +902,7 @@ $recs = $this->buildRecommendations(
     $openPositions,
     $capitalTotal,
     $rows,
-    $topPickIndices
+    $recoIndices
 );
 
 // Build groups (LOCKED keys: top_picks, secondary, watch_only, avoid, no_trade)
@@ -3950,7 +3968,16 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 ];
             }
 
-            // Initial selection = first N in pool.
+            // Allocation pool ordering (LOCKED, docs/watchlist/watchlist.md):
+            // 1) score_total desc
+            // 2) plan.rr_est desc
+            // 3) plan.stop_pct asc
+            // 4) dv20_idr desc
+            // 5) atr_pct asc
+            // 6) ticker_code asc
+            $poolIdx = $this->sortAllocationPoolIndices($poolIdx, $candidates);
+
+            // Initial selection = first N in sorted pool.
             $selectedIdx = array_slice($poolIdx, 0, $target);
             $nextPoolPos = count($selectedIdx);
 
@@ -4270,6 +4297,57 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
     {
         $res = $this->policyDocs->check($policy);
         return (bool) $res->ok;
+    }
+
+    /**
+     * Sort pool indices for capital allocation ordering.
+     *
+     * LOCKED (docs/watchlist/watchlist.md):
+     * 1) score_total desc
+     * 2) plan.rr_est desc
+     * 3) plan.stop_pct asc
+     * 4) dv20_idr desc
+     * 5) atr_pct asc
+     * 6) ticker_code asc
+     *
+     * @param int[] $indices
+     * @param array<int,array<string,mixed>> $candidates
+     * @return int[]
+     */
+    private function sortAllocationPoolIndices(array $indices, array $candidates): array
+    {
+        $indices = array_values($indices);
+
+        usort($indices, function ($ia, $ib) use ($candidates): int {
+            $a = $candidates[$ia] ?? [];
+            $b = $candidates[$ib] ?? [];
+
+            $scoreA = (float)($a['derived']['score_total'] ?? 0.0);
+            $scoreB = (float)($b['derived']['score_total'] ?? 0.0);
+            if ($scoreA !== $scoreB) return ($scoreA > $scoreB) ? -1 : 1;
+
+            $rrA = (float)($a['plan']['rr_est'] ?? 0.0);
+            $rrB = (float)($b['plan']['rr_est'] ?? 0.0);
+            if ($rrA !== $rrB) return ($rrA > $rrB) ? -1 : 1;
+
+            $stopA = (float)($a['plan']['stop_pct'] ?? 999.0);
+            $stopB = (float)($b['plan']['stop_pct'] ?? 999.0);
+            if ($stopA !== $stopB) return ($stopA < $stopB) ? -1 : 1;
+
+            $dvA = (float)($a['derived']['dv20_idr'] ?? 0.0);
+            $dvB = (float)($b['derived']['dv20_idr'] ?? 0.0);
+            if ($dvA !== $dvB) return ($dvA > $dvB) ? -1 : 1;
+
+            $atrA = (float)($a['derived']['atr_pct'] ?? 999.0);
+            $atrB = (float)($b['derived']['atr_pct'] ?? 999.0);
+            if ($atrA !== $atrB) return ($atrA < $atrB) ? -1 : 1;
+
+            $tkA = (string)($a['ticker_code'] ?? '');
+            $tkB = (string)($b['ticker_code'] ?? '');
+            return strcmp($tkA, $tkB);
+        });
+
+        return $indices;
     }
 
     /**
