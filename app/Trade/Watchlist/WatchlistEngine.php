@@ -498,7 +498,7 @@ $netEdgePct = function(int $entry, int $lotSize, ?int $profitNet) {
     return round($profitNet / $cost, 4);
 };
 
-$capitalTotal = $opts['capital_idr'] ?? ($opts['capital_total'] ?? null); // legacy fallback: capital_total
+$capitalTotal = $opts['capital_idr'] ?? null; // strict: docs use capital_idr
 
 $topPickIndices = [];
 foreach ($rows as $i => $r) {
@@ -512,7 +512,7 @@ foreach ($rows as $i => $r) {
     $lotSize = (int)($sizing['lot_size'] ?? 100);
 
     if ($policy === 'WEEKLY_SWING') {
-        // WeeklySwing: evaluate viability when capital_total is provided.
+        // WeeklySwing: evaluate viability when capital_idr is provided.
         $rows[$i]['plan']['trade_viability']['evaluated'] = ($capitalTotal !== null);
         if ($capitalTotal === null) {
             $rows[$i]['plan']['trade_viability']['is_viable'] = null;
@@ -1352,7 +1352,7 @@ $plan = [
 	{
 	    $recs = (array)($p['plan']['recommendations'] ?? []);
 	    $capital = null;
-	    $capRaw = $recs['capital_idr'] ?? ($recs['capital_total'] ?? null); // legacy fallback
+	    $capRaw = $recs['capital_idr'] ?? null; // strict
 	    if ($capRaw !== null && is_numeric($capRaw)) {
 	        $capital = (int)round((float)$capRaw);
 	    }

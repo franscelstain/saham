@@ -36,7 +36,7 @@ class WatchlistPreopenBuildRegressionTest extends TestCase
         $doc = $engine->buildPreopen([
             'policy' => 'WEEKLY_SWING',
             'eod_date' => '2026-01-30',
-            'capital_total' => 10_000_000,
+            'capital_idr' => 10_000_000,
             'now_ts' => '2026-02-03T08:00:00+07:00',
         ]);
 
@@ -61,7 +61,7 @@ class WatchlistPreopenBuildRegressionTest extends TestCase
         $doc = $engine->buildPreopen([
             'policy' => 'WEEKLY_SWING',
             'eod_date' => '2026-01-30',
-            'capital_total' => 10_000_000,
+            'capital_idr' => 10_000_000,
             'now_ts' => '2026-02-03T08:00:00+07:00',
         ]);
 

@@ -29,7 +29,7 @@
     "mode": "NO_TRADE",
     "max_positions_today": 0,
     "risk_per_trade_pct": 1.0,
-    "capital_total": 10000000,
+    "capital_idr": 10000000,
     "allocations": []
   },
   "groups": {

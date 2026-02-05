@@ -20,7 +20,7 @@ class WatchlistLotSizingRegressionTest extends TestCase
     {
         $payload = $this->loadFixture('sample_weekly_swing_buy1.json');
 
-        $capital = (int) $payload['recommendations']['capital_total'];
+        $capital = (int) $payload['recommendations']['capital_idr'];
         $allocs = $payload['recommendations']['allocations'];
         $this->assertCount(1, $allocs);
 
