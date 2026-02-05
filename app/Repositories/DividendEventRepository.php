@@ -44,44 +44,6 @@ class DividendEventRepository
         return $out;
     }
 
-
-    /**
-     * Next upcoming dividend event per ticker (nearest ex_date >= $fromDate).
-     * Used so DIVIDEND_SWING can distinguish EVENT_MISSING vs OUTSIDE_WINDOW.
-     *
-     * @return array<int,array{ticker_id:int,cum_date:string|null,ex_date:string|null,cash_dividend:float|null,dividend_yield_est:float|null}>
-     */
-    public function nextEventsByTicker(string $fromDate): array
-    {
-        if (!$this->tableExists('ticker_dividend_events')) {
-            return [];
-        }
-
-        $rows = DB::table('ticker_dividend_events')
-            ->whereNotNull('ex_date')
-            ->where('ex_date', '>=', $fromDate)
-            ->orderBy('ex_date')
-            ->get();
-
-        $out = [];
-        foreach ($rows as $r) {
-            $tid = (int)($r->ticker_id ?? 0);
-            if ($tid <= 0) continue;
-            if (!isset($out[$tid]) || ((string)$r->ex_date) < (string)$out[$tid]['ex_date']) {
-                $out[$tid] = [
-                    'ticker_id' => $tid,
-                    'cum_date' => $r->cum_date ? (string)$r->cum_date : null,
-                    'ex_date' => $r->ex_date ? (string)$r->ex_date : null,
-                    'cash_dividend' => isset($r->cash_dividend) ? (float)$r->cash_dividend : null,
-                    'dividend_yield_est' => isset($r->dividend_yield_est) ? (float)$r->dividend_yield_est : null,
-                ];
-            }
-        }
-
-        return $out;
-    }
-
-
     private function tableExists(string $table): bool
     {
         try {

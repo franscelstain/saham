@@ -205,7 +205,21 @@ class ExecutionEligibilityEvaluator
             return $this->resultReject($ticker, ['CF_SPREAD_TOO_WIDE'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
         }
 
-        // BREAKOUT strict rule: lower bound (last >= entry) + upper band (last <= entry*(1+band))
+        
+        // Optional order book depth guard (if live provides depth and policy enables it).
+        $minDepthLots = (int)($guards['min_depth_lots'] ?? $this->cfg->minDepthLotsDefault);
+        if ($minDepthLots > 0 && $live) {
+            $bidDepth = $live->bidDepthLots;
+            $askDepth = $live->askDepthLots;
+            if ($bidDepth !== null && $askDepth !== null) {
+                $minSide = min((int)$bidDepth, (int)$askDepth);
+                if ($minSide < $minDepthLots) {
+                    return $this->resultReject($ticker, ['CF_BOOK_TOO_THIN'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
+                }
+            }
+        }
+
+// BREAKOUT strict rule: lower bound (last >= entry) + upper band (last <= entry*(1+band))
         $setup = strtoupper(trim((string)($planBlock['setup_type'] ?? '')));
         $bandPct = (float)($guards['breakout_band_pct'] ?? 0.0);
         if ($setup === 'BREAKOUT') {
@@ -225,12 +239,27 @@ class ExecutionEligibilityEvaluator
 
         foreach ($slices as $slice) {
             if (!is_array($slice)) continue;
-            $tranche = (int)($slice['tranche'] ?? 0);
-            $lots = (int)($slice['lots'] ?? 0);
-            $planLimit = isset($slice['plan_limit_price']) ? (float)$slice['plan_limit_price'] : 0.0;
-            $planCap = isset($slice['plan_price_cap']) ? (float)$slice['plan_price_cap'] : 0.0;
 
-            if ($tranche <= 0 || $lots <= 0 || $planLimit <= 0) {
+            $n = (int)($slice['tranche'] ?? ($slice['n'] ?? 0));
+            $lots = (int)($slice['lots'] ?? 0);
+            $planLimit = isset($slice['plan_limit_price']) ? (float)$slice['plan_limit_price'] : (isset($slice['plan_limit']) ? (float)$slice['plan_limit'] : 0.0);
+            $planCap = isset($slice['plan_price_cap']) ? (float)$slice['plan_price_cap'] : (isset($slice['plan_cap']) ? (float)$slice['plan_cap'] : 0.0);
+
+            if ($n <= 0 || $lots <= 0 || $planLimit <= 0) {
+                $orders[] = [
+                    'n' => max(1, $n),
+                    'action' => 'SKIP',
+                    'recommended_limit_price' => null,
+                    'plan_limit_price' => $planLimit > 0 ? $planLimit : null,
+                    'plan_price_cap' => $planCap > 0 ? $planCap : null,
+                    'lots' => $lots > 0 ? $lots : null,
+                    'reasons' => $this->reasonsFromCodes(['CF_TRANCHE_SKIPPED']),
+                    'inputs_used' => [
+                        'ask_best' => $ask,
+                        'spread_pct' => $computed['spread_pct'],
+                        'snapshot_age_sec' => $computed['snapshot_age_sec'],
+                    ],
+                ];
                 continue;
             }
 
@@ -240,13 +269,15 @@ class ExecutionEligibilityEvaluator
                 $hasWait = true;
                 $waitReason = $waitReason ?: 'CF_CHASE_BLOCK';
                 $orders[] = [
-                    'tranche' => $tranche,
-                    'lots' => $lots,
+                    'n' => $n,
                     'action' => 'WAIT',
-                    'reason_code' => 'CF_CHASE_BLOCK',
                     'recommended_limit_price' => null,
+                    'plan_limit_price' => $planLimit,
+                    'plan_price_cap' => $cap,
+                    'lots' => $lots,
+                    'reasons' => $this->reasonsFromCodes(['CF_CHASE_BLOCK']),
                     'inputs_used' => [
-                        'ask1' => $ask,
+                        'ask_best' => $ask,
                         'plan_price_cap' => $cap,
                         'plan_limit_price' => $planLimit,
                         'spread_pct' => $computed['spread_pct'],
@@ -257,15 +288,28 @@ class ExecutionEligibilityEvaluator
             }
 
             $limit = $this->clampLimitPrice($ask, $cap, $planLimit);
+
+            $reasonCodes = [];
+            if (abs($limit - $ask) < 0.0000001) {
+                $reasonCodes[] = 'CF_PRICE_AT_ASK1_WITHIN_CAP';
+            } else {
+                // audit clamp reasons
+                if ($cap > 0 && $cap < $ask && abs($limit - $cap) < 0.0000001) $reasonCodes[] = 'CF_PRICE_CLAMPED_TO_CAP';
+                if ($planLimit > 0 && $planLimit < $ask && abs($limit - $planLimit) < 0.0000001) $reasonCodes[] = 'CF_PRICE_CLAMPED_TO_PLAN_LIMIT';
+                if (empty($reasonCodes)) $reasonCodes[] = 'CF_PRICE_AT_ASK1_WITHIN_CAP';
+            }
+
             $hasPlace = true;
             $orders[] = [
-                'tranche' => $tranche,
-                'lots' => $lots,
+                'n' => $n,
                 'action' => 'PLACE_LIMIT',
-                'reason_code' => 'CF_PRICE_AT_ASK1_WITHIN_CAP',
                 'recommended_limit_price' => $limit,
+                'plan_limit_price' => $planLimit,
+                'plan_price_cap' => $cap,
+                'lots' => $lots,
+                'reasons' => $this->reasonsFromCodes($reasonCodes),
                 'inputs_used' => [
-                    'ask1' => $ask,
+                    'ask_best' => $ask,
                     'plan_price_cap' => $cap,
                     'plan_limit_price' => $planLimit,
                     'spread_pct' => $computed['spread_pct'],
@@ -323,7 +367,7 @@ class ExecutionEligibilityEvaluator
             if ($act === 'PLACE_LIMIT') {
                 $o['action'] = 'WAIT';
                 $o['recommended_limit_price'] = null;
-                $o['reason_code'] = 'CF_DECISION_NOT_APPROVE';
+                $o['reasons'] = $this->reasonsFromCodes(['CF_DECISION_NOT_APPROVE']);
             }
             $out[] = $o;
         }

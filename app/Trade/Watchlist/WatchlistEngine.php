@@ -273,13 +273,12 @@ public function buildInternal(array $opts = []): array
         // Load datasets used both by router & candidate rules
         $intradayByTicker = $this->intraRepo->snapshotsByTicker($execTradeDate);
         $w = $this->dividendWindow($execTradeDate);
-        $divEventsInWindowByTicker = $this->divRepo->eventsByTickerInWindow((string)($w['from'] ?? ''), (string)($w['to'] ?? ''));
-        $divNextEventsByTicker = $this->divRepo->nextEventsByTicker($execTradeDate);
+        $divEventsByTicker = $this->divRepo->eventsByTickerInWindow((string)($w['from'] ?? ''), (string)($w['to'] ?? ''));
         $openPositions = $this->posRepo->openPositionsByTicker();
         $hasOpenPositions = !empty($openPositions);
 
         // Policy selection: do not override selection due to global locks.
-        $policy = $this->selectPolicy($requestedPolicy, $divEventsInWindowByTicker, $intradayByTicker, $hasOpenPositions);
+        $policy = $this->selectPolicy($requestedPolicy, $divEventsByTicker, $intradayByTicker, $hasOpenPositions);
 
         // Policy doc presence gate (docs/watchlist/watchlist.md)
         if (!$this->policyDocExists($policy)) {
@@ -330,7 +329,7 @@ public function buildInternal(array $opts = []): array
                 $now,
                 $session,
                 $statusByTicker,
-                $divNextEventsByTicker,
+                $divEventsByTicker,
                 $openPositions,
                 $globalLockCodes
             );
@@ -1645,7 +1644,9 @@ $plan = [
 	        $orders = [];
 	        foreach ((array)($r['recommended_orders'] ?? []) as $o) {
 	            if (!is_array($o)) continue;
-	            $tr = isset($o['tranche']) && is_numeric($o['tranche']) ? (int)$o['tranche'] : null;
+	            $tr = null;
+	            if (isset($o['n']) && is_numeric($o['n'])) $tr = (int)$o['n'];
+	            if ($tr === null && isset($o['tranche']) && is_numeric($o['tranche'])) $tr = (int)$o['tranche'];
 	            if ($tr === null || $tr <= 0) $tr = count($orders) + 1;
 	
 	            $ps = $sliceByTranche[$tr] ?? [];
@@ -1675,9 +1676,9 @@ $plan = [
 	                'plan_limit_price' => $planLimit,
 	                'plan_price_cap' => $planCap,
 	                'recommended_limit_price' => $recommended,
-	                'reasons' => $this->buildReasonObjects($reasonCode !== '' ? [$reasonCode] : [], $severity),
+	                'reasons' => (isset($o['reasons']) && is_array($o['reasons']) ? $o['reasons'] : $this->buildReasonObjects($reasonCode !== '' ? [$reasonCode] : [], $severity)),
 	                'inputs_used' => [
-	                    'ask_best' => isset($o['inputs_used']['ask1']) && is_numeric($o['inputs_used']['ask1']) ? (float)$o['inputs_used']['ask1'] : $ask1,
+	                    'ask_best' => isset($o['inputs_used']['ask_best']) && is_numeric($o['inputs_used']['ask_best']) ? (float)$o['inputs_used']['ask_best'] : $ask1,
 	                    'bid_best' => $bid1,
 	                    'spread_pct' => $spreadPct,
 	                    'snapshot_age_sec' => $ageSec,
@@ -2764,15 +2765,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             $exDate = is_array($div) ? (string)($div['ex_date'] ?? '') : '';
             $execDate = (string)($x['exec_trade_date'] ?? '');
 
-            
-            // Too late: executing on/after ex_date is invalid for dividend swing entry
-            if ($exDate !== '' && $execDate !== '' && $execDate >= $exDate) {
-                $drop = true;
-                $reasonCodes[] = 'DS_TOO_LATE_EXDATE';
-                return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_TOO_LATE_EXDATE']);
-            }
-
-if ($exDate === '' || $execDate === '') {
+            if ($exDate === '' || $execDate === '') {
                 $drop = true;
                 $reasonCodes[] = 'DS_EVENT_MISSING';
                 return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_EVENT_MISSING']);

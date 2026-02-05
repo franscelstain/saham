@@ -13,8 +13,7 @@
       "reasons": [
         {
           "code": "CF_OK",
-          "message": "Sesuai guard CONFIRM.",
-          "severity": "INFO"
+          "message": "Sesuai guard CONFIRM."
         }
       ],
       "plan": {
@@ -55,17 +54,24 @@
       },
       "recommended_orders": [
         {
-          "tranche": 1,
-          "lots": 100,
+          "n": 1,
           "action": "PLACE_LIMIT",
-          "reason_code": "CF_PRICE_AT_ASK1_WITHIN_CAP",
           "recommended_limit_price": 6000,
+          "plan_limit_price": 6000,
+          "plan_price_cap": 6060,
+          "lots": 100,
+          "reasons": [
+            {
+              "code": "CF_PRICE_AT_ASK1_WITHIN_CAP",
+              "message": "Harga di ask1 dan masih dalam batas cap."
+            }
+          ],
           "inputs_used": {
-            "ask1": 6000,
             "plan_price_cap": 6060,
             "plan_limit_price": 6000,
             "spread_pct": 0,
-            "snapshot_age_sec": 0
+            "snapshot_age_sec": 0,
+            "ask_best": 6000
           }
         }
       ]
@@ -77,8 +83,7 @@
       "reasons": [
         {
           "code": "CF_CHASE_BLOCK",
-          "message": "Harga ask melewati price cap.",
-          "severity": "BLOCK"
+          "message": "Harga ask melewati price cap."
         }
       ],
       "plan": {
@@ -119,17 +124,24 @@
       },
       "recommended_orders": [
         {
-          "tranche": 1,
-          "lots": 100,
+          "n": 1,
           "action": "WAIT",
-          "reason_code": "CF_CHASE_BLOCK",
           "recommended_limit_price": null,
+          "plan_limit_price": 10000,
+          "plan_price_cap": 10050,
+          "lots": 100,
+          "reasons": [
+            {
+              "code": "CF_CHASE_BLOCK",
+              "message": "Harga ask melewati price cap."
+            }
+          ],
           "inputs_used": {
-            "ask1": 10100,
             "plan_price_cap": 10050,
             "plan_limit_price": 10000,
             "spread_pct": 0,
-            "snapshot_age_sec": 0
+            "snapshot_age_sec": 0,
+            "ask_best": 10100
           }
         }
       ]

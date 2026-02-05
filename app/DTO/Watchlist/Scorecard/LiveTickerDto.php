@@ -19,6 +19,11 @@ class LiveTickerDto
     /** @var float|null */
     public $open;
 
+    /** @var int|null */
+    public $bidDepthLots;
+    /** @var int|null */
+    public $askDepthLots;
+
     // For strict CONFIRM: prefer prev_close_plan (EOD reference), but keep live prev close too.
     /** @var float|null */
     public $prevClosePlan;
@@ -41,6 +46,8 @@ class LiveTickerDto
         $ask,
         $last,
         $open,
+        $bidDepthLots,
+        $askDepthLots,
         $prevClosePlan,
         $prevCloseLive,
         $retryCount = null,
@@ -51,6 +58,8 @@ class LiveTickerDto
         $this->ask = ($ask === null) ? null : (float)$ask;
         $this->last = ($last === null) ? null : (float)$last;
         $this->open = ($open === null) ? null : (float)$open;
+        $this->bidDepthLots = ($bidDepthLots === null) ? null : (int)$bidDepthLots;
+        $this->askDepthLots = ($askDepthLots === null) ? null : (int)$askDepthLots;
         $this->prevClosePlan = ($prevClosePlan === null) ? null : (float)$prevClosePlan;
         $this->prevCloseLive = ($prevCloseLive === null) ? null : (float)$prevCloseLive;
         $this->prevClose = $this->prevClosePlan !== null ? $this->prevClosePlan : $this->prevCloseLive;
@@ -79,6 +88,8 @@ class LiveTickerDto
             self::toFloatOrNull($a['ask'] ?? ($a['ask1'] ?? null)),
             self::toFloatOrNull($a['last'] ?? ($a['open_or_last'] ?? null)),
             self::toFloatOrNull($a['open'] ?? null),
+            self::toIntOrNull($a['bid_depth_lots'] ?? ($a['bid_lots'] ?? null)),
+            self::toIntOrNull($a['ask_depth_lots'] ?? ($a['ask_lots'] ?? null)),
             $prevPlan,
             $prevLive,
             $retryCount,
@@ -97,6 +108,8 @@ class LiveTickerDto
             'ask' => $this->ask,
             'last' => $this->last,
             'open' => $this->open,
+            'bid_depth_lots' => $this->bidDepthLots,
+            'ask_depth_lots' => $this->askDepthLots,
             'prev_close_plan' => $this->prevClosePlan,
             'prev_close_live' => $this->prevCloseLive,
         ];

@@ -20,6 +20,8 @@ class ScorecardConfig
     public $gapUpBlockPctDefault;
     /** @var float */
     public $spreadMaxPctDefault;
+    /** @var int */
+    public $minDepthLotsDefault;
     /** @var string */
     public $sessionOpenTimeDefault;
     /** @var string */
@@ -45,6 +47,7 @@ class ScorecardConfig
         $maxChasePctDefault,
         $gapUpBlockPctDefault,
         $spreadMaxPctDefault,
+        $minDepthLotsDefault,
         $sessionOpenTimeDefault,
         $sessionCloseTimeDefault
     ) {
@@ -52,6 +55,7 @@ class ScorecardConfig
         $this->maxChasePctDefault = (float)$maxChasePctDefault;
         $this->gapUpBlockPctDefault = (float)$gapUpBlockPctDefault;
         $this->spreadMaxPctDefault = (float)$spreadMaxPctDefault;
+        $this->minDepthLotsDefault = (int)$minDepthLotsDefault;
         $this->sessionOpenTimeDefault = (string)$sessionOpenTimeDefault;
         $this->sessionCloseTimeDefault = (string)$sessionCloseTimeDefault;
 
@@ -76,6 +80,7 @@ class ScorecardConfig
             (float)($cfg['max_chase_pct_default'] ?? 0.01),
             (float)($cfg['gap_up_block_pct_default'] ?? 0.015),
             (float)($cfg['spread_max_pct_default'] ?? 0.006),
+            (int)($cfg['min_depth_lots_default'] ?? 0),
             (string)($cfg['session_open_time_default'] ?? '09:00'),
             (string)($cfg['session_close_time_default'] ?? '16:00')
         );
