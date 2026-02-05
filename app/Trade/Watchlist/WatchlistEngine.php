@@ -3978,44 +3978,51 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             $poolIdx = $this->sortAllocationPoolIndices($poolIdx, $candidates);
 
             // Initial selection = first N in sorted pool.
-            $selectedIdx = array_slice($poolIdx, 0, $target);
-            $nextPoolPos = count($selectedIdx);
+            // Step 5 (LOCKED, docs/watchlist/watchlist.md): binding allocation algorithm
+            // - if lots < 1 (or < min_lots) => DROP ticker
+            // - renormalize weights
+            // - backfill with next ranked pool ticker
+            // - repeat until stable or pool exhausted
+            $activeIdx = array_slice($poolIdx, 0, $target);
+            $nextPoolPos = count($activeIdx);
 
             $minLots = (int)($policyMeta['min_lots'] ?? 1);
             $minAlloc = (int)($policyMeta['min_alloc_idr'] ?? 0);
 
             $allocs = [];
-            $lastSignature = null;
             $iter = 0;
-            $maxIter = 20; // defensive; pool is small in practice
+            $maxIter = 30; // defensive
 
             while ($iter++ < $maxIter) {
-                if (empty($selectedIdx)) break;
+                if (empty($activeIdx)) {
+                    $allocs = [];
+                    break;
+                }
 
-                // Prevent infinite loops.
-                $sig = implode(',', $selectedIdx);
-                if ($sig === $lastSignature) break;
-                $lastSignature = $sig;
+                // Ensure determinism: keep activeIdx order as pool ranking order.
+                $sig = implode(',', $activeIdx) . '|' . (string)$nextPoolPos;
+                if (isset($seen[$sig])) break;
+                $seen[$sig] = true;
 
-                // Recompute weights after each backfill (LOCKED: renormalize after drops).
-                $weights = $this->computeRecommendationWeights($selectedIdx, $candidates);
-                $remaining = $capitalTotal;
+                // Renormalize weights every iteration (after drops/backfills).
+                $weights = $this->computeRecommendationWeights($activeIdx, $candidates);
 
+                $remaining = (int)$capitalTotal;
                 $allocsPass = [];
-                $allocatedIdxMap = [];
+                $dropIdx = [];
 
-                foreach ($selectedIdx as $k => $idx) {
+                foreach ($activeIdx as $k => $idx) {
                     $c = $candidates[$idx];
-                    $w = $weights[$k] ?? (1.0 / max(1, count($selectedIdx)));
+                    $w = $weights[$k] ?? (1.0 / max(1, count($activeIdx)));
 
-                    // Budget is derived from total capital and weight, but allocations must never overspend remaining cash.
+                    // Intended budget from total capital (docs: alloc_pct is weight share)
                     $intendedBudget = (int) floor($capitalTotal * $w * $sizeMult);
+                    if ($intendedBudget < 0) $intendedBudget = 0;
                     $budget = (int) min($intendedBudget, $remaining);
 
                     $entryRef = (int)($c['levels']['entry_trigger_price'] ?? 0);
                     $lotSize = 100;
 
-                    // Mini tranche profile (LOCKED, watchlist.md) and conservative price cap for affordability.
                     $setupKind = $this->inferSetupKind((string)($c['setup_type'] ?? 'BREAKOUT'));
                     $stopRef = (int)($c['levels']['stop_loss_price'] ?? 0);
                     $tp1Ref = (int)($c['levels']['tp1_price'] ?? 0);
@@ -4026,31 +4033,33 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                     if (isset($c['derived']['tick_pct']) && is_numeric($c['derived']['tick_pct'])) $tickPct = (float)$c['derived']['tick_pct'];
                     $hasCaEvent = !empty($c['basis']['ca_event'] ?? null) || !empty($c['basis']['ca_hint'] ?? null);
                     $profile = $this->selectMiniTrancheProfile($policy, $rrEst, $atrPct, $tickPct, $hasCaEvent);
-                    $priceCapRef = $this->computePlanPriceCap($policy, $setupKind, $entryRef);
 
-                    if ($budget <= 0 || $remaining <= 0 || $entryRef <= 0) {
-                        $code = $this->policyPrefix($policy) . '_INSUFFICIENT_CASH';
+                    // Conservative price cap for affordability: plan_price_cap if available.
+                    $priceCapRef = $this->computePlanPriceCap($policy, $setupKind, $entryRef);
+                    $refPrice = ($priceCapRef > 0) ? $priceCapRef : $entryRef;
+
+                    if ($budget <= 0 || $remaining <= 0 || $entryRef <= 0 || $refPrice <= 0) {
+                        $dropIdx[] = $idx;
                         $addSkip([
                             'ticker_code' => (string)($c['ticker_code'] ?? ''),
-                            'reason_code' => $code,
+                            'reason_code' => $this->policyPrefix($policy) . '_INSUFFICIENT_CASH',
                             'alloc_budget' => $budget,
                             'entry_price_ref' => $entryRef,
                         ]);
                         continue;
                     }
 
-                    // First-pass lots from budget, then enforce affordability against remaining cash (include fee + slippage).
-                    $refPrice = ($priceCapRef > 0) ? $priceCapRef : $entryRef;
-
+                    // Lots derived from budget and remaining cash.
                     $lots = (int) floor($budget / ($refPrice * $lotSize));
                     $lots = min($lots, (int) floor($remaining / ($refPrice * $lotSize)));
                     $lots = $this->maxAffordableLots($remaining, $refPrice, $lotSize, $lots);
 
+                    // Binding rule: if lots < min lots OR budget below min_alloc -> DROP (not skip/backfill in same pass)
                     if ($lots < $minLots || $budget < $minAlloc) {
-                        $code = $this->policyPrefix($policy) . '_MIN_TRADE_VIABILITY_FAIL';
+                        $dropIdx[] = $idx;
                         $addSkip([
                             'ticker_code' => (string)($c['ticker_code'] ?? ''),
-                            'reason_code' => $code,
+                            'reason_code' => $this->policyPrefix($policy) . '_MIN_TRADE_VIABILITY_FAIL',
                             'alloc_budget' => $budget,
                             'entry_price_ref' => $entryRef,
                         ]);
@@ -4060,12 +4069,11 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                     $shares = $lots * $lotSize;
                     $estCost = $this->estimateBuyTotalCost($refPrice, $shares);
 
-                    // Absolute guard: never overspend remaining cash.
-                    if ($estCost > $remaining) {
-                        $code = $this->policyPrefix($policy) . '_INSUFFICIENT_CASH';
+                    if ($estCost <= 0 || $estCost > $remaining) {
+                        $dropIdx[] = $idx;
                         $addSkip([
                             'ticker_code' => (string)($c['ticker_code'] ?? ''),
-                            'reason_code' => $code,
+                            'reason_code' => $this->policyPrefix($policy) . '_INSUFFICIENT_CASH',
                             'alloc_budget' => $budget,
                             'entry_price_ref' => $entryRef,
                         ]);
@@ -4081,49 +4089,45 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                         'alloc_budget' => $budget,
                         'entry_price_ref' => $entryRef,
                         'lots_recommended' => $lots,
-                        // NOTE: estimated_cost is TOTAL cost (buy + fee + slippage) so remaining_cash is consistent.
+                        // estimated_cost is TOTAL buy cost used for remaining_cash accounting.
                         'estimated_cost' => (int)$estCost,
                         'execution_slices' => $this->buildExecutionSlices($policy, $setupKind, $entryRef, $lots, $profile),
                         'remaining_cash' => (int)$remainingAfter,
                     ];
-                    $allocatedIdxMap[$idx] = true;
 
                     if ($remaining <= 0) break;
                 }
 
-                // If we already hit target allocations, accept this pass.
-                if (count($allocsPass) >= $target) {
+                // If no drops, allocation is stable -> accept.
+                if (empty($dropIdx)) {
                     $allocs = $allocsPass;
                     break;
                 }
 
-                // If we cannot backfill any more, accept best effort and stop.
-                if ($nextPoolPos >= count($poolIdx) || $remaining <= 0) {
-                    $allocs = $allocsPass;
-                    break;
+                // DROP tickers that failed min-lot / min-alloc / cash checks.
+                $dropMap = array_fill_keys($dropIdx, true);
+                $newActive = [];
+                foreach ($activeIdx as $idx) {
+                    if (!isset($dropMap[$idx])) $newActive[] = $idx;
                 }
 
-                // Remove selected tickers that failed to allocate, then backfill with next ranked pool tickers.
-                $nextSelected = [];
-                foreach ($selectedIdx as $idx) {
-                    if (isset($allocatedIdxMap[$idx])) {
-                        $nextSelected[] = $idx;
+                // Backfill with next ranked pool tickers until we reach target size.
+                while (count($newActive) < $target && $nextPoolPos < count($poolIdx)) {
+                    $candIdx = $poolIdx[$nextPoolPos++];
+                    if (!in_array($candIdx, $newActive, true)) {
+                        $newActive[] = $candIdx;
                     }
                 }
 
-                // Backfill until we reach target selection size or pool exhausted.
-                while (count($nextSelected) < $target && $nextPoolPos < count($poolIdx)) {
-                    $nextSelected[] = $poolIdx[$nextPoolPos++];
-                }
-
-                // If selection does not change, stop.
-                if (implode(',', $nextSelected) === $sig) {
+                // If active set doesn't change, stop best-effort.
+                if (implode(',', $newActive) === implode(',', $activeIdx)) {
                     $allocs = $allocsPass;
                     break;
                 }
 
-                $selectedIdx = $nextSelected;
+                $activeIdx = $newActive;
             }
+
 
 
 
