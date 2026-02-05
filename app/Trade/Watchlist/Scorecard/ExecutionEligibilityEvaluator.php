@@ -264,17 +264,18 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
             if ($n <= 0 || $lots <= 0 || $planLimit <= 0) {
                 $orders[] = [
                     'n' => ($n > 0 ? $n : (count($orders) + 1)),
+                    'time_window' => (string)($slice['time_window'] ?? ($slice['time'] ?? '')),
                     'lots' => ($lots > 0 ? $lots : null),
                     'action' => 'SKIP',
                     'recommended_limit_price' => null,
-                    'plan_limit_price' => ($planLimit > 0 ? $planLimit : null),
-                    'plan_price_cap' => ($planCap > 0 ? $planCap : null),
+                    'plan_limit_price' => ($planLimit > 0 ? (int)$planLimit : null),
+                    'plan_price_cap' => ($planCap > 0 ? (int)$planCap : null),
                     'reasons' => [
                         (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_TRANCHE_SKIPPED', \App\Trade\Explain\ReasonCatalog::getMessage('CF_TRANCHE_SKIPPED'), 'ERROR'))->toArray(),
                     ],
                     'inputs_used' => [
-                        'ask1' => $ask,
-                        'bid1' => $bid,
+                        'ask_best' => (int)$ask,
+                        'bid_best' => (int)$bid,
                         'spread_pct' => $computed['spread_pct'],
                         'snapshot_age_sec' => $computed['snapshot_age_sec'],
                     ],
@@ -290,6 +291,7 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
                 $waitReason = $waitReason ?: 'CF_CHASE_BLOCK';
                 $orders[] = [
                     'n' => $n,
+                'time_window' => (string)($slice['time_window'] ?? ($slice['time'] ?? '')),
                     'lots' => $lots,
                     'action' => 'WAIT',
                     'recommended_limit_price' => null,
@@ -299,8 +301,8 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
                         (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_CHASE_BLOCK', \App\Trade\Explain\ReasonCatalog::getMessage('CF_CHASE_BLOCK'), 'ERROR'))->toArray(),
                     ],
                     'inputs_used' => [
-                        'ask1' => $ask,
-                        'bid1' => $bid,
+                        'ask_best' => (int)$ask,
+                        'bid_best' => (int)$bid,
                         'spread_pct' => $computed['spread_pct'],
                         'snapshot_age_sec' => $computed['snapshot_age_sec'],
                     ],
@@ -327,6 +329,7 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
             $hasPlace = true;
             $orders[] = [
                 'n' => $n,
+                'time_window' => (string)($slice['time_window'] ?? ($slice['time'] ?? '')),
                 'lots' => $lots,
                 'action' => 'PLACE_LIMIT',
                 'recommended_limit_price' => $limit,
@@ -334,8 +337,8 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
                 'plan_price_cap' => $cap,
                 'reasons' => $reasons,
                 'inputs_used' => [
-                    'ask1' => $ask,
-                    'bid1' => $bid,
+                    'ask_best' => (int)$ask,
+                    'bid_best' => (int)$bid,
                     'spread_pct' => $computed['spread_pct'],
                     'snapshot_age_sec' => $computed['snapshot_age_sec'],
                 ],
@@ -392,7 +395,7 @@ if ($hasPlace) {
                 $o['action'] = 'WAIT';
                 $o['recommended_limit_price'] = null;
                 $o['reasons'] = [
-                    (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_DECISION_NOT_APPROVE', \App\Trade\Explain\ReasonCatalog::getMessage('CF_DECISION_NOT_APPROVE'), 'ERROR'))->toArray(),
+                    (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_DECISION_NOT_APPROVE', \App\Trade\Explain\ReasonCatalog::getMessage('CF_DECISION_NOT_APPROVE'), 'WARN'))->toArray(),
                 ];
             }
             $out[] = $o;

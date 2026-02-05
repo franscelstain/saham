@@ -1681,7 +1681,7 @@ $plan = [
 
 	            $orders[] = [
 	                'n' => $n,
-	                'time_window' => (string)($ps['time'] ?? ''),
+	                'time_window' => (string)($o['time_window'] ?? ($ps['time'] ?? '')),
 	                'action' => $action,
 	                'lots' => isset($o['lots']) && is_numeric($o['lots']) ? (int)$o['lots'] : null,
 	                'plan_limit_price' => $planLimit,
@@ -1689,8 +1689,8 @@ $plan = [
 	                'recommended_limit_price' => $recommended,
 	                'reasons' => $reasons,
 	                'inputs_used' => [
-	                    'ask_best' => isset($o['inputs_used']['ask1']) && is_numeric($o['inputs_used']['ask1']) ? (float)$o['inputs_used']['ask1'] : $ask1,
-	                    'bid_best' => isset($o['inputs_used']['bid1']) && is_numeric($o['inputs_used']['bid1']) ? (float)$o['inputs_used']['bid1'] : $bid1,
+	                    'ask_best' => isset($o['inputs_used']['ask_best']) && is_numeric($o['inputs_used']['ask_best']) ? (int)$this->tickRule->roundDown((float)$o['inputs_used']['ask_best']) : (is_numeric($ask1) ? (int)$this->tickRule->roundDown((float)$ask1) : null),
+	                    'bid_best' => isset($o['inputs_used']['bid_best']) && is_numeric($o['inputs_used']['bid_best']) ? (int)$this->tickRule->roundDown((float)$o['inputs_used']['bid_best']) : (is_numeric($bid1) ? (int)$this->tickRule->roundDown((float)$bid1) : null),
 	                    'spread_pct' => $spreadPct,
 	                    'snapshot_age_sec' => $ageSec,
 	                ],
