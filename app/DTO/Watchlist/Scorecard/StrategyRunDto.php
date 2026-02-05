@@ -66,7 +66,7 @@ class StrategyRunDto
         $tradeDate = (string)($payload['trade_date'] ?? '');
         $execDate = (string)($payload['exec_trade_date'] ?? ($payload['exec_date'] ?? ''));
         $policy = (string)(($payload['policy']['selected'] ?? '') ?: ($payload['policy'] ?? ''));
-        $mode = strtoupper(trim((string)($payload['recommendation']['mode'] ?? ($payload['mode'] ?? ''))));
+        $mode = strtoupper(trim((string)(($payload['recommendations']['mode'] ?? null) ?? ($payload['recommendation']['mode'] ?? null) ?? ($payload['mode'] ?? ''))));
 
         $gen = null;
         if (isset($payload['meta']['generated_at']) && is_string($payload['meta']['generated_at']) && $payload['meta']['generated_at'] !== '') {
@@ -127,7 +127,9 @@ class StrategyRunDto
             'exec_trade_date' => $this->execDate,
             'exec_date' => $this->execDate,
             'policy' => $this->policy,
-            'recommendation' => ['mode' => $this->recommendationMode],
+            'recommendations' => ['mode' => $this->recommendationMode],
+            // legacy compatibility (should be removed once DB payloads are fully migrated)
+            'recommendations' => ['mode' => $this->recommendationMode],
             'meta' => ['generated_at' => $this->generatedAt],
             'generated_at' => $this->generatedAt,
             'groups' => [

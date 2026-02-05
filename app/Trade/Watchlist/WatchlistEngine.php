@@ -1197,7 +1197,10 @@ $plan = [
 	private function computePlanPriceCap(string $policy, string $setupKind, int $entryPrice): int
 	{
 	    if ($entryPrice <= 0) return 0;
-	    $chasePct = (float)($this->confirmGuardsForPolicy($policy)['max_chase_from_close_pct'] ?? 0.02);
+	    // Source-of-truth: SCORECARD strict guards (docs/watchlist/scorecard.md).
+	    // PLAN must be deterministic and aligned with CONFIRM strict.
+	    $g = $this->scorecardCfg->guardsForPolicy($policy);
+	    $chasePct = isset($g['max_chase_pct']) ? (float)$g['max_chase_pct'] : 0.02;
 	    if ($setupKind === 'PULLBACK') {
 	        return $entryPrice;
 	    }
@@ -1741,19 +1744,17 @@ $byTicker[$ticker] = [
 	 */
 	private function confirmGuardsForPolicy(string $policy): array
 	{
-	    $all = $this->cfg->confirmGuards();
-	    $g = [];
-	    if (isset($all[$policy]) && is_array($all[$policy])) {
-	        $g = $all[$policy];
-	    } elseif (isset($all[strtoupper($policy)]) && is_array($all[strtoupper($policy)])) {
-	        $g = $all[strtoupper($policy)];
-	    } elseif (isset($all[strtolower($policy)]) && is_array($all[strtolower($policy)])) {
-	        $g = $all[strtolower($policy)];
-	    }
+	    // Source-of-truth: ScorecardConfig per policy.
+	    $g = $this->scorecardCfg->guardsForPolicy($policy);
 	    return [
-	        'max_gap_up_pct' => isset($g['max_gap_up_pct']) ? (float)$g['max_gap_up_pct'] : 0.03,
-	        'max_chase_from_close_pct' => isset($g['max_chase_from_close_pct']) ? (float)$g['max_chase_from_close_pct'] : 0.02,
-	        'max_spread_pct' => isset($g['max_spread_pct']) ? (float)$g['max_spread_pct'] : 0.015,
+	        // legacy naming kept for internal helpers that still expect these keys
+	        'max_gap_up_pct' => isset($g['gap_up_block_pct']) ? (float)$g['gap_up_block_pct'] : 0.03,
+	        'max_chase_from_close_pct' => isset($g['max_chase_pct']) ? (float)$g['max_chase_pct'] : 0.02,
+	        'max_spread_pct' => isset($g['spread_max_pct']) ? (float)$g['spread_max_pct'] : 0.015,
+	        // depth guards (optional)
+	        'depth_top_n' => isset($g['depth_top_n']) ? (int)$g['depth_top_n'] : 0,
+	        'min_depth_lots_bid' => isset($g['min_depth_lots_bid']) ? (int)$g['min_depth_lots_bid'] : 0,
+	        'min_depth_lots_ask' => isset($g['min_depth_lots_ask']) ? (int)$g['min_depth_lots_ask'] : 0,
 	    ];
 	}
 
@@ -4032,6 +4033,84 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 $selectedIdx = $nextSelected;
             }
 
+
+
+            // LEFTOVER distribution (LOCKED, docs/watchlist/watchlist.md):
+            // Distribute remaining cash deterministically by ranking order to add +1 lot where feasible.
+            if (!empty($allocs)) {
+                // Current remaining cash is based on the last allocation's remaining_cash.
+                $cashRemainingTmp = $capitalTotal;
+                $lastTmp = end($allocs);
+                if (is_array($lastTmp) && isset($lastTmp['remaining_cash']) && is_numeric($lastTmp['remaining_cash'])) {
+                    $cashRemainingTmp = (int)$lastTmp['remaining_cash'];
+                }
+                reset($allocs);
+
+                $remainingExtra = $cashRemainingTmp;
+                if ($remainingExtra > 0) {
+                    foreach ($allocs as $i => $a) {
+                        if (!is_array($a)) continue;
+                        $entryRef = (int)($a['entry_price_ref'] ?? 0);
+                        if ($entryRef <= 0) continue;
+
+                        // Conservative affordability ref price: use plan_price_cap if present, else entry.
+                        $refPrice = $entryRef;
+                        $slices = (isset($a['execution_slices']) && is_array($a['execution_slices'])) ? $a['execution_slices'] : [];
+                        if (!empty($slices) && is_array($slices[0]) && isset($slices[0]['plan_price_cap']) && is_numeric($slices[0]['plan_price_cap'])) {
+                            $cap = (int)$slices[0]['plan_price_cap'];
+                            if ($cap > 0) $refPrice = $cap;
+                        }
+
+                        $perLotCost = (int)$this->estimateBuyTotalCost($refPrice, 100);
+                        if ($perLotCost <= 0) continue;
+
+                        if ($remainingExtra >= $perLotCost) {
+                            $lotsOld = (int)($a['lots_recommended'] ?? 0);
+                            if ($lotsOld <= 0) continue;
+
+                            $lotsNew = $lotsOld + 1;
+                            $allocs[$i]['lots_recommended'] = $lotsNew;
+                            $allocs[$i]['estimated_cost'] = (int)((int)($a['estimated_cost'] ?? 0) + $perLotCost);
+
+                            // Rebalance tranche lots using locked rounding formulas based on current number of tranches.
+                            if (!empty($slices)) {
+                                $nTranches = count($slices);
+                                if ($nTranches === 1) {
+                                    $slices[0]['lots'] = $lotsNew;
+                                } elseif ($nTranches === 2) {
+                                    $t1 = (int)ceil(0.6 * $lotsNew);
+                                    $t2 = (int)($lotsNew - $t1);
+                                    $slices[0]['lots'] = $t1;
+                                    $slices[1]['lots'] = $t2;
+                                } elseif ($nTranches === 3) {
+                                    $t1 = (int)ceil(0.5 * $lotsNew);
+                                    $t2 = (int)ceil(0.3 * $lotsNew);
+                                    $t3 = (int)($lotsNew - $t1 - $t2);
+                                    $slices[0]['lots'] = $t1;
+                                    $slices[1]['lots'] = $t2;
+                                    $slices[2]['lots'] = $t3;
+                                }
+                                $allocs[$i]['execution_slices'] = $slices;
+                            }
+
+                            $remainingExtra -= $perLotCost;
+                            if ($remainingExtra <= 0) break;
+                        }
+                    }
+
+                    // Recompute remaining_cash chain so it stays consistent after leftover adjustments.
+                    $remainingChain = $capitalTotal;
+                    foreach ($allocs as $j => $a2) {
+                        if (!is_array($a2)) continue;
+                        $est2 = (int)($a2['estimated_cost'] ?? 0);
+                        if ($est2 < 0) $est2 = 0;
+                        if ($est2 > $remainingChain) $est2 = $remainingChain;
+                        $remainingChain -= $est2;
+                        $allocs[$j]['remaining_cash'] = (int)$remainingChain;
+                        if ($remainingChain <= 0) break;
+                    }
+                }
+            }
             // Top-level remaining cash for contract mapping (used by mapRecommendations).
             // If no allocations were made, remaining equals total capital.
             $cashRemaining = $capitalTotal;

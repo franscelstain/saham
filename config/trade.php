@@ -188,46 +188,8 @@ return [
             'long_wick_pct' => (float) env('WATCHLIST_LONG_WICK_PCT', 0.55),
         ],
 
-        // CONFIRM (intraday snapshot-based)
-        'confirm' => [
-            'enabled' => env('WATCHLIST_CONFIRM_ENABLED', true),
-            'guards' => [
-                'WEEKLY_SWING' => [
-                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_GAP_UP_PCT', 0.03),
-                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_CHASE_FROM_CLOSE_PCT', 0.02),
-                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_SPREAD_PCT', 0.002),
-                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_WS_MIN_BID1_LOTS', 10),
-                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_WS_MIN_ASK1_LOTS', 10),
-                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_WS_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.02),
-                ],
-                'DIVIDEND_SWING' => [
-                    // LOCKED by docs/watchlist/policy/dividend_swing.md
-                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_GAP_UP_PCT', 0.03),
-                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_CHASE_FROM_CLOSE_PCT', 0.015),
-                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_SPREAD_PCT', 0.0025),
-                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_DS_MIN_BID1_LOTS', 8),
-                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_DS_MIN_ASK1_LOTS', 8),
-                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_DS_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.03),
-                ],
-                'INTRADAY_LIGHT' => [
-                    // Locked by docs/watchlist/scorecard.md
-                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_GAP_UP_PCT', 0.025),
-                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_CHASE_FROM_CLOSE_PCT', 0.008),
-                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_SPREAD_PCT', 0.005),
-                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_IL_MIN_BID1_LOTS', 15),
-                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_IL_MIN_ASK1_LOTS', 15),
-                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_IL_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.003),
-                ],
-                'POSITION_TRADE' => [
-                    'max_gap_up_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_GAP_UP_PCT', 0.06),
-                    'max_chase_from_close_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_CHASE_FROM_CLOSE_PCT', 0.04),
-                    'max_spread_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_SPREAD_PCT', 0.004),
-                    'min_bid1_lots' => (int) env('WATCHLIST_CONFIRM_PT_MIN_BID1_LOTS', 5),
-                    'min_ask1_lots' => (int) env('WATCHLIST_CONFIRM_PT_MIN_ASK1_LOTS', 5),
-                    'max_open_or_last_above_entry_pct' => (float) env('WATCHLIST_CONFIRM_PT_MAX_OPEN_OR_LAST_ABOVE_ENTRY_PCT', 0.04),
-                ],
-            ],
-        ],
+        // CONFIRM enabled flag. Thresholds are sourced from SCORECARD strict config below.
+        'confirm_enabled' => env('WATCHLIST_CONFIRM_ENABLED', true),
 
         // SCORECARD / CONFIRM STRICT (docs/watchlist/scorecard.md)
         // NOTE: This is the preferred config source for CONFIRM.
@@ -235,54 +197,54 @@ return [
             'include_watch_only' => (bool) env('WATCHLIST_SCORECARD_INCLUDE_WATCH_ONLY', false),
             // Defaults (LOCKED by docs/watchlist/scorecard.md)
             // NOTE: Per-policy overrides below are the real source; these defaults are only fallbacks.
-            'max_chase_pct_default' => (float) env('WATCHLIST_SCORECARD_MAX_CHASE_PCT_DEFAULT', 0.010),
-            'gap_up_block_pct_default' => (float) env('WATCHLIST_SCORECARD_GAP_UP_BLOCK_PCT_DEFAULT', 0.015),
-            'spread_max_pct_default' => (float) env('WATCHLIST_SCORECARD_SPREAD_MAX_PCT_DEFAULT', 0.006),
-            'breakout_band_pct_default' => (float) env('WATCHLIST_SCORECARD_BREAKOUT_BAND_PCT_DEFAULT', 0.004),
-            'max_retry_windows_default' => (int) env('WATCHLIST_SCORECARD_MAX_RETRY_WINDOWS_DEFAULT', 2),
+            'max_chase_pct_default' => 0.010,
+            'gap_up_block_pct_default' => 0.015,
+            'spread_max_pct_default' => 0.006,
+            'breakout_band_pct_default' => 0.004,
+            'max_retry_windows_default' => 2,
 
-            'stale_tol_pct' => (float) env('WATCHLIST_SCORECARD_STALE_TOL_PCT', 0.003),
-            'max_snapshot_age_sec' => (int) env('WATCHLIST_SCORECARD_MAX_SNAPSHOT_AGE_SEC', 30),
-            'retry_cooldown_sec' => (int) env('WATCHLIST_SCORECARD_RETRY_COOLDOWN_SEC', 30),
-            'session_open_time_default' => env('WATCHLIST_SCORECARD_SESSION_OPEN_TIME_DEFAULT', '09:00'),
-            'session_close_time_default' => env('WATCHLIST_SCORECARD_SESSION_CLOSE_TIME_DEFAULT', '16:00'),
+            'stale_tol_pct' => 0.003,
+            'max_snapshot_age_sec' => 30,
+            'retry_cooldown_sec' => 30,
+            'session_open_time_default' => '09:00',
+            'session_close_time_default' => '16:00',
 
             // Per-policy overrides + windows.
             // Window syntax: "HH:MM-HH:MM", token "open"/"close" allowed.
             'policy_overrides' => [
                 'WEEKLY_SWING' => [
-                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_WS_MAX_CHASE_PCT', 0.010),
-                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_WS_GAP_UP_BLOCK_PCT', 0.015),
-                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_WS_SPREAD_MAX_PCT', 0.006),
-                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_WS_BREAKOUT_BAND_PCT', 0.004),
-                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_WS_MAX_RETRY_WINDOWS', 2),
+                    'max_chase_pct' => 0.010,
+                    'gap_up_block_pct' => 0.015,
+                    'spread_max_pct' => 0.006,
+                    'breakout_band_pct' => 0.004,
+                    'max_retry_windows' => 2,
                     'entry_windows' => ['09:20-10:15','13:35-14:15'],
                     'avoid_windows' => ['09:00-09:20','11:30-13:30','15:15-16:00'],
                 ],
                 'DIVIDEND_SWING' => [
-                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_DS_MAX_CHASE_PCT', 0.008),
-                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_DS_GAP_UP_BLOCK_PCT', 0.012),
-                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_DS_SPREAD_MAX_PCT', 0.006),
-                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_DS_BREAKOUT_BAND_PCT', 0.004),
-                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_DS_MAX_RETRY_WINDOWS', 2),
+                    'max_chase_pct' => 0.008,
+                    'gap_up_block_pct' => 0.012,
+                    'spread_max_pct' => 0.006,
+                    'breakout_band_pct' => 0.004,
+                    'max_retry_windows' => 2,
                     'entry_windows' => ['09:20-10:15','13:35-14:15'],
                     'avoid_windows' => ['09:00-09:20','11:30-13:30','15:15-16:00'],
                 ],
                 'POSITION_TRADE' => [
-                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_PT_MAX_CHASE_PCT', 0.012),
-                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_PT_GAP_UP_BLOCK_PCT', 0.018),
-                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_PT_SPREAD_MAX_PCT', 0.008),
-                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_PT_BREAKOUT_BAND_PCT', 0.004),
-                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_PT_MAX_RETRY_WINDOWS', 2),
+                    'max_chase_pct' => 0.012,
+                    'gap_up_block_pct' => 0.018,
+                    'spread_max_pct' => 0.008,
+                    'breakout_band_pct' => 0.004,
+                    'max_retry_windows' => 2,
                     'entry_windows' => ['09:20-10:15','13:35-14:15'],
                     'avoid_windows' => ['09:00-09:20','11:30-13:30','15:15-16:00'],
                 ],
                 'INTRADAY_LIGHT' => [
-                    'max_chase_pct' => (float) env('WATCHLIST_SCORECARD_IL_MAX_CHASE_PCT', 0.006),
-                    'gap_up_block_pct' => (float) env('WATCHLIST_SCORECARD_IL_GAP_UP_BLOCK_PCT', 0.010),
-                    'spread_max_pct' => (float) env('WATCHLIST_SCORECARD_IL_SPREAD_MAX_PCT', 0.010),
-                    'breakout_band_pct' => (float) env('WATCHLIST_SCORECARD_IL_BREAKOUT_BAND_PCT', 0.004),
-                    'max_retry_windows' => (int) env('WATCHLIST_SCORECARD_IL_MAX_RETRY_WINDOWS', 1),
+                    'max_chase_pct' => 0.006,
+                    'gap_up_block_pct' => 0.010,
+                    'spread_max_pct' => 0.010,
+                    'breakout_band_pct' => 0.004,
+                    'max_retry_windows' => 1,
                     'entry_windows' => ['09:05-09:45','13:35-14:10'],
                     'avoid_windows' => ['09:00-09:05','11:30-13:30','15:00-16:00'],
                 ],

@@ -80,6 +80,25 @@ class AppServiceProvider extends ServiceProvider
 
         // ---- Watchlist ----
         $this->app->singleton(WatchlistPolicyConfig::class, function () {
+            // CONFIRM guards source-of-truth is SCORECARD strict (docs/watchlist/scorecard.md).
+            // We keep legacy shape in WatchlistPolicyConfig for internal helpers.
+            $score = (array) config('trade.watchlist.scorecard', []);
+            $over = isset($score['policy_overrides']) && is_array($score['policy_overrides']) ? $score['policy_overrides'] : [];
+            $confirmGuards = [];
+            foreach ($over as $policy => $vals) {
+                if (!is_string($policy) || $policy === '' || !is_array($vals)) continue;
+                $p = strtoupper($policy);
+                $confirmGuards[$p] = [
+                    'max_gap_up_pct' => isset($vals['gap_up_block_pct']) ? (float)$vals['gap_up_block_pct'] : (float)($score['gap_up_block_pct_default'] ?? 0.015),
+                    'max_chase_from_close_pct' => isset($vals['max_chase_pct']) ? (float)$vals['max_chase_pct'] : (float)($score['max_chase_pct_default'] ?? 0.010),
+                    'max_spread_pct' => isset($vals['spread_max_pct']) ? (float)$vals['spread_max_pct'] : (float)($score['spread_max_pct_default'] ?? 0.006),
+                    // optional depth guards
+                    'depth_top_n' => isset($vals['depth_top_n']) ? (int)$vals['depth_top_n'] : 0,
+                    'min_depth_lots_bid' => isset($vals['min_depth_lots_bid']) ? (int)$vals['min_depth_lots_bid'] : 0,
+                    'min_depth_lots_ask' => isset($vals['min_depth_lots_ask']) ? (int)$vals['min_depth_lots_ask'] : 0,
+                ];
+            }
+
             return new WatchlistPolicyConfig(
                 (string) config('trade.watchlist.policy_default', 'AUTO'),
                 (string) (config('trade.watchlist.eod_cutoff_time', '') ?: null),
@@ -94,8 +113,8 @@ class AppServiceProvider extends ServiceProvider
                 (float) config('trade.watchlist.corporate_action.suspect_ratio_min', 0.55),
                 (float) config('trade.watchlist.corporate_action.suspect_ratio_max', 1.80),
                 (float) config('trade.watchlist.candle.long_wick_pct', 0.55),
-                (bool) config('trade.watchlist.confirm.enabled', true),
-                (array) config('trade.watchlist.confirm.guards', [])
+                (bool) config('trade.watchlist.confirm_enabled', true),
+                $confirmGuards
             );
         });
 

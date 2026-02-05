@@ -128,6 +128,33 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
         $this->assertSame($r1['cash_remaining'], $r2['cash_remaining']);
     }
 
+
+
+    public function testLeftoverDistributionAddsOneLotInRankingOrderWhenFeasible(): void
+    {
+        $engine = $this->makeEngine();
+
+        $candidates = $this->makeCandidates([
+            ['code' => 'AAA', 'score' => 0.60, 'entry' => 1000],
+            ['code' => 'BBB', 'score' => 0.50, 'entry' => 1000],
+        ]);
+
+        // With these inputs, initial floor should buy 1 lot each, leaving enough cash for +1 lot.
+        $capital = 310_000;
+        $res = $this->invokeBuildRecommendations($engine, $candidates, [0, 1], $capital, 2);
+        $allocs = (array)($res['allocations'] ?? []);
+
+        $this->assertCount(2, $allocs);
+        $this->assertSame('AAA', (string)($allocs[0]['ticker_code'] ?? ''));
+        $this->assertSame('BBB', (string)($allocs[1]['ticker_code'] ?? ''));
+
+        // Leftover distribution must allocate the extra lot to the top-ranked ticker first.
+        $this->assertSame(2, (int)($allocs[0]['lots_recommended'] ?? 0));
+        $this->assertSame(1, (int)($allocs[1]['lots_recommended'] ?? 0));
+
+        // remaining cash must be consistent with the last allocation.
+        $this->assertSame((int)($allocs[1]['remaining_cash'] ?? -1), (int)($res['cash_remaining'] ?? -2));
+    }
     /**
      * @param array<int,array{code:string,score:float,entry:int}> $rows
      * @return array<int,array<string,mixed>>
