@@ -499,6 +499,8 @@ $netEdgePct = function(int $entry, int $lotSize, ?int $profitNet) {
 
 $capitalTotal = $opts['capital_total'] ?? null;
 
+
+$topPickIndices = [];
 foreach ($rows as $i => $r) {
     $levels = $r['levels'] ?? [];
     $entry = $levels['entry_trigger_price'] ?? null;
