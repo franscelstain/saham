@@ -6,7 +6,7 @@ namespace App\DTO\Watchlist\Scorecard;
  * Reason object (LOCKED by docs/watchlist/scorecard.md).
  * - code: stable machine code
  * - message: 1 kalimat user-facing
- * - severity: optional INFO|WARN|BLOCK
+ * - severity: optional INFO|WARN|ERROR
  *
  * PHP 7.3 compatible.
  */
@@ -25,7 +25,8 @@ class ReasonDto
         $this->message = (string)$message;
         $sev = $severity === null ? null : strtoupper(trim((string)$severity));
         if ($sev === '') $sev = null;
-        if ($sev !== null && !in_array($sev, ['INFO','WARN','BLOCK'], true)) {
+        if ($sev === 'BLOCK') $sev = 'ERROR';
+        if ($sev !== null && !in_array($sev, ['INFO','WARN','ERROR'], true)) {
             $sev = null;
         }
         $this->severity = $sev;

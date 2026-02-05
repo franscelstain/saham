@@ -174,8 +174,8 @@ Mapping (LOCKED):
 - `plan_rr_est` = `TickerPlan.plan.rr_est`
 - `plan_r` = `TickerPlan.plan.r`
 - Mini execution hint:
-  - `mini_tranches_pct` dipakai untuk Top Picks/Secondary (pre-open hint)
-  - `recommendations.tranches` dipakai sebagai sumber lots (Mode B / capital ada)
+  - `ticker_plan.execution_slices[]` selalu boleh ada sebagai template (lots bisa `null`).
+  - Hanya `recommendations.items[].execution_slices[]` yang punya `lots` integer (Mode B / capital ada).
 
 ### 1.2 Input LIVE (manual dari Ajaib)
 Target: input yang **pasti ada di layar** Ajaib dan cukup untuk cek kelayakan entry.

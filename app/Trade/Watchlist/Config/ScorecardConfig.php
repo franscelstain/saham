@@ -20,8 +20,6 @@ class ScorecardConfig
     public $gapUpBlockPctDefault;
     /** @var float */
     public $spreadMaxPctDefault;
-    /** @var int */
-    public $minDepthLotsDefault;
     /** @var string */
     public $sessionOpenTimeDefault;
     /** @var string */
@@ -39,6 +37,14 @@ class ScorecardConfig
     /** @var int */
     public $maxRetryWindowsDefault;
 
+    // --- Depth Top-N (optional) ---
+    /** @var int */
+    public $depthTopNDefault;
+    /** @var int */
+    public $minDepthLotsBidDefault;
+    /** @var int */
+    public $minDepthLotsAskDefault;
+
     /** @var array<string,array<string,mixed>> */
     public $overridesByPolicy;
 
@@ -47,7 +53,6 @@ class ScorecardConfig
         $maxChasePctDefault,
         $gapUpBlockPctDefault,
         $spreadMaxPctDefault,
-        $minDepthLotsDefault,
         $sessionOpenTimeDefault,
         $sessionCloseTimeDefault
     ) {
@@ -55,7 +60,6 @@ class ScorecardConfig
         $this->maxChasePctDefault = (float)$maxChasePctDefault;
         $this->gapUpBlockPctDefault = (float)$gapUpBlockPctDefault;
         $this->spreadMaxPctDefault = (float)$spreadMaxPctDefault;
-        $this->minDepthLotsDefault = (int)$minDepthLotsDefault;
         $this->sessionOpenTimeDefault = (string)$sessionOpenTimeDefault;
         $this->sessionCloseTimeDefault = (string)$sessionCloseTimeDefault;
 
@@ -65,6 +69,11 @@ class ScorecardConfig
         $this->retryCooldownSec = 30;
         $this->breakoutBandPctDefault = 0.004;
         $this->maxRetryWindowsDefault = 2;
+
+        // Depth defaults (LOCKED by docs/watchlist/scorecard.md when enabled)
+        $this->depthTopNDefault = 3;
+        $this->minDepthLotsBidDefault = 2000;
+        $this->minDepthLotsAskDefault = 2000;
 
         $this->overridesByPolicy = [];
     }
@@ -80,7 +89,6 @@ class ScorecardConfig
             (float)($cfg['max_chase_pct_default'] ?? 0.01),
             (float)($cfg['gap_up_block_pct_default'] ?? 0.015),
             (float)($cfg['spread_max_pct_default'] ?? 0.006),
-            (int)($cfg['min_depth_lots_default'] ?? 0),
             (string)($cfg['session_open_time_default'] ?? '09:00'),
             (string)($cfg['session_close_time_default'] ?? '16:00')
         );
@@ -91,6 +99,9 @@ class ScorecardConfig
         if (isset($cfg['retry_cooldown_sec']) && is_numeric($cfg['retry_cooldown_sec'])) $o->retryCooldownSec = (int)$cfg['retry_cooldown_sec'];
         if (isset($cfg['breakout_band_pct_default']) && is_numeric($cfg['breakout_band_pct_default'])) $o->breakoutBandPctDefault = (float)$cfg['breakout_band_pct_default'];
         if (isset($cfg['max_retry_windows_default']) && is_numeric($cfg['max_retry_windows_default'])) $o->maxRetryWindowsDefault = (int)$cfg['max_retry_windows_default'];
+        if (isset($cfg['depth_top_n_default']) && is_numeric($cfg['depth_top_n_default'])) $o->depthTopNDefault = (int)$cfg['depth_top_n_default'];
+        if (isset($cfg['min_depth_lots_bid_default']) && is_numeric($cfg['min_depth_lots_bid_default'])) $o->minDepthLotsBidDefault = (int)$cfg['min_depth_lots_bid_default'];
+        if (isset($cfg['min_depth_lots_ask_default']) && is_numeric($cfg['min_depth_lots_ask_default'])) $o->minDepthLotsAskDefault = (int)$cfg['min_depth_lots_ask_default'];
 
         // policy overrides (optional)
         $over = isset($cfg['policy_overrides']) && is_array($cfg['policy_overrides']) ? $cfg['policy_overrides'] : [];
@@ -123,7 +134,7 @@ class ScorecardConfig
     }
 
     /**
-     * @return array{max_chase_pct:float,gap_up_block_pct:float,spread_max_pct:float,breakout_band_pct:float,max_retry_windows:int}
+     * @return array{max_chase_pct:float,gap_up_block_pct:float,spread_max_pct:float,breakout_band_pct:float,max_retry_windows:int,depth_top_n:int,min_depth_lots_bid:int,min_depth_lots_ask:int}
      */
     public function guardsForPolicy(string $policy): array
     {
@@ -132,6 +143,9 @@ class ScorecardConfig
         $spreadMax = $this->policyValue($policy, 'spread_max_pct', $this->spreadMaxPctDefault);
         $band = $this->policyValue($policy, 'breakout_band_pct', $this->breakoutBandPctDefault);
         $maxRetry = $this->policyValue($policy, 'max_retry_windows', $this->maxRetryWindowsDefault);
+        $depthTopN = $this->policyValue($policy, 'depth_top_n', 0);
+        $minDepthBid = $this->policyValue($policy, 'min_depth_lots_bid', $this->minDepthLotsBidDefault);
+        $minDepthAsk = $this->policyValue($policy, 'min_depth_lots_ask', $this->minDepthLotsAskDefault);
 
         return [
             'max_chase_pct' => (float)$maxChase,
@@ -139,6 +153,9 @@ class ScorecardConfig
             'spread_max_pct' => (float)$spreadMax,
             'breakout_band_pct' => (float)$band,
             'max_retry_windows' => (int)$maxRetry,
+            'depth_top_n' => (int)$depthTopN,
+            'min_depth_lots_bid' => (int)$minDepthBid,
+            'min_depth_lots_ask' => (int)$minDepthAsk,
         ];
     }
 

@@ -32,9 +32,8 @@ class ReasonCatalog
             'CF_BREAKOUT_BELOW_ENTRY' => 'Breakout belum mencapai entry (masih di bawah).',
             'CF_GAP_UP_BLOCK' => 'Gap-up terlalu besar dibanding prev close PLAN.',
             'CF_SPREAD_TOO_WIDE' => 'Spread terlalu lebar.',
-            'CF_BOOK_TOO_THIN' => 'Order book terlalu tipis (depth tidak memadai).',
+            'CF_BOOK_TOO_THIN' => 'Depth orderbook terlalu tipis (Top-N lots di bawah minimum).',
             'CF_MAX_RETRY_REACHED' => 'Batas retry DELAY tercapai.',
-            'CF_TRANCHE_SKIPPED' => 'Tranche ini dilewati karena tidak memenuhi rule eksekusi.',
 
             // Price intent / audit
             'CF_PRICE_AT_ASK1_WITHIN_CAP' => 'Harga di ask1 dan masih dalam batas cap.',
@@ -44,6 +43,7 @@ class ReasonCatalog
             'CF_SPREAD_BLOCK' => 'Spread terlalu lebar.',
             'CF_CHASE_BLOCK' => 'Harga ask melewati price cap.',
             'CF_SKIP_NO_LOTS' => 'Tidak ada lots untuk tranche ini.',
+            'CF_TRANCHE_SKIPPED' => 'Tranche di-skip (invalid / tidak feasible untuk dieksekusi).',
             'CF_NO_SLICES' => 'Tidak ada tranche yang bisa dievaluasi.',
 
             'CF_DECISION_NOT_APPROVE' => 'Keputusan bukan APPROVE; eksekusi diblokir.',

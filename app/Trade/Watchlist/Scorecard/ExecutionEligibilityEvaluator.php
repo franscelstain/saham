@@ -143,6 +143,13 @@ class ExecutionEligibilityEvaluator
 
         $bid = $live->bid;
         $ask = $live->ask;
+        // If Top-N depth is provided, prefer level-1 for best bid/ask when missing.
+        if (($bid === null || $bid <= 0) && is_array($live->bidLevels) && isset($live->bidLevels[0])) {
+            $bid = (float)$live->bidLevels[0];
+        }
+        if (($ask === null || $ask <= 0) && is_array($live->askLevels) && isset($live->askLevels[0])) {
+            $ask = (float)$live->askLevels[0];
+        }
         $last = $live->last;
         $open = $live->open;
         $prevPlan = $live->prevClosePlan;
@@ -183,10 +190,22 @@ class ExecutionEligibilityEvaluator
             $computed['gap_pct'] = ($priceRef - $prevPlan) / $prevPlan;
         }
 
-        // spread_pct uses mid (bid+ask)/2
+        // spread_pct uses mid_vwap_N when depth enabled, else mid (bid+ask)/2
+        $depthN = (int)($guards['depth_top_n'] ?? 0);
+        $hasDepth = is_array($live->bidLevels) && is_array($live->bidLots) && is_array($live->askLevels) && is_array($live->askLots)
+            && isset($live->bidLevels[0]) && isset($live->askLevels[0]);
+        if ($depthN <= 0 && strtoupper(trim($policy)) === 'INTRADAY_LIGHT' && $hasDepth) {
+            $depthN = (int)$this->cfg->depthTopNDefault;
+        }
+        if ($depthN > 5) $depthN = 5;
         $mid = ($bid + $ask) / 2.0;
-        if ($mid > 0) {
-            $computed['spread_pct'] = ($ask - $bid) / $mid;
+        $midVwapN = null;
+        if ($depthN > 0 && $hasDepth) {
+            $midVwapN = $this->midVwapN($live->bidLevels, $live->bidLots, $live->askLevels, $live->askLots, $depthN);
+        }
+        $denom = ($midVwapN !== null && $midVwapN > 0) ? $midVwapN : $mid;
+        if ($denom > 0) {
+            $computed['spread_pct'] = ($ask - $bid) / $denom;
         }
 
         if ($priceRef !== null && $entryTrigger > 0) {
@@ -200,26 +219,23 @@ class ExecutionEligibilityEvaluator
             return $this->resultReject($ticker, ['CF_GAP_UP_BLOCK'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
         }
 
-        $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
+                // Book depth guard (Top-N lots) when enabled
+        if ($depthN > 0 && $hasDepth) {
+            $minBid = (int)($guards['min_depth_lots_bid'] ?? (int)$this->cfg->minDepthLotsBidDefault);
+            $minAsk = (int)($guards['min_depth_lots_ask'] ?? (int)$this->cfg->minDepthLotsAskDefault);
+            $sumBid = $this->sumLotsTopN($live->bidLots, $depthN);
+            $sumAsk = $this->sumLotsTopN($live->askLots, $depthN);
+            if (($minBid > 0 && $sumBid < $minBid) || ($minAsk > 0 && $sumAsk < $minAsk)) {
+                return $this->resultDelayWithRetry($ticker, ['CF_BOOK_TOO_THIN'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows, []);
+            }
+        }
+
+$spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
         if ($spreadMax > 0 && $computed['spread_pct'] !== null && $computed['spread_pct'] > $spreadMax) {
             return $this->resultReject($ticker, ['CF_SPREAD_TOO_WIDE'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
         }
 
-        
-        // Optional order book depth guard (if live provides depth and policy enables it).
-        $minDepthLots = (int)($guards['min_depth_lots'] ?? $this->cfg->minDepthLotsDefault);
-        if ($minDepthLots > 0 && $live) {
-            $bidDepth = $live->bidDepthLots;
-            $askDepth = $live->askDepthLots;
-            if ($bidDepth !== null && $askDepth !== null) {
-                $minSide = min((int)$bidDepth, (int)$askDepth);
-                if ($minSide < $minDepthLots) {
-                    return $this->resultReject($ticker, ['CF_BOOK_TOO_THIN'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
-                }
-            }
-        }
-
-// BREAKOUT strict rule: lower bound (last >= entry) + upper band (last <= entry*(1+band))
+        // BREAKOUT strict rule: lower bound (last >= entry) + upper band (last <= entry*(1+band))
         $setup = strtoupper(trim((string)($planBlock['setup_type'] ?? '')));
         $bandPct = (float)($guards['breakout_band_pct'] ?? 0.0);
         if ($setup === 'BREAKOUT') {
@@ -239,23 +255,26 @@ class ExecutionEligibilityEvaluator
 
         foreach ($slices as $slice) {
             if (!is_array($slice)) continue;
-
-            $n = (int)($slice['tranche'] ?? ($slice['n'] ?? 0));
+            $n = (int)($slice['n'] ?? ($slice['tranche'] ?? 0));
             $lots = (int)($slice['lots'] ?? 0);
-            $planLimit = isset($slice['plan_limit_price']) ? (float)$slice['plan_limit_price'] : (isset($slice['plan_limit']) ? (float)$slice['plan_limit'] : 0.0);
-            $planCap = isset($slice['plan_price_cap']) ? (float)$slice['plan_price_cap'] : (isset($slice['plan_cap']) ? (float)$slice['plan_cap'] : 0.0);
+            $planLimit = isset($slice['plan_limit_price']) ? (float)$slice['plan_limit_price'] : 0.0;
+            $planCap = isset($slice['plan_price_cap']) ? (float)$slice['plan_price_cap'] : 0.0;
 
+            // Invalid slice -> SKIP with CF_TRANCHE_SKIPPED (LOCKED)
             if ($n <= 0 || $lots <= 0 || $planLimit <= 0) {
                 $orders[] = [
-                    'n' => max(1, $n),
+                    'n' => ($n > 0 ? $n : (count($orders) + 1)),
+                    'lots' => ($lots > 0 ? $lots : null),
                     'action' => 'SKIP',
                     'recommended_limit_price' => null,
-                    'plan_limit_price' => $planLimit > 0 ? $planLimit : null,
-                    'plan_price_cap' => $planCap > 0 ? $planCap : null,
-                    'lots' => $lots > 0 ? $lots : null,
-                    'reasons' => $this->reasonsFromCodes(['CF_TRANCHE_SKIPPED']),
+                    'plan_limit_price' => ($planLimit > 0 ? $planLimit : null),
+                    'plan_price_cap' => ($planCap > 0 ? $planCap : null),
+                    'reasons' => [
+                        (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_TRANCHE_SKIPPED', \App\Trade\Explain\ReasonCatalog::getMessage('CF_TRANCHE_SKIPPED'), 'ERROR'))->toArray(),
+                    ],
                     'inputs_used' => [
-                        'ask_best' => $ask,
+                        'ask1' => $ask,
+                        'bid1' => $bid,
                         'spread_pct' => $computed['spread_pct'],
                         'snapshot_age_sec' => $computed['snapshot_age_sec'],
                     ],
@@ -265,21 +284,23 @@ class ExecutionEligibilityEvaluator
 
             $cap = $planCap > 0 ? $planCap : $planLimit;
 
+            // Chase block -> WAIT with retry
             if ($ask > $cap) {
                 $hasWait = true;
                 $waitReason = $waitReason ?: 'CF_CHASE_BLOCK';
                 $orders[] = [
                     'n' => $n,
+                    'lots' => $lots,
                     'action' => 'WAIT',
                     'recommended_limit_price' => null,
                     'plan_limit_price' => $planLimit,
                     'plan_price_cap' => $cap,
-                    'lots' => $lots,
-                    'reasons' => $this->reasonsFromCodes(['CF_CHASE_BLOCK']),
+                    'reasons' => [
+                        (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_CHASE_BLOCK', \App\Trade\Explain\ReasonCatalog::getMessage('CF_CHASE_BLOCK'), 'ERROR'))->toArray(),
+                    ],
                     'inputs_used' => [
-                        'ask_best' => $ask,
-                        'plan_price_cap' => $cap,
-                        'plan_limit_price' => $planLimit,
+                        'ask1' => $ask,
+                        'bid1' => $bid,
                         'spread_pct' => $computed['spread_pct'],
                         'snapshot_age_sec' => $computed['snapshot_age_sec'],
                     ],
@@ -289,36 +310,39 @@ class ExecutionEligibilityEvaluator
 
             $limit = $this->clampLimitPrice($ask, $cap, $planLimit);
 
-            $reasonCodes = [];
-            if (abs($limit - $ask) < 0.0000001) {
-                $reasonCodes[] = 'CF_PRICE_AT_ASK1_WITHIN_CAP';
-            } else {
-                // audit clamp reasons
-                if ($cap > 0 && $cap < $ask && abs($limit - $cap) < 0.0000001) $reasonCodes[] = 'CF_PRICE_CLAMPED_TO_CAP';
-                if ($planLimit > 0 && $planLimit < $ask && abs($limit - $planLimit) < 0.0000001) $reasonCodes[] = 'CF_PRICE_CLAMPED_TO_PLAN_LIMIT';
-                if (empty($reasonCodes)) $reasonCodes[] = 'CF_PRICE_AT_ASK1_WITHIN_CAP';
+            $reasons = [];
+            $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_AT_ASK1_WITHIN_CAP', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_AT_ASK1_WITHIN_CAP'), 'INFO'))->toArray();
+            if ($cap > 0 && $ask > $cap) {
+                // (should not happen due to chase block) but keep for safety
+                $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_CLAMPED_TO_CAP', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_CLAMPED_TO_CAP'), 'WARN'))->toArray();
+            } elseif ($cap > 0 && $limit < $ask) {
+                $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_CLAMPED_TO_CAP', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_CLAMPED_TO_CAP'), 'WARN'))->toArray();
+            }
+            if ($planLimit > 0 && $limit < $ask && $limit <= $planLimit) {
+                if ($limit < $ask) {
+                    $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_CLAMPED_TO_PLAN_LIMIT', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_CLAMPED_TO_PLAN_LIMIT'), 'WARN'))->toArray();
+                }
             }
 
             $hasPlace = true;
             $orders[] = [
                 'n' => $n,
+                'lots' => $lots,
                 'action' => 'PLACE_LIMIT',
                 'recommended_limit_price' => $limit,
                 'plan_limit_price' => $planLimit,
                 'plan_price_cap' => $cap,
-                'lots' => $lots,
-                'reasons' => $this->reasonsFromCodes($reasonCodes),
+                'reasons' => $reasons,
                 'inputs_used' => [
-                    'ask_best' => $ask,
-                    'plan_price_cap' => $cap,
-                    'plan_limit_price' => $planLimit,
+                    'ask1' => $ask,
+                    'bid1' => $bid,
                     'spread_pct' => $computed['spread_pct'],
                     'snapshot_age_sec' => $computed['snapshot_age_sec'],
                 ],
             ];
         }
 
-        if ($hasPlace) {
+if ($hasPlace) {
             // APPROVE
             $computed['retry_count'] = $this->retryCountFromLive($live);
             return new EligibilityResultDto(
@@ -367,7 +391,9 @@ class ExecutionEligibilityEvaluator
             if ($act === 'PLACE_LIMIT') {
                 $o['action'] = 'WAIT';
                 $o['recommended_limit_price'] = null;
-                $o['reasons'] = $this->reasonsFromCodes(['CF_DECISION_NOT_APPROVE']);
+                $o['reasons'] = [
+                    (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_DECISION_NOT_APPROVE', \App\Trade\Explain\ReasonCatalog::getMessage('CF_DECISION_NOT_APPROVE'), 'ERROR'))->toArray(),
+                ];
             }
             $out[] = $o;
         }

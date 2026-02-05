@@ -499,8 +499,6 @@ $netEdgePct = function(int $entry, int $lotSize, ?int $profitNet) {
 
 $capitalTotal = $opts['capital_total'] ?? null;
 
-
-$topPickIndices = [];
 foreach ($rows as $i => $r) {
     $levels = $r['levels'] ?? [];
     $entry = $levels['entry_trigger_price'] ?? null;
@@ -1646,15 +1644,18 @@ $plan = [
 	        $orders = [];
 	        foreach ((array)($r['recommended_orders'] ?? []) as $o) {
 	            if (!is_array($o)) continue;
-	            $tr = null;
-	            if (isset($o['n']) && is_numeric($o['n'])) $tr = (int)$o['n'];
-	            if ($tr === null && isset($o['tranche']) && is_numeric($o['tranche'])) $tr = (int)$o['tranche'];
-	            if ($tr === null || $tr <= 0) $tr = count($orders) + 1;
-	
-	            $ps = $sliceByTranche[$tr] ?? [];
-	            $planLimit = isset($ps['plan_limit_price']) && is_numeric($ps['plan_limit_price']) ? (int)$ps['plan_limit_price'] : null;
-	            $planCap = isset($ps['plan_price_cap']) && is_numeric($ps['plan_price_cap']) ? (int)$ps['plan_price_cap'] : null;
-	
+
+	            $n = isset($o['n']) && is_numeric($o['n']) ? (int)$o['n'] : (count($orders) + 1);
+	            $ps = $sliceByTranche[$n] ?? [];
+
+	            $planLimit = isset($o['plan_limit_price']) && is_numeric($o['plan_limit_price'])
+	                ? (int)$this->tickRule->roundDown((float)$o['plan_limit_price'])
+	                : (isset($ps['plan_limit_price']) && is_numeric($ps['plan_limit_price']) ? (int)$ps['plan_limit_price'] : null);
+
+	            $planCap = isset($o['plan_price_cap']) && is_numeric($o['plan_price_cap'])
+	                ? (int)$this->tickRule->roundDown((float)$o['plan_price_cap'])
+	                : (isset($ps['plan_price_cap']) && is_numeric($ps['plan_price_cap']) ? (int)$ps['plan_price_cap'] : null);
+
 	            $recommended = null;
 	            if (isset($o['recommended_limit_price']) && is_numeric($o['recommended_limit_price'])) {
 	                $recommended = (int)$this->tickRule->roundDown((float)$o['recommended_limit_price']);
@@ -1667,28 +1668,35 @@ $plan = [
 	                $recommended = null;
 	            }
 
-	            $reasonCode = isset($o['reason_code']) && is_string($o['reason_code']) ? (string)$o['reason_code'] : '';
-	            $severity = (strtoupper($action) === 'WAIT') ? 'WARN' : 'INFO';
-	
+	            $reasons = [];
+	            if (isset($o['reasons']) && is_array($o['reasons'])) {
+	                $reasons = array_values($o['reasons']);
+	            } else {
+	                // backward-compat: reason_code string
+	                $reasonCode = isset($o['reason_code']) && is_string($o['reason_code']) ? (string)$o['reason_code'] : '';
+	                $severity = (strtoupper($action) === 'WAIT') ? 'WARN' : 'INFO';
+	                $reasons = $this->buildReasonObjects($reasonCode !== '' ? [$reasonCode] : [], $severity);
+	            }
+
 	            $orders[] = [
-	                'n' => $tr,
+	                'n' => $n,
 	                'time_window' => (string)($ps['time'] ?? ''),
 	                'action' => $action,
 	                'lots' => isset($o['lots']) && is_numeric($o['lots']) ? (int)$o['lots'] : null,
 	                'plan_limit_price' => $planLimit,
 	                'plan_price_cap' => $planCap,
 	                'recommended_limit_price' => $recommended,
-	                'reasons' => (isset($o['reasons']) && is_array($o['reasons']) ? $o['reasons'] : $this->buildReasonObjects($reasonCode !== '' ? [$reasonCode] : [], $severity)),
+	                'reasons' => $reasons,
 	                'inputs_used' => [
-	                    'ask_best' => isset($o['inputs_used']['ask_best']) && is_numeric($o['inputs_used']['ask_best']) ? (float)$o['inputs_used']['ask_best'] : $ask1,
-	                    'bid_best' => $bid1,
+	                    'ask_best' => isset($o['inputs_used']['ask1']) && is_numeric($o['inputs_used']['ask1']) ? (float)$o['inputs_used']['ask1'] : $ask1,
+	                    'bid_best' => isset($o['inputs_used']['bid1']) && is_numeric($o['inputs_used']['bid1']) ? (float)$o['inputs_used']['bid1'] : $bid1,
 	                    'spread_pct' => $spreadPct,
 	                    'snapshot_age_sec' => $ageSec,
 	                ],
 	            ];
 	        }
 
-	        $byTicker[$ticker] = [
+$byTicker[$ticker] = [
 	            'checked_at' => $checkedAt,
 	            'decision' => (string)($r['decision'] ?? 'REJECT'),
 	            'eligible_now' => (bool)($r['eligible_now'] ?? false),

@@ -19,10 +19,15 @@ class LiveTickerDto
     /** @var float|null */
     public $open;
 
-    /** @var int|null */
-    public $bidDepthLots;
-    /** @var int|null */
-    public $askDepthLots;
+    // Depth Top-N (optional) bid/ask levels and lots
+    /** @var float[]|null */
+    public $bidLevels;
+    /** @var int[]|null */
+    public $bidLots;
+    /** @var float[]|null */
+    public $askLevels;
+    /** @var int[]|null */
+    public $askLots;
 
     // For strict CONFIRM: prefer prev_close_plan (EOD reference), but keep live prev close too.
     /** @var float|null */
@@ -46,10 +51,12 @@ class LiveTickerDto
         $ask,
         $last,
         $open,
-        $bidDepthLots,
-        $askDepthLots,
         $prevClosePlan,
         $prevCloseLive,
+        $bidLevels = null,
+        $bidLots = null,
+        $askLevels = null,
+        $askLots = null,
         $retryCount = null,
         $retryLastCheckedAt = null
     ) {
@@ -58,11 +65,14 @@ class LiveTickerDto
         $this->ask = ($ask === null) ? null : (float)$ask;
         $this->last = ($last === null) ? null : (float)$last;
         $this->open = ($open === null) ? null : (float)$open;
-        $this->bidDepthLots = ($bidDepthLots === null) ? null : (int)$bidDepthLots;
-        $this->askDepthLots = ($askDepthLots === null) ? null : (int)$askDepthLots;
         $this->prevClosePlan = ($prevClosePlan === null) ? null : (float)$prevClosePlan;
         $this->prevCloseLive = ($prevCloseLive === null) ? null : (float)$prevCloseLive;
         $this->prevClose = $this->prevClosePlan !== null ? $this->prevClosePlan : $this->prevCloseLive;
+
+        $this->bidLevels = self::toFloatArrayOrNull($bidLevels);
+        $this->bidLots = self::toIntArrayOrNull($bidLots);
+        $this->askLevels = self::toFloatArrayOrNull($askLevels);
+        $this->askLots = self::toIntArrayOrNull($askLots);
 
         $this->retryCount = ($retryCount === null) ? null : (int)$retryCount;
         $this->retryLastCheckedAt = ($retryLastCheckedAt === null || $retryLastCheckedAt === '') ? null : (string)$retryLastCheckedAt;
@@ -78,6 +88,11 @@ class LiveTickerDto
         $prevPlan = self::toFloatOrNull($a['prev_close_plan'] ?? null);
         $prevLive = self::toFloatOrNull($a['prev_close_live'] ?? ($a['prev_close'] ?? null));
 
+        $bidLevels = self::readDepthLevels($a, 'bid', 5);
+        $bidLots = self::readDepthLots($a, 'bid_lots', 5);
+        $askLevels = self::readDepthLevels($a, 'ask', 5);
+        $askLots = self::readDepthLots($a, 'ask_lots', 5);
+
         $retryCount = null;
         if (isset($a['retry_count']) && is_numeric($a['retry_count'])) $retryCount = (int)$a['retry_count'];
         $retryLast = isset($a['retry_last_checked_at']) ? (string)$a['retry_last_checked_at'] : null;
@@ -88,10 +103,12 @@ class LiveTickerDto
             self::toFloatOrNull($a['ask'] ?? ($a['ask1'] ?? null)),
             self::toFloatOrNull($a['last'] ?? ($a['open_or_last'] ?? null)),
             self::toFloatOrNull($a['open'] ?? null),
-            self::toIntOrNull($a['bid_depth_lots'] ?? ($a['bid_lots'] ?? null)),
-            self::toIntOrNull($a['ask_depth_lots'] ?? ($a['ask_lots'] ?? null)),
             $prevPlan,
             $prevLive,
+            $bidLevels,
+            $bidLots,
+            $askLevels,
+            $askLots,
             $retryCount,
             $retryLast
         );
@@ -108,11 +125,13 @@ class LiveTickerDto
             'ask' => $this->ask,
             'last' => $this->last,
             'open' => $this->open,
-            'bid_depth_lots' => $this->bidDepthLots,
-            'ask_depth_lots' => $this->askDepthLots,
             'prev_close_plan' => $this->prevClosePlan,
             'prev_close_live' => $this->prevCloseLive,
         ];
+        if ($this->bidLevels !== null) $a['bid_levels'] = $this->bidLevels;
+        if ($this->bidLots !== null) $a['bid_lots'] = $this->bidLots;
+        if ($this->askLevels !== null) $a['ask_levels'] = $this->askLevels;
+        if ($this->askLots !== null) $a['ask_lots'] = $this->askLots;
         if ($this->retryCount !== null) $a['retry_count'] = (int)$this->retryCount;
         if ($this->retryLastCheckedAt !== null) $a['retry_last_checked_at'] = $this->retryLastCheckedAt;
         return $a;
