@@ -273,12 +273,13 @@ public function buildInternal(array $opts = []): array
         // Load datasets used both by router & candidate rules
         $intradayByTicker = $this->intraRepo->snapshotsByTicker($execTradeDate);
         $w = $this->dividendWindow($execTradeDate);
-        $divEventsByTicker = $this->divRepo->eventsByTickerInWindow((string)($w['from'] ?? ''), (string)($w['to'] ?? ''));
+        $divEventsInWindowByTicker = $this->divRepo->eventsByTickerInWindow((string)($w['from'] ?? ''), (string)($w['to'] ?? ''));
+        $divNextEventsByTicker = $this->divRepo->nextEventsByTicker($execTradeDate);
         $openPositions = $this->posRepo->openPositionsByTicker();
         $hasOpenPositions = !empty($openPositions);
 
         // Policy selection: do not override selection due to global locks.
-        $policy = $this->selectPolicy($requestedPolicy, $divEventsByTicker, $intradayByTicker, $hasOpenPositions);
+        $policy = $this->selectPolicy($requestedPolicy, $divEventsInWindowByTicker, $intradayByTicker, $hasOpenPositions);
 
         // Policy doc presence gate (docs/watchlist/watchlist.md)
         if (!$this->policyDocExists($policy)) {
@@ -329,7 +330,7 @@ public function buildInternal(array $opts = []): array
                 $now,
                 $session,
                 $statusByTicker,
-                $divEventsByTicker,
+                $divNextEventsByTicker,
                 $openPositions,
                 $globalLockCodes
             );
@@ -2763,7 +2764,15 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             $exDate = is_array($div) ? (string)($div['ex_date'] ?? '') : '';
             $execDate = (string)($x['exec_trade_date'] ?? '');
 
-            if ($exDate === '' || $execDate === '') {
+            
+            // Too late: executing on/after ex_date is invalid for dividend swing entry
+            if ($exDate !== '' && $execDate !== '' && $execDate >= $exDate) {
+                $drop = true;
+                $reasonCodes[] = 'DS_TOO_LATE_EXDATE';
+                return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_TOO_LATE_EXDATE']);
+            }
+
+if ($exDate === '' || $execDate === '') {
                 $drop = true;
                 $reasonCodes[] = 'DS_EVENT_MISSING';
                 return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_EVENT_MISSING']);
