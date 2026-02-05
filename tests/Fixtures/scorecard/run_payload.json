@@ -2,7 +2,7 @@
   "trade_date": "2026-01-30",
   "exec_trade_date": "2026-01-30",
   "policy": {"selected": "WEEKLY_SWING"},
-  "recommendation": {"mode": "WITH_CAPITAL"},
+  "recommendations": {"mode": "WITH_CAPITAL"},
   "meta": {"generated_at": "2026-01-30T08:50:00+07:00"},
   "groups": {
     "top_picks": [

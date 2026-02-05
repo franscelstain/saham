@@ -97,17 +97,15 @@ class WatchlistScorecardService
         $groups = is_array($contract['groups'] ?? null) ? $contract['groups'] : [];
 
         // Preopen contract (docs/watchlist/preopen.md) uses `recommendations` (plural).
-        // Keep a small backward-compat fallback for older persisted payloads.
-        $recs = is_array($contract['recommendations'] ?? null)
-            ? $contract['recommendations']
-            : (is_array($contract['recommendation'] ?? null) ? $contract['recommendation'] : []);
+        $recs = is_array($contract['recommendations'] ?? null) ? $contract['recommendations'] : [];
+
 
         $payload = [
             'trade_date' => (string)($meta['asof_eod_date'] ?? $tradeDate),
             'exec_trade_date' => (string)($meta['trade_date'] ?? $execDate),
             'policy' => (string)($meta['policy'] ?? $policy),
             // Scorecard strategy_run stores only mode (A/B). Other recommendation fields are not needed for check-live.
-            'recommendation' => [
+            'recommendations' => [
                 'mode' => (string)($recs['mode'] ?? ''),
             ],
             'meta' => ['generated_at' => (string)($meta['generated_at'] ?? '')],
@@ -196,12 +194,9 @@ class WatchlistScorecardService
         } else {
             $generatedAt = $this->clock->nowRfc3339();
         }
-        // Contract key is `recommendations` (plural). Accept legacy `recommendation` if present.
-        $mode = strtoupper(trim((string)(
-            $payload['recommendations']['mode']
-                ?? $payload['recommendation']['mode']
-                ?? ($payload['mode'] ?? '')
-        )));
+        // Contract key is `recommendations` (plural).
+        $mode = strtoupper(trim((string)(($payload['recommendations']['mode'] ?? null) ?? ($payload['mode'] ?? ''))));
+
 
         $groups = (array)($payload['groups'] ?? []);
         $guardsFallback = new \App\DTO\Watchlist\Scorecard\CandidateGuardsDto(

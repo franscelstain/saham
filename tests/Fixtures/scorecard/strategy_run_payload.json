@@ -4,7 +4,7 @@
   "policy": {
     "selected": "PREOPEN_WEEKLY_SWING"
   },
-  "recommendation": {
+  "recommendations": {
     "mode": "ONE_SHOT"
   },
   "meta": {

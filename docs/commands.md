@@ -24,7 +24,7 @@ Dokumen ini merangkum **seluruh Artisan command** yang tersedia di TradeAxis3.3 
 
 ### C. Watchlist Score Card (live check + metrics)
 
-6. `watchlist:scorecard:check-live` — evaluasi eksekusi *real-time* berbasis snapshot bid/ask/last (spread/gap/chase + entry/avoid windows) dan menghasilkan default recommendation.
+6. `watchlist:scorecard:check-live` — evaluasi eksekusi *real-time* berbasis snapshot bid/ask/last (spread/gap/chase + entry/avoid windows) dan menghasilkan default recommendations.
 
 7. `watchlist:scorecard:compute` — hitung metrik scorecard (feasible_rate + fill_rate) dari hasil check-live + OHLC harian pada `exec_date`, lalu persist ke tabel scorecard.
 
