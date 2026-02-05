@@ -4242,8 +4242,10 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 
 
     /**
-     * Estimate total BUY cost including fee + slippage (both rounded up) for the given shares.
-     * This function is used to enforce no-overspend in recommendations.
+     * Estimate total BUY cost (gross + fee_buy) for the given shares.
+     *
+     * Docs (watchlist): estimated_cost = gross + fee_buy(gross). Slippage is NOT included
+     * in estimated_cost (slippage can be used for PnL projections separately).
      */
     private function estimateBuyTotalCost(int $entryPrice, int $shares): int
     {
@@ -4251,13 +4253,12 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         if ($rawCost <= 0) return 0;
 
         $buyFee = (int) ceil($rawCost * $this->buyFeePct);
-        $slip = (int) ceil($rawCost * $this->slippagePct);
 
-        return (int) ($rawCost + $buyFee + $slip);
+        return (int) ($rawCost + $buyFee);
     }
 
     /**
-     * Find max lots such that estimated BUY cost (incl fee+slippage) does not exceed remaining cash.
+     * Find max lots such that estimated BUY cost (gross + fee_buy) does not exceed remaining cash.
      * Uses binary search to avoid slow decrement loops.
      */
     private function maxAffordableLots(int $remaining, int $entryPrice, int $lotSize, int $lots): int
