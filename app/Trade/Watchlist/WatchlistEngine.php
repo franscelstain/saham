@@ -25,6 +25,9 @@ use App\DTO\Watchlist\Scorecard\StrategyRunDto;
 use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
 use App\DTO\Watchlist\Scorecard\LiveTickerDto;
 use App\Trade\Watchlist\Scorecard\ExecutionEligibilityEvaluator;
+use App\Trade\Watchlist\Algo\AllocationComparator;
+use App\Trade\Watchlist\Algo\WatchlistAlgoConfig;
+use App\Trade\Watchlist\Algo\WatchlistCutoffs;
 
 /**
  * WatchlistEngine
@@ -805,15 +808,8 @@ foreach ($rows as $i => $r) {
     // U = all rows (already Universe-passed).
     // Q = rows where group == 'candidate' (policy hard rules pass) and tradeability enabled.
 
-    $TOPPICK_MIN_SCORE = 0.70;
-    $TOPPICK_SCORE_GAP = 0.08;
-    $SECONDARY_MIN_SCORE = 0.55;
-    $WATCH_ONLY_MIN_SCORE = 0.35;
-
-    // Recommendations cutoff (LOCKED) per docs/watchlist/watchlist.md
-    // cut = max(MIN_RECO_SCORE, S0 - RECO_SCORE_GAP)
-    $MIN_RECO_SCORE = 0.70;
-    $RECO_SCORE_GAP = 0.05;
+    $SECONDARY_MIN_SCORE = WatchlistAlgoConfig::SECONDARY_MIN_SCORE;
+    $WATCH_ONLY_MIN_SCORE = WatchlistAlgoConfig::WATCH_ONLY_MIN_SCORE;
 
     $qIdx = [];
     foreach ($rows as $idx => $rrr) {
@@ -846,17 +842,19 @@ foreach ($rows as $i => $r) {
     };
 
     $S0 = null;
-    $topCut = $TOPPICK_MIN_SCORE;
+    $topCut = WatchlistAlgoConfig::TOPPICK_MIN_SCORE;
     if (!empty($qIdx)) {
         usort($qIdx, $cmpQ);
         $best = $rows[$qIdx[0]];
         $S0 = (isset($best['score_total']) && is_numeric($best['score_total'])) ? (float)$best['score_total'] : 0.0;
-        $topCut = max($TOPPICK_MIN_SCORE, $S0 - $TOPPICK_SCORE_GAP);
+        $topCut = WatchlistCutoffs::topPickCutoff($S0);
     }
 
     // Recommendation pool (LOCKED): use Q and apply cutoff.
     // Q already excludes avoid/no_trade and includes only eligible "candidate" rows.
-    $recoCut = max($MIN_RECO_SCORE, (($S0 !== null) ? ($S0 - $RECO_SCORE_GAP) : $MIN_RECO_SCORE));
+    $recoCut = ($S0 !== null)
+        ? WatchlistCutoffs::recommendationsCutoff($S0)
+        : WatchlistAlgoConfig::MIN_RECO_SCORE;
     $recoIndices = [];
     foreach ($qIdx as $idx) {
         $rrr = $rows[$idx] ?? null;
