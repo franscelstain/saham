@@ -157,7 +157,7 @@ class ScorecardCheckLiveGoldenMasterTest extends TestCase
                         }
                     }
                     // Drop volatile/implementation-detail keys
-                    foreach (['chase_pct', 'max_retry_windows', 'retry_count'] as $k) {
+                    foreach (['chase_pct','max_retry_windows','retry_count'] as $k) {
                         if (array_key_exists($k, $a['results'][$i]['computed'])) {
                             unset($a['results'][$i]['computed'][$k]);
                         }
@@ -180,36 +180,25 @@ class ScorecardCheckLiveGoldenMasterTest extends TestCase
                     }
                 }
 
-                // Normalize plan numeric fields to float and drop volatile guard keys.
+                // Normalize plan numeric fields.
                 if (isset($r['plan']) && is_array($r['plan'])) {
-                    foreach (['entry_trigger', 'stop_price', 'tp1_price'] as $k) {
-                        if (array_key_exists($k, $r['plan'])) {
+                    foreach (['entry_trigger', 'stop', 'tp1', 'rr_est'] as $k) {
+                        if (array_key_exists($k, $r['plan']) && $r['plan'][$k] !== null) {
                             $a['results'][$i]['plan'][$k] = (float)$r['plan'][$k];
                         }
                     }
-                    if (isset($r['plan']['execution_slices']) && is_array($r['plan']['execution_slices'])) {
-                        foreach ($r['plan']['execution_slices'] as $si => $sl) {
-                            if (!is_array($sl)) continue;
-                            foreach (['plan_limit_price', 'plan_price_cap'] as $k) {
-                                if (array_key_exists($k, $sl)) {
-                                    $a['results'][$i]['plan']['execution_slices'][$si][$k] = (float)$sl[$k];
-                                }
-                            }
-                        }
-                    }
-                    if (isset($r['plan']['guards']) && is_array($r['plan']['guards'])) {
-                        // breakout_band_pct may evolve with docs/config; don't golden-master it.
-                        foreach (['breakout_band_pct', 'max_retry_windows'] as $k) {
-                            if (array_key_exists($k, $a['results'][$i]['plan']['guards'])) {
-                                unset($a['results'][$i]['plan']['guards'][$k]);
-                            }
+
+                    // Docs-strict: plan must not leak implementation details
+                    foreach (['guards', 'execution_slices'] as $k) {
+                        if (array_key_exists($k, $a['results'][$i]['plan'])) {
+                            unset($a['results'][$i]['plan'][$k]);
                         }
                     }
                 }
 
                 // Normalize live numeric fields.
                 if (isset($r['live']) && is_array($r['live'])) {
-                    foreach (['last', 'bid1', 'ask1', 'open', 'prev_close_plan', 'prev_close_live'] as $k) {
+                    foreach (['last', 'bid', 'ask', 'open', 'prev_close_plan', 'prev_close_live'] as $k) {
                         if (array_key_exists($k, $r['live'])) {
                             $a['results'][$i]['live'][$k] = (float)$r['live'][$k];
                         }
@@ -248,31 +237,21 @@ class ScorecardCheckLiveGoldenMasterTest extends TestCase
                             $a['results'][$i]['recommended_orders'][$oi]['reasons'] = $codes;
                         }
 
-                        // Inputs used: map ask_best/bid_best -> ask1/bid1, cast spread
+                        // Inputs used: cast numerics and keep stable keys
                         if (isset($ord['inputs_used']) && is_array($ord['inputs_used'])) {
                             $in = $ord['inputs_used'];
-                            if (array_key_exists('ask_best', $in) && !array_key_exists('ask1', $in)) {
-                                $in['ask1'] = $in['ask_best'];
-                                unset($in['ask_best']);
-                            }
-                            if (array_key_exists('bid_best', $in) && !array_key_exists('bid1', $in)) {
-                                $in['bid1'] = $in['bid_best'];
-                                unset($in['bid_best']);
+                            foreach (['ask_best', 'bid_best'] as $k) {
+                                if (array_key_exists($k, $in) && $in[$k] !== null) {
+                                    $in[$k] = (float)$in[$k];
+                                }
                             }
                             if (array_key_exists('spread_pct', $in)) {
                                 $in['spread_pct'] = (float)$in['spread_pct'];
                             }
-
-                            // bid1 is not a stable contract across feeds; keep golden-master tolerant.
-                            // Always keep ask1, but null out bid1 so expected fixtures remain stable.
-                            if (array_key_exists('ask1', $in) && $in['ask1'] !== null) {
-                                $in['ask1'] = (float)$in['ask1'];
-                            }
-                            if (array_key_exists('bid1', $in)) {
-                                $in['bid1'] = null;
+                            if (array_key_exists('snapshot_age_sec', $in)) {
+                                $in['snapshot_age_sec'] = (int)$in['snapshot_age_sec'];
                             }
 
-                            // Canonical key order for assertSame.
                             $in = $this->ksortAssocRecursive($in);
                             $a['results'][$i]['recommended_orders'][$oi]['inputs_used'] = $in;
                         }

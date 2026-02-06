@@ -145,6 +145,22 @@ return [
         // Default policy if query param missing
         'policy_default' => env('WATCHLIST_POLICY_DEFAULT', 'WEEKLY_SWING'),
 
+        // Supported policies (for UI, docs, and validation)
+        'supported_policies' => [
+            'WEEKLY_SWING',
+            'DIVIDEND_SWING',
+            'POSITION_TRADE',
+            'INTRADAY_LIGHT',
+            'NO_TRADE',
+        ],
+
+        // Default session if calendar overrides missing (HH:MM:SS)
+        'session_default' => [
+            'open_time' => '09:00:00',
+            'close_time' => '16:00:00',
+            'breaks' => [],
+        ],
+
         // EOD cutoff time (HH:MM) to decide whether to use today's canonical (if available)
         'eod_cutoff_time' => env('WATCHLIST_EOD_CUTOFF_TIME', ''),
 

@@ -20,23 +20,9 @@
       "plan": {
         "setup_type": "PULLBACK",
         "entry_trigger": 6000,
-        "stop_price": 5850,
-        "tp1_price": 6200,
-        "rr_est": 1.5,
-        "guards": {
-          "max_chase_pct": 0.01,
-          "gap_up_block_pct": 0.015,
-          "spread_max_pct": 0.004,
-          "breakout_band_pct": 0.005
-        },
-        "execution_slices": [
-          {
-            "tranche": 1,
-            "lots": 100,
-            "plan_limit_price": 6000,
-            "plan_price_cap": 6060
-          }
-        ]
+        "stop": 5850,
+        "tp1": 6200,
+        "rr_est": 1.5
       },
       "computed": {
         "gap_pct": 0.005,
@@ -46,12 +32,11 @@
       },
       "live": {
         "last": 6000,
-        "bid1": 6000,
-        "ask1": 6000,
+        "bid": 6000,
+        "ask": 6000,
         "open": 6030,
         "prev_close_plan": 6000,
-        "prev_close_live": 6000,
-        "snapshot_age_sec": 0
+        "prev_close_live": 6000
       },
       "recommended_orders": [
         {
@@ -69,10 +54,10 @@
             }
           ],
           "inputs_used": {
-            "ask1": 6000,
-            "bid1": null,
             "spread_pct": 0,
-            "snapshot_age_sec": 0
+            "snapshot_age_sec": 0,
+            "ask_best": 6000,
+            "bid_best": 6000
           }
         }
       ]
@@ -91,23 +76,9 @@
       "plan": {
         "setup_type": "PULLBACK",
         "entry_trigger": 10000,
-        "stop_price": 9800,
-        "tp1_price": 10400,
-        "rr_est": 1.2,
-        "guards": {
-          "max_chase_pct": 0.01,
-          "gap_up_block_pct": 0.015,
-          "spread_max_pct": 0.004,
-          "breakout_band_pct": 0.005
-        },
-        "execution_slices": [
-          {
-            "tranche": 1,
-            "lots": 100,
-            "plan_limit_price": 10000,
-            "plan_price_cap": 10050
-          }
-        ]
+        "stop": 9800,
+        "tp1": 10400,
+        "rr_est": 1.2
       },
       "computed": {
         "gap_pct": 0.005,
@@ -117,12 +88,11 @@
       },
       "live": {
         "last": 10100,
-        "bid1": 10100,
-        "ask1": 10100,
+        "bid": 10100,
+        "ask": 10100,
         "open": 10050,
         "prev_close_plan": 10000,
-        "prev_close_live": 10000,
-        "snapshot_age_sec": 0
+        "prev_close_live": 10000
       },
       "recommended_orders": [
         {
@@ -140,10 +110,10 @@
             }
           ],
           "inputs_used": {
-            "ask1": 10100,
-            "bid1": null,
             "spread_pct": 0,
-            "snapshot_age_sec": 0
+            "snapshot_age_sec": 0,
+            "ask_best": 10100,
+            "bid_best": 10100
           }
         }
       ]

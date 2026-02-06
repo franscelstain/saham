@@ -50,8 +50,8 @@ class ExecutionEligibilityEvaluator
                 $planByTicker[$t] = [
                     'setup_type' => $cand->setupType,
                     'entry_trigger' => ($cand->entryTrigger === null) ? null : (float)$cand->entryTrigger,
-                    'stop_price' => $cand->stopPrice,
-                    'tp1_price' => $cand->tp1Price,
+                    'stop' => $cand->stopPrice,
+                    'tp1' => $cand->tp1Price,
                     'rr_est' => $cand->rrEst,
                     'execution_slices' => (array)$cand->executionSlices,
                 ];
@@ -129,16 +129,23 @@ class ExecutionEligibilityEvaluator
         ];
 
         $planBlock = $this->buildPlanBlock($plan, $guards);
+        $planOut = [
+            'setup_type' => (string)($planBlock['setup_type'] ?? ''),
+            'entry_trigger' => isset($planBlock['entry_trigger']) ? (int)round((float)$planBlock['entry_trigger']) : null,
+            'stop' => isset($planBlock['stop']) ? (int)round((float)$planBlock['stop']) : null,
+            'tp1' => isset($planBlock['tp1']) ? (int)round((float)$planBlock['tp1']) : null,
+            'rr_est' => isset($planBlock['rr_est']) ? (float)$planBlock['rr_est'] : null,
+        ];
 
         // --- PLAN minimum ---
         $slices = isset($planBlock['execution_slices']) && is_array($planBlock['execution_slices']) ? $planBlock['execution_slices'] : [];
         if (empty($slices)) {
-            return $this->resultReject($ticker, ['CF_PLAN_INPUT_MISSING'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
+            return $this->resultReject($ticker, ['CF_PLAN_INPUT_MISSING'], $planOut, $computed, $this->liveBlockFromDto($live));
         }
 
         // --- LIVE minimum ---
         if (!$live || $live->ticker === '') {
-            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_INPUT_MISSING'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows);
+            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_INPUT_MISSING'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows);
         }
 
         $bid = $live->bid;
@@ -155,31 +162,31 @@ class ExecutionEligibilityEvaluator
         $prevPlan = $live->prevClosePlan;
 
         if ($bid === null || $ask === null || $last === null || $bid <= 0 || $ask <= 0) {
-            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_INPUT_MISSING'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows);
+            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_INPUT_MISSING'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows);
         }
 
         if ($bid > $ask) {
-            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_BOOK_INVALID'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows);
+            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_BOOK_INVALID'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows);
         }
 
         // Stale detector (tolerance based on bid/ask vs last)
         if ($this->isStaleBook($bid, $ask, $last, $this->cfg->staleTolPct)) {
-            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_SNAPSHOT_STALE'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows);
+            return $this->resultDelayWithRetry($ticker, ['CF_LIVE_SNAPSHOT_STALE'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows);
         }
 
         // Entry/avoid window
         $checkedAt = $snapshot->checkedAt;
         if (!$this->isInAnyWindow($checkedAt, $snapshot->sessionOpenTime, $snapshot->sessionCloseTime, (array)($windows['entry_windows'] ?? []))) {
-            return $this->resultDelayWithRetry($ticker, ['CF_NOT_IN_ENTRY_WINDOW'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows);
+            return $this->resultDelayWithRetry($ticker, ['CF_NOT_IN_ENTRY_WINDOW'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows);
         }
         if ($this->isInAnyWindow($checkedAt, $snapshot->sessionOpenTime, $snapshot->sessionCloseTime, (array)($windows['avoid_windows'] ?? []))) {
-            return $this->resultDelayWithRetry($ticker, ['CF_IN_AVOID_WINDOW'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows);
+            return $this->resultDelayWithRetry($ticker, ['CF_IN_AVOID_WINDOW'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows);
         }
 
         // Compute guard metrics
         $entryTrigger = isset($planBlock['entry_trigger']) ? (float)$planBlock['entry_trigger'] : 0.0;
         if ($entryTrigger <= 0) {
-            return $this->resultReject($ticker, ['CF_PLAN_INPUT_MISSING'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
+            return $this->resultReject($ticker, ['CF_PLAN_INPUT_MISSING'], $planOut, $computed, $this->liveBlockFromDto($live));
         }
 
         // --- Price reference (open vs last) locked by window ---
@@ -216,7 +223,7 @@ class ExecutionEligibilityEvaluator
         // Hard guards
         $gapBlock = (float)($guards['gap_up_block_pct'] ?? 0.0);
         if ($gapBlock > 0 && $computed['gap_pct'] !== null && $computed['gap_pct'] > $gapBlock) {
-            return $this->resultReject($ticker, ['CF_GAP_UP_BLOCK'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
+            return $this->resultReject($ticker, ['CF_GAP_UP_BLOCK'], $planOut, $computed, $this->liveBlockFromDto($live));
         }
 
                 // Book depth guard (Top-N lots) when enabled
@@ -226,13 +233,13 @@ class ExecutionEligibilityEvaluator
             $sumBid = $this->sumLotsTopN($live->bidLots, $depthN);
             $sumAsk = $this->sumLotsTopN($live->askLots, $depthN);
             if (($minBid > 0 && $sumBid < $minBid) || ($minAsk > 0 && $sumAsk < $minAsk)) {
-                return $this->resultDelayWithRetry($ticker, ['CF_BOOK_TOO_THIN'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows, []);
+                return $this->resultDelayWithRetry($ticker, ['CF_BOOK_TOO_THIN'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows, []);
             }
         }
 
 $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
         if ($spreadMax > 0 && $computed['spread_pct'] !== null && $computed['spread_pct'] > $spreadMax) {
-            return $this->resultReject($ticker, ['CF_SPREAD_TOO_WIDE'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
+            return $this->resultReject($ticker, ['CF_SPREAD_TOO_WIDE'], $planOut, $computed, $this->liveBlockFromDto($live));
         }
 
         // BREAKOUT strict rule: lower bound (last >= entry) + upper band (last <= entry*(1+band))
@@ -240,10 +247,10 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
         $bandPct = (float)($guards['breakout_band_pct'] ?? 0.0);
         if ($setup === 'BREAKOUT') {
             if ($last < $entryTrigger) {
-                return $this->resultDelayWithRetry($ticker, ['CF_BREAKOUT_BELOW_ENTRY'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows);
+                return $this->resultDelayWithRetry($ticker, ['CF_BREAKOUT_BELOW_ENTRY'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows);
             }
             if ($bandPct > 0 && $last > ($entryTrigger * (1.0 + $bandPct))) {
-                return $this->resultReject($ticker, ['CF_BREAKOUT_TOO_EXTENDED'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']));
+                return $this->resultReject($ticker, ['CF_BREAKOUT_TOO_EXTENDED'], $planOut, $computed, $this->liveBlockFromDto($live));
             }
         }
 
@@ -264,7 +271,6 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
             if ($n <= 0 || $lots <= 0 || $planLimit <= 0) {
                 $orders[] = [
                     'n' => ($n > 0 ? $n : (count($orders) + 1)),
-                    'time_window' => (string)($slice['time_window'] ?? ($slice['time'] ?? '')),
                     'lots' => ($lots > 0 ? $lots : null),
                     'action' => 'SKIP',
                     'recommended_limit_price' => null,
@@ -291,7 +297,6 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
                 $waitReason = $waitReason ?: 'CF_CHASE_BLOCK';
                 $orders[] = [
                     'n' => $n,
-                'time_window' => (string)($slice['time_window'] ?? ($slice['time'] ?? '')),
                     'lots' => $lots,
                     'action' => 'WAIT',
                     'recommended_limit_price' => null,
@@ -329,7 +334,6 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
             $hasPlace = true;
             $orders[] = [
                 'n' => $n,
-                'time_window' => (string)($slice['time_window'] ?? ($slice['time'] ?? '')),
                 'lots' => $lots,
                 'action' => 'PLACE_LIMIT',
                 'recommended_limit_price' => $limit,
@@ -361,19 +365,19 @@ if ($hasPlace) {
                 null,
                 $planBlock,
                 $computed,
-                $this->liveBlockFromDto($live, $computed['snapshot_age_sec']),
+                $this->liveBlockFromDto($live),
                 $orders
             );
         }
 
         if ($hasWait) {
             // DELAY (retry budget)
-            return $this->resultDelayWithRetry($ticker, [$waitReason ?: 'CF_CHASE_BLOCK'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $snapshot, $live, $maxRetryWindows, $orders);
+            return $this->resultDelayWithRetry($ticker, [$waitReason ?: 'CF_CHASE_BLOCK'], $planOut, $computed, $this->liveBlockFromDto($live), $snapshot, $live, $maxRetryWindows, $orders);
         }
 
         // Nothing placeable and nothing waitable -> reject
         $computed['retry_count'] = $this->retryCountFromLive($live);
-        return $this->resultReject($ticker, ['CF_NO_SLICES'], $planBlock, $computed, $this->liveBlockFromDto($live, $computed['snapshot_age_sec']), $orders);
+        return $this->resultReject($ticker, ['CF_NO_SLICES'], $planOut, $computed, $this->liveBlockFromDto($live), $orders);
     }
 
     /**
@@ -614,8 +618,8 @@ if ($hasPlace) {
         return [
             'setup_type' => (string)($plan['setup_type'] ?? ''),
             'entry_trigger' => isset($plan['entry_trigger']) ? (float)$plan['entry_trigger'] : (isset($plan['entry_trigger_price']) ? (float)$plan['entry_trigger_price'] : null),
-            'stop_price' => isset($plan['stop_price']) ? (float)$plan['stop_price'] : null,
-            'tp1_price' => isset($plan['tp1_price']) ? (float)$plan['tp1_price'] : null,
+            'stop' => isset($plan['stop']) ? (float)$plan['stop'] : (isset($plan['stop_price']) ? (float)$plan['stop_price'] : null),
+            'tp1' => isset($plan['tp1']) ? (float)$plan['tp1'] : (isset($plan['tp1_price']) ? (float)$plan['tp1_price'] : null),
             'rr_est' => isset($plan['rr_est']) ? (float)$plan['rr_est'] : null,
             'guards' => [
                 'max_chase_pct' => (float)($guards['max_chase_pct'] ?? 0),
@@ -628,39 +632,37 @@ if ($hasPlace) {
         ];
     }
 
-    private function clampLimitPrice(float $ask1, float $cap, float $planLimit): float
+    private function clampLimitPrice(float $ask1, float $cap, float $planLimit): int
     {
         $v = $ask1;
         if ($cap > 0) $v = min($v, $cap);
         if ($planLimit > 0) $v = min($v, $planLimit);
-        return $v;
+        return (int)round($v);
     }
 
     /**
      * @return array<string,mixed>
      */
-    private function liveBlockFromDto(?LiveTickerDto $live, int $ageSec): array
+    private function liveBlockFromDto(?LiveTickerDto $live): array
     {
         if (!$live) {
             return [
-                'last' => null,
-                'bid1' => null,
-                'ask1' => null,
-                'open' => null,
-                'prev_close_plan' => null,
-                'prev_close_live' => null,
-                'snapshot_age_sec' => $ageSec,
+                "last" => null,
+                "bid" => null,
+                "ask" => null,
+                "open" => null,
+                "prev_close_plan" => null,
+                "prev_close_live" => null,
             ];
         }
 
         return [
-            'last' => $live->last,
-            'bid1' => $live->bid,
-            'ask1' => $live->ask,
-            'open' => $live->open,
-            'prev_close_plan' => $live->prevClosePlan,
-            'prev_close_live' => $live->prevCloseLive,
-            'snapshot_age_sec' => $ageSec,
+            "last" => ($live->last === null ? null : (int)round($live->last)),
+            "bid" => ($live->bid === null ? null : (int)round($live->bid)),
+            "ask" => ($live->ask === null ? null : (int)round($live->ask)),
+            "open" => ($live->open === null ? null : (int)round($live->open)),
+            "prev_close_plan" => ($live->prevClosePlan === null ? null : (int)round($live->prevClosePlan)),
+            "prev_close_live" => ($live->prevCloseLive === null ? null : (int)round($live->prevCloseLive)),
         ];
     }
 
