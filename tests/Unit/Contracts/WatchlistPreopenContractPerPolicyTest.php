@@ -44,12 +44,13 @@ class WatchlistPreopenContractPerPolicyTest extends TestCase
             $doc = $engine->buildPreopen([
                 'policy' => $policy,
                 'eod_date' => '2026-01-30',
-                'capital_idr' => 10_000_000,
+                'capital_total' => 10_000_000,
                 'now_ts' => '2026-02-03T08:00:00+07:00',
             ]);
 
             $validator->validate($doc);
-            $this->assertSame($policy, (string)($doc['meta']['policy'] ?? ''));
+            $selected = (string)($doc['policy']['selected'] ?? ($doc['meta']['policy'] ?? ''));
+            $this->assertSame($policy, $selected);
         }
     }
 
@@ -175,7 +176,7 @@ class WatchlistPreopenContractPerPolicyTest extends TestCase
         };
 
         $posRepo = new class extends PortfolioPositionRepository {
-            public function openPositionsByTicker(): array { return []; }
+            public function openPositionsByTicker(int $accountId = 1): array { return []; }
         };
 
         $policyDocs = new class implements PolicyDocLocator {
@@ -185,9 +186,10 @@ class WatchlistPreopenContractPerPolicyTest extends TestCase
             }
         };
 
-        $ctor = new \ReflectionMethod(WatchlistEngine::class, '__construct');
+        $rc = new \ReflectionClass(WatchlistEngine::class);
+        $ctor = $rc->getConstructor();
         $args = [];
-        foreach ($ctor->getParameters() as $p) {
+        foreach (($ctor ? $ctor->getParameters() : []) as $p) {
             $t = $p->getType();
             $name = $t ? (string)$t : '';
             switch ($name) {
@@ -210,7 +212,7 @@ class WatchlistPreopenContractPerPolicyTest extends TestCase
         }
 
         /** @var WatchlistEngine $engine */
-        $engine = $ctor->invokeArgs($args);
+        $engine = $rc->newInstanceArgs($args);
         return $engine;
     }
 }

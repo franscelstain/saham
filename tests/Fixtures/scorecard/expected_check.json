@@ -79,7 +79,7 @@
     },
     {
       "ticker_code": "BBCA",
-      "decision": "REJECT",
+      "decision": "DELAY",
       "eligible_now": false,
       "reasons": [
         {

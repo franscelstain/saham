@@ -25,9 +25,6 @@ use App\DTO\Watchlist\Scorecard\StrategyRunDto;
 use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
 use App\DTO\Watchlist\Scorecard\LiveTickerDto;
 use App\Trade\Watchlist\Scorecard\ExecutionEligibilityEvaluator;
-use App\Trade\Watchlist\Algo\AllocationComparator;
-use App\Trade\Watchlist\Algo\WatchlistAlgoConfig;
-use App\Trade\Watchlist\Algo\WatchlistCutoffs;
 
 /**
  * WatchlistEngine
@@ -501,7 +498,7 @@ $netEdgePct = function(int $entry, int $lotSize, ?int $profitNet) {
     return round($profitNet / $cost, 4);
 };
 
-$capitalTotal = $opts['capital_idr'] ?? null; // strict: docs use capital_idr
+$capitalTotal = $opts['capital_idr'] ?? ($opts['capital_total'] ?? null); // legacy fallback: capital_total
 
 $topPickIndices = [];
 foreach ($rows as $i => $r) {
@@ -515,7 +512,7 @@ foreach ($rows as $i => $r) {
     $lotSize = (int)($sizing['lot_size'] ?? 100);
 
     if ($policy === 'WEEKLY_SWING') {
-        // WeeklySwing: evaluate viability when capital_idr is provided.
+        // WeeklySwing: evaluate viability when capital_total is provided.
         $rows[$i]['plan']['trade_viability']['evaluated'] = ($capitalTotal !== null);
         if ($capitalTotal === null) {
             $rows[$i]['plan']['trade_viability']['is_viable'] = null;
@@ -784,115 +781,39 @@ foreach ($rows as $i => $r) {
             return $res;
         }
 
-        // Grouping semantics (LOCKED) per docs/watchlist/watchlist.md
-        // NOTE: We only set provisional flags here; final grouping is computed after this loop
-        // because it depends on S0 (top score) from Q.
-        if (strtoupper((string)$policy) === 'NO_TRADE') {
-            $rows[$i]['group'] = 'no_trade';
+        // NO_TRADE policy → groups.no_trade (monitoring only)
+    if (strtoupper((string)$policy) === 'NO_TRADE') {
+        $rows[$i]['group'] = 'no_trade';
+        continue;
+    }
+
+    $elig = (bool)($r['plan']['is_eligible_new_entry'] ?? true);
+    $st = (float)($r['score_total'] ?? 0);
+
+    if ($elig) {
+        if ($st >= $scoreCutTop) {
+            $rows[$i]['group'] = 'top_picks';
+            $topPickIndices[] = $i;
             continue;
         }
-
-        $elig = (bool)($r['plan']['is_eligible_new_entry'] ?? true);
-        $tradeDisabled = (bool)($r['timing']['trade_disabled'] ?? false);
-
-        if ($tradeDisabled) {
-            $rows[$i]['group'] = 'avoid';
+        if ($st >= $secondaryMin) {
+            $rows[$i]['group'] = 'secondary';
             continue;
         }
-
-        // candidate: passed policy hard rules (eligible for new entry) and tradeability enabled
-        $rows[$i]['group'] = $elig ? 'candidate' : 'watch_candidate';
-    }
-
-    // ---- Final grouping pass (LOCKED) ----
-    // U = all rows (already Universe-passed).
-    // Q = rows where group == 'candidate' (policy hard rules pass) and tradeability enabled.
-
-    $SECONDARY_MIN_SCORE = WatchlistAlgoConfig::SECONDARY_MIN_SCORE;
-    $WATCH_ONLY_MIN_SCORE = WatchlistAlgoConfig::WATCH_ONLY_MIN_SCORE;
-
-    $qIdx = [];
-    foreach ($rows as $idx => $rrr) {
-        if ((string)($rrr['group'] ?? '') === 'candidate') $qIdx[] = (int)$idx;
-    }
-
-    // Sort Q (LOCKED): score desc, dv20 desc, atr_pct asc, tick_pct asc, ticker_code asc
-    $cmpQ = function(int $a, int $b) use ($rows): int {
-        $ra = $rows[$a];
-        $rb = $rows[$b];
-        $sa = (isset($ra['score_total']) && is_numeric($ra['score_total'])) ? (float)$ra['score_total'] : -INF;
-        $sb = (isset($rb['score_total']) && is_numeric($rb['score_total'])) ? (float)$rb['score_total'] : -INF;
-        if ($sa != $sb) return ($sa > $sb) ? -1 : 1;
-
-        $dva = (isset($ra['derived']['dv20_idr']) && is_numeric($ra['derived']['dv20_idr'])) ? (float)$ra['derived']['dv20_idr'] : -INF;
-        $dvb = (isset($rb['derived']['dv20_idr']) && is_numeric($rb['derived']['dv20_idr'])) ? (float)$rb['derived']['dv20_idr'] : -INF;
-        if ($dva != $dvb) return ($dva > $dvb) ? -1 : 1;
-
-        $atra = (isset($ra['derived']['atr_pct']) && is_numeric($ra['derived']['atr_pct'])) ? (float)$ra['derived']['atr_pct'] : INF;
-        $atrb = (isset($rb['derived']['atr_pct']) && is_numeric($rb['derived']['atr_pct'])) ? (float)$rb['derived']['atr_pct'] : INF;
-        if ($atra != $atrb) return ($atra < $atrb) ? -1 : 1;
-
-        $tpa = (isset($ra['derived']['tick_pct']) && is_numeric($ra['derived']['tick_pct'])) ? (float)$ra['derived']['tick_pct'] : INF;
-        $tpb = (isset($rb['derived']['tick_pct']) && is_numeric($rb['derived']['tick_pct'])) ? (float)$rb['derived']['tick_pct'] : INF;
-        if ($tpa != $tpb) return ($tpa < $tpb) ? -1 : 1;
-
-        $ca = (string)($ra['ticker_code'] ?? '');
-        $cb = (string)($rb['ticker_code'] ?? '');
-        return strcmp($ca, $cb);
-    };
-
-    $S0 = null;
-    $topCut = WatchlistAlgoConfig::TOPPICK_MIN_SCORE;
-    if (!empty($qIdx)) {
-        usort($qIdx, $cmpQ);
-        $best = $rows[$qIdx[0]];
-        $S0 = (isset($best['score_total']) && is_numeric($best['score_total'])) ? (float)$best['score_total'] : 0.0;
-        $topCut = WatchlistCutoffs::topPickCutoff($S0);
-    }
-
-    // Recommendation pool (LOCKED): use Q and apply cutoff.
-    // Q already excludes avoid/no_trade and includes only eligible "candidate" rows.
-    $recoCut = ($S0 !== null)
-        ? WatchlistCutoffs::recommendationsCutoff($S0)
-        : WatchlistAlgoConfig::MIN_RECO_SCORE;
-    $recoIndices = [];
-    foreach ($qIdx as $idx) {
-        $rrr = $rows[$idx] ?? null;
-        if (!$rrr) continue;
-        $st = (isset($rrr['score_total']) && is_numeric($rrr['score_total'])) ? (float)$rrr['score_total'] : 0.0;
-        if ($st >= $recoCut) {
-            $recoIndices[] = (int)$idx;
-        }
-    }
-
-    $topPickIndices = [];
-    foreach ($rows as $idx => $rrr) {
-        $g = (string)($rrr['group'] ?? 'watch_candidate');
-        if ($g === 'no_trade' || $g === 'avoid') {
-            // keep
+        if ($st >= $watchMin) {
+            $rows[$i]['group'] = 'watch_only';
             continue;
         }
-
-        $st = (isset($rrr['score_total']) && is_numeric($rrr['score_total'])) ? (float)$rrr['score_total'] : 0.0;
-
-        if ($g === 'candidate') {
-            if ($st >= $topCut) {
-                $rows[$idx]['group'] = 'top_picks';
-                $topPickIndices[] = (int)$idx;
-            } elseif ($st >= $SECONDARY_MIN_SCORE) {
-                $rows[$idx]['group'] = 'secondary';
-            } elseif ($st >= $WATCH_ONLY_MIN_SCORE) {
-                $rows[$idx]['group'] = 'watch_only';
-            } else {
-                $rows[$idx]['group'] = 'excluded';
-            }
-        } else {
-            // watch_candidate: failed hard rules; still can appear as watch_only if score meets WATCH_ONLY_MIN_SCORE
-            $rows[$idx]['group'] = ($st >= $WATCH_ONLY_MIN_SCORE) ? 'watch_only' : 'excluded';
-        }
+        // Below WATCH_ONLY_MIN_SCORE: exclude from groups output (docs/watchlist/watchlist.md).
+        $rows[$i]['group'] = 'excluded';
+        continue;
     }
 
-// Recommendations (allocations) use reco pool (Q + cutoff) per docs/watchlist/watchlist.md.
+    // Failed hard rules policy: may appear as watch_only only if score meets WATCH_ONLY_MIN_SCORE.
+    $rows[$i]['group'] = ($st >= $watchMin) ? 'watch_only' : 'excluded';
+}
+
+// Recommendations (allocations) use top-picks as the universe, but do NOT cap top-picks.
 $recs = $this->buildRecommendations(
     $policy,
     $policyMeta,
@@ -900,7 +821,7 @@ $recs = $this->buildRecommendations(
     $openPositions,
     $capitalTotal,
     $rows,
-    $recoIndices
+    $topPickIndices
 );
 
 // Build groups (LOCKED keys: top_picks, secondary, watch_only, avoid, no_trade)
@@ -1350,7 +1271,7 @@ $plan = [
 	{
 	    $recs = (array)($p['plan']['recommendations'] ?? []);
 	    $capital = null;
-	    $capRaw = $recs['capital_idr'] ?? null; // strict
+	    $capRaw = $recs['capital_idr'] ?? ($recs['capital_total'] ?? null); // legacy fallback
 	    if ($capRaw !== null && is_numeric($capRaw)) {
 	        $capital = (int)round((float)$capRaw);
 	    }
@@ -3966,61 +3887,45 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 ];
             }
 
-            // Allocation pool ordering (LOCKED, docs/watchlist/watchlist.md):
-            // 1) score_total desc
-            // 2) plan.rr_est desc
-            // 3) plan.stop_pct asc
-            // 4) dv20_idr desc
-            // 5) atr_pct asc
-            // 6) ticker_code asc
-            $poolIdx = $this->sortAllocationPoolIndices($poolIdx, $candidates);
-
-            // Initial selection = first N in sorted pool.
-            // Step 5 (LOCKED, docs/watchlist/watchlist.md): binding allocation algorithm
-            // - if lots < 1 (or < min_lots) => DROP ticker
-            // - renormalize weights
-            // - backfill with next ranked pool ticker
-            // - repeat until stable or pool exhausted
-            $activeIdx = array_slice($poolIdx, 0, $target);
-            $nextPoolPos = count($activeIdx);
+            // Initial selection = first N in pool.
+            $selectedIdx = array_slice($poolIdx, 0, $target);
+            $nextPoolPos = count($selectedIdx);
 
             $minLots = (int)($policyMeta['min_lots'] ?? 1);
             $minAlloc = (int)($policyMeta['min_alloc_idr'] ?? 0);
 
             $allocs = [];
+            $lastSignature = null;
             $iter = 0;
-            $maxIter = 30; // defensive
+            $maxIter = 20; // defensive; pool is small in practice
 
             while ($iter++ < $maxIter) {
-                if (empty($activeIdx)) {
-                    $allocs = [];
-                    break;
-                }
+                if (empty($selectedIdx)) break;
 
-                // Ensure determinism: keep activeIdx order as pool ranking order.
-                $sig = implode(',', $activeIdx) . '|' . (string)$nextPoolPos;
-                if (isset($seen[$sig])) break;
-                $seen[$sig] = true;
+                // Prevent infinite loops.
+                $sig = implode(',', $selectedIdx);
+                if ($sig === $lastSignature) break;
+                $lastSignature = $sig;
 
-                // Renormalize weights every iteration (after drops/backfills).
-                $weights = $this->computeRecommendationWeights($activeIdx, $candidates);
+                // Recompute weights after each backfill (LOCKED: renormalize after drops).
+                $weights = $this->computeRecommendationWeights($selectedIdx, $candidates);
+                $remaining = $capitalTotal;
 
-                $remaining = (int)$capitalTotal;
                 $allocsPass = [];
-                $dropIdx = [];
+                $allocatedIdxMap = [];
 
-                foreach ($activeIdx as $k => $idx) {
+                foreach ($selectedIdx as $k => $idx) {
                     $c = $candidates[$idx];
-                    $w = $weights[$k] ?? (1.0 / max(1, count($activeIdx)));
+                    $w = $weights[$k] ?? (1.0 / max(1, count($selectedIdx)));
 
-                    // Intended budget from total capital (docs: alloc_pct is weight share)
+                    // Budget is derived from total capital and weight, but allocations must never overspend remaining cash.
                     $intendedBudget = (int) floor($capitalTotal * $w * $sizeMult);
-                    if ($intendedBudget < 0) $intendedBudget = 0;
                     $budget = (int) min($intendedBudget, $remaining);
 
                     $entryRef = (int)($c['levels']['entry_trigger_price'] ?? 0);
                     $lotSize = 100;
 
+                    // Mini tranche profile (LOCKED, watchlist.md) and conservative price cap for affordability.
                     $setupKind = $this->inferSetupKind((string)($c['setup_type'] ?? 'BREAKOUT'));
                     $stopRef = (int)($c['levels']['stop_loss_price'] ?? 0);
                     $tp1Ref = (int)($c['levels']['tp1_price'] ?? 0);
@@ -4031,33 +3936,31 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                     if (isset($c['derived']['tick_pct']) && is_numeric($c['derived']['tick_pct'])) $tickPct = (float)$c['derived']['tick_pct'];
                     $hasCaEvent = !empty($c['basis']['ca_event'] ?? null) || !empty($c['basis']['ca_hint'] ?? null);
                     $profile = $this->selectMiniTrancheProfile($policy, $rrEst, $atrPct, $tickPct, $hasCaEvent);
-
-                    // Conservative price cap for affordability: plan_price_cap if available.
                     $priceCapRef = $this->computePlanPriceCap($policy, $setupKind, $entryRef);
-                    $refPrice = ($priceCapRef > 0) ? $priceCapRef : $entryRef;
 
-                    if ($budget <= 0 || $remaining <= 0 || $entryRef <= 0 || $refPrice <= 0) {
-                        $dropIdx[] = $idx;
+                    if ($budget <= 0 || $remaining <= 0 || $entryRef <= 0) {
+                        $code = $this->policyPrefix($policy) . '_INSUFFICIENT_CASH';
                         $addSkip([
                             'ticker_code' => (string)($c['ticker_code'] ?? ''),
-                            'reason_code' => $this->policyPrefix($policy) . '_INSUFFICIENT_CASH',
+                            'reason_code' => $code,
                             'alloc_budget' => $budget,
                             'entry_price_ref' => $entryRef,
                         ]);
                         continue;
                     }
 
-                    // Lots derived from budget and remaining cash.
+                    // First-pass lots from budget, then enforce affordability against remaining cash (include fee + slippage).
+                    $refPrice = ($priceCapRef > 0) ? $priceCapRef : $entryRef;
+
                     $lots = (int) floor($budget / ($refPrice * $lotSize));
                     $lots = min($lots, (int) floor($remaining / ($refPrice * $lotSize)));
                     $lots = $this->maxAffordableLots($remaining, $refPrice, $lotSize, $lots);
 
-                    // Binding rule: if lots < min lots OR budget below min_alloc -> DROP (not skip/backfill in same pass)
                     if ($lots < $minLots || $budget < $minAlloc) {
-                        $dropIdx[] = $idx;
+                        $code = $this->policyPrefix($policy) . '_MIN_TRADE_VIABILITY_FAIL';
                         $addSkip([
                             'ticker_code' => (string)($c['ticker_code'] ?? ''),
-                            'reason_code' => $this->policyPrefix($policy) . '_MIN_TRADE_VIABILITY_FAIL',
+                            'reason_code' => $code,
                             'alloc_budget' => $budget,
                             'entry_price_ref' => $entryRef,
                         ]);
@@ -4067,11 +3970,12 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                     $shares = $lots * $lotSize;
                     $estCost = $this->estimateBuyTotalCost($refPrice, $shares);
 
-                    if ($estCost <= 0 || $estCost > $remaining) {
-                        $dropIdx[] = $idx;
+                    // Absolute guard: never overspend remaining cash.
+                    if ($estCost > $remaining) {
+                        $code = $this->policyPrefix($policy) . '_INSUFFICIENT_CASH';
                         $addSkip([
                             'ticker_code' => (string)($c['ticker_code'] ?? ''),
-                            'reason_code' => $this->policyPrefix($policy) . '_INSUFFICIENT_CASH',
+                            'reason_code' => $code,
                             'alloc_budget' => $budget,
                             'entry_price_ref' => $entryRef,
                         ]);
@@ -4087,45 +3991,49 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                         'alloc_budget' => $budget,
                         'entry_price_ref' => $entryRef,
                         'lots_recommended' => $lots,
-                        // estimated_cost is TOTAL buy cost used for remaining_cash accounting.
+                        // NOTE: estimated_cost is TOTAL cost (buy + fee + slippage) so remaining_cash is consistent.
                         'estimated_cost' => (int)$estCost,
                         'execution_slices' => $this->buildExecutionSlices($policy, $setupKind, $entryRef, $lots, $profile),
                         'remaining_cash' => (int)$remainingAfter,
                     ];
+                    $allocatedIdxMap[$idx] = true;
 
                     if ($remaining <= 0) break;
                 }
 
-                // If no drops, allocation is stable -> accept.
-                if (empty($dropIdx)) {
+                // If we already hit target allocations, accept this pass.
+                if (count($allocsPass) >= $target) {
                     $allocs = $allocsPass;
                     break;
                 }
 
-                // DROP tickers that failed min-lot / min-alloc / cash checks.
-                $dropMap = array_fill_keys($dropIdx, true);
-                $newActive = [];
-                foreach ($activeIdx as $idx) {
-                    if (!isset($dropMap[$idx])) $newActive[] = $idx;
+                // If we cannot backfill any more, accept best effort and stop.
+                if ($nextPoolPos >= count($poolIdx) || $remaining <= 0) {
+                    $allocs = $allocsPass;
+                    break;
                 }
 
-                // Backfill with next ranked pool tickers until we reach target size.
-                while (count($newActive) < $target && $nextPoolPos < count($poolIdx)) {
-                    $candIdx = $poolIdx[$nextPoolPos++];
-                    if (!in_array($candIdx, $newActive, true)) {
-                        $newActive[] = $candIdx;
+                // Remove selected tickers that failed to allocate, then backfill with next ranked pool tickers.
+                $nextSelected = [];
+                foreach ($selectedIdx as $idx) {
+                    if (isset($allocatedIdxMap[$idx])) {
+                        $nextSelected[] = $idx;
                     }
                 }
 
-                // If active set doesn't change, stop best-effort.
-                if (implode(',', $newActive) === implode(',', $activeIdx)) {
+                // Backfill until we reach target selection size or pool exhausted.
+                while (count($nextSelected) < $target && $nextPoolPos < count($poolIdx)) {
+                    $nextSelected[] = $poolIdx[$nextPoolPos++];
+                }
+
+                // If selection does not change, stop.
+                if (implode(',', $nextSelected) === $sig) {
                     $allocs = $allocsPass;
                     break;
                 }
 
-                $activeIdx = $newActive;
+                $selectedIdx = $nextSelected;
             }
-
 
 
 
@@ -4240,10 +4148,8 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 
 
     /**
-     * Estimate total BUY cost (gross + fee_buy) for the given shares.
-     *
-     * Docs (watchlist): estimated_cost = gross + fee_buy(gross). Slippage is NOT included
-     * in estimated_cost (slippage can be used for PnL projections separately).
+     * Estimate total BUY cost including fee + slippage (both rounded up) for the given shares.
+     * This function is used to enforce no-overspend in recommendations.
      */
     private function estimateBuyTotalCost(int $entryPrice, int $shares): int
     {
@@ -4251,12 +4157,13 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         if ($rawCost <= 0) return 0;
 
         $buyFee = (int) ceil($rawCost * $this->buyFeePct);
+        $slip = (int) ceil($rawCost * $this->slippagePct);
 
-        return (int) ($rawCost + $buyFee);
+        return (int) ($rawCost + $buyFee + $slip);
     }
 
     /**
-     * Find max lots such that estimated BUY cost (gross + fee_buy) does not exceed remaining cash.
+     * Find max lots such that estimated BUY cost (incl fee+slippage) does not exceed remaining cash.
      * Uses binary search to avoid slow decrement loops.
      */
     private function maxAffordableLots(int $remaining, int $entryPrice, int $lotSize, int $lots): int
@@ -4300,57 +4207,6 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
     {
         $res = $this->policyDocs->check($policy);
         return (bool) $res->ok;
-    }
-
-    /**
-     * Sort pool indices for capital allocation ordering.
-     *
-     * LOCKED (docs/watchlist/watchlist.md):
-     * 1) score_total desc
-     * 2) plan.rr_est desc
-     * 3) plan.stop_pct asc
-     * 4) dv20_idr desc
-     * 5) atr_pct asc
-     * 6) ticker_code asc
-     *
-     * @param int[] $indices
-     * @param array<int,array<string,mixed>> $candidates
-     * @return int[]
-     */
-    private function sortAllocationPoolIndices(array $indices, array $candidates): array
-    {
-        $indices = array_values($indices);
-
-        usort($indices, function ($ia, $ib) use ($candidates): int {
-            $a = $candidates[$ia] ?? [];
-            $b = $candidates[$ib] ?? [];
-
-            $scoreA = (float)($a['derived']['score_total'] ?? 0.0);
-            $scoreB = (float)($b['derived']['score_total'] ?? 0.0);
-            if ($scoreA !== $scoreB) return ($scoreA > $scoreB) ? -1 : 1;
-
-            $rrA = (float)($a['plan']['rr_est'] ?? 0.0);
-            $rrB = (float)($b['plan']['rr_est'] ?? 0.0);
-            if ($rrA !== $rrB) return ($rrA > $rrB) ? -1 : 1;
-
-            $stopA = (float)($a['plan']['stop_pct'] ?? 999.0);
-            $stopB = (float)($b['plan']['stop_pct'] ?? 999.0);
-            if ($stopA !== $stopB) return ($stopA < $stopB) ? -1 : 1;
-
-            $dvA = (float)($a['derived']['dv20_idr'] ?? 0.0);
-            $dvB = (float)($b['derived']['dv20_idr'] ?? 0.0);
-            if ($dvA !== $dvB) return ($dvA > $dvB) ? -1 : 1;
-
-            $atrA = (float)($a['derived']['atr_pct'] ?? 999.0);
-            $atrB = (float)($b['derived']['atr_pct'] ?? 999.0);
-            if ($atrA !== $atrB) return ($atrA < $atrB) ? -1 : 1;
-
-            $tkA = (string)($a['ticker_code'] ?? '');
-            $tkB = (string)($b['ticker_code'] ?? '');
-            return strcmp($tkA, $tkB);
-        });
-
-        return $indices;
     }
 
     /**

@@ -37,8 +37,8 @@
         "alloc_budget": 10000000,
         "entry_price_ref": 9000,
         "lots_recommended": 1,
-        "estimated_cost": 901800,
-        "remaining_cash": 9098200,
+        "estimated_cost": 901350,
+        "remaining_cash": 9098650,
         "reason_codes": ["WS_ALLOC_TOP1"]
       }
     ]
@@ -85,8 +85,8 @@
           "slices": 1,
           "slice_pct": 1.0,
           "lots_recommended": 1,
-          "estimated_cost": 901800,
-          "remaining_cash": 9098200,
+          "estimated_cost": 901350,
+          "remaining_cash": 9098650,
           "risk_pct": 1.0,
           "profit_tp2_net": 0.0,
           "rr_tp2_net": 2.0

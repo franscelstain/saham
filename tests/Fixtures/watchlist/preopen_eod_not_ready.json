@@ -26,7 +26,9 @@
     "mode": "B_WITH_CAPITAL",
     "capital_idr": 5000000,
     "items": [],
-    "cash_remaining_idr": 5000000
+    "cash_remaining_idr": 5000000,
+    "reasons": [],
+    "skipped": []
   },
   "confirm": {
     "status": "none",

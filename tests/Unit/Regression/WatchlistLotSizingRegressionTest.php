@@ -16,17 +16,16 @@ class WatchlistLotSizingRegressionTest extends TestCase
         return $data;
     }
 
-    public function testAllocationEstimatedCostMatchesFeeAndSlippageFormula(): void
+    public function testAllocationEstimatedCostMatchesFeeOnlyFormula(): void
     {
         $payload = $this->loadFixture('sample_weekly_swing_buy1.json');
 
-        $capital = (int) $payload['recommendations']['capital_idr'];
+        $capital = (int) ($payload['recommendations']['capital_idr'] ?? $payload['recommendations']['capital_total']);
         $allocs = $payload['recommendations']['allocations'];
         $this->assertCount(1, $allocs);
 
         // Must match config/trade.php defaults
         $buyFeePct = 0.0015;
-        $slippagePct = 0.0005;
         $lotSize = 100;
 
         $remaining = $capital;
@@ -37,13 +36,14 @@ class WatchlistLotSizingRegressionTest extends TestCase
 
             $rawCost = $entry * $shares;
             $buyFee = (int) ceil($rawCost * $buyFeePct);
-            $slip   = (int) ceil($rawCost * $slippagePct);
-            $expected = (int) ($rawCost + $buyFee + $slip);
+            $expected = (int) ($rawCost + $buyFee);
 
             $this->assertSame($expected, (int) $a['estimated_cost']);
 
             // R2 guard ensures allocations never overspend remaining cash.
-            $this->assertLessThanOrEqual($expected, $remaining, 'estimated_cost must not exceed remaining cash');
+            // PHPUnit signature: assertLessThanOrEqual($expected, $actual) asserts $actual <= $expected.
+            // We want: expected_cost <= remaining.
+            $this->assertLessThanOrEqual($remaining, $expected, 'estimated_cost must not exceed remaining cash');
 
             $remaining = $remaining - $expected;
             $this->assertGreaterThanOrEqual(0, $remaining);

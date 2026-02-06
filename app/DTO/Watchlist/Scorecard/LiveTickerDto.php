@@ -152,4 +152,102 @@ class LiveTickerDto
         }
         return null;
     }
+
+    /**
+     * @param mixed $v
+     * @return float[]|null
+     */
+    private static function toFloatArrayOrNull($v)
+    {
+        if ($v === null) return null;
+        if (!is_array($v)) return null;
+        $out = [];
+        foreach ($v as $x) {
+            $f = self::toFloatOrNull($x);
+            if ($f === null) continue;
+            $out[] = $f;
+        }
+        return $out;
+    }
+
+    /**
+     * @param mixed $v
+     * @return int[]|null
+     */
+    private static function toIntArrayOrNull($v)
+    {
+        if ($v === null) return null;
+        if (!is_array($v)) return null;
+        $out = [];
+        foreach ($v as $x) {
+            if ($x === null || $x === '') continue;
+            if (is_int($x)) { $out[] = $x; continue; }
+            if (is_float($x)) { $out[] = (int)round($x); continue; }
+            if (is_string($x)) {
+                $x = trim($x);
+                if ($x === '' || !is_numeric($x)) continue;
+                $out[] = (int)round((float)$x);
+                continue;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Read depth price levels from various broker payload shapes.
+     * Accepts:
+     * - `${side}_levels`: array of prices
+     * - `${side}1..${side}N`: scalar prices
+     * - `${side}`: array of prices
+     *
+     * @param array<string,mixed> $a
+     * @return float[]|null
+     */
+    private static function readDepthLevels(array $a, string $side, int $n)
+    {
+        $k1 = $side . '_levels';
+        if (isset($a[$k1]) && is_array($a[$k1])) return self::toFloatArrayOrNull($a[$k1]);
+        if (isset($a[$side]) && is_array($a[$side])) return self::toFloatArrayOrNull($a[$side]);
+
+        $out = [];
+        for ($i = 1; $i <= $n; $i++) {
+            $k = $side . $i;
+            if (!array_key_exists($k, $a)) continue;
+            $f = self::toFloatOrNull($a[$k]);
+            if ($f === null) continue;
+            $out[] = $f;
+        }
+        return empty($out) ? null : $out;
+    }
+
+    /**
+     * Read depth lots from various broker payload shapes.
+     * Accepts:
+     * - `${sideLotsKey}`: array
+     * - `${sideLotsKey}1..${sideLotsKey}N`: scalars
+     *
+     * @param array<string,mixed> $a
+     * @return int[]|null
+     */
+    private static function readDepthLots(array $a, string $sideLotsKey, int $n)
+    {
+        if (isset($a[$sideLotsKey]) && is_array($a[$sideLotsKey])) return self::toIntArrayOrNull($a[$sideLotsKey]);
+
+        $out = [];
+        for ($i = 1; $i <= $n; $i++) {
+            $k = $sideLotsKey . $i;
+            if (!array_key_exists($k, $a)) continue;
+            $x = $a[$k];
+            if ($x === null || $x === '') continue;
+            if (is_int($x)) { $out[] = $x; continue; }
+            if (is_float($x)) { $out[] = (int)round($x); continue; }
+            if (is_string($x)) {
+                $x = trim($x);
+                if ($x === '' || !is_numeric($x)) continue;
+                $out[] = (int)round((float)$x);
+                continue;
+            }
+        }
+        return empty($out) ? null : $out;
+    }
 }

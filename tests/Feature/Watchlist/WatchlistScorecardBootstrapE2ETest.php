@@ -102,11 +102,18 @@ final class WatchlistScorecardBootstrapE2ETest extends TestCase
         $this->assertSame(1, (int)$runCnt, 'Strategy run must exist after check-live bootstrap');
 
         // Ensure check row persisted.
-        $checkCnt = DB::table('watchlist_strategy_checks')
+        $runIdRow = DB::table('watchlist_strategy_runs')
             ->where('trade_date', '2026-01-30')
             ->where('exec_trade_date', '2026-01-31')
             ->where('policy', WatchlistPolicyCodes::WEEKLY_SWING)
             ->where('source', $source)
+            ->select('run_id')
+            ->first();
+
+        $runId = $runIdRow ? (int) $runIdRow->run_id : 0;
+
+        $checkCnt = DB::table('watchlist_strategy_checks')
+            ->where('run_id', $runId)
             ->count();
 
         $this->assertGreaterThanOrEqual(1, (int)$checkCnt, 'Strategy check must be persisted');

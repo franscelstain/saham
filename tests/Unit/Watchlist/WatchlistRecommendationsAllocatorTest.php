@@ -79,7 +79,9 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
             $after = (int)($a['remaining_cash'] ?? 0);
 
             $this->assertGreaterThan(0, $est);
-            $this->assertLessThanOrEqual($est, $remaining, 'estimated_cost must not exceed remaining cash');
+            // PHPUnit: assertLessThanOrEqual($expected, $actual) asserts $actual <= $expected.
+            // We want: est <= remaining.
+            $this->assertLessThanOrEqual($remaining, $est, 'estimated_cost must not exceed remaining cash');
 
             $this->assertSame($remaining - $est, $after);
             $this->assertGreaterThanOrEqual(0, $after);
@@ -87,7 +89,7 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
         }
 
         // Top-level cash_remaining must match the last allocation remaining_cash.
-        $this->assertSame($remaining, (int)($res['cash_remaining'] ?? -1));
+        $this->assertSame($remaining, (int)($res['cash_remaining_idr'] ?? ($res['cash_remaining'] ?? -1)));
     }
 
     public function testBackfillDropsInfeasibleTopPickAndUsesNextRanked(): void
@@ -125,7 +127,7 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
 
         $this->assertSame($r1['mode'], $r2['mode']);
         $this->assertSame($r1['allocations'], $r2['allocations']);
-        $this->assertSame($r1['cash_remaining'], $r2['cash_remaining']);
+        $this->assertSame($r1['cash_remaining_idr'], $r2['cash_remaining_idr']);
     }
 
 
@@ -153,7 +155,7 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
         $this->assertSame(1, (int)($allocs[1]['lots_recommended'] ?? 0));
 
         // remaining cash must be consistent with the last allocation.
-        $this->assertSame((int)($allocs[1]['remaining_cash'] ?? -1), (int)($res['cash_remaining'] ?? -2));
+        $this->assertSame((int)($allocs[1]['remaining_cash'] ?? -1), (int)($res['cash_remaining_idr'] ?? ($res['cash_remaining'] ?? -2)));
     }
     /**
      * @param array<int,array{code:string,score:float,entry:int}> $rows
@@ -220,7 +222,7 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
         ];
 
         $globalLocks = [];
-        $hasOpen = false;
+        $openPositions = [];
 
         $m = new \ReflectionMethod(WatchlistEngine::class, 'buildRecommendations');
         $m->setAccessible(true);
@@ -231,7 +233,7 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
             $policy,
             $policyMeta,
             $globalLocks,
-            $hasOpen,
+            $openPositions,
             $capital,
             &$candRef,
             $topPickIndices,

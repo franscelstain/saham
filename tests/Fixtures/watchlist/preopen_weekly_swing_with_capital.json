@@ -82,7 +82,7 @@
       {
         "ticker": "BBCA",
         "rank_ref": 1,
-        "weight_pct": 1.0,
+        "weight_pct": 1,
         "planned_lots": 1,
         "estimated_cost_idr": 901800,
         "fee_included": true,
@@ -129,7 +129,9 @@
         ]
       }
     ],
-    "cash_remaining_idr": 9098200
+    "cash_remaining_idr": 9098200,
+    "reasons": [],
+    "skipped": []
   },
   "confirm": {
     "status": "none",

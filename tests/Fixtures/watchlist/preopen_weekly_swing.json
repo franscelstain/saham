@@ -18,7 +18,9 @@
     "mode": "A_NO_CAPITAL",
     "capital_idr": null,
     "items": [],
-    "cash_remaining_idr": null
+    "cash_remaining_idr": null,
+    "reasons": [],
+    "skipped": []
   },
   "confirm": {
     "status": "none",
