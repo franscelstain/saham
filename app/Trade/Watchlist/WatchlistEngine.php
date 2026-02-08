@@ -902,6 +902,33 @@ $plan = [
 		// Keep intraday snapshots (keyed by ticker_code) in internal payload for mapping to strict preopen CONFIRM.
 		$plan['_intraday_by_code'] = $intradayByCode;
 
+			// Expose thresholds & unit conventions in *internal* payload to avoid score confusion in downstream UI/conditions.
+			// NOTE: strict preopen contract mapping intentionally ignores these extra meta keys.
+			$groupSemanticsMeta = [
+			    'option' => 'A',
+			    // score_total is FRACTION [0..1]. For display/scoring, score_0_100 is score_total * 100.
+			    'score_total_unit' => 'fraction_0_1',
+			    'score_0_100_unit' => 'percent_0_100',
+			    'thresholds_fraction' => [
+			        'toppick_min_score' => $toppickMin,
+			        'toppick_score_gap' => $toppickGap,
+			        'secondary_min_score' => $secondaryMin,
+			        'watch_only_min_score' => $watchMin,
+			    ],
+			    'computed' => [
+			        // top_cut = max(TOPPICK_MIN_SCORE, S0 - TOPPICK_SCORE_GAP)
+			        'top_cut' => $scoreCutTop,
+				        // S0 = best score_total across candidates (fraction 0..1)
+				        'best_score_s0' => $top1,
+			    ],
+			    'semantics' => [
+			        'top_picks' => 'eligible_new_entry && score_total >= top_cut',
+			        'secondary' => 'eligible_new_entry && score_total >= secondary_min_score && score_total < top_cut',
+			        'watch_only' => 'score_total >= watch_only_min_score && not in top_picks/secondary',
+			        'excluded' => 'score_total < watch_only_min_score',
+			    ],
+			];
+
         $payload = [
             'trade_date' => (string)$eodDate,
             'exec_trade_date' => (string)$execTradeDate,
@@ -915,7 +942,8 @@ $plan = [
                 'market_regime' => $marketRegime,
                 'eod_canonical_ready' => (bool)$eodCanonicalReady,
                 'as_of_trade_date' => $asOfTradeDate,
-                'missing_trading_dates' => $missingTradingDates,
+	                'missing_trading_dates' => $missingTradingDates,
+	                'group_semantics' => $groupSemanticsMeta,
                 'counts' => [
                     'total' => count($rows),
                     'top_picks' => count($top),
@@ -924,8 +952,8 @@ $plan = [
                     'avoid' => count($avoid),
                     'no_trade' => count($noTrade),
                 ],
-                'notes' => $notes,
-                'session' => $session,
+	                'notes' => $notes,
+	                'session' => $session,
             ],
             'plan' => $plan,
         ];
