@@ -179,6 +179,16 @@ return [
         // Auto-position-trade fallback (optional)
         'auto_position_trade_enabled' => env('WATCHLIST_AUTO_POSITION_TRADE_ENABLED', false),
 
+        // Group semantics cutoffs (docs/watchlist/watchlist.md)
+        // IMPORTANT: These are score_total fractions (0..1), not percent.
+        'group_semantics' => [
+            'top_pick_max' => (int) env('WATCHLIST_TOP_PICK_MAX', 10),
+            'toppick_min_score' => (float) env('WATCHLIST_TOPPICK_MIN_SCORE', 0.70),
+            'toppick_score_gap' => (float) env('WATCHLIST_TOPPICK_SCORE_GAP', 0.08),
+            'secondary_min_score' => (float) env('WATCHLIST_SECONDARY_MIN_SCORE', 0.55),
+            'watch_only_min_score' => (float) env('WATCHLIST_WATCH_ONLY_MIN_SCORE', 0.35),
+        ],
+
         // Liquidity proxy (dv20 = SMA20 of close*volume over 20 prior trading days; exclude today)
         'liq' => [
             'dv20_a_min' => (float) env('WATCHLIST_DV20_A_MIN', 20000000000), // >= 20B

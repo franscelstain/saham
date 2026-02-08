@@ -916,10 +916,15 @@ secara deterministik dari hasil PLAN (EOD-only). Ini berlaku lintas policy.
 - `Q` = ticker yang lolos **Hard Rules policy** (lihat `policy/<policy>.md`) *dan* tradeability `ENABLED`.
 - `score_total` = skor final per policy, **range [0..1]** (lihat section scoring/weights per policy).
 
+> Penting: jika ticker tidak lolos Universe / tradeability / input minimum (global hard reasons), maka `score_total` di-output sebagai **0.0** agar tidak menyesatkan saat membaca `top_cut` dan group semantics.
+
 > Catatan: `canonical_ready=false` hanya mempengaruhi `recommendations` (wajib kosong). Groups tetap boleh dihitung untuk monitoring,
 > tapi set `meta.flags += EOD_NOT_READY` dan `meta.reasons += GL_EOD_NOT_READY`.
 
 ### Threshold defaults (LOCKED)
+
+Sumber angka (single source of truth): `config('trade.watchlist.group_semantics')` (lihat `config/trade.php`).
+Nilai adalah **fraction 0..1** (bukan persen). Kalau kamu menulis 70 artinya 70x terlalu besar dan akan bikin grouping kacau.
 
 - `TOPPICK_MIN_SCORE = 0.70`
 - `TOPPICK_SCORE_GAP = 0.08`

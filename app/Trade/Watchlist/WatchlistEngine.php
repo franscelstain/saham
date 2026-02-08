@@ -17,6 +17,7 @@ use App\Trade\Pricing\TickRule;
 use App\Trade\Support\TradeClockConfig;
 use App\Trade\Watchlist\Config\ScorecardConfig;
 use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
+use App\Trade\Watchlist\Support\WatchlistScoreScale;
 use App\Trade\Watchlist\Contracts\PolicyDocLocator;
 use App\Trade\Watchlist\Contracts\PreopenContractValidator;
 use App\DTO\Watchlist\Scorecard\CandidateDto;
@@ -499,6 +500,35 @@ $netEdgePct = function(int $entry, int $lotSize, ?int $profitNet) {
 };
 
 $capitalTotal = $opts['capital_idr'] ?? ($opts['capital_total'] ?? null); // legacy fallback: capital_total
+
+
+    // --- Group semantics cutoffs (anti salah tafsir) ---
+    // score_total is 0..1 (NOT percent). All cutoffs/top_cut are computed on score_total (0..1).
+    $gs = (array) (config('trade.watchlist.group_semantics') ?? []);
+    // Guard anti salah tafsir: values below are fractions (0..1), not percent (0..100).
+    foreach (['toppick_min_score','toppick_score_gap','secondary_min_score','watch_only_min_score'] as $k) {
+        if (array_key_exists($k, $gs) && is_numeric($gs[$k]) && (float)$gs[$k] > 1.0) {
+            throw new \InvalidArgumentException("trade.watchlist.group_semantics.$k must be 0..1 (fraction), not percent.");
+        }
+    }
+    $topPickMax = (int) ($gs['top_pick_max'] ?? 10);
+    if ($topPickMax < 1) { $topPickMax = 1; }
+    $toppickMin = (float) ($gs['toppick_min_score'] ?? 0.70);
+    $toppickGap = (float) ($gs['toppick_score_gap'] ?? 0.08);
+    $secondaryMin = (float) ($gs['secondary_min_score'] ?? 0.55);
+    $watchMin = (float) ($gs['watch_only_min_score'] ?? 0.35);
+
+    $scores01 = [];
+    foreach ($rows as $r2) { $scores01[] = (float) ($r2['score_total'] ?? 0.0); }
+    rsort($scores01);
+    $top1 = $scores01[0] ?? 0.0;
+    $idx = min(max($topPickMax - 1, 0), max(count($scores01) - 1, 0));
+    $scoreAtRank = $scores01[$idx] ?? 0.0;
+
+    // top_cut = max(score_at_rank(top_pick_max), TOPPICK_MIN_SCORE, top1 - TOPPICK_SCORE_GAP)
+    $scoreCutTop = max($scoreAtRank, $toppickMin, ($top1 - $toppickGap));
+    if ($scoreCutTop < 0.0) $scoreCutTop = 0.0;
+    if ($scoreCutTop > 1.0) $scoreCutTop = 1.0;
 
 $topPickIndices = [];
 foreach ($rows as $i => $r) {
@@ -2113,12 +2143,17 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 
 		$policyHardFail = (($policyRes['drop'] ?? false) === true);
 
-		// Score is for ranking/grouping. On hard-rule FAIL, keep the base score (do not force 0).
-		if (!$policyHardFail && isset($policyRes['score_total']) && is_numeric($policyRes['score_total'])) {
-			$scoreTotal = (float)$policyRes['score_total'];
-		} else {
-			$scoreTotal = (isset($r['score_total']) && is_numeric($r['score_total'])) ? (float)$r['score_total'] : 0.0;
+		// Score is for ranking/grouping. Contract: output score_total MUST be 0..1.
+		// If candidate is not hard-eligible (universe/input missing), force score_total=0.0 to avoid misleading group logic.
+		$rawScoreTotal = 0.0;
+		if (!$policyHardFail) {
+			if (isset($policyRes['score_total']) && is_numeric($policyRes['score_total'])) {
+				$rawScoreTotal = $policyRes['score_total'];
+			} else {
+				$rawScoreTotal = $hardEligible ? ($r['score_total'] ?? 0.0) : 0.0;
+			}
 		}
+		$scoreTotal = WatchlistScoreScale::toScore01($rawScoreTotal);
 
 		$entryStyle = (string)($policyRes['entry_style'] ?? 'Default');
 		if ($policyHardFail) {
