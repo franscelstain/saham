@@ -511,7 +511,7 @@ $capitalTotal = $opts['capital_idr'] ?? ($opts['capital_total'] ?? null); // leg
             throw new \InvalidArgumentException("trade.watchlist.group_semantics.$k must be 0..1 (fraction), not percent.");
         }
     }
-    $topPickMax = (int) ($gs['top_pick_max'] ?? 10);
+    $topPickMax = (int) ($gs["toppick_max"] ?? ($gs["top_pick_max"] ?? 10));
     if ($topPickMax < 1) { $topPickMax = 1; }
     $toppickMin = (float) ($gs['toppick_min_score'] ?? 0.70);
     $toppickGap = (float) ($gs['toppick_score_gap'] ?? 0.08);

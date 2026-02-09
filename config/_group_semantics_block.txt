@@ -1,0 +1,20 @@
+        'group_semantics' => [
+            // Doc-anchored option selector for group semantics thresholding.
+            // Keep as explicit string to avoid "Option A vs B" ambiguity.
+            'option' => (string) env('WATCHLIST_GROUP_SEMANTICS_OPTION', 'A'),
+
+            // Max items per group in the PREOPEN output (display / UX guardrail).
+            // NOTE: recommendations allocator is NOT capped by these maxima.
+            'toppick_max' => (int) env('WATCHLIST_TOPPICK_MAX', 10),
+            'secondary_max' => (int) env('WATCHLIST_SECONDARY_MAX', 10),
+            'watch_only_max' => (int) env('WATCHLIST_WATCH_ONLY_MAX', 50),
+
+            // Backward-compat aliases (older code/tests may still reference these).
+            'top_pick_max' => (int) env('WATCHLIST_TOPPICK_MAX', 10),
+
+            // Thresholds are FRACTION units (0..1), NOT watchlist_score (0..100).
+            'toppick_min_score' => (float) env('WATCHLIST_TOPPICK_MIN_SCORE', 0.70),
+            'toppick_score_gap' => (float) env('WATCHLIST_TOPPICK_SCORE_GAP', 0.08),
+            'secondary_min_score' => (float) env('WATCHLIST_SECONDARY_MIN_SCORE', 0.55),
+            'watch_only_min_score' => (float) env('WATCHLIST_WATCH_ONLY_MIN_SCORE', 0.35),
+        ],

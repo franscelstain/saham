@@ -5,6 +5,35 @@
 # Catatan: biar reuseable dan konsisten di seluruh aplikasi.
 # path: config/trade.php
 
+// -----------------------------------------------------------------------------
+// Watchlist Group Semantics (Option A) - runtime guardrails
+// Tujuan: kalau env salah (misalnya toppick < secondary), sistem auto-normalize
+// supaya ordering tetap monotonic: toppick >= secondary >= watch_only.
+// Ini mencegah output yang bikin bingung (contoh: WatchOnly score tampak "jatuh"
+// padahal top_cut bisa puluhan/persen), dan mencegah bug pengkondisian.
+// -----------------------------------------------------------------------------
+
+$__gsOption = (string) env('WATCHLIST_GROUP_SEMANTICS_OPTION', 'A');
+$__gsToppickMin = (float) env('WATCHLIST_TOPPICK_MIN_SCORE', 0.70);
+$__gsSecondaryMin = (float) env('WATCHLIST_SECONDARY_MIN_SCORE', 0.55);
+$__gsWatchOnlyMin = (float) env('WATCHLIST_WATCH_ONLY_MIN_SCORE', 0.35);
+
+$__gsClamp01 = static function (float $v): float {
+    if ($v < 0.0) { return 0.0; }
+    if ($v > 1.0) { return 1.0; }
+    return $v;
+};
+
+$__gsToppickMin = $__gsClamp01($__gsToppickMin);
+$__gsSecondaryMin = $__gsClamp01($__gsSecondaryMin);
+$__gsWatchOnlyMin = $__gsClamp01($__gsWatchOnlyMin);
+
+// enforce monotonic ordering
+$__gsToppickMin = max($__gsToppickMin, $__gsSecondaryMin);
+$__gsSecondaryMin = min($__gsSecondaryMin, $__gsToppickMin);
+$__gsSecondaryMin = max($__gsSecondaryMin, $__gsWatchOnlyMin);
+$__gsWatchOnlyMin = min($__gsWatchOnlyMin, $__gsSecondaryMin);
+
 return [
     'compute_eod' => [
         'upsert_batch_size' => env('TRADE_EOD_UPSERT_BATCH_SIZE', 500),
@@ -180,15 +209,27 @@ return [
         'auto_position_trade_enabled' => env('WATCHLIST_AUTO_POSITION_TRADE_ENABLED', false),
 
         // Group semantics cutoffs (docs/watchlist/watchlist.md)
-        // IMPORTANT: These are score_total fractions (0..1), not percent.
         'group_semantics' => [
-            'top_pick_max' => (int) env('WATCHLIST_TOP_PICK_MAX', 10),
-            'toppick_min_score' => (float) env('WATCHLIST_TOPPICK_MIN_SCORE', 0.70),
-            'toppick_score_gap' => (float) env('WATCHLIST_TOPPICK_SCORE_GAP', 0.08),
-            'secondary_min_score' => (float) env('WATCHLIST_SECONDARY_MIN_SCORE', 0.55),
-            'watch_only_min_score' => (float) env('WATCHLIST_WATCH_ONLY_MIN_SCORE', 0.35),
-        ],
+            // Doc-anchored option selector for group semantics thresholding.
+            // Keep as explicit string to avoid "Option A vs B" ambiguity.
+            'option' => $__gsOption,
 
+            // Max items per group in the PREOPEN output (display / UX guardrail).
+            // NOTE: recommendations allocator is NOT capped by these maxima.
+            'toppick_max' => (int) env('WATCHLIST_TOPPICK_MAX', 10),
+            'secondary_max' => (int) env('WATCHLIST_SECONDARY_MAX', 10),
+            'watch_only_max' => (int) env('WATCHLIST_WATCH_ONLY_MAX', 50),
+
+            // Backward-compat aliases (older code/tests may still reference these).
+            'top_pick_max' => (int) env('WATCHLIST_TOPPICK_MAX', 10),
+
+            // Thresholds are FRACTION units (0..1), NOT watchlist_score (0..100).
+            'toppick_min_score' => $__gsToppickMin,
+            'toppick_score_gap' => (float) env('WATCHLIST_TOPPICK_SCORE_GAP', 0.08),
+            'secondary_min_score' => $__gsSecondaryMin,
+            'watch_only_min_score' => $__gsWatchOnlyMin,
+        ],
+        // IMPORTANT: These are score_total fractions (0..1), not percent.
         // Liquidity proxy (dv20 = SMA20 of close*volume over 20 prior trading days; exclude today)
         'liq' => [
             'dv20_a_min' => (float) env('WATCHLIST_DV20_A_MIN', 20000000000), // >= 20B
