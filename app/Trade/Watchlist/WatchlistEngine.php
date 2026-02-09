@@ -1106,22 +1106,25 @@ $plan = [
 	/** @return array<string,mixed> */
 	private function buildEodBar(array $row, string $asofEodDate): array
 	{
-	    	    $open  = (int)round((float)($row['open'] ?? 0));
-	    $high  = (int)round((float)($row['high'] ?? 0));
-	    $low   = (int)round((float)($row['low'] ?? 0));
-	    $close = (int)round((float)($row['close'] ?? 0));
-	    $volumeShares = (int)round((float)($row['volume'] ?? 0));
+	    // NOTE: Real DB feeds sometimes return numeric strings with separators or blanks.
+	    // Cast ONLY after sanitizing to avoid "A non well formed numeric value encountered" warnings.
+	    $open  = (int) round($this->toFloat($row['open'] ?? null, 0.0));
+	    $high  = (int) round($this->toFloat($row['high'] ?? null, 0.0));
+	    $low   = (int) round($this->toFloat($row['low'] ?? null, 0.0));
+	    $close = (int) round($this->toFloat($row['close'] ?? null, 0.0));
+	    $volumeShares = (int) round($this->toFloat($row['volume'] ?? null, 0.0));
 
-	    $prevClose = (int)round((float)($row['prev_close'] ?? 0));
+	    $prevClose = (int) round($this->toFloat($row['prev_close'] ?? null, 0.0));
 
 	    // Best-effort value estimate (IDR). Prefer value_est if provided.
 	    $valueEst = null;
-	    if (isset($row['value_est']) && is_numeric($row['value_est'])) {
-	        $valueEst = (float)$row['value_est'];
-	    } else {
-	        $valueEst = (float)$close * (float)$volumeShares;
+	    if (array_key_exists('value_est', $row)) {
+	        $valueEst = $this->toFloat($row['value_est'], 0.0);
 	    }
-	    $valueIdr = (int)round($valueEst);
+	    if ($valueEst === null || $valueEst <= 0) {
+	        $valueEst = (float) $close * (float) $volumeShares;
+	    }
+	    $valueIdr = (int) round($valueEst);
 
 	    $gapPct = null;
 	    if ($prevClose > 0) {
@@ -1139,6 +1142,34 @@ $plan = [
 	        'volume_shares' => $volumeShares,
 	        'value_idr' => $valueIdr,
 	    ];
+	}
+
+	/**
+	 * Safe numeric parsing for values coming from DB/fixtures.
+	 * Avoids "A non well formed numeric value encountered" warnings
+	 * when values contain commas, spaces, or other formatting.
+	 */
+	private function toFloat($v, float $default = 0.0): float
+	{
+	    if (is_int($v) || is_float($v)) {
+	        return (float) $v;
+	    }
+	    if ($v === null) {
+	        return $default;
+	    }
+	    if (is_string($v)) {
+	        $s = trim($v);
+	        if ($s === '') return $default;
+	        // common formatting: 6,000 or 6 000
+	        $s = str_replace([',', ' '], ['', ''], $s);
+	        // some sources might use underscores as separators
+	        $s = str_replace('_', '', $s);
+	        if (is_numeric($s)) return (float) $s;
+	        return $default;
+	    }
+	    // last resort: only cast if it is numeric
+	    if (is_numeric($v)) return (float) $v;
+	    return $default;
 	}
 
 	/** @return array<string,mixed> */

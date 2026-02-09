@@ -211,3 +211,26 @@ SELECT COUNT(*) as n
 FROM watchlist_intraday_snapshots
 WHERE trade_date='2026-02-02';
 ```
+
+---
+
+## 7) Step 14: CLI Backtest (Preopen)
+
+Command ini menjalankan *preopen build* secara batch untuk rentang tanggal (hanya pada hari trading berdasarkan `market_calendars`).
+
+Jalankan:
+
+```bash
+php artisan watchlist:backtest --policy=WEEKLY_SWING --from=2026-01-01 --to=2026-02-01
+```
+
+Opsi:
+- `--persist=1` untuk menyimpan hasil snapshot harian (preopen) menggunakan source yang bisa dibedakan (default `backtest`).
+- `--source=...` untuk override source.
+- `--limit=N` untuk membatasi jumlah hari trading yang diproses.
+
+Contoh (persist + source khusus):
+
+```bash
+php artisan watchlist:backtest --policy=WEEKLY_SWING --from=2026-01-01 --to=2026-02-01 --persist=1 --source=bt_ws
+```

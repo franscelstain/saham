@@ -7,6 +7,48 @@ use Illuminate\Support\Facades\DB;
 class WatchlistPersistenceRepository
 {
     /**
+     * Convert mixed numeric input into a safe float.
+     * Accepts numeric strings like "6000", "6000.0", and formatted strings like "6,000".
+     * Returns null when value is empty/invalid.
+     */
+    private static function toFloat($v): ?float
+    {
+        if ($v === null) {
+            return null;
+        }
+        // Guard against unexpected shapes (arrays/objects) coming from JSON payloads.
+        if (is_array($v) || is_object($v)) {
+            return null;
+        }
+        if (is_int($v) || is_float($v)) {
+            return (float) $v;
+        }
+        $s = trim((string) $v);
+        if ($s === '') {
+            return null;
+        }
+        // tolerate formatted numbers (e.g. "6,000")
+        $s = str_replace([',', ' '], '', $s);
+        if (!is_numeric($s)) {
+            return null;
+        }
+        return (float) $s;
+    }
+
+    /**
+     * Convert mixed numeric input into a safe int.
+     * Useful for prices/lots that might come as formatted strings.
+     */
+    private static function toInt($v): ?int
+    {
+        $f = self::toFloat($v);
+        if ($f === null) {
+            return null;
+        }
+        return (int) round($f);
+    }
+
+    /**
      * Save full preopen payload as daily snapshot.
      * Returns watchlist_daily_id.
      *
@@ -123,8 +165,8 @@ class WatchlistPersistenceRepository
                 $ticker = (string)($it['ticker'] ?? '');
                 if ($ticker === '') continue;
 
-                $rank = isset($it['rank']) ? (int)$it['rank'] : null;
-                $scoreTotal = isset($it['score_total']) && is_numeric($it['score_total']) ? (float)$it['score_total'] : null;
+                $rank = isset($it['rank']) ? self::toInt($it['rank']) : null;
+                $scoreTotal = self::toFloat($it['score_total'] ?? null);
 
                 $reasonsJson = json_encode((array)($it['reasons'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                 $eodBarJson = json_encode((array)($it['eod_bar'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -141,10 +183,12 @@ class WatchlistPersistenceRepository
                     'rank' => $rank,
                     'score_total' => $scoreTotal,
                     'setup_type' => isset($tickerPlan['setup_type']) ? (string)$tickerPlan['setup_type'] : null,
-                    'plan_entry' => isset($tickerPlan['plan_entry']) ? (int)$tickerPlan['plan_entry'] : null,
-                    'plan_stop' => isset($tickerPlan['plan_stop']) ? (int)$tickerPlan['plan_stop'] : null,
-                    'plan_tp1' => isset($tickerPlan['plan_tp1']) ? (int)$tickerPlan['plan_tp1'] : null,
-                    'rr_est' => isset($tickerPlan['rr_est']) && is_numeric($tickerPlan['rr_est']) ? (float)$tickerPlan['rr_est'] : null,
+                    // Prices often travel through JSON and may become formatted strings (e.g. "6,000").
+                    // Use safe parsers so persistence never explodes during backtest.
+                    'plan_entry' => isset($tickerPlan['plan_entry']) ? self::toInt($tickerPlan['plan_entry']) : null,
+                    'plan_stop'  => isset($tickerPlan['plan_stop']) ? self::toInt($tickerPlan['plan_stop']) : null,
+                    'plan_tp1'   => isset($tickerPlan['plan_tp1']) ? self::toInt($tickerPlan['plan_tp1']) : null,
+                    'rr_est' => self::toFloat($tickerPlan['rr_est'] ?? null),
                     'reasons_json' => $reasonsJson,
                     'eod_bar_json' => $eodBarJson,
                     'ticker_plan_json' => $tickerPlanJson,
