@@ -40,7 +40,7 @@ Istilah inti yang dipakai lintas dokumen. Semua definisi di bawah bersifat **bin
 - `tick_pct` = `tick_size / close` (range [0..1]).
 - `R` = `plan_entry - plan_stop` (IDR). Kontrak global: `R <= 0` atau `R < tick` → **PLAN_INVALID** → **EXCLUDE** untuk policy tersebut.
 - `rr_est` = `(plan_tp1 - plan_entry) / R` (tanpa magic number).
-- `score_total` = skor final per policy, **range [0..1]**.
+- `score_total` (fraction, range [0..1]) = skor final per policy.
 - `reasons[]` = array object `{code,message,severity?}` (lihat section Reasons object).
 
 ## Semantik hasil evaluasi (ANTI SALAH TAFSIR) (LOCKED)
@@ -905,7 +905,7 @@ Tujuan: setiap perubahan engine/threshold harus lolos checklist ini agar output 
 
 Setiap item di atas harus punya minimal 1 fixture test/fixture JSON yang bisa dibandingkan (golden master).
 
-## Grouping semantics → numeric algorithm (LOCKED)
+## Group Semantics (Option A) → numeric algorithm (LOCKED)
 
 Bagian ini mengunci *cara* membentuk `groups.top_picks`, `groups.secondary`, `groups.watch_only`, `groups.avoid`, `groups.no_trade`
 secara deterministik dari hasil PLAN (EOD-only). Ini berlaku lintas policy.
@@ -926,10 +926,10 @@ secara deterministik dari hasil PLAN (EOD-only). Ini berlaku lintas policy.
 Sumber angka (single source of truth): `config('trade.watchlist.group_semantics')` (lihat `config/trade.php`).
 Nilai adalah **fraction 0..1** (bukan persen). Kalau kamu menulis 70 artinya 70x terlalu besar dan akan bikin grouping kacau.
 
-- `TOPPICK_MIN_SCORE = 0.70`
-- `TOPPICK_SCORE_GAP = 0.08`
-- `SECONDARY_MIN_SCORE = 0.55`
-- `WATCH_ONLY_MIN_SCORE = 0.35`
+- `TOPPICK_MIN_SCORE = config('trade.watchlist.group_semantics.toppick_min_score')` (env: `WATCHLIST_TOPPICK_MIN_SCORE`)
+- `TOPPICK_SCORE_GAP = config('trade.watchlist.group_semantics.toppick_score_gap')` (env: `WATCHLIST_TOPPICK_SCORE_GAP`)
+- `SECONDARY_MIN_SCORE = config('trade.watchlist.group_semantics.secondary_min_score')` (env: `WATCHLIST_SECONDARY_MIN_SCORE`)
+- `WATCH_ONLY_MIN_SCORE = config('trade.watchlist.group_semantics.watch_only_min_score')` (env: `WATCHLIST_WATCH_ONLY_MIN_SCORE`)
 
 Makna:
 - `TOPPICK_MIN_SCORE` = batas minimum mutlak untuk masuk Top Picks.
