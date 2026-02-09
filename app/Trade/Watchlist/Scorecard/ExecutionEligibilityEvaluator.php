@@ -315,7 +315,7 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
                 continue;
             }
 
-            $limit = $this->clampLimitPrice($ask, $cap, $planLimit);
+            $limit = $this->clampLimitPrice($ask, $cap, $planLimit, $setup);
 
             $reasons = [];
             $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_AT_ASK1_WITHIN_CAP', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_AT_ASK1_WITHIN_CAP'), 'INFO'))->toArray();
@@ -325,9 +325,14 @@ $spreadMax = (float)($guards['spread_max_pct'] ?? 0.0);
             } elseif ($cap > 0 && $limit < $ask) {
                 $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_CLAMPED_TO_CAP', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_CLAMPED_TO_CAP'), 'WARN'))->toArray();
             }
-            if ($planLimit > 0 && $limit < $ask && $limit <= $planLimit) {
-                if ($limit < $ask) {
-                    $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_CLAMPED_TO_PLAN_LIMIT', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_CLAMPED_TO_PLAN_LIMIT'), 'WARN'))->toArray();
+            // docs/watchlist/scorecard.md:
+            // - PULLBACK: min(plan_limit_price, ask_best, plan_price_cap)
+            // - BREAKOUT: min(ask_best, plan_price_cap)  (do NOT clamp to plan_limit_price)
+            if ($setup !== 'BREAKOUT') {
+                if ($planLimit > 0 && $limit < $ask && $limit <= $planLimit) {
+                    if ($limit < $ask) {
+                        $reasons[] = (new \App\DTO\Watchlist\Scorecard\ReasonDto('CF_PRICE_CLAMPED_TO_PLAN_LIMIT', \App\Trade\Explain\ReasonCatalog::getMessage('CF_PRICE_CLAMPED_TO_PLAN_LIMIT'), 'WARN'))->toArray();
+                    }
                 }
             }
 
@@ -632,11 +637,14 @@ if ($hasPlace) {
         ];
     }
 
-    private function clampLimitPrice(float $ask1, float $cap, float $planLimit): int
+    private function clampLimitPrice(float $ask1, float $cap, float $planLimit, string $setupType): int
     {
         $v = $ask1;
         if ($cap > 0) $v = min($v, $cap);
-        if ($planLimit > 0) $v = min($v, $planLimit);
+        $setupType = strtoupper(trim($setupType));
+        if ($setupType !== 'BREAKOUT') {
+            if ($planLimit > 0) $v = min($v, $planLimit);
+        }
         return (int)round($v);
     }
 
@@ -679,35 +687,75 @@ if ($hasPlace) {
         $ts = strtotime($checkedAt);
         if ($ts === false) return false;
 
-        $t = date('H:i', $ts);
+        // Use second-level precision.
+        // Docs define windows as: start <= checked_at < end (end is exclusive).
+        $tSec = ((int)date('H', $ts) * 3600) + ((int)date('i', $ts) * 60) + (int)date('s', $ts);
 
         foreach ($windows as $w) {
             $w = strtolower(trim((string)$w));
             if ($w === '') continue;
 
             if ($w === 'open-close') {
-                if ($this->isTimeBetween($t, $sessionOpenTime, $sessionCloseTime)) return true;
+                if ($this->isTimeBetween($tSec, $sessionOpenTime, $sessionCloseTime)) return true;
                 continue;
             }
 
             // HH:MM-HH:MM
             if (strpos($w, '-') !== false) {
                 [$a, $b] = array_map('trim', explode('-', $w, 2));
-                if ($a !== '' && $b !== '' && $this->isTimeBetween($t, $a, $b)) return true;
+                if ($a !== '' && $b !== '' && $this->isTimeBetween($tSec, $a, $b)) return true;
             }
         }
 
         return false;
     }
 
-    private function isTimeBetween(string $t, string $start, string $end): bool
+    private function isTimeBetween(int $tSec, string $start, string $end): bool
     {
-        // naive lexicographic compare works for HH:MM format
         if ($start === '' || $end === '') return false;
-        if ($start <= $end) {
-            return ($t >= $start && $t <= $end);
+
+        $sSec = $this->parseTimeToSeconds($start);
+        $eSec = $this->parseTimeToSeconds($end);
+        if ($sSec === null || $eSec === null) return false;
+
+        if ($sSec <= $eSec) {
+            // End is exclusive: [start, end)
+            return ($tSec >= $sSec && $tSec < $eSec);
         }
-        // wrap-around window (rare)
-        return ($t >= $start || $t <= $end);
+
+        // Wrap-around window: [start, 24h) U [0, end)
+        return ($tSec >= $sSec || $tSec < $eSec);
+    }
+
+    /**
+     * Accepts "HH:MM" or "HH:MM:SS" and returns seconds since midnight.
+     * "HH:MM" is treated as "HH:MM:00".
+     */
+    private function parseTimeToSeconds(string $t): ?int
+    {
+        $t = trim($t);
+        if ($t === '') return null;
+
+        // Fast path: HH:MM
+        if (preg_match('/^(\d{2}):(\d{2})$/', $t, $m) === 1) {
+            $h = (int)$m[1];
+            $i = (int)$m[2];
+            if ($h < 0 || $h > 23) return null;
+            if ($i < 0 || $i > 59) return null;
+            return ($h * 3600) + ($i * 60);
+        }
+
+        // HH:MM:SS
+        if (preg_match('/^(\d{2}):(\d{2}):(\d{2})$/', $t, $m) === 1) {
+            $h = (int)$m[1];
+            $i = (int)$m[2];
+            $s = (int)$m[3];
+            if ($h < 0 || $h > 23) return null;
+            if ($i < 0 || $i > 59) return null;
+            if ($s < 0 || $s > 59) return null;
+            return ($h * 3600) + ($i * 60) + $s;
+        }
+
+        return null;
     }
 }

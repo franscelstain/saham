@@ -59,6 +59,15 @@ class WatchlistScorecardCheckLive extends Command
             $snapshot['checked_at'] = now()->toRfc3339String();
         }
 
+        // docs/watchlist/scorecard.md: checked_at may be provided as HH:MM(:SS).
+        // Normalize it to a datetime on exec-date so window-based rules can operate deterministically.
+        $checkedAtNorm = $this->normalizeCheckedAt($execDate, (string)($snapshot['checked_at'] ?? ''));
+        if ($checkedAtNorm === null) {
+            $this->error('Invalid checked_at. Use RFC3339 (recommended) or HH:MM(:SS).');
+            return 2;
+        }
+        $snapshot['checked_at'] = $checkedAtNorm;
+
         try {
             $snapshotDto = LiveSnapshotDto::fromArray($snapshot, $cfg, (string)($snapshot['checked_at'] ?? ''));
             $resultDto = $svc->checkLiveDto($tradeDate, $execDate, $policy, $snapshotDto, $source);
@@ -69,5 +78,24 @@ class WatchlistScorecardCheckLive extends Command
 
         $this->line(json_encode($resultDto->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         return 0;
+    }
+
+    private function normalizeCheckedAt(string $execDate, string $checkedAt): ?string
+    {
+        $execDate = trim($execDate);
+        $checkedAt = trim($checkedAt);
+        if ($checkedAt === '') return null;
+
+        // If only HH:MM(:SS) provided, glue to exec_date
+        if (preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $checkedAt)) {
+            $t = strlen($checkedAt) === 5 ? $checkedAt . ':00' : $checkedAt;
+            if ($execDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $execDate)) return null;
+            return $execDate . ' ' . $t;
+        }
+
+        // Try parse ISO/RFC3339 to local datetime string
+        $ts = strtotime($checkedAt);
+        if ($ts === false) return null;
+        return date('Y-m-d H:i:s', $ts);
     }
 }

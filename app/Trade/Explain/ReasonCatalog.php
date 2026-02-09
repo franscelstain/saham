@@ -19,6 +19,12 @@ class ReasonCatalog
         $wl = [
             'GL_EOD_NOT_READY' => 'EOD canonical belum siap.',
 
+            // Global / data quality
+            'GL_TICKER_STATUS_UNKNOWN' => 'Status ticker tidak diketahui (data status belum tersedia).',
+
+            // Weekly Swing gates
+            'WS_TREND_GATE_FAIL' => 'Weekly Swing: trend utama tidak memenuhi syarat.',
+
             'CF_OK' => 'Sesuai guard CONFIRM.',
 
             // --- CONFIRM (strict) ---
@@ -69,7 +75,12 @@ class ReasonCatalog
         ];
         if (isset($wl[$code])) return $wl[$code];
 
-        return self::rankReasonMessage($code, []);
+        // Ranking/scorecard reason codes (and legacy gates).
+        $msg = self::rankReasonMessage($code, []);
+        if ($msg !== '' && $msg !== $code) return $msg;
+
+        // Last-resort: humanize unknown codes so UI never shows raw code.
+        return self::humanizeUnknown($code);
     }
 
     public static function rankReasonCatalog(): array
@@ -156,6 +167,43 @@ class ReasonCatalog
 
         // fallback supaya tidak return null
         return $code !== '' ? $code : 'Unknown reason';
+    }
+
+    /**
+     * Last-resort message for unknown codes.
+     * LOCKED: UI must not show raw machine code as the user-facing message.
+     */
+    private static function humanizeUnknown(string $code): string
+    {
+        $c = trim($code);
+        if ($c === '') return 'Alasan tidak diketahui.';
+
+        // Prefix helpers
+        $prefix = '';
+        if (strpos($c, 'WS_') === 0) $prefix = 'Weekly Swing: ';
+        elseif (strpos($c, 'DS_') === 0) $prefix = 'Dividend Swing: ';
+        elseif (strpos($c, 'PT_') === 0) $prefix = 'Position Trade: ';
+        elseif (strpos($c, 'IL_') === 0) $prefix = 'Intraday Light: ';
+        elseif (strpos($c, 'NT_') === 0) $prefix = 'No Trade: ';
+        elseif (strpos($c, 'RECO_') === 0) $prefix = 'Rekomendasi: ';
+        elseif (strpos($c, 'GL_') === 0) $prefix = 'Data: ';
+
+        // Humanize body
+        $body = $c;
+        // drop known prefixes so sentence reads better
+        foreach (['WS_', 'DS_', 'PT_', 'IL_', 'NT_', 'RECO_', 'GL_'] as $p) {
+            if (strpos($body, $p) === 0) {
+                $body = substr($body, strlen($p));
+                break;
+            }
+        }
+
+        $body = strtolower(str_replace('_', ' ', $body));
+        $body = trim($body);
+        if ($body === '') return 'Alasan tidak diketahui.';
+
+        // keep it one short sentence
+        return $prefix . ucfirst($body) . '.';
     }
 
     private static function fmt($n, int $dec = 0): string

@@ -411,7 +411,12 @@ class WatchlistRepository
         }
 
         $q->where('t.is_deleted', 0)
+            // Treat zero/NULL OHLC as missing. Watchlist preopen contract expects real EOD bars.
             ->whereNotNull('od.close')
+            ->where('od.open', '>', 0)
+            ->where('od.high', '>', 0)
+            ->where('od.low', '>', 0)
+            ->where('od.close', '>', 0)
             ->orderBy('t.ticker_code', 'asc');
 
         // IMPORTANT: return DTO objects, not arrays.
