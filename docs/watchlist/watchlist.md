@@ -85,7 +85,7 @@ Bagian ini adalah **kontrak universal**. Semua policy wajib patuh. Policy **tida
 - **Source of truth OHLC:** gunakan `ticker_ohlc_daily` sebagai kebenaran OHLC. `ticker_indicators_daily` adalah **turunan**.
 - **Canonical ready gate:** jika data EOD untuk `asof_eod_date` belum final/canonical → **wajib** `recommendations = []` (No Trade untuk eksekusi). Namun **groups** (Top Picks/Secondary/Watch Only/Avoid) tetap boleh dihitung untuk monitoring, dengan flag global `EOD_NOT_READY` dan reason `GL_EOD_NOT_READY`.
 - **Satu `asof_eod_date` yang sama:** semua ticker dinilai pada tanggal EOD yang sama (basis PLAN).
-- **Run consistency (jika ada `run_id`):** pada `asof_eod_date`, hasil scoring wajib pakai run yang sama (canonical). Jika OHLC berbeda antar run → dianggap belum ready.
+- **Run consistency (opsional):** aturan ini **hanya berlaku jika** dataset EOD kamu menyimpan identitas *run* (mis. `run_id`) untuk OHLC/indikator. **Pada schema default TradeAxis saat ini tidak ada `run_id` di OHLC/indikator**, jadi engine tidak dapat memverifikasi konsistensi antar-run dan aturan ini dianggap *N/A* (tidak ditegakkan).
 
 ### 2) Window & lookback definition (anti-bias)
 
@@ -1011,3 +1011,12 @@ Urutan kandidat untuk ranking & tie-break:
 - Nilai threshold di atas adalah default. Jika kamu ingin beda per policy, lakukan lewat `policy overrides (LOCKED)` di masing-masing policy
   dengan nama yang eksplisit (mis. `WS_TOPPICK_MIN_SCORE`) dan dokumentasikan bahwa override menggantikan default global.
 - Groups adalah hasil PLAN (EOD-only). CONFIRM tidak boleh memindahkan ticker antar group; CONFIRM hanya memberi status eksekusi.
+
+
+## Metrik ringkas untuk audit
+Untuk memudahkan audit/diagnostik (tanpa membaca seluruh kandidat), output menambahkan:
+- `meta.counts.total_candidates`: jumlah kandidat mentah dari repository.
+- `meta.counts.universe_passed`: jumlah kandidat yang lolos filter universe/hard gates.
+- `meta.counts.tradeable`: kandidat yang tidak hard-locked.
+- `meta.counts.eligible_new_entry`: kandidat tradeable yang eligible NEW ENTRY.
+- `meta.score_stats`: statistik `score_total` (count/min/max/mean) pada kandidat yang diranking.

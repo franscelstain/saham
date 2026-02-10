@@ -552,6 +552,23 @@ $capitalTotal = $opts['capital_idr'] ?? ($opts['capital_total'] ?? null); // leg
     if ($scoreCutTop < 0.0) $scoreCutTop = 0.0;
     if ($scoreCutTop > 1.0) $scoreCutTop = 1.0;
 
+
+    // --- Diagnostics / acceptance metrics (docs/watchlist/watchlist.md) ---
+    $totalCandidates = is_array($candidates ?? null) ? count($candidates) : 0;
+    $universePassed = count($rows);
+    $eligibleNewEntry = 0;
+    $tradeableCount = 0;
+    foreach ($rows as $r3) {
+        if (!empty($r3['plan']['is_tradeable'])) $tradeableCount++;
+        if (!empty($r3['plan']['is_eligible_new_entry']) && !empty($r3['plan']['is_tradeable'])) $eligibleNewEntry++;
+    }
+    $scoreStats = [
+        'count' => count($scores01),
+        'min' => !empty($scores01) ? min($scores01) : null,
+        'max' => !empty($scores01) ? max($scores01) : null,
+        'mean' => !empty($scores01) ? (array_sum($scores01) / max(count($scores01), 1)) : null,
+    ];
+
 $topPickIndices = [];
 foreach ($rows as $i => $r) {
     $levels = $r['levels'] ?? [];
@@ -967,13 +984,23 @@ $plan = [
 	                'missing_trading_dates' => $missingTradingDates,
 	                'group_semantics' => $groupSemanticsMeta,
                 'counts' => [
-                    'total' => count($rows),
+                    // candidates fetched from repository (pre-universe filter)
+                    'total_candidates' => $totalCandidates,
+                    // rows after global universe/hard gates (post-buildCandidate)
+                    'universe_passed' => $universePassed,
+                    // rows that are tradeable today (not hard-locked)
+                    'tradeable' => $tradeableCount,
+                    // rows that are eligible for NEW ENTRY today (tradeable + not blocked)
+                    'eligible_new_entry' => $eligibleNewEntry,
+
+                    // grouped outputs
                     'top_picks' => count($top),
                     'secondary' => count($secondary),
                     'watch_only' => count($watch),
                     'avoid' => count($avoid),
                     'no_trade' => count($noTrade),
                 ],
+                'score_stats' => $scoreStats,
 	                'notes' => $notes,
 	                'session' => $session,
             ],
@@ -2946,11 +2973,12 @@ public function applyPolicyRulesLegacy(string $policy, array $x, array $reasonCo
                 return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_EVENT_MISSING']);
             }
 
-            $daysToEx = $this->tradingDaysAhead($execDate, $exDate);
-            if ($daysToEx === null) {
+            $daysToEx = $this->tradingDaysBetween($execDate, $exDate);
+
+            if ($exDate <= $execDate) {
                 $drop = true;
-                $reasonCodes[] = 'DS_EVENT_MISSING';
-                return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_EVENT_MISSING']);
+                $reasonCodes[] = 'DS_TOO_LATE_EXDATE';
+                return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_TOO_LATE_EXDATE']);
             }
 
             $minDays = 2;
@@ -4692,17 +4720,18 @@ private function isEodReady(array $coverage): bool
         return $cur;
     }
 
+    /**
+     * Global contract: trading_days_between(a,b) counts trading days d where a < d <= b.
+     */
+    public function tradingDaysBetween(string $fromDate, string $toDate): int
+    {
+        return $this->calRepo->countTradingDaysBetweenExclusiveInclusive($fromDate, $toDate);
+    }
+
     public function tradingDaysAhead(string $fromDate, string $toDate): int
     {
-        if ($toDate <= $fromDate) return 0;
-        $dates = $this->calRepo->tradingDatesBetween($fromDate, $toDate);
-        // tradingDatesBetween includes both ends? repo returns inclusive start/end? Let's inspect: it likely returns between exclusive? We'll treat as list between (>=start and <=end)
-        // We want number of trading days strictly after fromDate up to toDate.
-        $n = 0;
-        foreach ($dates as $d) {
-            if ($d > $fromDate && $d <= $toDate) $n++;
-        }
-        return $n;
+        // Backward-compatible alias. Prefer tradingDaysBetween().
+        return $this->tradingDaysBetween($fromDate, $toDate);
     }
 
     /**

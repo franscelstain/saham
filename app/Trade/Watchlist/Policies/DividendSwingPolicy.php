@@ -53,7 +53,7 @@ class DividendSwingPolicy implements WatchlistPolicyInterface
             return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, ['DS_EVENT_MISSING']);
         }
 
-        $daysToEx = $engine->tradingDaysAhead($execDate, $exDate);
+        $daysToEx = $engine->tradingDaysBetween($execDate, $exDate);
 
         $minDays = 2;
         $maxDays = 12;

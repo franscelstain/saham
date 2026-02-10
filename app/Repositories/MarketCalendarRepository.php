@@ -15,7 +15,6 @@ class MarketCalendarRepository
         }
     }
 
-
     public function isTradingDay(string $date): bool
     {
         if (!$this->tableExists()) return false;
@@ -68,6 +67,25 @@ class MarketCalendarRepository
             return $out;
         } catch (\Throwable $e) {
             return [];
+        }
+    }
+
+    /**
+     * Count trading days d such that from < d <= to.
+     * This matches docs/watchlist/watchlist.md contract trading_days_between(a,b).
+     */
+    public function countTradingDaysBetweenExclusiveInclusive(string $from, string $to): int
+    {
+        if (!$this->tableExists()) return 0;
+        if ($to <= $from) return 0;
+        try {
+            return (int) DB::table('market_calendar')
+                ->where('is_trading_day', 1)
+                ->where('cal_date', '>', $from)
+                ->where('cal_date', '<=', $to)
+                ->count();
+        } catch (\Throwable $e) {
+            return 0;
         }
     }
 
