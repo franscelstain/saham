@@ -124,7 +124,23 @@ class WatchlistEngine
         $this->slippagePct = $feeCfg->slippageRate();
     }
 
-    /**
+    
+    public function tickSize(float $price): int
+    {
+        return (int)$this->tickRule->tickSize(max(1.0, $price));
+    }
+
+    public function roundUp(float $price): float
+    {
+        return (float)$this->tickRule->roundUp($price);
+    }
+
+    public function roundDown(float $price): float
+    {
+        return (float)$this->tickRule->roundDown($price);
+    }
+
+/**
      * Build watchlist payload.
      *
      * @param array{
@@ -1135,11 +1151,19 @@ $plan = [
 
 	    // NOTE: Real DB feeds sometimes return numeric strings with separators or blanks.
 	    // Cast ONLY after sanitizing to avoid "A non well formed numeric value encountered" warnings.
-	    $open  = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
-	    $high  = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
-	    $low   = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
-	    $close = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
-	    $volumeShares = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
+	    // Internal rows SHOULD provide these keys: open, high, low, close, volume.
+	    // Some legacy paths may provide: o,h,l,c,v or volume_shares.
+	    $openRaw  = $src['open']  ?? ($src['o'] ?? null);
+	    $highRaw  = $src['high']  ?? ($src['h'] ?? null);
+	    $lowRaw   = $src['low']   ?? ($src['l'] ?? null);
+	    $closeRaw = $src['close'] ?? ($src['c'] ?? null);
+	    $volRaw   = $src['volume'] ?? ($src['volume_shares'] ?? ($src['v'] ?? null));
+
+	    $open  = (int) round($this->toFloat($openRaw, 0.0));
+	    $high  = (int) round($this->toFloat($highRaw, 0.0));
+	    $low   = (int) round($this->toFloat($lowRaw, 0.0));
+	    $close = (int) round($this->toFloat($closeRaw, 0.0));
+	    $volumeShares = (int) round($this->toFloat($volRaw, 0.0));
 
 	    $prevClose = (int) round($this->toFloat($src['prev_close'] ?? null, 0.0));
 
@@ -1233,7 +1257,7 @@ $plan = [
 	    return 'BREAKOUT';
 	}
 
-	private function computeRrEst(int $entry, int $stop, int $tp1): ?float
+	public function computeRrEst(int $entry, int $stop, int $tp1): ?float
 	{
 	    if ($entry <= 0 || $tp1 <= 0 || $stop <= 0) return null;
 	    $risk = $entry - $stop;
@@ -2683,7 +2707,16 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         return ['open-close'];
     }
 
+    
     private function applyPolicyRules(string $policy, array $x, array $reasonCodes): array
+    {
+        // Delegated per-policy implementation (Policies/*). WatchlistEngine remains orchestrator.
+        $factory = new \App\Trade\Watchlist\Policies\PolicyFactory();
+        $policyObj = $factory->make($policy);
+        return $policyObj->apply($x, $reasonCodes, $this);
+    }
+
+public function applyPolicyRulesLegacy(string $policy, array $x, array $reasonCodes): array
     {
         // PLAN-only rules (EOD). CONFIRM rules (preopen/intraday) must not alter PLAN selection.
         $score = 100.0;
@@ -3332,7 +3365,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         $blockCodes[] = 'GL_POLICY_INACTIVE';
         return $this->policyRes(false, 0.0, 'WATCH_ONLY', 'Low', $reasonCodes, $blockCodes);
     }
-    private function policyRes(bool $drop, float $score, string $entryStyle, string $confidence, array $reasonCodes, array $blockCodes, float $sizeMultiplierAdj = 1.0, ?string $shiftEntryWindows = null): array
+    public function policyRes(bool $drop, float $score, string $entryStyle, string $confidence, array $reasonCodes, array $blockCodes, float $sizeMultiplierAdj = 1.0, ?string $shiftEntryWindows = null): array
     {
         return [
             'drop' => $drop,
@@ -3346,7 +3379,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         ];
     }
 
-    private function evaluateEligibilityForNewEntry(string $policy, array $blockCodes, bool $tradeDisabled): bool
+    public function evaluateEligibilityForNewEntry(string $policy, array $blockCodes, bool $tradeDisabled): bool
     {
         if ($tradeDisabled) return false;
         if (!empty($blockCodes)) return false;
@@ -3363,7 +3396,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
      * @param array{close:float,low:float,hh20:float|null,ll5:float|null} $ctx
      * @return array<string,mixed>
      */
-    private function buildWeeklySwingLevels(string $setupType, array $ctx, float $minRr, float $tp2RMult): array
+    public function buildWeeklySwingLevels(string $setupType, array $ctx, float $minRr, float $tp2RMult): array
     {
         $close = (float)($ctx['close'] ?? 0);
         $low = (float)($ctx['low'] ?? 0);
@@ -3441,7 +3474,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
      *   - Breakout: resistance_50
      * - tp1 = round_down(min(tp1_raw, cap))
      */
-    private function buildDividendSwingLevels(string $setupType, array $ctx, float $minRr): array
+    public function buildDividendSwingLevels(string $setupType, array $ctx, float $minRr): array
     {
         $close = (float)($ctx['close'] ?? 0);
         $low = (float)($ctx['low'] ?? 0);
@@ -3529,7 +3562,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
      * - cap TP1 (PULLBACK only): min(tp1_raw, resistance_50)
      * - tp2 optional: entry + (tp2RMult * R)
      */
-    private function buildPositionTradeLevels(string $setupType, array $ctx, float $minRr, float $tp2RMult): array
+    public function buildPositionTradeLevels(string $setupType, array $ctx, float $minRr, float $tp2RMult): array
     {
         $close = (float)($ctx['close'] ?? 0);
         $low   = (float)($ctx['low'] ?? 0);
@@ -3597,7 +3630,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 
 
 
-    private function buildIntradayLightLevels(array $ctx, string $setupType): array
+    public function buildIntradayLightLevels(array $ctx, string $setupType): array
     {
         $close = (float)($ctx['close'] ?? 0);
         $low = (float)($ctx['low'] ?? 0);
@@ -3643,14 +3676,14 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             'tick_size' => $tickEntry > 0 ? $tickEntry : null,
         ];
     }
-    private function clamp01(float $v): float
+    public function clamp01(float $v): float
     {
         if ($v < 0.0) return 0.0;
         if ($v > 1.0) return 1.0;
         return $v;
     }
 
-    private function norm01(float $v, float $lo, float $hi): float
+    public function norm01(float $v, float $lo, float $hi): float
     {
         if ($hi <= $lo) return 0.0;
         return $this->clamp01(($v - $lo) / ($hi - $lo));
@@ -3660,7 +3693,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
      * Map PatternClassifier's signal_code to [0..1] score.
      * Deterministic; used by WEEKLY_SWING scoring.
      */
-    private function wsPatternScoreFromSignal($signalCode): float
+    public function wsPatternScoreFromSignal($signalCode): float
     {
         $s = is_numeric($signalCode) ? (int)$signalCode : 0;
         $map = [
@@ -4659,7 +4692,7 @@ private function isEodReady(array $coverage): bool
         return $cur;
     }
 
-    private function tradingDaysAhead(string $fromDate, string $toDate): int
+    public function tradingDaysAhead(string $fromDate, string $toDate): int
     {
         if ($toDate <= $fromDate) return 0;
         $dates = $this->calRepo->tradingDatesBetween($fromDate, $toDate);
@@ -4786,7 +4819,7 @@ private function isEodReady(array $coverage): bool
         return array_values(array_unique($out));
     }
 
-    private function tradingDaysBetweenInclusive(string $fromDate, string $toDate): ?int
+    public function tradingDaysBetweenInclusive(string $fromDate, string $toDate): ?int
     {
         $dates = $this->calRepo->tradingDatesBetween($fromDate, $toDate);
         if (empty($dates)) return null;

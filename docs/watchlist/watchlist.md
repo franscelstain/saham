@@ -24,6 +24,18 @@
 >    - Mencatat **commands** yang tersedia + urutan eksekusi + contoh pemakaian.
 >    - Menjadi **panduan penggunaan** saat aplikasi sudah jadi (runbook mini untuk operator/user).
 
+## Lokasi Kode Per-Policy
+
+- Entry point watchlist tetap di `app/Trade/Watchlist/WatchlistEngine.php` (orchestrator).
+- Implementasi policy dipetakan per file di `app/Trade/Watchlist/Policies/*Policy.php`.
+  - `WeeklySwingPolicy` => `WEEKLY_SWING`
+  - `DividendSwingPolicy` => `DIVIDEND_SWING`
+  - `IntradayLightPolicy` => `INTRADAY_LIGHT`
+  - `PositionTradePolicy` => `POSITION_TRADE`
+  - `NoTradePolicy` => `NO_TRADE`
+
+Tujuannya: saat tracking bug/threshold, langsung tahu file policy yang relevan tanpa menyisir seluruh WatchlistEngine.
+
 ## Glossary (LOCKED)
 
 Istilah inti yang dipakai lintas dokumen. Semua definisi di bawah bersifat **binding**.
