@@ -551,43 +551,45 @@ foreach ($rows as $i => $r) {
         // WeeklySwing: evaluate viability when capital_total is provided.
         $rows[$i]['plan']['trade_viability']['evaluated'] = ($capitalTotal !== null);
         if ($capitalTotal === null) {
+            // Capital not provided: viability is not evaluated, but we MUST still
+            // run grouping (top/secondary/watch) based on policy score.
             $rows[$i]['plan']['trade_viability']['is_viable'] = null;
             $rows[$i]['plan']['trade_viability']['reason_codes'] = ['WS_VIABILITY_NOT_EVALUATED'];
-            continue;
+
+            // Do not short-circuit the loop; grouping happens later in the same pass.
+            // Keep the existing plan.is_eligible_new_entry untouched.
+        } else {
+            $isViable = true;
+            $vReasons = [];
+
+            $lotsRec = $sizing['lots_recommended'] ?? null;
+            $minLots = (int)($policyMeta['min_lots'] ?? 1);
+            if ($lotsRec !== null && (int)$lotsRec < $minLots) {
+                $isViable = false;
+                $vReasons[] = 'WS_MIN_LOTS_FAIL';
+            }
+
+            $profitNet = $sizing['profit_tp2_net'] ?? null;
+            $edge = ($entry !== null) ? $netEdgePct((int)$entry, $lotSize, is_int($profitNet) ? $profitNet : null) : null;
+            $minEdge = (float)($policyMeta['min_net_edge_pct'] ?? 0.0);
+            if ($edge !== null && $edge < $minEdge) {
+                $isViable = false;
+                $vReasons[] = 'WS_MIN_NET_EDGE_FAIL';
+            }
+
+            $rows[$i]['plan']['trade_viability']['is_viable'] = $isViable;
+            $rows[$i]['plan']['trade_viability']['reason_codes'] = $vReasons;
         }
-
-        $isViable = true;
-        $vReasons = [];
-
-        $lotsRec = $sizing['lots_recommended'] ?? null;
-        $minLots = (int)($policyMeta['min_lots'] ?? 1);
-        if ($lotsRec !== null && (int)$lotsRec < $minLots) {
-            $isViable = false;
-            $vReasons[] = 'WS_MIN_LOTS_FAIL';
-        }
-
-        $profitNet = $sizing['profit_tp2_net'] ?? null;
-        $edge = ($entry !== null) ? $netEdgePct((int)$entry, $lotSize, is_int($profitNet) ? $profitNet : null) : null;
-        $minEdge = (float)($policyMeta['min_net_edge_pct'] ?? 0.0);
-        if ($edge !== null && $edge < $minEdge) {
-            $isViable = false;
-            $vReasons[] = 'WS_MIN_NET_EDGE_FAIL';
-        }
-
-        $rows[$i]['plan']['trade_viability']['is_viable'] = $isViable;
-        $rows[$i]['plan']['trade_viability']['reason_codes'] = $vReasons;
-
-        continue;
     }
 
-    if ($policy === 'DIVIDEND_SWING') {
+    elseif ($policy === 'DIVIDEND_SWING') {
         if ($entry === null || $sl === null || $tp1 === null) {
             $rows[$i]['plan']['is_eligible_new_entry'] = false;
             $rows[$i]['plan']['block_codes'][] = 'DS_LEVELS_INCOMPLETE';
             $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
             $rows[$i]['reason_codes'][] = 'DS_LEVELS_INCOMPLETE';
             $rows[$i]['reason_codes'] = array_values(array_unique($rows[$i]['reason_codes']));
-            continue;
+            // keep running for grouping pass
         }
 
         $rval = $rr((int)$entry, (int)$sl, (int)$tp1);
@@ -604,17 +606,16 @@ foreach ($rows as $i => $r) {
             $rows[$i]['plan']['block_codes'][] = 'DS_MIN_TRADE_VIABILITY_FAIL';
             $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
         }
-        continue;
     }
 
-    if ($policy === 'INTRADAY_LIGHT') {
+    elseif ($policy === 'INTRADAY_LIGHT') {
         if ($entry === null || $sl === null || $tp1 === null) {
             $rows[$i]['plan']['is_eligible_new_entry'] = false;
             $rows[$i]['plan']['block_codes'][] = 'IL_LEVELS_INCOMPLETE';
             $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
             $rows[$i]['reason_codes'][] = 'IL_LEVELS_INCOMPLETE';
             $rows[$i]['reason_codes'] = array_values(array_unique($rows[$i]['reason_codes']));
-            continue;
+            // keep running for grouping pass
         }
         $rval = $rr((int)$entry, (int)$sl, (int)$tp1);
         if ($rval !== null && $rval < 1.6) {
@@ -625,7 +626,6 @@ foreach ($rows as $i => $r) {
             $rows[$i]['plan']['block_codes'][] = 'IL_MIN_TRADE_VIABILITY_FAIL';
             $rows[$i]['plan']['block_codes'] = array_values(array_unique($rows[$i]['plan']['block_codes']));
         }
-        continue;
     }
 
         if ($policy === 'POSITION_TRADE') {
