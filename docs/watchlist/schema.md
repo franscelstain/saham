@@ -2,9 +2,11 @@
 
 Dokumen ini mencatat **struktur database yang dipakai fitur Watchlist** (table/view/kolom) beserta fungsi tiap table & kolom dalam konteks Watchlist.
 
-> **STATUS (LIVING DOCS)**
-> Dokumen ini adalah catatan kondisi sistem saat ini. Jika ada perubahan di code/DB/command/output yang belum tercatat di sini, maka dokumen ini **wajib** diupdate agar kembali sinkron.
-> Dokumen ini membantu operasional dan audit; dokumen ini tidak mengubah aturan **LOCKED** di `docs/watchlist/watchlist.md`.
+> **Catatan penting (anti salah tafsir)**
+> - File ini **bukan acuan untuk membangun/merancang perilaku sistem**.
+> - **Source of truth teknis** selalu mengikuti: **migrations + database aktual + code yang berjalan**.
+> - `schema.md` hanya dokumentasi untuk membantu pembaca memahami struktur tersebut.
+> - Jika ada perbedaan, **ikuti migrations/DB/code** lalu **perbarui dokumen ini** agar kembali sinkron.
 
 **Batasan penting (LOCKED):**
 - Watchlist **hanya boleh merombak / membuat** table dengan prefix `watchlist_*`.
@@ -207,14 +209,24 @@ Dipakai untuk:
 **Diisi oleh:** pipeline Compute EOD (hasil compute indikator dari data canonical). Watchlist tidak mengubah.
 
 ### `ticker_status_daily`
-Dipakai untuk filter/gate tambahan seperti status suspend, not-for-trade, atau flag lain yang menonaktifkan eksekusi untuk `trade_date` tertentu (dipakai oleh Universe/Global gate di WatchlistEngine).
+Dipakai untuk **global/ticker gate** (bukan scoring) — contoh: suspend, special notation, atau mekanisme perdagangan yang menonaktifkan entry untuk **tanggal eksekusi tertentu**.
+
+**Source of truth struktur:** migrations + database aktual + code yang berjalan.
+
+Aturan pemakaian oleh Watchlist (anti salah tafsir):
+- Watchlist membaca status **STRICTLY pada tanggal eksekusi** (`trade_date` atau `asof_date` sesuai DB).
+- Jika **tidak ada row** untuk tanggal eksekusi ⇒ watchlist memakai default **REGULAR** (`status_quality=DEFAULT`). Ini **bukan** UNKNOWN.
+- UNKNOWN hanya boleh muncul jika row pada tanggal eksekusi memang bertanda UNKNOWN / kualitas data buruk (`status_quality=UNKNOWN`).
 
 **Diisi oleh:** pipeline Market Data / corporate actions / manual seed (tergantung implementasi). Watchlist tidak mengubah.
 
 Kolom minimal yang dibaca (best-effort, lihat `App\Repositories\TickerStatusRepository`):
 - `ticker_id`
-- `asof_date` (DATE)
-- `status_code` (STRING) / flag status
+- `trade_date` (DATE) **atau** `asof_date` (DATE)
+- `is_suspended` (BOOL/INT)
+- `special_notations` (STRING/JSON nullable; contoh: `"E,X"`)
+- `trading_mechanism` (STRING; contoh: `REGULAR` / `FULL_CALL_AUCTION`)
+- `status_quality` (STRING optional; `OK` | `UNKNOWN`)
 
 
 ### `market_calendar`

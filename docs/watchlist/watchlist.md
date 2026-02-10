@@ -5,10 +5,11 @@
 > - Detail Hard/Soft/Risk/Scoring per strategi ada di `policy/<policy>.md`.
 > - Aturan CONFIRM (intraday checks) ada di `scorecard.md`.
 > **Jika ada kalimat lain yang bertentangan, anggap tidak binding dan ikuti yang LOCKED.**
-> **Catatan Anti Salah Tafsir — `schema.md` & `strategi.md` adalah LIVING DOCS (bukan acuan normatif)**
-> - `docs/watchlist/schema.md` dan `docs/watchlist/strategi.md` adalah **catatan kondisi sistem saat ini** yang **wajib selalu diupdate** bila ada perubahan di code/DB/command/output yang belum tercatat.
-> - Jika ada gap antara implementasi dan dua dokumen tersebut, maka **yang dibetulkan adalah dokumennya** (supaya kembali sinkron), bukan memaksa implementasi mengikuti dokumen yang tertinggal.
-> - Dua dokumen itu **tidak meng-override** aturan **LOCKED** di dokumen ini; mereka berfungsi untuk **mencegah salah pakai** dan memudahkan operasional.
+> **Catatan Anti Salah Tafsir — `schema.md` & `strategi.md` (DOKUMENTASI, bukan acuan membangun sistem)**
+> - `docs/watchlist/schema.md` dan `docs/watchlist/strategi.md` **bukan acuan untuk membangun/merancang perilaku sistem**.
+> - **Source of truth teknis** selalu mengikuti: **migrations + database aktual + code yang berjalan**.
+> - Jika ada perbedaan antara implementasi vs dokumen tersebut, maka **ikuti implementasi** lalu **perbarui dokumennya** agar kembali sinkron.
+> - Dua dokumen itu tidak boleh dianggap mengunci rule; rule yang mengikat hanya dokumen **LOCKED** (`watchlist.md`, `scorecard.md`, `policy/*.md`).
 >
 > **Ruang lingkup wajib masing-masing dokumen**
 > 1) `schema.md`:
@@ -234,6 +235,13 @@ Aturan (LOCKED):
 - Trading mechanism tidak regular (mis. FCA) → `tradeability = TRADE_DISABLED`, group = `Avoid`, reason `GL_MECHANISM_FCA`.
 - Special notation `X` → `tradeability = TRADE_DISABLED`, group = `Avoid`, reason `GL_SPECIAL_NOTATION_X`.
 - Special notation `E` → **tidak disable**, tetap tradeable; tambahkan warning reason `GL_SPECIAL_NOTATION_E` (group ditentukan oleh hasil policy/risk).
+
+#### 2.3.1 Sumber data status & default behavior (LOCKED, anti salah tafsir)
+Watchlist membaca status dari tabel `ticker_status_daily` (jika tersedia) **hanya untuk tanggal eksekusi** (`exec_trade_date`).
+
+- Jika **ada row** untuk ticker pada `exec_trade_date`: gunakan data itu untuk menentukan tradeability (REGULAR / SUSPENDED / FCA / special notation / UNKNOWN).
+- Jika **tidak ada row** pada `exec_trade_date`: watchlist menganggap ticker **REGULAR** (soft reason `GL_TICKER_STATUS_DEFAULT_ASSUMED`).
+- **UNKNOWN tidak boleh dipakai sebagai default.** UNKNOWN hanya boleh muncul jika row pada `exec_trade_date` memang menyatakan UNKNOWN.
 
 ### 2.4 Liquidity gate (EXCLUDE / Universe)
 

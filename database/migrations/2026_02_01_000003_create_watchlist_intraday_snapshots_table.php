@@ -25,6 +25,9 @@ class CreateWatchlistIntradaySnapshotsTable extends Migration
             $table->decimal('open', 18, 4)->nullable();
             $table->decimal('open_or_last_exec', 18, 4)->nullable();
             $table->decimal('spread_pct', 18, 6)->nullable();
+            $table->integer('confirm_retry_count')->default(0);
+            $table->dateTime('confirm_last_checked_at')->nullable();
+            $table->dateTime('confirm_next_check_at')->nullable();
 
             // Optional orderbook depth (Top-3)
             $table->decimal('bid2', 18, 4)->nullable();

@@ -20,7 +20,8 @@ class ReasonCatalog
             'GL_EOD_NOT_READY' => 'EOD canonical belum siap.',
 
             // Global / data quality
-            'GL_TICKER_STATUS_UNKNOWN' => 'Status ticker tidak diketahui (data status belum tersedia).',
+            'GL_TICKER_STATUS_UNKNOWN' => 'Status ticker hari ini UNKNOWN (sumber status menyatakan tidak pasti / data buruk).',
+            'GL_TICKER_STATUS_DEFAULT_ASSUMED' => 'Status ticker hari ini tidak tersedia; diasumsikan REGULAR.',
 
             // Weekly Swing gates
             'WS_TREND_GATE_FAIL' => 'Weekly Swing: trend utama tidak memenuhi syarat.',

@@ -315,7 +315,12 @@ public function buildInternal(array $opts = []): array
 
         // Load datasets for candidate rules
         $candidates = $this->watchRepo->getEodCandidates((string)$eodDate);
-        $statusByTicker = $this->statusRepo->statusByTickerAsOf((string)$execTradeDate);
+
+        // Ticker status is resolved STRICTLY on execTradeDate.
+        // IMPORTANT: If there is no status data at all for this trade date, we still default to REGULAR
+        // and we DO NOT spam per-ticker DEFAULT_ASSUMED reasons (docs/watchlist/watchlist.md 2.6).
+        $statusByTicker = $this->statusRepo->statusByTickerOnDate((string)$execTradeDate);
+        $hasAnyTickerStatus = !empty($statusByTicker);
 
         $rows = [];
         foreach ($candidates as $ci) {
@@ -331,6 +336,7 @@ public function buildInternal(array $opts = []): array
                 $now,
                 $session,
                 $statusByTicker,
+                $hasAnyTickerStatus,
                 $divEventsByTicker,
                 $openPositions,
                 $globalLockCodes
@@ -1053,8 +1059,26 @@ $plan = [
 	    $rank = (int)($row['rank'] ?? 0);
 	    $scoreTotal = isset($row['score_total']) && is_numeric($row['score_total']) ? (float)$row['score_total'] : 0.0;
 
+	    // IMPORTANT: PREOPEN reasons must explain BOTH "why it looks good" and "why it's blocked".
+	    // Otherwise users see watch_only with empty reasons (ambiguous / misleading).
 	    $reasonCodes = array_values(array_unique(array_filter((array)($row['reason_codes'] ?? []), 'is_string')));
-	    $reasons = $this->buildReasonObjects($reasonCodes);
+	    $blockCodes = array_values(array_unique(array_filter((array)($row['eligibility_block_codes'] ?? []), 'is_string')));
+
+	    $reasons = [];
+	    if (!empty($reasonCodes)) {
+	        $reasons = array_merge($reasons, $this->buildReasonObjects($reasonCodes, 'INFO'));
+	    }
+	    if (!empty($blockCodes)) {
+	        $reasons = array_merge($reasons, $this->buildReasonObjects($blockCodes, 'WARN'));
+	    }
+	    // Deduplicate by code
+	    if (!empty($reasons)) {
+	        $tmp = [];
+	        foreach ($reasons as $rr) {
+	            if (is_array($rr) && isset($rr['code'])) $tmp[(string)$rr['code']] = $rr;
+	        }
+	        $reasons = array_values($tmp);
+	    }
 
 	    // Allow internal rows to provide richer reason objects (e.g., missing_fields details).
 	    if (isset($row['reasons']) && is_array($row['reasons'])) {
@@ -1106,15 +1130,18 @@ $plan = [
 	/** @return array<string,mixed> */
 	private function buildEodBar(array $row, string $asofEodDate): array
 	{
+	    // Support both legacy top-level OHLC keys and internal rows that keep OHLC under `basis`.
+	    $src = (isset($row['basis']) && is_array($row['basis'])) ? (array)$row['basis'] : $row;
+
 	    // NOTE: Real DB feeds sometimes return numeric strings with separators or blanks.
 	    // Cast ONLY after sanitizing to avoid "A non well formed numeric value encountered" warnings.
-	    $open  = (int) round($this->toFloat($row['open'] ?? null, 0.0));
-	    $high  = (int) round($this->toFloat($row['high'] ?? null, 0.0));
-	    $low   = (int) round($this->toFloat($row['low'] ?? null, 0.0));
-	    $close = (int) round($this->toFloat($row['close'] ?? null, 0.0));
-	    $volumeShares = (int) round($this->toFloat($row['volume'] ?? null, 0.0));
+	    $open  = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
+	    $high  = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
+	    $low   = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
+	    $close = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
+	    $volumeShares = (int) round($this->toFloat($src['\1'] ?? null, 0.0));
 
-	    $prevClose = (int) round($this->toFloat($row['prev_close'] ?? null, 0.0));
+	    $prevClose = (int) round($this->toFloat($src['prev_close'] ?? null, 0.0));
 
 	    // Best-effort value estimate (IDR). Prefer value_est if provided.
 	    $valueEst = null;
@@ -2032,6 +2059,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         \DateTimeImmutable $now,
         array $session,
         array $statusByTicker,
+        bool $hasAnyTickerStatus,
         array $divEventsByTicker,
         array $openPositions,
         array $globalLockCodes
@@ -2110,11 +2138,12 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         $candle = $this->deriveCandleMetrics($open, $high, $low, $close);
         // ticker flags as-of exec date (docs 2.6)
         $st = $statusByTicker[$tickerId] ?? null;
+        // Contract: missing status on trade date defaults to REGULAR (not UNKNOWN).
         $tickerFlags = [
             'special_notations' => $st ? (array)($st['special_notations'] ?? []) : [],
             'is_suspended' => $st ? (bool)($st['is_suspended'] ?? false) : false,
-            'status_quality' => $st ? (string)($st['status_quality'] ?? 'UNKNOWN') : 'UNKNOWN',
-            'status_asof_trade_date' => $st ? (string)($st['status_asof_trade_date'] ?? null) : null,
+            'status_quality' => $st ? (string)($st['status_quality'] ?? 'OK') : 'DEFAULT',
+            'status_asof_trade_date' => $st ? (string)($st['status_asof_trade_date'] ?? $execTradeDate) : null,
             'trading_mechanism' => $st ? (string)($st['trading_mechanism'] ?? 'REGULAR') : 'REGULAR',
         ];
 
@@ -2126,7 +2155,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         $hardLockCodes = [];
 
         // status quality flags
-        if ($tickerFlags['status_quality'] === 'STALE') $reasonCodes[] = 'GL_TICKER_STATUS_STALE';
+        if ($hasAnyTickerStatus && $tickerFlags['status_quality'] === 'DEFAULT') $reasonCodes[] = 'GL_TICKER_STATUS_DEFAULT_ASSUMED';
         if ($tickerFlags['status_quality'] === 'UNKNOWN') $reasonCodes[] = 'GL_TICKER_STATUS_UNKNOWN';
 
         // global tradeability gating (docs 2.6.2)
@@ -2373,6 +2402,10 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
             'confidence' => (string)($policyRes['confidence'] ?? 'Medium'),
             'reason_codes' => array_values(array_unique($reasonCodes)),
 
+            // Eligibility blocks MUST be visible in PREOPEN reasons; otherwise UI shows watch_only with no explanation.
+            // These codes are also used to determine plan.is_eligible_new_entry.
+            'eligibility_block_codes' => array_values(array_unique($eligBlockCodes)),
+
             'reasons' => $customReasons,
 
             'ticker_flags' => $tickerFlags,
@@ -2383,6 +2416,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
                 'high' => (int) round($high),
                 'low' => (int) round($low),
                 'close' => (int) round($close),
+                'prev_close' => (int) round($this->toFloat($r['prev_close'] ?? null, 0.0)),
                 'volume' => (int)($r['volume'] ?? 0),
                 'adj_close' => $r['adj_close'] ?? null,
                 'ca_hint' => $r['ca_hint'] ?? null,

@@ -3,17 +3,40 @@
 namespace App\Repositories;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
- * SRP: read ticker status (special notations, suspension, trading mechanism) as-of a trade date.
+ * SRP: read ticker status (special notations, suspension, trading mechanism) for a trade date.
  * Contract: docs/watchlist/watchlist.md Section 2.6
+ *
+ * Anti salah tafsir:
+ * - Watchlist hanya memakai status yang tepat pada trade_date yang sedang dieksekusi.
+ * - Jika tidak ada row untuk trade_date tsb, watchlist menganggap DEFAULT=REGULAR (bukan UNKNOWN).
+ * - UNKNOWN hanya boleh muncul jika row hari ini memang bertanda UNKNOWN / kualitas data buruk.
  */
 class TickerStatusRepository
 {
+
+private function dateColumn(): string
+{
+    // docs/watchlist/schema.md: column may be `asof_date` (preferred) or legacy `trade_date`.
+    try {
+        if (Schema::hasColumn('ticker_status_daily', 'asof_date')) return 'asof_date';
+    } catch (\Throwable $e) { /* ignore */ }
+    return 'trade_date';
+}
+
     /**
+     * Return status rows STRICTLY for the provided tradeDate.
+     *
+     * NOTE:
+     * - This function DOES NOT provide carry-forward/as-of behavior.
+     * - Missing status for a ticker is handled by the WatchlistEngine as DEFAULT=REGULAR.
+     *
      * @return array<int,array{
      *   ticker_id:int,
-     *   trade_date:string,
+     *   status_asof_trade_date:string,
+     *   status_quality:string, // OK|UNKNOWN
      *   is_suspended:bool,
      *   special_notations:array<int,string>,
      *   trading_mechanism:string
@@ -23,84 +46,35 @@ class TickerStatusRepository
     {
         if (!$this->tableExists('ticker_status_daily')) return [];
 
+        $dc = $this->dateColumn();
+
+        // best-effort: status_quality column is optional (older DBs). Default to OK.
+        $cols = ['ticker_id', 'is_suspended', 'special_notations', 'trading_mechanism'];
+        try {
+            if (Schema::hasColumn('ticker_status_daily', 'status_quality')) $cols[] = 'status_quality';
+        } catch (\Throwable $e) { /* ignore */ }
+
         $rows = DB::table('ticker_status_daily')
-            ->where('trade_date', $tradeDate)
-            ->get();
+            ->where($dc, $tradeDate)
+            ->get($cols);
 
         $out = [];
         foreach ($rows as $r) {
             $tid = (int)($r->ticker_id ?? 0);
             if ($tid <= 0) continue;
 
+            $q = strtoupper(trim((string)($r->status_quality ?? 'OK')));
+            if ($q !== 'OK' && $q !== 'UNKNOWN') $q = 'OK';
+
             $out[$tid] = [
                 'ticker_id' => $tid,
-                'trade_date' => (string)$tradeDate,
+                'status_asof_trade_date' => (string)$tradeDate,
+                'status_quality' => $q,
                 'is_suspended' => (bool)($r->is_suspended ?? false),
                 'special_notations' => $this->parseNotations($r->special_notations ?? null),
                 'trading_mechanism' => $this->normalizeMechanism((string)($r->trading_mechanism ?? 'REGULAR')),
             ];
         }
-        return $out;
-    }
-
-    /**
-     * Latest known status per ticker up to (<=) tradeDate.
-     *
-     * Used to provide STALE vs UNKNOWN quality flags.
-     *
-     * @return array<int,array{
-     *   ticker_id:int,
-     *   status_asof_trade_date:string,
-     *   status_quality:string, // OK|STALE
-     *   is_suspended:bool,
-     *   special_notations:array<int,string>,
-     *   trading_mechanism:string
-     * }>
-     */
-    public function statusByTickerAsOf(string $tradeDate): array
-    {
-        if (!$this->tableExists('ticker_status_daily')) return [];
-
-        // subquery: max(trade_date) per ticker <= asof
-        $sub = DB::table('ticker_status_daily')
-            ->select([
-                'ticker_id',
-                DB::raw('MAX(trade_date) as mx_trade_date'),
-            ])
-            ->where('trade_date', '<=', $tradeDate)
-            ->groupBy('ticker_id');
-
-        $rows = DB::table('ticker_status_daily as s')
-            ->joinSub($sub, 'm', function ($join) {
-                $join->on('s.ticker_id', '=', 'm.ticker_id')
-                    ->on('s.trade_date', '=', 'm.mx_trade_date');
-            })
-            ->get([
-                's.ticker_id',
-                's.trade_date',
-                's.is_suspended',
-                's.special_notations',
-                's.trading_mechanism',
-            ]);
-
-        $out = [];
-        foreach ($rows as $r) {
-            $tid = (int)($r->ticker_id ?? 0);
-            if ($tid <= 0) continue;
-
-            $asof = (string)($r->trade_date ?? '');
-            $quality = ($asof === $tradeDate) ? 'OK' : 'STALE';
-
-            $out[$tid] = [
-                'ticker_id' => $tid,
-                'status_asof_trade_date' => $asof,
-                'status_quality' => $quality,
-                'is_suspended' => (bool)($r->is_suspended ?? false),
-                'special_notations' => $this->parseNotations($r->special_notations ?? null),
-                'trading_mechanism' => $this->normalizeMechanism((string)($r->trading_mechanism ?? 'REGULAR')),
-            ];
-        }
-
         return $out;
     }
 

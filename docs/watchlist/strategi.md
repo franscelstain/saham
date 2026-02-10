@@ -2,9 +2,11 @@
 
 Dokumen ini menjelaskan cara kerja **operasional** untuk menyempurnakan data Watchlist: langkah proses, urutan eksekusi, dan contoh command/query yang dipakai.
 
-> **STATUS (LIVING DOCS)**
-> Dokumen ini adalah panduan penggunaan Watchlist saat aplikasi sudah jadi. Jika ada perubahan di code/command/parameter/urutan eksekusi yang belum tercatat di sini, maka dokumen ini **wajib** diupdate agar operator/user tidak salah menjalankan.
-> Dokumen ini tidak mengubah aturan **LOCKED** di `docs/watchlist/watchlist.md`.
+> **Catatan penting (anti salah tafsir)**
+> - File ini **bukan acuan untuk membangun/merancang perilaku sistem**.
+> - **Source of truth teknis** selalu mengikuti: **code yang berjalan + konfigurasi + database aktual**.
+> - `strategi.md` hanya dokumentasi langkah operasional (runbook) untuk operator/user.
+> - Jika ada perbedaan, **ikuti implementasi** lalu **perbarui dokumen ini** agar kembali sinkron.
 
 ## Daftar aktivitas (ringkas)
 1. Pastikan prasyarat data (calendar, tickers, OHLC, indicators, dividend events)
@@ -29,6 +31,11 @@ Watchlist **membaca** data berikut sebelum bisa menghasilkan output yang valid:
 3. `ticker_ohlc_daily` terisi untuk `asof_eod_date` (dan beberapa hari sebelumnya untuk DV20 + prev candle).
 4. `ticker_indicators_daily` terisi untuk `asof_eod_date` (hasil compute-eod).
 5. Khusus policy `DIVIDEND_SWING`: `ticker_dividend_events` terisi (minimal `ticker_id` + `ex_date`).
+6. (Opsional tapi direkomendasikan) `ticker_status_daily` terisi untuk `trade_date` eksekusi.
+
+Catatan `ticker_status_daily`:
+- Jika tabel/row status tidak tersedia untuk hari eksekusi, watchlist **tetap jalan** dengan default **REGULAR** (soft reason: `GL_TICKER_STATUS_DEFAULT_ASSUMED`).
+- Jika ada row pada hari eksekusi, watchlist memakai row tsb untuk gate: suspend / special notation / FCA / UNKNOWN.
 
 Khusus `INTRADAY_LIGHT`:
 - Butuh histori OHLC yang cukup untuk mengambil **prior trading dates** sebelum `asof_eod_date`:
