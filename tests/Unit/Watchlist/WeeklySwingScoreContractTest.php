@@ -91,7 +91,7 @@ class WeeklySwingScoreContractTest extends TestCase
 
         foreach ($groups as $groupName => $items) {
             foreach ((array)$items as $it) {
-                if (($it['ticker_code'] ?? null) === 'BBCA') {
+                if (($it['ticker'] ?? null) === 'BBCA') {
                     $foundGroup = (string)$groupName;
                     $foundItem = (array)$it;
                     break 2;
@@ -100,10 +100,11 @@ class WeeklySwingScoreContractTest extends TestCase
         }
 
         $this->assertNotNull($foundGroup, 'BBCA should remain in preopen payload groups');
-        $this->assertNotSame('excluded', $foundGroup, 'BBCA hard-rule fail must not be excluded');
+        $this->assertSame('watch_only', $foundGroup, 'BBCA hard-rule fail must land in watch_only group');
 
-        $blockCodes = (array)($foundItem['eligibility_block_codes'] ?? []);
-        $this->assertContains('WS_MIN_DV20_IDR', $blockCodes);
+        $reasons = (array)($foundItem['reasons'] ?? []);
+        $codes = array_map(fn($r) => (string)($r['code'] ?? ''), $reasons);
+        $this->assertContains('WS_MIN_DV20_IDR', $codes);
     }
 
     private function clamp01(float $v): float

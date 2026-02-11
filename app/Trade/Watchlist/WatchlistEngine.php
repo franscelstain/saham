@@ -2080,14 +2080,13 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 		$policyHardFail = (($policyRes['drop'] ?? false) === true);
 
 		// Score is for ranking/grouping. Contract: output score_total MUST be 0..1.
-		// If candidate is not hard-eligible (universe/input missing), force score_total=0.0 to avoid misleading group logic.
+		// IMPORTANT (docs/watchlist/watchlist.md): hard-rule FAIL must NOT remove the ticker from PLAN output.
+		// Therefore, even when policyHardFail=true, we keep a stable score_total for grouping (eligibility will be blocked).
 		$rawScoreTotal = 0.0;
-		if (!$policyHardFail) {
-			if (isset($policyRes['score_total']) && is_numeric($policyRes['score_total'])) {
-				$rawScoreTotal = $policyRes['score_total'];
-			} else {
-				$rawScoreTotal = $hardEligible ? ($r['score_total'] ?? 0.0) : 0.0;
-			}
+		if (isset($policyRes['score_total']) && is_numeric($policyRes['score_total'])) {
+			$rawScoreTotal = (float)$policyRes['score_total'];
+		} elseif (isset($r['score_total']) && is_numeric($r['score_total'])) {
+			$rawScoreTotal = (float)$r['score_total'];
 		}
 		$scoreTotal = WatchlistScoreScale::toScore01($rawScoreTotal);
 
