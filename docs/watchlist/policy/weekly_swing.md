@@ -7,8 +7,15 @@
 
 ## 1) Tujuan & horizon
 - Horizon: 3–7 hari bursa.
-- Gaya entry: `setup_type ∈ {BREAKOUT, PULLBACK}` (ditentukan deterministik oleh rules PLAN) pada uptrend yang tradeable.
+- Gaya entry: `setup_type ∈ {BREAKOUT, PULLBACK}` (label output di code saat ini: `Breakout` / `Pullback`; semantik sama). (ditentukan deterministik oleh rules PLAN) pada uptrend yang tradeable.
 - Target cuan realistis: 2%–6% (tergantung ATR/likuiditas), dengan stop disiplin.
+
+## 1.1) Input & definisi field (anti salah tafsir)
+
+- `dv20` di codebase adalah **average daily traded value 20 hari terakhir dalam IDR** (bukan volume/lot).  
+  Di docs, ini ditulis sebagai `dv20_idr` untuk menegaskan satuan; **artinya sama**.
+- `tick(price)` wajib berasal dari **TickRule (IDX tick ladder)** dan dipakai untuk semua rounding/offset.
+- `signal_code` adalah output classifier (integer) yang dipetakan menjadi `s_pattern` (0..1) oleh tabel mapping (lihat bagian Scoring).
 
 ## 2) Hard Rules (wajib lolos untuk NEW ENTRY)
 

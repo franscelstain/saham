@@ -1,0 +1,320 @@
+<?php
+
+namespace Tests\Unit\Watchlist;
+
+use App\DTO\Watchlist\CandidateInput;
+use App\DTO\Watchlist\PolicyDocCheckResult;
+use App\Repositories\DividendEventRepository;
+use App\Repositories\IntradaySnapshotRepository;
+use App\Repositories\MarketBreadthRepository;
+use App\Repositories\MarketCalendarRepository;
+use App\Repositories\PortfolioPositionRepository;
+use App\Repositories\TickerStatusRepository;
+use App\Repositories\WatchlistRepository;
+use App\Trade\Pricing\FeeConfig;
+use App\Trade\Pricing\TickLadderConfig;
+use App\Trade\Pricing\TickRule;
+use App\Trade\Support\TradeClockConfig;
+use App\Trade\Watchlist\CandidateDerivedMetricsBuilder;
+use App\Trade\Watchlist\Config\ScorecardConfig;
+use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
+use App\Trade\Watchlist\Contracts\PolicyDocLocator;
+use App\Trade\Watchlist\Contracts\PreopenContractValidator;
+use App\Trade\Watchlist\Policies\WeeklySwingPolicy;
+use App\Trade\Watchlist\WatchlistEngine;
+use Tests\TestCase;
+
+class WeeklySwingScoreContractTest extends TestCase
+{
+    public function testWeeklySwingPolicyScoringMatchesDocsWeightsAndClamps(): void
+    {
+        $candidate = $this->makeCandidateGood();
+        $engine = $this->makeEngineWithCandidate($candidate, true);
+
+        $policy = new WeeklySwingPolicy();
+        $res = $policy->apply($this->candidateToPolicyInput($candidate), [], $engine);
+
+        $this->assertFalse((bool)($res['drop'] ?? true));
+        $this->assertArrayHasKey('score_total', $res);
+
+        // Expected score based on docs/watchlist/policy/weekly_swing.md (weights + clamp):
+        // s_pattern=1.0 (signal_code=5)
+        // s_trend from close_vs_ma20=(1020/990)-1
+        // s_momentum from roc20=0.10
+        // s_volume from vol_ratio=2.0
+        // s_risk: invStop (inverse normalized stop_pct) and invAtr (atr_pct=atr14/close)
+        $close = 1020.0;
+        $ma20 = 990.0;
+        $closeVsMa20 = ($close / $ma20) - 1.0;
+        $sTrend = $this->clamp01(($closeVsMa20 + 0.02) / (0.05 - (-0.02)));
+        $sMomentum = $this->clamp01((0.10 - (-0.03)) / (0.12 - (-0.03)));
+        $sVolume = $this->clamp01((2.0 - 1.0) / (3.0 - 1.0));
+
+        // stop_pct = (entry - sl) / entry. This fixture is built so TP1 RR passes rounding.
+        // entry=1020, sl=960 => stop_pct=60/1020
+        $stopPct = 60.0 / 1020.0;
+        $invStop = 1.0 - $this->clamp01(($stopPct - 0.01) / (0.08 - 0.01));
+
+        $atrPct = 31.0 / 1020.0;
+        $invAtr = 1.0 - $this->clamp01(($atrPct - 0.01) / (0.12 - 0.01));
+        $sRisk = $this->clamp01(0.5 * $invStop + 0.5 * $invAtr);
+
+        $expected = $this->clamp01(
+            0.30 * 1.0 +
+            0.25 * $sTrend +
+            0.20 * $sMomentum +
+            0.15 * $sVolume +
+            0.10 * $sRisk
+        );
+
+        $this->assertEqualsWithDelta($expected, (float)$res['score_total'], 0.02);
+        $this->assertEqualsWithDelta($expected * 100.0, (float)($res['score'] ?? 0.0), 2.0);
+    }
+
+    public function testHardRuleFailStaysInPreopenAsWatchOnlyNotExcluded(): void
+    {
+        $candidate = $this->makeCandidateHardFailDv20();
+        $engine = $this->makeEngineWithCandidate($candidate, true);
+
+        $doc = $engine->buildPreopen([
+            'policy' => 'WEEKLY_SWING',
+            'eod_date' => '2026-01-30',
+            'capital_idr' => null,
+            'now_ts' => '2026-02-03T08:00:00+07:00',
+        ]);
+
+        (new PreopenContractValidator())->validate($doc);
+
+        $groups = (array)($doc['groups'] ?? []);
+        $foundGroup = null;
+        $foundItem = null;
+
+        foreach ($groups as $groupName => $items) {
+            foreach ((array)$items as $it) {
+                if (($it['ticker_code'] ?? null) === 'BBCA') {
+                    $foundGroup = (string)$groupName;
+                    $foundItem = (array)$it;
+                    break 2;
+                }
+            }
+        }
+
+        $this->assertNotNull($foundGroup, 'BBCA should remain in preopen payload groups');
+        $this->assertNotSame('excluded', $foundGroup, 'BBCA hard-rule fail must not be excluded');
+
+        $blockCodes = (array)($foundItem['eligibility_block_codes'] ?? []);
+        $this->assertContains('WS_MIN_DV20_IDR', $blockCodes);
+    }
+
+    private function clamp01(float $v): float
+    {
+        if ($v < 0.0) return 0.0;
+        if ($v > 1.0) return 1.0;
+        return $v;
+    }
+
+    private function makeCandidateGood(): CandidateInput
+    {
+        $c = new CandidateInput([
+            'ticker_id' => 1,
+            'ticker_code' => 'BBCA',
+            'open' => 1000,
+            'high' => 1050,
+            'low' => 970,
+            'close' => 1020,
+            'volume' => 1000000,
+            'prev_close' => 1000,
+            // Universe gate requires a numeric score_total from repo output.
+            'score_total' => 0.60,
+            'ma20' => 990,
+            'ma50' => 980,
+            'ma200' => 900,
+            'rsi14' => 55,
+            'atr14' => 31,
+            'vol_ratio' => 2.0,
+            'hh20' => 1050,
+            // ll5 set so policy stop rounds to 960 (RR(tp1) meets WS_MIN_RR after rounding)
+            'll5' => 965,
+            'roc20' => 0.10,
+            'dv20' => 50_000_000_000,
+        ]);
+        $c->decisionCode = 5;
+        $c->signalCode = 5; // s_pattern=1.0
+        $c->volumeLabelCode = 4;
+        return $c;
+    }
+
+    private function makeCandidateHardFailDv20(): CandidateInput
+    {
+        $c = $this->makeCandidateGood();
+        // Must pass Universe liquidity gate (default 2B) but fail WEEKLY_SWING policy gate (5B)
+        $c->dv20 = 3_000_000_000;
+        return $c;
+    }
+
+    private function candidateToPolicyInput(CandidateInput $c): array
+    {
+        // Mimic the core policy input built by WatchlistEngine::buildCandidate()
+        return [
+            'ticker_id' => $c->tickerId,
+            'ticker_code' => $c->tickerCode,
+            'open' => $c->open,
+            'high' => $c->high,
+            'low' => $c->low,
+            'close' => $c->close,
+            'ma20' => $c->ma20,
+            'ma50' => $c->ma50,
+            'ma200' => $c->ma200,
+            'atr14' => $c->atr14,
+            'atr_pct' => ($c->atr14 !== null && $c->close > 0) ? ((float)$c->atr14 / (float)$c->close) : null,
+            'vol_ratio' => $c->volRatio,
+            'dv20' => (property_exists($c, 'dv20') ? $c->dv20 : (property_exists($c, 'dv20_idr') ? $c->dv20_idr : null)),
+            'hh20' => $c->hh20,
+            'll5' => $c->ll5,
+            'roc20' => $c->roc20,
+            'signal_code' => $c->signalCode,
+            'setup_type' => 'Base',
+        ];
+    }
+
+    private function makeEngineWithCandidate(CandidateInput $candidate, bool $canonicalReady): WatchlistEngine
+    {
+        $cfg = new WatchlistPolicyConfig(
+            'WEEKLY_SWING',
+            null,
+            false,
+            [],
+            2,
+            95.0,
+            95.0,
+            false,
+            15.0,
+            8.0,
+            0.02,
+            0.02,
+            0.75,
+            true,
+            [
+                'WEEKLY_SWING' => [
+                    'max_gap_up_pct' => 0.03,
+                    'max_chase_from_close_pct' => 0.02,
+                    'max_spread_pct' => 0.015,
+                ],
+            ]
+        );
+
+        $tickRule = new TickRule(new TickLadderConfig([
+            ['lt' => 200, 'tick' => 1],
+            ['lt' => 500, 'tick' => 2],
+            ['lt' => 2000, 'tick' => 5],
+            ['lt' => 5000, 'tick' => 10],
+            ['lt' => 20000, 'tick' => 25],
+            ['lt' => 50000, 'tick' => 50],
+            ['tick' => 100],
+        ]));
+
+        $feeCfg = new FeeConfig(0.0015, 0.0025, 0.0, 0.0, 0.0005);
+        $clockCfg = new TradeClockConfig('Asia/Jakarta', 16, 0);
+        $scorecardCfg = new ScorecardConfig(false, 0.01, 0.015, 0.004, '09:00', '15:50');
+        $metricsBuilder = new CandidateDerivedMetricsBuilder($cfg);
+
+        $watchRepo = new class($candidate, $canonicalReady) extends WatchlistRepository {
+            private CandidateInput $c;
+            private bool $ok;
+            public function __construct(CandidateInput $c, bool $ok) { $this->c = $c; $this->ok = $ok; }
+            public function getLatestCommonEodDate(): ?string { return '2026-01-30'; }
+            public function getEodCandidates(string $tradeDate): array { return [$this->c]; }
+            public function coverageSnapshot(string $tradeDate): array
+            {
+                if ($this->ok) {
+                    return ['canonical_coverage_pct' => 100.0, 'indicators_coverage_pct' => 100.0];
+                }
+                return ['canonical_coverage_pct' => 10.0, 'indicators_coverage_pct' => 10.0];
+            }
+        };
+
+        $breadthRepo = new class extends MarketBreadthRepository {
+            public function snapshot(string $tradeDate): array { return ['trade_date' => $tradeDate, 'sample_size' => 0]; }
+        };
+
+        $calRepo = new class extends MarketCalendarRepository {
+            public function prevTradingDay(string $date): ?string { return $date; }
+            public function nextTradingDay(string $date): ?string { return $date; }
+            public function isTradingDay(string $date): bool { return true; }
+            public function tradingDatesBetween(string $from, string $to): array { return [$from, $to]; }
+            public function getCalendarRow(string $date): ?array
+            {
+                return [
+                    'trade_date' => $date,
+                    'session_open_time' => '09:00:00',
+                    'session_close_time' => '16:00:00',
+                    'breaks_json' => json_encode([]),
+                ];
+            }
+        };
+
+        $divRepo = new class extends DividendEventRepository {
+            public function eventsByTickerInWindow(string $from, string $to): array { return []; }
+        };
+
+        $intraRepo = new class extends IntradaySnapshotRepository {
+            public function snapshotsByTicker(string $tradeDate): array { return []; }
+        };
+
+        $statusRepo = new class extends TickerStatusRepository {
+            public function statusByTickerAsOf(string $tradeDate): array
+            {
+                return [
+                    1 => [
+                        'special_notations' => [],
+                        'is_suspended' => false,
+                        'status_quality' => 'OK',
+                        'status_asof_trade_date' => $tradeDate,
+                        'trading_mechanism' => 'REGULAR',
+                    ],
+                ];
+            }
+        };
+
+        $posRepo = new class extends PortfolioPositionRepository {
+            public function openPositionsByTicker(int $accountId = 1): array { return []; }
+        };
+
+        $policyDocs = new class implements PolicyDocLocator {
+            public function check(string $policyCode): PolicyDocCheckResult
+            {
+                return PolicyDocCheckResult::ok($policyCode, null, null);
+            }
+        };
+
+        $rc = new \ReflectionClass(WatchlistEngine::class);
+        $ctor = $rc->getConstructor();
+        $args = [];
+        foreach (($ctor ? $ctor->getParameters() : []) as $p) {
+            $t = (string)($p->getType() ? $p->getType()->getName() : '');
+            switch ($t) {
+                case WatchlistRepository::class: $args[] = $watchRepo; break;
+                case MarketCalendarRepository::class: $args[] = $calRepo; break;
+                case DividendEventRepository::class: $args[] = $divRepo; break;
+                case IntradaySnapshotRepository::class: $args[] = $intraRepo; break;
+                case TickerStatusRepository::class: $args[] = $statusRepo; break;
+                case PortfolioPositionRepository::class: $args[] = $posRepo; break;
+                case MarketBreadthRepository::class: $args[] = $breadthRepo; break;
+                case TickRule::class: $args[] = $tickRule; break;
+                case FeeConfig::class: $args[] = $feeCfg; break;
+                case TradeClockConfig::class: $args[] = $clockCfg; break;
+                case ScorecardConfig::class: $args[] = $scorecardCfg; break;
+                case CandidateDerivedMetricsBuilder::class: $args[] = $metricsBuilder; break;
+                case WatchlistPolicyConfig::class: $args[] = $cfg; break;
+                case PolicyDocLocator::class: $args[] = $policyDocs; break;
+                default:
+                    $args[] = $p->isDefaultValueAvailable() ? $p->getDefaultValue() : null;
+                    break;
+            }
+        }
+
+        /** @var WatchlistEngine $engine */
+        $engine = $rc->newInstanceArgs($args);
+        return $engine;
+}
+}

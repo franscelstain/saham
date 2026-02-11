@@ -27,4 +27,22 @@ final class PolicyDefaults
     public const DS_PULLBACK_MAX_MA_DIST_ATR = 0.5;
     public const DS_PULLBACK_MIN_LOWER_WICK  = 0.30;
     public const DS_PULLBACK_MIN_CLOSE_POS   = 0.60;
+    // POSITION_TRADE (docs/watchlist/policy/position_trade.md)
+    public const PT_MIN_RR = 2.0;
+    public const PT_TP2_R_MULT = 3.0;
+    public const PT_MAX_ATR_PCT = 0.12;
+    public const PT_MAX_ATR_PCT_SHOCK = 0.15;
+    public const PT_MAX_STOP_PCT = 0.12;
+    public const PT_NEAR_RESIST_PCT = 0.02;
+
+    public const PT_BREAKOUT_MIN_CLOSE_POS = 0.70;
+    public const PT_BREAKOUT_MIN_VOL_RATIO = 1.30;
+    public const PT_PULLBACK_MAX_MA_DIST_ATR = 0.50;
+    public const PT_PULLBACK_MIN_LOWER_WICK_RATIO = 0.30;
+    public const PT_PULLBACK_MIN_CLOSE_POS = 0.60;
+
+    public const PT_BLOWOFF_RSI = 80.0;
+    public const PT_BLOWOFF_VOL_RATIO = 2.0;
+    public const PT_BLOWOFF_MIN_CLOSE_POS = 0.80;
+
 }
