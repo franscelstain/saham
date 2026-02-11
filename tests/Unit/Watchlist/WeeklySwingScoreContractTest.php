@@ -51,8 +51,8 @@ class WeeklySwingScoreContractTest extends TestCase
         $sVolume = $this->clamp01((2.0 - 1.0) / (3.0 - 1.0));
 
         // stop_pct = (entry - sl) / entry. This fixture is built so TP1 RR passes rounding.
-        // entry=1020, sl=960 => stop_pct=60/1020
-        $stopPct = 60.0 / 1020.0;
+        // entry=1020, sl=970 => stop_pct=50/1020
+        $stopPct = 50.0 / 1020.0;
         $invStop = 1.0 - $this->clamp01(($stopPct - 0.01) / (0.08 - 0.01));
 
         $atrPct = 31.0 / 1020.0;
@@ -120,7 +120,7 @@ class WeeklySwingScoreContractTest extends TestCase
             'ticker_code' => 'BBCA',
             'open' => 1000,
             'high' => 1050,
-            'low' => 970,
+            'low' => 980,
             'close' => 1020,
             'volume' => 1000000,
             'prev_close' => 1000,
@@ -133,9 +133,12 @@ class WeeklySwingScoreContractTest extends TestCase
             'atr14' => 31,
             'vol_ratio' => 2.0,
             'hh20' => 1050,
-            // ll5 set so policy stop rounds to 960 (RR(tp1) meets WS_MIN_RR after rounding)
-            'll5' => 965,
+            // ll5/low set so policy stop rounds to 970 (R=50), TP1 RR meets WS_MIN_RR after rounding
+            'll5' => 975,
             'roc20' => 0.10,
+            // Canonical liquidity field is dv20_idr (average daily traded value 20d in IDR)
+            'dv20_idr' => 50_000_000_000,
+            // Also keep dv20 for backward compatibility in some code paths.
             'dv20' => 50_000_000_000,
         ]);
         $c->decisionCode = 5;
@@ -149,6 +152,7 @@ class WeeklySwingScoreContractTest extends TestCase
         $c = $this->makeCandidateGood();
         // Must pass Universe liquidity gate (default 2B) but fail WEEKLY_SWING policy gate (5B)
         $c->dv20 = 3_000_000_000;
+        $c->dv20Idr = 3_000_000_000;
         return $c;
     }
 
@@ -223,7 +227,7 @@ class WeeklySwingScoreContractTest extends TestCase
             private bool $ok;
             public function __construct(CandidateInput $c, bool $ok) { $this->c = $c; $this->ok = $ok; }
             public function getLatestCommonEodDate(): ?string { return '2026-01-30'; }
-            public function getEodCandidates(string $tradeDate): array { return [$this->c]; }
+            public function getEodCandidates(string $tradeDate): array { return [$this->c->toArray()]; }
             public function coverageSnapshot(string $tradeDate): array
             {
                 if ($this->ok) {

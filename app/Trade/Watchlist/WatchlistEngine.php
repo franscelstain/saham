@@ -317,7 +317,13 @@ public function buildInternal(array $opts = []): array
         $hasAnyTickerStatus = !empty($statusByTicker);
 
         $rows = [];
-        foreach ($candidates as $ci) {
+        foreach ($candidates as $ciRaw) {
+            // Repository implementations historically returned either DTOs or plain rows.
+            // Normalize here to keep the derived-metrics pipeline strongly typed.
+            $ci = ($ciRaw instanceof \App\DTO\Watchlist\CandidateInput)
+                ? $ciRaw
+                : new \App\DTO\Watchlist\CandidateInput((array)$ciRaw);
+
             $this->derivedBuilder->enrich($ci);
             // labels are part of output contract; keep mapping out of DTO (docs/DTO.md)
             $ci->decisionLabel = LabelCatalog::decision($ci->decisionCode);
