@@ -125,6 +125,16 @@ final class EodIndicatorsStreamCalculator
         $lows20 = [];
         $highs20 = [];
 
+        // extra rolling windows
+        $lows5 = [];
+
+        // price history for ROC20 (include today; need 21 values)
+        $lastPrices21 = [];
+
+        // traded value history for DV20_IDR (exclude-today semantics)
+        $lastTv20 = [];
+        $sumTv20 = 0.0;
+
         $lastVols20 = [];
         $sumVol20 = 0.0;
 
@@ -143,6 +153,12 @@ final class EodIndicatorsStreamCalculator
                 $lows20 = [];
                 $highs20 = [];
 
+                $lows5 = [];
+                $lastPrices21 = [];
+
+                $lastTv20 = [];
+                $sumTv20 = 0.0;
+
                 $lastVols20 = [];
                 $sumVol20 = 0.0;
             }
@@ -152,6 +168,14 @@ final class EodIndicatorsStreamCalculator
             $resist20 = null;
             if (count($lows20) >= 20)  $support20 = min($lows20);
             if (count($highs20) >= 20) $resist20  = max($highs20);
+
+            // ll5 (exclude today)
+            $ll5 = null;
+            if (count($lows5) >= 5) $ll5 = min($lows5);
+
+            // dv20_idr (exclude today) = avg traded value (close*volume) over last 20 trading bars
+            $dv20Idr = null;
+            if (count($lastTv20) >= 20) $dv20Idr = ($sumTv20 / 20.0);
 
             // volSma20Prev (exclude today)
             $volSma20Prev = null;
@@ -218,6 +242,13 @@ final class EodIndicatorsStreamCalculator
                         'vol_sma20' => null,
                         'vol_ratio' => null,
 
+                        // extra rollups (kept NULL when bar invalid)
+                        'dv20_idr' => null,
+                        'atr14_pct' => null,
+                        'hh20' => null,
+                        'll5' => null,
+                        'roc20' => null,
+
                         'decision_code' => $decisionCode,
                         'signal_code' => $signalCode,
                         'volume_label_code' => $volumeLabelCode,
@@ -274,6 +305,21 @@ final class EodIndicatorsStreamCalculator
             // update buffers
             $lows20[] = $low;   if (count($lows20) > 20) array_shift($lows20);
             $highs20[] = $high; if (count($highs20) > 20) array_shift($highs20);
+
+            $lows5[] = $low; if (count($lows5) > 5) array_shift($lows5);
+
+            // ROC20 uses price_used history (include today)
+            $lastPrices21[] = $priceUsed;
+            if (count($lastPrices21) > 21) array_shift($lastPrices21);
+
+            // DV20_IDR uses traded value history (exclude today when used as a guard)
+            $tv = $closeReal * $vol;
+            $lastTv20[] = $tv;
+            $sumTv20 += $tv;
+            if (count($lastTv20) > 20) {
+                $outTv = array_shift($lastTv20);
+                $sumTv20 -= $outTv;
+            }
 
             $lastVols20[] = $vol;
             $sumVol20 += $vol;
@@ -342,6 +388,13 @@ final class EodIndicatorsStreamCalculator
                     'vol_sma20' => null,
                     'vol_ratio' => null,
 
+                    // extra rollups (kept NULL for CA guard)
+                    'dv20_idr' => null,
+                    'atr14_pct' => null,
+                    'hh20' => null,
+                    'll5' => null,
+                    'roc20' => null,
+
                     // scoring (neutral)
                     'score_total' => 0,
                     'score_trend' => 0,
@@ -378,6 +431,22 @@ final class EodIndicatorsStreamCalculator
                 $volRatio = round($vol / $volSma20Prev, 4);
             }
 
+            // ROC20 (include today) based on price_used
+            $roc20 = null;
+            if (count($lastPrices21) >= 21) {
+                $base = (float) $lastPrices21[0];
+                if ($base > 0) {
+                    $roc20 = round(($priceUsed / $base) - 1.0, 6);
+                }
+            }
+
+            // ATR14% relative to price_used
+            $atr14Pct = null;
+            $atrVal = $atr14->value();
+            if ($atrVal !== null && $priceUsed > 0) {
+                $atr14Pct = round(((float) $atrVal) / $priceUsed, 6);
+            }
+
             $metrics = [
                 'open' => (float) $r->open,
                 'high' => $high,
@@ -393,6 +462,13 @@ final class EodIndicatorsStreamCalculator
 
                 'support_20d' => $support20,
                 'resistance_20d' => $resist20,
+
+                // extra rollups
+                'dv20_idr' => $dv20Idr,
+                'atr14_pct' => $atr14Pct,
+                'hh20' => $resist20,
+                'll5' => $ll5,
+                'roc20' => $roc20,
 
                 'vol_sma20' => $volSma20Prev,
                 'vol_ratio' => $volRatio,
@@ -421,6 +497,12 @@ final class EodIndicatorsStreamCalculator
             if ($resist20 === null) $missing[] = 'resistance_20d';
             if ($volSma20Prev === null) $missing[] = 'vol_sma20';
             if ($volRatio === null) $missing[] = 'vol_ratio';
+
+            // extra rollups used by watchlist policies
+            if ($dv20Idr === null) $missing[] = 'dv20_idr';
+            if ($ll5 === null) $missing[] = 'll5';
+            if ($roc20 === null) $missing[] = 'roc20';
+            if ($atr14Pct === null) $missing[] = 'atr14_pct';
 
             if (!empty($missing)) {
                 if (is_callable($this->onInsufficientWindowOnTradeDate)) {
@@ -475,6 +557,13 @@ final class EodIndicatorsStreamCalculator
 
                 'vol_sma20' => $volSma20Prev !== null ? round($volSma20Prev, 4) : null,
                 'vol_ratio' => $volRatio,
+
+                // extra rollups
+                'dv20_idr' => $dv20Idr !== null ? round($dv20Idr, 2) : null,
+                'atr14_pct' => $atr14Pct,
+                'hh20' => $resist20 !== null ? round($resist20, 4) : null,
+                'll5' => $ll5 !== null ? round($ll5, 4) : null,
+                'roc20' => $roc20,
 
                 'decision_code' => $decisionCode,
                 'signal_code' => $signalCode,
