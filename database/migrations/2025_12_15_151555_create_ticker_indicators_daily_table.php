@@ -41,6 +41,12 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->decimal('vol_sma20', 20, 4)->nullable();
             $table->decimal('vol_ratio', 12, 4)->nullable(); // volume / vol_sma20
 
+            $table->decimal('dv20_idr', 26, 2)->nullable();
+            $table->decimal('atr14_pct', 10, 6)->nullable();
+            $table->decimal('hh20', 18, 4)->nullable();
+            $table->decimal('ll5', 18, 4)->nullable();
+            $table->decimal('roc20', 10, 6)->nullable();
+
             // momentum / volatility
             $table->decimal('rsi14', 6, 2)->nullable();
             $table->decimal('atr14', 18, 4)->nullable();
@@ -49,24 +55,8 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->decimal('support_20d', 18, 4)->nullable();
             $table->decimal('resistance_20d', 18, 4)->nullable();
 
-            // hasil klasifikasi (yang kamu mau)
-            $table->unsignedTinyInteger('decision_code')->default(1); // 1..5
-            $table->unsignedTinyInteger('signal_code')->nullable(); // 1..10
-            $table->unsignedTinyInteger('volume_label_code')->nullable(); // 1..8
             $table->boolean('is_valid')->default(true);
             $table->string('invalid_reason', 64)->nullable();
-
-            // Tanggal pertama kali sinyal ini muncul (streak start)
-            $table->date('signal_first_seen_date')->nullable();
-            $table->smallInteger('signal_age_days')->default(0);
-
-            // scoring
-            $table->smallInteger('score_total')->default(0);
-            $table->smallInteger('score_trend')->default(0);
-            $table->smallInteger('score_momentum')->default(0);
-            $table->smallInteger('score_volume')->default(0);
-            $table->smallInteger('score_breakout')->default(0);
-            $table->smallInteger('score_risk')->default(0);
 
             $table->string('source', 30)->nullable();
 
@@ -79,9 +69,7 @@ class CreateTickerIndicatorsDailyTable extends Migration
             $table->unique(['ticker_id', 'trade_date'], 'uq_ind_daily_ticker_date');
 
             $table->index(['trade_date', 'vol_ratio'], 'idx_ind_date_volratio');
-            $table->index(['trade_date', 'signal_code', 'volume_label_code', 'score_total'], 'idx_ind_candidates');
             $table->index(['trade_date', 'rsi14', 'ma20', 'ma50', 'ma200'], 'idx_ind_trend_filter');
-            $table->index(['trade_date', 'signal_code', 'signal_age_days'], 'idx_ti_trade_signal_age');
             $table->index(['trade_date', 'basis_used'], 'idx_tid_basis_date');
 
             $table->foreign('ticker_id', 'fk_ind_daily_ticker')

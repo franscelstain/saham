@@ -256,14 +256,6 @@ final class EodIndicatorsStreamCalculator
                         'signal_first_seen_date' => $age['signal_first_seen_date'],
                         'signal_age_days' => $age['signal_age_days'],
 
-                        // scoring (neutral)
-                        'score_total' => 0,
-                        'score_trend' => 0,
-                        'score_momentum' => 0,
-                        'score_volume' => 0,
-                        'score_breakout' => 0,
-                        'score_risk' => 0,
-
                         'is_valid' => 0,
                         'invalid_reason' => 'INVALID_BAR',
 
@@ -394,14 +386,6 @@ final class EodIndicatorsStreamCalculator
                     'hh20' => null,
                     'll5' => null,
                     'roc20' => null,
-
-                    // scoring (neutral)
-                    'score_total' => 0,
-                    'score_trend' => 0,
-                    'score_momentum' => 0,
-                    'score_volume' => 0,
-                    'score_breakout' => 0,
-                    'score_risk' => 0,
 
                     // CA guard = data valid, but indicators are intentionally neutralized.
                     // Keep semantics consistent:
@@ -572,29 +556,12 @@ final class EodIndicatorsStreamCalculator
                 'signal_first_seen_date' => $age['signal_first_seen_date'],
                 'signal_age_days' => $age['signal_age_days'],
 
-                // scoring
-                'score_total' => 0,
-                'score_trend' => 0,
-                'score_momentum' => 0,
-                'score_volume' => 0,
-                'score_breakout' => 0,
-                'score_risk' => 0,
-
                 'is_valid' => 1,
                 'invalid_reason' => null,
 
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
-
-            // compute score only if the row is not neutralized
-            $scores = $this->computeScores($metrics, $signalCode, $volumeLabelCode, $decisionCode);
-            $row['score_total'] = $scores['score_total'];
-            $row['score_trend'] = $scores['score_trend'];
-            $row['score_momentum'] = $scores['score_momentum'];
-            $row['score_volume'] = $scores['score_volume'];
-            $row['score_breakout'] = $scores['score_breakout'];
-            $row['score_risk'] = $scores['score_risk'];
 
             $this->seenOnTradeDate[$tid] = true;
             $this->processed++;
@@ -624,119 +591,6 @@ final class EodIndicatorsStreamCalculator
     }
 
     /**
-     * Simple scoring model (kept deterministic + lightweight).
-     *
-     * Tujuan:
-     * - Menghindari kolom score_* jadi "kosong" (over/unused).
-     * - Memberi ranking sederhana untuk Watchlist tanpa mengubah decision_code.
-     *
-     * Skala kecil (approx): -5 .. +10.
-     * Downstream boleh pakai score_total untuk sorting saja.
-     *
-     * @return array{score_total:int,score_trend:int,score_momentum:int,score_volume:int,score_breakout:int,score_risk:int}
-     */
-    private function computeScores(array $m, int $signalCode, int $volumeLabelCode, int $decisionCode): array
-    {
-        // For neutralized rows (invalid/CA guard), caller should keep scores at 0.
-        if ($decisionCode <= 0) {
-            return [
-                'score_total' => 0,
-                'score_trend' => 0,
-                'score_momentum' => 0,
-                'score_volume' => 0,
-                'score_breakout' => 0,
-                'score_risk' => 0,
-            ];
-        }
-
-        $close = isset($m['close']) ? (float) $m['close'] : 0.0;
-        if ($close <= 0) {
-            return [
-                'score_total' => 0,
-                'score_trend' => 0,
-                'score_momentum' => 0,
-                'score_volume' => 0,
-                'score_breakout' => 0,
-                'score_risk' => 0,
-            ];
-        }
-
-        $ma20  = $m['ma20']  !== null ? (float) $m['ma20']  : null;
-        $ma50  = $m['ma50']  !== null ? (float) $m['ma50']  : null;
-        $ma200 = $m['ma200'] !== null ? (float) $m['ma200'] : null;
-        $rsi   = $m['rsi14'] !== null ? (float) $m['rsi14'] : null;
-        $atr   = $m['atr14'] !== null ? (float) $m['atr14'] : null;
-        $volRatio = $m['vol_ratio'] !== null ? (float) $m['vol_ratio'] : null;
-        $res  = $m['resistance_20d'] !== null ? (float) $m['resistance_20d'] : null;
-
-        // Trend: close>ma20, ma20>=ma50, ma50>=ma200
-        $trend = 0;
-        if ($ma20 !== null && $close > $ma20) $trend += 1;
-        if ($ma20 !== null && $ma50 !== null && $ma20 >= $ma50) $trend += 1;
-        if ($ma50 !== null && $ma200 !== null && $ma50 >= $ma200) $trend += 1;
-
-        // Momentum: prefer RSI 55-68, penalize extremes
-        $mom = 0;
-        if ($rsi !== null) {
-            if ($rsi >= 55 && $rsi <= 68) $mom += 2;
-            elseif (($rsi >= 50 && $rsi < 55) || ($rsi > 68 && $rsi <= 72)) $mom += 1;
-            elseif ($rsi < 40 || $rsi > 75) $mom -= 1;
-        }
-
-        // Volume: use ratio if available, otherwise approximate by label
-        $vol = 0;
-        if ($volRatio !== null) {
-            if ($volRatio >= 2.0) $vol += 2;
-            elseif ($volRatio >= 1.3) $vol += 1;
-            elseif ($volRatio < 0.9) $vol -= 1;
-        } else {
-            if ($volumeLabelCode >= 7) $vol += 2;
-            elseif ($volumeLabelCode >= 6) $vol += 1;
-        }
-
-        // Breakout: above resistance or strong breakout signal
-        $br = 0;
-        if ($res !== null) {
-            if ($close > $res) $br += 2;
-            elseif ($res > 0 && ($close / $res) >= 0.99) $br += 1;
-        }
-        if (in_array($signalCode, [4, 5, 6, 7], true)) $br += 1;
-
-        // Risk: penalize ATR% if too high
-        $risk = 0;
-        if ($atr !== null && $atr > 0) {
-            $atrPct = ($atr / $close) * 100.0;
-            if ($atrPct > 6.0) $risk -= 2;
-            elseif ($atrPct > 4.0) $risk -= 1;
-        }
-
-        // Decision bias (small) so Layak/Confirm tends to float to top, but does not dominate.
-        $bias = 0;
-        if ($decisionCode === 5) $bias = 1;
-        elseif ($decisionCode === 4) $bias = 0;
-        elseif ($decisionCode <= 2) $bias = -1;
-
-        $total = $trend + $mom + $vol + $br + $risk + $bias;
-
-        return [
-            'score_total' => (int) $this->clampInt($total, -20, 20),
-            'score_trend' => (int) $this->clampInt($trend, -10, 10),
-            'score_momentum' => (int) $this->clampInt($mom, -10, 10),
-            'score_volume' => (int) $this->clampInt($vol, -10, 10),
-            'score_breakout' => (int) $this->clampInt($br, -10, 10),
-            'score_risk' => (int) $this->clampInt($risk, -10, 10),
-        ];
-    }
-
-    private function clampInt($v, int $min, int $max): int
-    {
-        $i = (int) round((float) $v);
-        if ($i < $min) return $min;
-        if ($i > $max) return $max;
-        return $i;
-    }
-
-    /**
      * Guard minimal untuk canonical OHLC.
      * Null/0 akan merusak rolling MA/RSI/ATR dan membuat output mismatch besar.
      */
@@ -753,9 +607,9 @@ final class EodIndicatorsStreamCalculator
         if ($open <= 0 || $high <= 0 || $low <= 0 || $close <= 0) return false;
         if ($high < $low) return false;
 
-        // volume boleh 0 (jarang), tapi tidak boleh null/negatif
-        if ($r->volume === null) return false;
-        $vol = (float) $r->volume;
+        // volume boleh 0, dan boleh NULL (anggap 0) agar pipeline tahan banting.
+        // Contract compute_eod.md: missing volume ikut window sebagai 0 (bukan bikin bar invalid).
+        $vol = ($r->volume === null) ? 0.0 : (float) $r->volume;
         if ($vol < 0) return false;
 
         return true;

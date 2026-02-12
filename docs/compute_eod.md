@@ -29,6 +29,9 @@ Semua lookback menggunakan **trading days** dari `market_calendar`.
 ## 4) Output Persist (LOCKED)
 Compute‑EOD **wajib** mengisi/menulis 1 row per `(ticker_id, trade_date)` ke `ticker_indicators_daily` untuk setiap ticker yang diproses.
 
+Selain indikator, Compute‑EOD juga boleh menghasilkan **signal global (policy‑agnostic)** dan mempersistnya ke tabel terpisah `ticker_signals_daily`.
+Signal global ini adalah **fitur input** (mis. untuk WEEKLY_SWING), bukan output akhir watchlist.
+
 ### 4.1 Kolom Wajib Ada
 Kolom berikut **wajib ada** di `ticker_indicators_daily` (nama kolom dan makna dikunci):
 - Identitas: `trade_date`, `ticker_id`
@@ -50,6 +53,20 @@ Kolom indikator minimal yang dipersist untuk kebutuhan watchlist/backtest:
 - Volume rollups: `vol_sma20`, `vol_ratio`
 
 > Kolom lain boleh ada, tapi tidak boleh mengubah makna kolom LOCKED di atas.
+
+### 4.3 Tabel Signals (Global, LOCKED)
+Compute‑EOD **tidak** lagi menulis kolom `decision_code/signal_code/volume_label_code/signal_age_days` ke `ticker_indicators_daily`.
+Sebagai gantinya, jika modul signal diaktifkan, Compute‑EOD menulis 1 row per `(ticker_id, trade_date)` ke `ticker_signals_daily`.
+
+Kolom yang dikunci di `ticker_signals_daily`:
+- Identitas: `trade_date`, `ticker_id`
+- Klasifikasi global: `decision_code`, `signal_code`, `volume_label_code`
+- Tracking umur signal: `signal_first_seen_date`, `signal_age_days`
+- Mirror validitas (opsional tapi direkomendasikan): `is_valid`, `invalid_reason`
+
+Catatan:
+- Signal ini **satu** untuk semua policy (global). Policy boleh mengabaikan.
+- Perbedaan "signal per-policy" (jika suatu saat ada) harus dibuat di dokumen policy, bukan di compute‑eod.
 
 ## 5) Window & NULL Policy (LOCKED)
 Jika data historis tidak cukup untuk indikator tertentu:

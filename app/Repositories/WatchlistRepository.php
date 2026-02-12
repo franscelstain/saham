@@ -302,7 +302,13 @@ class WatchlistRepository
             })
             ->leftJoin('ticker_indicators_daily as ti', function ($j) use ($eodDate) {
                 $j->on('ti.ticker_id', '=', 't.ticker_id')
-                    ->where('ti.trade_date', '=', $eodDate);
+                    ->where('ti.trade_date', '=', $eodDate)
+                    ->where('ti.is_deleted', '=', 0);
+            })
+            ->leftJoin('ticker_signals_daily as ts', function ($j) use ($eodDate) {
+                $j->on('ts.ticker_id', '=', 't.ticker_id')
+                    ->where('ts.trade_date', '=', $eodDate)
+                    ->where('ts.is_deleted', '=', 0);
             })
             ->leftJoin('ticker_ohlc_daily as od_prev', function ($j) use ($prevDate) {
                 $j->on('od_prev.ticker_id', '=', 't.ticker_id')
@@ -360,13 +366,12 @@ class WatchlistRepository
             DB::raw('od_prev.low as prev_low'),
             DB::raw('od_prev.close as prev_close'),
 
-            // score_total must be in [0..1] (watchlist.md).
-            // Backward compat: older table may store 0..100.
-            DB::raw('CASE WHEN ti.score_total IS NULL THEN NULL WHEN ti.score_total > 1 THEN (ti.score_total / 100.0) ELSE ti.score_total END as score_total'),
+            // score_total selalu dihitung per-policy di watchlist snapshot (bukan compute-eod).
+            DB::raw('NULL as score_total'),
 
-            'ti.decision_code',
-            'ti.signal_code',
-            'ti.signal_age_days',
+            'ts.decision_code',
+            'ts.signal_code',
+            'ts.signal_age_days',
             'ti.ma20', 'ti.ma50', 'ti.ma200',
             'ti.rsi14',
             'ti.atr14',
@@ -375,7 +380,7 @@ class WatchlistRepository
             'ti.support_20d',
             'ti.resistance_20d',
 
-            'ti.volume_label_code',
+            'ts.volume_label_code',
 
             // Liquidity (LOCKED naming: dv20_idr)
             DB::raw('dv.dv20_idr as dv20_idr'),

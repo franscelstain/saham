@@ -3,6 +3,7 @@
 namespace App\Services\Compute;
 
 use App\Repositories\MarketCalendarRepository;
+use App\Repositories\TickerSignalsDailyRepository;
 use App\Repositories\TickerIndicatorsDailyRepository;
 use App\Repositories\TickerOhlcDailyRepository;
 use App\Trade\Compute\Calculators\EodIndicatorsStreamCalculator;
@@ -16,6 +17,7 @@ class ComputeEodService
     private MarketCalendarRepository $cal;
     private TickerOhlcDailyRepository $ohlc;
     private TickerIndicatorsDailyRepository $ind;
+    private TickerSignalsDailyRepository $sig;
 
     private EodIndicatorsStreamCalculator $calculator;
 
@@ -26,6 +28,7 @@ class ComputeEodService
         MarketCalendarRepository $cal,
         TickerOhlcDailyRepository $ohlc,
         TickerIndicatorsDailyRepository $ind,
+        TickerSignalsDailyRepository $sig,
         EodDateResolver $dateResolver,
         ComputeEodPolicy $policy,
         EodIndicatorsStreamCalculator $calculator
@@ -33,6 +36,7 @@ class ComputeEodService
         $this->cal = $cal;
         $this->ohlc = $ohlc;
         $this->ind = $ind;
+        $this->sig = $sig;
         $this->dateResolver = $dateResolver;
         $this->policy = $policy;
         $this->calculator = $calculator;
@@ -173,7 +177,7 @@ class ComputeEodService
             // preload prev snapshot (1 query per chunk)
             $prevSnaps = [];
             if ($prev) {
-                $prevSnaps = $this->ind->getPrevSnapshotMany($prev, $ids);
+                $prevSnaps = $this->sig->getPrevSnapshotMany($prev, $ids);
             }
 
             $cursor = $this->ohlc->cursorHistoryRange($startDate, $date, $ids);
@@ -193,14 +197,19 @@ class ComputeEodService
 
             $seenOnDate = [];
             $invalidOnDate = [];
-            $rowsBuffer = [];
+            $indBuffer = [];
+            $sigBuffer = [];
 
             foreach ($calc->streamRows($cursor, $date, $prevSnaps, $now) as $row) {
-                $rowsBuffer[] = $row;
+                // split row into 2 tables: indicators vs signals
+                $indBuffer[] = $row;
+                $sigBuffer[] = $row;
 
-                if (count($rowsBuffer) >= $upsertBatchSize) {
-                    $this->ind->upsertMany($rowsBuffer, $upsertBatchSize);
-                    $rowsBuffer = [];
+                if (count($indBuffer) >= $upsertBatchSize) {
+                    $this->ind->upsertMany($indBuffer, $upsertBatchSize);
+                    $this->sig->upsertMany($sigBuffer, $upsertBatchSize);
+                    $indBuffer = [];
+                    $sigBuffer = [];
                 }
             }
 
@@ -209,9 +218,11 @@ class ComputeEodService
             $seenOnDate = $calc->seenOnTradeDateMap();
             $invalidOnDate = $calc->invalidOnTradeDateMap();
 
-            if (!empty($rowsBuffer)) {
-                $this->ind->upsertMany($rowsBuffer, $upsertBatchSize);
-                $rowsBuffer = [];
+            if (!empty($indBuffer)) {
+                $this->ind->upsertMany($indBuffer, $upsertBatchSize);
+                $this->sig->upsertMany($sigBuffer, $upsertBatchSize);
+                $indBuffer = [];
+                $sigBuffer = [];
             }
 
             // diagnostic: harusnya 0 karena ids dipilih dari "having row on date"
