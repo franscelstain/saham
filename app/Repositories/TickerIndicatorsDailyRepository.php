@@ -10,14 +10,14 @@ class TickerIndicatorsDailyRepository
      * Kolom yang memang disimpan di ticker_indicators_daily.
      * NOTE: kolom signal/decision dipindah ke ticker_signals_daily.
      */
-    private const COLUMNS = [
+    public const COLUMNS = [
+        // PK (auto increment). Stored in table, but usually omitted in writes.
+        'indicator_daily_id',
         'ticker_id', 'trade_date',
 
         // basic
         'open', 'high', 'low', 'close', 'adj_close', 'volume',
-        'basis_used', 'price_used', 'volume_used',
-
-        // MA/RSI/ATR
+        'basis_used', 'price_used',        // MA/RSI/ATR
         'ma20', 'ma50', 'ma200',
         'rsi14', 'atr14',
 
@@ -56,6 +56,7 @@ class TickerIndicatorsDailyRepository
 
         // update semua kolom kecuali key + created_at
         $update = array_values(array_diff(self::COLUMNS, [
+            'indicator_daily_id',
             'ticker_id',
             'trade_date',
             'created_at',

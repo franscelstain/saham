@@ -54,6 +54,15 @@ Kolom indikator minimal yang dipersist untuk kebutuhan watchlist/backtest:
 
 > Kolom lain boleh ada, tapi tidak boleh mengubah makna kolom LOCKED di atas.
 
+### 4.2.1 Metadata & Housekeeping (Disarankan)
+Kolom berikut **boleh** ada untuk kebutuhan operasional (bukan indikator):
+- `source` (VARCHAR) — asal data per row (mis. `compute-eod`)
+- `is_deleted` (TINYINT/BOOLEAN) — soft-delete internal
+- `created_at`, `updated_at`
+
+> Kolom ini tidak dipakai untuk scoring; hanya untuk auditing/pipeline.
+
+
 ### 4.3 Tabel Signals (Global, LOCKED)
 Compute‑EOD **tidak** lagi menulis kolom `decision_code/signal_code/volume_label_code/signal_age_days` ke `ticker_indicators_daily`.
 Sebagai gantinya, jika modul signal diaktifkan, Compute‑EOD menulis 1 row per `(ticker_id, trade_date)` ke `ticker_signals_daily`.

@@ -4,6 +4,23 @@ namespace App\Trade\Watchlist\Policies;
 
 class PolicyFactory
 {
+    /**
+     * Canonical list of supported watchlist policy codes.
+     *
+     * Used by docs/tests parity checks to ensure the docs folder contains
+     * exactly the policy docs for all known policies (and nothing else).
+     */
+    public static function knownPolicies(): array
+    {
+        return [
+            'WEEKLY_SWING',
+            'DIVIDEND_SWING',
+            'INTRADAY_LIGHT',
+            'POSITION_TRADE',
+            'NO_TRADE',
+        ];
+    }
+
     public function make(string $policy): WatchlistPolicyInterface
     {
         $p = strtoupper(trim($policy));

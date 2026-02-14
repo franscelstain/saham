@@ -2,25 +2,25 @@
 
 namespace Tests\Unit\Docs;
 
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
+use App\Trade\Watchlist\Policies\PolicyFactory;
 
-final class WatchlistPolicyDocsExistTest extends TestCase
+class WatchlistPolicyDocsExistTest extends TestCase
 {
     public function testPolicyDocFilesExistForAllKnownPolicies(): void
     {
-        // Keep in sync with TradeWatchlistServiceProvider.
-        $map = [
-            'WEEKLY_SWING' => 'weekly_swing.md',
-            'DIVIDEND_SWING' => 'dividend_swing.md',
-            'INTRADAY_LIGHT' => 'intraday_light.md',
-            'POSITION_TRADE' => 'position_trade.md',
-            'NO_TRADE' => 'no_trade.md',
-        ];
-
         $base = base_path('docs/watchlist/policy');
-        foreach ($map as $policy => $file) {
-            $path = $base . DIRECTORY_SEPARATOR . $file;
-            $this->assertFileExists($path, "Missing policy doc for {$policy}: {$path}");
+        $this->assertDirectoryExists($base);
+
+        foreach (PolicyFactory::knownPolicies() as $policy) {
+            $file = strtolower($policy) . '.md';
+            $plain = $base . DIRECTORY_SEPARATOR . $file;
+
+            // Allow numbered prefix variants: "1.weekly_swing.md"
+            $glob = glob($base . DIRECTORY_SEPARATOR . '*.' . $file);
+            $exists = file_exists($plain) || (!empty($glob));
+
+            $this->assertTrue($exists, "Missing policy doc for {$policy}: expected {$plain} (or numbered variant).");
         }
     }
 }

@@ -2,35 +2,39 @@
 
 namespace Tests\Unit\Docs;
 
-use App\Trade\Watchlist\WatchlistPolicyCodes;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
+use App\Trade\Watchlist\Policies\PolicyFactory;
 
-final class WatchlistPolicyCoverageTest extends TestCase
+class WatchlistPolicyCoverageTest extends TestCase
 {
+    private function stripNumberPrefix(string $name): string
+    {
+        return (string) preg_replace('/^\d+\./', '', $name);
+    }
+
     public function testDocsFolderAndKnownPoliciesAreInSync(): void
     {
-        $base = base_path('docs/watchlist/policy');
-        $this->assertDirectoryExists($base);
+        $dir = base_path('docs/watchlist/policy');
+        $this->assertDirectoryExists($dir);
 
-        // Known policies (code)
-        $known = WatchlistPolicyCodes::all();
-        sort($known);
-
-        // Docs present in folder
-        $files = glob($base . DIRECTORY_SEPARATOR . '*.md') ?: [];
-        $docNames = array_map(function ($p) {
-            return basename((string)$p);
-        }, $files);
+        $docNames = [];
+        foreach (glob($dir . DIRECTORY_SEPARATOR . '*.md') as $path) {
+            $base = basename((string)$path);
+            $docNames[] = $this->stripNumberPrefix($base);
+        }
+        $docNames = array_values(array_unique($docNames));
         sort($docNames);
 
-        // Expected docs (filename) derived from policy code naming.
         $expectedDocs = [];
-        foreach ($known as $code) {
-            $expectedDocs[] = strtolower($code) . '.md';
+        foreach (PolicyFactory::knownPolicies() as $policy) {
+            $expectedDocs[] = strtolower($policy) . '.md';
         }
-        // But docs use short names (weekly_swing.md) not weekly_swing? Actually lower(WEEKLY_SWING)=weekly_swing.
         sort($expectedDocs);
 
-        $this->assertSame($expectedDocs, $docNames, 'Policy docs folder must contain exactly the docs for known watchlist policies (no missing, no extra).');
+        $this->assertSame(
+            $expectedDocs,
+            $docNames,
+            'Policy docs folder must contain exactly the docs for known watchlist policies (numbered prefixes allowed).'
+        );
     }
 }

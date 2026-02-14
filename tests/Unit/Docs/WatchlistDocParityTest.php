@@ -8,7 +8,8 @@ final class WatchlistDocParityTest extends TestCase
 {
     public function testGroupSemanticsDocsReferenceSingleSourceOfTruth(): void
     {
-        $docPath = base_path('docs/watchlist/watchlist.md');
+        // Canonical index + single-source-of-truth snippet lives in 2.watchlist.md.
+        $docPath = base_path('docs/watchlist/2.watchlist.md');
         $this->assertFileExists($docPath);
 
         $md = (string) file_get_contents($docPath);

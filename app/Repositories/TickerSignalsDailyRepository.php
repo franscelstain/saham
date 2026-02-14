@@ -11,6 +11,8 @@ class TickerSignalsDailyRepository
      * Keep this list tight so compute-eod output can't silently drift.
      */
     public const COLUMNS = [
+        // PK (auto increment). Stored in table, but usually omitted in writes.
+        'signal_daily_id',
         'ticker_id',
         'trade_date',
         'decision_code',
@@ -79,7 +81,7 @@ class TickerSignalsDailyRepository
         if (empty($normalized)) return;
 
         // update columns (exclude unique key + created_at)
-        $updateCols = array_values(array_diff(self::COLUMNS, ['ticker_id', 'trade_date', 'created_at']));
+        $updateCols = array_values(array_diff(self::COLUMNS, ['signal_daily_id', 'ticker_id', 'trade_date', 'created_at']));
 
         DB::table('ticker_signals_daily')->upsert(
             $normalized,
