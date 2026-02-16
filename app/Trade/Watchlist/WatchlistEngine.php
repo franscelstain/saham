@@ -277,10 +277,12 @@ public function buildInternal(array $opts = []): array
         $policy = $this->selectPolicy($requestedPolicy, $divEventsByTicker, $intradayByTicker, $hasOpenPositions);
 
         // Policy doc presence gate (docs/watchlist/watchlist.md)
+        // IMPORTANT: Do NOT downgrade selected policy to NO_TRADE just because
+        // a doc file is missing/misnamed. Watchlist screening (groups) should still run.
+        // Missing docs are surfaced as a global lock/note for audit, but do not change policy.
         if (!$this->policyDocExists($policy)) {
             $globalLockCodes[] = 'GL_POLICY_DOC_MISSING';
             $notes[] = 'Policy doc missing for selected policy: ' . $policy;
-            $policy = 'NO_TRADE';
         }
 
         // NOTE: Watchlist/preopen focuses on new-entry planning; open-position management is handled by Portfolio.
@@ -653,8 +655,9 @@ foreach ($rows as $i => $r) {
         continue;
     }
 
-    $elig = (bool)($r['plan']['is_eligible_new_entry'] ?? true);
-    $st = (float)($r['score_total'] ?? 0);
+    // IMPORTANT: use the mutated row (after policy + derived mapping), not the stale $r snapshot.
+    $elig = (bool)($rows[$i]['plan']['is_eligible_new_entry'] ?? ($r['plan']['is_eligible_new_entry'] ?? true));
+    $st = (float)($rows[$i]['score_total'] ?? ($r['score_total'] ?? 0));
 
     if ($elig) {
         if ($st >= $scoreCutTop) {
@@ -906,10 +909,11 @@ $plan = [
 
 	    $reasons = [];
 	    if (!empty($reasonCodes)) {
-	        $reasons = array_merge($reasons, $this->buildReasonObjects($reasonCodes, 'INFO'));
+	        $reasons = array_merge($reasons, $this->buildCandidateReasonObjects($reasonCodes, 'INFO'));
 	    }
 	    if (!empty($blockCodes)) {
-	        $reasons = array_merge($reasons, $this->buildReasonObjects($blockCodes, 'WARN'));
+	        // eligibility_block_codes are blockers for new entry today
+	        $reasons = array_merge($reasons, $this->buildCandidateReasonObjects($blockCodes, 'SOFT_BLOCK'));
 	    }
 	    // Deduplicate by code
 	    if (!empty($reasons)) {
@@ -932,10 +936,19 @@ $plan = [
 	            if (!is_array($cr)) continue;
 	            $c = (string)($cr['code'] ?? '');
 	            if ($c === '') continue;
+	            // Accept either candidate schema or legacy schema.
+	            $sevLvl = (string)($cr['severity_level'] ?? '');
+	            if ($sevLvl === '' && isset($cr['severity'])) {
+	                $sev = strtoupper(trim((string)$cr['severity']));
+	                if ($sev === 'WARN') $sevLvl = 'WARN';
+	                elseif ($sev === 'INFO') $sevLvl = 'INFO';
+	                else $sevLvl = 'SOFT_BLOCK';
+	            }
+	            if ($sevLvl === '') $sevLvl = 'INFO';
 	            $map[$c] = [
 	                'code' => $c,
 	                'message' => (string)($cr['message'] ?? $c),
-	                'severity' => (string)($cr['severity'] ?? 'INFO'),
+	                'severity_level' => strtoupper($sevLvl),
 	            ];
 	        }
 	        $reasons = array_values($map);
@@ -955,7 +968,7 @@ $plan = [
 	}
 
 	/** @return array<int, array{code:string,message:string,severity?:string}> */
-	private function buildReasonObjects(array $codes, string $defaultSeverity = 'INFO'): array
+	private function buildGlobalReasonObjects(array $codes, string $defaultSeverity = 'INFO'): array
 	{
 	    $out = [];
 	    foreach ($codes as $code) {
@@ -963,6 +976,78 @@ $plan = [
 	        $msg = ReasonCatalog::getMessage($code);
 	        if ($msg === '') $msg = $code;
 	        $out[] = ['code' => $code, 'message' => $msg, 'severity' => $defaultSeverity];
+	    }
+	    return array_values($out);
+	}
+
+	/** @return array<int, array{code:string,message:string,severity_level:string}> */
+	private function buildCandidateReasonObjects(array $codes, string $defaultLevel = 'INFO'): array
+	{
+	    $out = [];
+	    $lvl = strtoupper(trim($defaultLevel));
+	    if (!in_array($lvl, ['INFO','WARN','SOFT_BLOCK','HARD_EXCLUDE'], true)) $lvl = 'INFO';
+	    foreach ($codes as $code) {
+	        if (!is_string($code) || $code === '') continue;
+	        $msg = ReasonCatalog::getMessage($code);
+	        if ($msg === '') $msg = $code;
+
+	        $useLvl = $lvl;
+	        // Per docs: ticker status defaulted is WARN.
+	        if ($code === 'GL_TICKER_STATUS_DEFAULTED_REGULAR') $useLvl = 'WARN';
+
+	        $out[] = ['code' => $code, 'message' => $msg, 'severity_level' => $useLvl];
+	    }
+	    return array_values($out);
+	}
+
+	/**
+	 * Normalize an array of candidate reason arrays into strict CandidateReason schema.
+	 * Accepts either {code,message,severity_level} or legacy {code,message,severity}.
+	 *
+	 * @param array<int,mixed> $reasons
+	 * @return array<int,array{code:string,message:string,severity_level:string}>
+	 */
+	private function normalizeCandidateReasons(array $reasons): array
+	{
+	    $out = [];
+	    foreach ($reasons as $r) {
+	        if (!is_array($r)) continue;
+	        $c = (string)($r['code'] ?? '');
+	        if ($c === '') continue;
+	        $msg = (string)($r['message'] ?? ReasonCatalog::getMessage($c));
+	        $lvl = (string)($r['severity_level'] ?? '');
+	        if ($lvl === '' && isset($r['severity'])) {
+	            $sev = strtoupper(trim((string)$r['severity']));
+	            if ($sev === 'WARN') $lvl = 'WARN';
+	            elseif ($sev === 'INFO') $lvl = 'INFO';
+	            else $lvl = 'SOFT_BLOCK';
+	        }
+	        $lvl = strtoupper(trim($lvl));
+	        if (!in_array($lvl, ['INFO','WARN','SOFT_BLOCK','HARD_EXCLUDE'], true)) $lvl = 'INFO';
+	        $out[] = ['code' => $c, 'message' => $msg, 'severity_level' => $lvl];
+	    }
+	    // de-dupe by code
+	    $map = [];
+	    foreach ($out as $rr) $map[$rr['code']] = $rr;
+	    return array_values($map);
+	}
+
+	/**
+	 * Normalize execution_slices[].reason into CandidateReason schema.
+	 *
+	 * @param array<int,mixed> $slices
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function normalizeExecutionSlices(array $slices): array
+	{
+	    $out = [];
+	    foreach ($slices as $s) {
+	        if (!is_array($s)) continue;
+	        if (isset($s['reason']) && is_array($s['reason'])) {
+	            $rr = $this->normalizeCandidateReasons([$s['reason']]);
+	            $s['reason'] = isset($rr[0]) ? $rr[0] : $s['reason'];
+	        }
+	        $out[] = $s;
 	    }
 	    return array_values($out);
 	}
@@ -1136,7 +1221,7 @@ $plan = [
 	            'reason' => [
 	                'code' => $reasonCodePrefix . '_TRANCHE1',
 	                'message' => 'Tranche 1 (profile ' . $profile . ').',
-	                'severity' => 'INFO',
+	                'severity_level' => 'INFO',
 	            ],
 	        ],
 	        [
@@ -1150,7 +1235,7 @@ $plan = [
 	            'reason' => [
 	                'code' => $reasonCodePrefix . '_TRANCHE2',
 	                'message' => 'Tranche 2 (profile ' . $profile . ').',
-	                'severity' => 'INFO',
+	                'severity_level' => 'INFO',
 	            ],
 	        ],
 	    ];
@@ -1302,12 +1387,12 @@ $plan = [
 	            $stop = $plan ? (int)($plan['plan_stop'] ?? 0) : 0;
 	            $tp1 = $plan ? (int)($plan['plan_tp1'] ?? 0) : 0;
 
-	            $itemReasons = $ref ? (array)($ref['reasons'] ?? []) : [];
+	            $itemReasons = $ref ? $this->normalizeCandidateReasons((array)($ref['reasons'] ?? [])) : [];
 	            if ($mode === 'A_NO_CAPITAL') {
 	                $itemReasons[] = [
 	                    'code' => 'RECO_CAPITAL_MISSING',
 	                    'message' => 'Mode A: capital tidak tersedia, lots/cost tidak dihitung.',
-	                    'severity' => 'INFO',
+	                    'severity_level' => 'INFO',
 	                ];
 	            }
 
@@ -1322,9 +1407,9 @@ $plan = [
 	                'plan_entry' => $entry,
 	                'plan_stop' => $stop,
 	                'plan_tp1' => $tp1,
-	                'reasons' => $itemReasons,
-                'execution_slices' => (isset($a['execution_slices']) && is_array($a['execution_slices']))
-                    ? (array)$a['execution_slices']
+	                'reasons' => $this->normalizeCandidateReasons($itemReasons),
+	                'execution_slices' => (isset($a['execution_slices']) && is_array($a['execution_slices']))
+	                    ? $this->normalizeExecutionSlices((array)$a['execution_slices'])
                     : $this->buildExecutionSlices(
                         (string)($p['policy']['selected'] ?? ''),
                         $setupType,
@@ -1644,8 +1729,8 @@ $plan = [
 	            } else {
 	                // backward-compat: reason_code string
 	                $reasonCode = isset($o['reason_code']) && is_string($o['reason_code']) ? (string)$o['reason_code'] : '';
-	                $severity = (strtoupper($action) === 'WAIT') ? 'WARN' : 'INFO';
-	                $reasons = $this->buildReasonObjects($reasonCode !== '' ? [$reasonCode] : [], $severity);
+	                $lvl = (strtoupper($action) === 'WAIT') ? 'SOFT_BLOCK' : 'INFO';
+	                $reasons = $this->buildCandidateReasonObjects($reasonCode !== '' ? [$reasonCode] : [], $lvl);
 	            }
 
 	            $orders[] = [
@@ -1656,7 +1741,7 @@ $plan = [
 	                'plan_limit_price' => $planLimit,
 	                'plan_price_cap' => $planCap,
 	                'recommended_limit_price' => $recommended,
-	                'reasons' => $reasons,
+	                'reasons' => $this->normalizeCandidateReasons($reasons),
 	                'inputs_used' => [
 	                    'ask_best' => isset($o['inputs_used']['ask_best']) && is_numeric($o['inputs_used']['ask_best']) ? (int)$this->tickRule->roundDown((float)$o['inputs_used']['ask_best']) : (is_numeric($ask1) ? (int)$this->tickRule->roundDown((float)$ask1) : null),
 	                    'bid_best' => isset($o['inputs_used']['bid_best']) && is_numeric($o['inputs_used']['bid_best']) ? (int)$this->tickRule->roundDown((float)$o['inputs_used']['bid_best']) : (is_numeric($bid1) ? (int)$this->tickRule->roundDown((float)$bid1) : null),
@@ -1948,8 +2033,9 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         // Basic OHLC sanity.
         if ($high < max($open, $close) || $low > min($open, $close) || $low > $high) return null;
 
-        // Indicator readiness gate: scoring + ATR must exist.
-        if (!isset($r['score_total']) || !is_numeric($r['score_total'])) return null;
+        // Indicator readiness gate: ATR must exist.
+        // NOTE: legacy global score_total from ticker_indicators_daily has been removed;
+        // scoring now lives in the policy layer / watchlist snapshot.
         if ($atr14 === null || !is_numeric($atr14) || (float)$atr14 <= 0) return null;
 
         // Universe gates (docs/watchlist/watchlist.md): liquidity, price sanity, extreme volatility.
@@ -2003,7 +2089,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
         $hardLockCodes = [];
 
         // status quality flags
-        if ($hasAnyTickerStatus && $tickerFlags['status_quality'] === 'DEFAULT') $reasonCodes[] = 'GL_TICKER_STATUS_DEFAULT_ASSUMED';
+	        if ($hasAnyTickerStatus && $tickerFlags['status_quality'] === 'DEFAULT') $reasonCodes[] = 'GL_TICKER_STATUS_DEFAULTED_REGULAR';
         if ($tickerFlags['status_quality'] === 'UNKNOWN') $reasonCodes[] = 'GL_TICKER_STATUS_UNKNOWN';
 
         // global tradeability gating (docs 2.6.2)
@@ -2085,6 +2171,9 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 		$rawScoreTotal = 0.0;
 		if (isset($policyRes['score_total']) && is_numeric($policyRes['score_total'])) {
 			$rawScoreTotal = (float)$policyRes['score_total'];
+		} elseif (isset($policyRes['score']) && is_numeric($policyRes['score'])) {
+			// Backward-compat: some policy helpers return 'score' (0..1) instead of 'score_total'.
+			$rawScoreTotal = (float)$policyRes['score'];
 		} elseif (isset($r['score_total']) && is_numeric($r['score_total'])) {
 			$rawScoreTotal = (float)$r['score_total'];
 		}
@@ -2130,7 +2219,7 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 				$customReasons[] = [
 					'code' => 'GL_POLICY_INPUT_MISSING',
 					'message' => 'Policy input missing. missing_fields=[' . implode(',', $missing) . ']',
-					'severity' => 'ERROR',
+					'severity_level' => 'HARD_EXCLUDE',
 				];
 			}
 		}
@@ -3602,8 +3691,15 @@ private function isEodReady(array $coverage): bool
         $minInd = $this->cfg->minIndicatorCoveragePct();
         $canon = $coverage['canonical_coverage_pct'] ?? null;
         $ind = $coverage['indicators_coverage_pct'] ?? ($coverage['indicator_coverage_pct'] ?? null);
+        $sig = $coverage['signals_coverage_pct'] ?? null;
         if ($canon === null || $ind === null) return false;
-        return ((float)$canon >= $minCanon) && ((float)$ind >= $minInd);
+
+        $ok = ((float)$canon >= $minCanon) && ((float)$ind >= $minInd);
+        // If ticker_signals_daily exists (coverage provided), treat it as required too.
+        if ($sig !== null) {
+            $ok = $ok && ((float)$sig >= $minInd);
+        }
+        return $ok;
     }
 
     private function dayOfWeek(string $date): string

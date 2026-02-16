@@ -91,21 +91,56 @@ class WatchlistBacktest extends Command
                 // Extract minimal stable summary
                 $meta = (array)($contract['meta'] ?? []);
                 $groups = (array)($contract['groups'] ?? []);
-                $counts = [];
+                $counts = [
+                    'TOP_PICKS' => 0,
+                    'SECONDARY' => 0,
+                    'WATCH_ONLY' => 0,
+                    'AVOID' => 0,
+                    'NO_TRADE' => 0,
+                ];
                 $topTickers = [];
 
-                foreach ($groups as $g) {
-                    $k = (string)($g['semantic'] ?? '');
-                    if ($k === '') {
-                        continue;
+                // New schema (docs/watchlist): groups.{top_picks,secondary,watch_only,avoid,no_trade} are arrays
+                $isNewSchema = array_key_exists('top_picks', $groups)
+                    || array_key_exists('secondary', $groups)
+                    || array_key_exists('watch_only', $groups)
+                    || array_key_exists('avoid', $groups)
+                    || array_key_exists('no_trade', $groups);
+
+                if ($isNewSchema) {
+                    $topItems = (array)($groups['top_picks'] ?? []);
+                    $secItems = (array)($groups['secondary'] ?? []);
+                    $watItems = (array)($groups['watch_only'] ?? []);
+                    $avoItems = (array)($groups['avoid'] ?? []);
+                    $ntItems  = (array)($groups['no_trade'] ?? []);
+
+                    $counts['TOP_PICKS'] = count($topItems);
+                    $counts['SECONDARY'] = count($secItems);
+                    $counts['WATCH_ONLY'] = count($watItems);
+                    $counts['AVOID'] = count($avoItems);
+                    $counts['NO_TRADE'] = count($ntItems);
+
+                    foreach ($topItems as $it) {
+                        $t = (string)($it['ticker_code'] ?? ($it['ticker'] ?? ''));
+                        if ($t !== '') {
+                            $topTickers[] = $t;
+                        }
                     }
-                    $items = (array)($g['items'] ?? []);
-                    $counts[$k] = count($items);
-                    if (empty($topTickers) && $k === 'TOP_PICKS') {
-                        foreach ($items as $it) {
-                            $t = (string)($it['ticker_code'] ?? ($it['ticker'] ?? ''));
-                            if ($t !== '') {
-                                $topTickers[] = $t;
+                } else {
+                    // Legacy schema: groups is a list of {semantic, items}
+                    foreach ($groups as $g) {
+                        $k = (string)($g['semantic'] ?? '');
+                        if ($k === '') {
+                            continue;
+                        }
+                        $items = (array)($g['items'] ?? []);
+                        $counts[$k] = count($items);
+                        if (empty($topTickers) && $k === 'TOP_PICKS') {
+                            foreach ($items as $it) {
+                                $t = (string)($it['ticker_code'] ?? ($it['ticker'] ?? ''));
+                                if ($t !== '') {
+                                    $topTickers[] = $t;
+                                }
                             }
                         }
                     }
@@ -138,7 +173,8 @@ class WatchlistBacktest extends Command
                         'persisted' => $persist,
                     ]));
                 } else {
-                    $this->info(sprintf('%s OK  trade_date=%s  top=%s  secondary=%s  watch=%s  avoid=%s',
+                    $this->info(sprintf(
+                        '%s OK  trade_date=%s  top=%s  secondary=%s  watch=%s  avoid=%s',
                         $d,
                         (string)($meta['trade_date'] ?? '-'),
                         (string)($counts['TOP_PICKS'] ?? 0),
@@ -150,11 +186,12 @@ class WatchlistBacktest extends Command
             } catch (Throwable $e) {
                 $fail++;
                 $debug = (bool)((int) $this->option('debug'));
-                $err = sprintf('%s: %s @ %s:%d',
+                $err = sprintf(
+                    '%s: %s @ %s:%d',
                     get_class($e),
                     $e->getMessage(),
                     $e->getFile(),
-                    (int) $e->getLine()
+                    (int)$e->getLine()
                 );
                 if ($asJson) {
                     $this->line(json_encode([
@@ -173,7 +210,13 @@ class WatchlistBacktest extends Command
 
         $elapsed = microtime(true) - $startTs;
         if (!$asJson) {
-            $this->line(sprintf('Done. ok=%d fail=%d elapsed=%.2fs%s', $ok, $fail, $elapsed, $persist ? ' (persisted)' : ''));
+            $this->line(sprintf(
+                'Done. ok=%d fail=%d elapsed=%.2fs%s',
+                $ok,
+                $fail,
+                $elapsed,
+                $persist ? ' (persisted)' : ''
+            ));
         }
 
         return $fail === 0 ? 0 : 1;

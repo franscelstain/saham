@@ -34,17 +34,23 @@ class WatchlistRepository
      */
     public function getLatestCommonEodDate(): ?string
     {
-        if (!$this->hasTable('ticker_ohlc_daily') || !$this->hasTable('ticker_indicators_daily')) {
+	    if (!$this->hasTable('ticker_ohlc_daily') || !$this->hasTable('ticker_indicators_daily')) {
             return null;
         }
+	    $hasSignals = $this->hasTable('ticker_signals_daily');
 
         try {
-            $row = DB::table('ticker_ohlc_daily as od')
-                ->selectRaw('MAX(od.trade_date) as d')
-                ->whereIn('od.trade_date', function ($q) {
-                    $q->select('trade_date')->from('ticker_indicators_daily')->distinct();
-                })
-                ->first();
+	        $row = DB::table('ticker_ohlc_daily as od')
+	            ->selectRaw('MAX(od.trade_date) as d')
+	            ->whereIn('od.trade_date', function ($q) {
+	                $q->select('trade_date')->from('ticker_indicators_daily')->distinct();
+	            })
+	            ->when($hasSignals, function ($q) {
+	                $q->whereIn('od.trade_date', function ($qq) {
+	                    $qq->select('trade_date')->from('ticker_signals_daily')->distinct();
+	                });
+	            })
+	            ->first();
 
             $d = $row && isset($row->d) ? (string) $row->d : '';
             return $d !== '' ? $d : null;
@@ -67,8 +73,10 @@ class WatchlistRepository
             'ticker_total' => 0,
             'canonical_count' => 0,
             'indicators_count' => 0,
+	        'signals_count' => 0,
             'canonical_coverage_pct' => 0.0,
             'indicators_coverage_pct' => 0.0,
+	        'signals_coverage_pct' => 0.0,
         ];
 
         if (!$this->hasTable('tickers')) return $out;
@@ -95,11 +103,21 @@ class WatchlistRepository
                     ->count('ticker_id');
             }
 
+	        $sigCount = 0;
+	        if ($this->hasTable('ticker_signals_daily')) {
+	            $sigCount = (int) DB::table('ticker_signals_daily')
+	                ->where('trade_date', $eodDate)
+	                ->distinct('ticker_id')
+	                ->count('ticker_id');
+	        }
+
             $out['canonical_count'] = $canonCount;
             $out['indicators_count'] = $indCount;
+	        $out['signals_count'] = $sigCount;
 
             $out['canonical_coverage_pct'] = round(($canonCount / $total) * 100.0, 4);
             $out['indicators_coverage_pct'] = round(($indCount / $total) * 100.0, 4);
+	        $out['signals_coverage_pct'] = round(($sigCount / $total) * 100.0, 4);
 
             return $out;
         } catch (\Throwable $e) {
@@ -196,7 +214,12 @@ class WatchlistRepository
         $prev50Dates = [];
         $dv20Dates = [];
 
+        $usedCalendar = false;
         if ($this->calRepo->tableExists()) {
+            // Calendar exists, but may not have coverage for the requested window.
+            // We'll validate and fallback to OHLC-derived dates if coverage is insufficient.
+            $usedCalendar = true;
+
             $prevDate = $this->calRepo->previousTradingDate($eodDate);
 
             if ($prevDate !== null) {
@@ -212,7 +235,11 @@ class WatchlistRepository
             $startDv20 = $this->calRepo->lookbackStartDate($eodDate, 20);
             $dv20Asc = $this->calRepo->tradingDatesBetween($startDv20, $eodDate);
             $dv20Dates = array_reverse($dv20Asc);
-        } else {
+        }
+
+        // Fallback if calendar is missing coverage (common in local DBs / partial backfills).
+        // We need at least 20 dates for WS lookbacks and DV20, otherwise downstream scoring will hard-fail.
+        if (!$usedCalendar || $prevDate === null || count($prev20Dates) < 20 || count($dv20Dates) < 20) {
             // Fallback: infer from OHLC dates
             $prev = DB::table('ticker_ohlc_daily')
                 ->where('trade_date', '<', $eodDate)
@@ -375,6 +402,7 @@ class WatchlistRepository
             'ti.ma20', 'ti.ma50', 'ti.ma200',
             'ti.rsi14',
             'ti.atr14',
+            DB::raw('CASE WHEN ti.atr14 IS NOT NULL AND od.close > 0 THEN (ti.atr14 / od.close) ELSE NULL END as atr_pct'),
             'ti.vol_sma20',
             'ti.vol_ratio',
             'ti.support_20d',
@@ -384,6 +412,7 @@ class WatchlistRepository
 
             // Liquidity (LOCKED naming: dv20_idr)
             DB::raw('dv.dv20_idr as dv20_idr'),
+            DB::raw('dv.dv20_idr as dv20'),
             DB::raw('dv.turnover20_idr as turnover20_idr'),
             DB::raw('dv.dv20_n as dv20_n'),
 

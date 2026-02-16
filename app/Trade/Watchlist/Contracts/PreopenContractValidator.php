@@ -42,7 +42,7 @@ class PreopenContractValidator
 
         $this->assertIsArray($m['reasons'], $path.'.reasons');
         foreach ($m['reasons'] as $i => $r) {
-            $this->validateReason($r, $path.'.reasons['.$i.']');
+	        $this->validateGlobalReason($r, $path.'.reasons['.$i.']');
         }
     }
 
@@ -78,7 +78,7 @@ class PreopenContractValidator
         // recommendations-level reasons (e.g. exposure cap)
         $this->assertIsArray($r['reasons'], $path.'.reasons');
         foreach ($r['reasons'] as $i => $rs) {
-            $this->validateReason($rs, $path.'.reasons['.$i.']');
+	        $this->validateGlobalReason($rs, $path.'.reasons['.$i.']');
         }
 
         // skipped tickers for UI audit
@@ -94,7 +94,7 @@ class PreopenContractValidator
         $this->assertExactKeys($s, ['ticker','reason'], $path);
 
         $this->assertIsString($s['ticker'], $path.'.ticker');
-        $this->validateReason($s['reason'], $path.'.reason');
+	    $this->validateGlobalReason($s['reason'], $path.'.reason');
     }
 
     private function validateConfirm($c, string $path): void
@@ -126,7 +126,7 @@ class PreopenContractValidator
 
         $this->assertIsArray($it['reasons'], $path.'.reasons');
         foreach ($it['reasons'] as $i => $r) {
-            $this->validateReason($r, $path.'.reasons['.$i.']');
+	        $this->validateCandidateReason($r, $path.'.reasons['.$i.']');
         }
 
         $this->validateEodBar($it['eod_bar'], $path.'.eod_bar');
@@ -180,7 +180,7 @@ class PreopenContractValidator
         if ($s['plan_price_floor'] !== null) $this->assertIsInt($s['plan_price_floor'], $path.'.plan_price_floor');
 
         $this->assertIsString($s['trigger'], $path.'.trigger');
-        $this->validateReason($s['reason'], $path.'.reason');
+	    $this->validateCandidateReason($s['reason'], $path.'.reason');
     }
 
     private function validateRecommendationItem($it, string $path): void
@@ -199,7 +199,7 @@ class PreopenContractValidator
 
         $this->assertIsArray($it['reasons'], $path.'.reasons');
         foreach ($it['reasons'] as $i => $r) {
-            $this->validateReason($r, $path.'.reasons['.$i.']');
+	        $this->validateCandidateReason($r, $path.'.reasons['.$i.']');
         }
 
         $this->assertIsString($it['setup_type'], $path.'.setup_type');
@@ -226,7 +226,7 @@ class PreopenContractValidator
 
         $this->assertIsArray($r['reasons'], $path.'.reasons');
         foreach ($r['reasons'] as $i => $rs) {
-            $this->validateReason($rs, $path.'.reasons['.$i.']');
+            $this->validateCandidateReason($rs, $path.'.reasons['.$i.']');
         }
 
         $this->assertIsArray($r['retry'], $path.'.retry');
@@ -263,7 +263,7 @@ class PreopenContractValidator
 
         $this->assertIsArray($o['reasons'], $path.'.reasons');
         foreach ($o['reasons'] as $i => $rs) {
-            $this->validateReason($rs, $path.'.reasons['.$i.']');
+            $this->validateCandidateReason($rs, $path.'.reasons['.$i.']');
         }
 
         $this->assertIsArray($o['inputs_used'], $path.'.inputs_used');
@@ -274,7 +274,7 @@ class PreopenContractValidator
         if ($o['inputs_used']['snapshot_age_sec'] !== null) $this->assertIsInt($o['inputs_used']['snapshot_age_sec'], $path.'.inputs_used.snapshot_age_sec');
     }
 
-    private function validateReason($r, string $path): void
+    private function validateGlobalReason($r, string $path): void
     {
         $this->assertIsArray($r, $path);
         $allowed = ['code','message','severity'];
@@ -291,6 +291,23 @@ class PreopenContractValidator
         if (array_key_exists('severity', $r) && $r['severity'] !== null) {
             $this->assertIsString($r['severity'], $path.'.severity');
         }
+    }
+
+    private function validateCandidateReason($r, string $path): void
+    {
+        $this->assertIsArray($r, $path);
+        $allowed = ['code','message','severity_level'];
+        foreach ($r as $k => $v) {
+            if (!in_array($k, $allowed, true)) {
+                throw new \InvalidArgumentException($path.' has extra key: '.$k);
+            }
+        }
+        if (!array_key_exists('code', $r) || !array_key_exists('message', $r) || !array_key_exists('severity_level', $r)) {
+            throw new \InvalidArgumentException($path.' must have code, message, severity_level');
+        }
+        $this->assertIsString($r['code'], $path.'.code');
+        $this->assertIsString($r['message'], $path.'.message');
+        $this->assertIsString($r['severity_level'], $path.'.severity_level');
     }
 
     private function assertExactKeys(array $arr, array $keys, string $path): void

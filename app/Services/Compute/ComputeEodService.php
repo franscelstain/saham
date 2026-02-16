@@ -202,8 +202,10 @@ class ComputeEodService
 
             foreach ($calc->streamRows($cursor, $date, $prevSnaps, $now) as $row) {
                 // split row into 2 tables: indicators vs signals
-                $indBuffer[] = $row;
-                $sigBuffer[] = $row;
+                // NOTE: jangan andalkan repository whitelist untuk "drop" kolom.
+                // Row yang dibuffer di sini harus sudah clean sesuai schema table masing-masing.
+                $indBuffer[] = $this->buildIndicatorsRow($row);
+                $sigBuffer[] = $this->buildSignalsRow($row);
 
                 if (count($indBuffer) >= $upsertBatchSize) {
                     $this->ind->upsertMany($indBuffer, $upsertBatchSize);
@@ -262,5 +264,42 @@ class ComputeEodService
             'skipped_no_row' => $totalSkippedNoRow,
             'skipped_invalid' => $totalSkippedInvalid,
         ];
+    }
+
+    /**
+     * Build row payload khusus untuk ticker_indicators_daily.
+     * Tujuan: memutus ketergantungan pada repository whitelist (anti-drift & lebih "LOCKED" terhadap docs/compute_eod.md).
+     */
+    private function buildIndicatorsRow(array $row): array
+    {
+        $out = [
+            'ticker_id' => $row['ticker_id'] ?? null,
+            'trade_date' => $row['trade_date'] ?? null,
+        ];
+
+        foreach (TickerIndicatorsDailyRepository::COLUMNS as $col) {
+            if ($col === 'ticker_id' || $col === 'trade_date') continue;
+            if (array_key_exists($col, $row)) $out[$col] = $row[$col];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Build row payload khusus untuk ticker_signals_daily.
+     */
+    private function buildSignalsRow(array $row): array
+    {
+        $out = [
+            'ticker_id' => $row['ticker_id'] ?? null,
+            'trade_date' => $row['trade_date'] ?? null,
+        ];
+
+        foreach (TickerSignalsDailyRepository::COLUMNS as $col) {
+            if ($col === 'ticker_id' || $col === 'trade_date') continue;
+            if (array_key_exists($col, $row)) $out[$col] = $row[$col];
+        }
+
+        return $out;
     }
 }

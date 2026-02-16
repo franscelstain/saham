@@ -15,13 +15,13 @@ class ReasonCatalog
         $code = trim($code);
         if ($code === '') return '';
 
-        // Watchlist global / confirm reasons (docs/watchlist/*)
+	        // Watchlist global / confirm reasons (docs/watchlist/*)
         $wl = [
             'GL_EOD_NOT_READY' => 'EOD canonical belum siap.',
 
             // Global / data quality
             'GL_TICKER_STATUS_UNKNOWN' => 'Status ticker hari ini UNKNOWN (sumber status menyatakan tidak pasti / data buruk).',
-            'GL_TICKER_STATUS_DEFAULT_ASSUMED' => 'Status ticker hari ini tidak tersedia; diasumsikan REGULAR.',
+	            'GL_TICKER_STATUS_DEFAULTED_REGULAR' => 'Status ticker hari ini tidak tersedia; di-default menjadi REGULAR.',
 
             // Weekly Swing gates
             'WS_TREND_GATE_FAIL' => 'Weekly Swing: trend utama tidak memenuhi syarat.',

@@ -20,7 +20,7 @@ class EligibilityResultDto
     /** @var string|null */
     public $nextCheckAt;
 
-    /** @var ReasonDto[] */
+    /** @var CandidateReasonDto[] */
     public $reasons;
 
     /** @var array<string,mixed> */
@@ -51,7 +51,7 @@ class EligibilityResultDto
      * @param float|null $gapPct
      * @param float|null $spreadPct
      * @param float|null $chasePct
-     * @param array<int,string|array<string,mixed>|ReasonDto> $reasons
+     * @param array<int,string|array<string,mixed>|CandidateReasonDto> $reasons
      * @param string $notes
      * @param string $decision
      * @param string|null $nextCheckAt
@@ -90,17 +90,21 @@ class EligibilityResultDto
 
         $this->reasons = [];
         foreach ($reasons as $r) {
-            if ($r instanceof ReasonDto) {
+            if ($r instanceof CandidateReasonDto) {
                 $this->reasons[] = $r;
                 continue;
             }
             if (is_array($r)) {
-                $this->reasons[] = ReasonDto::fromArray($r);
+                $this->reasons[] = CandidateReasonDto::fromArray($r);
                 continue;
             }
             $code = (string)$r;
             if ($code !== '') {
-                $this->reasons[] = new ReasonDto($code, ReasonCatalog::getMessage($code));
+                // Default severity_level mapping (LOCKED behavior):
+                // - CF_OK is INFO
+                // - other CF_* reasons are SOFT_BLOCK by default (can be refined in evaluator later)
+                $lvl = ($code === 'CF_OK') ? 'INFO' : (strpos($code, 'CF_') === 0 ? 'SOFT_BLOCK' : 'INFO');
+                $this->reasons[] = new CandidateReasonDto($code, ReasonCatalog::getMessage($code), $lvl);
             }
         }
 
@@ -119,7 +123,7 @@ class EligibilityResultDto
     {
         $reasons = [];
         foreach ($this->reasons as $r) {
-            if ($r instanceof ReasonDto) $reasons[] = $r->toArray();
+            if ($r instanceof CandidateReasonDto) $reasons[] = $r->toArray();
         }
 
         // Ensure computed contains the common pct fields (for UI stability)
