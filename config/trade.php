@@ -236,6 +236,28 @@ return [
                 // Trading-day window for relevance gating via ticker_signals_daily.signal_code.
                 // Tickers without recent signals are excluded from PREOPEN output to avoid watch_only explosions.
                 'signal_recent_days' => (int) env('WATCHLIST_WS_SIGNAL_RECENT_DAYS', 5),
+
+                // Actionable signal codes allowlist for relevance gating.
+                // DO NOT use signal_code<>0 (many datasets use a non-zero default, commonly "1").
+                // Default excludes "1" by listing 2..10.
+                'signal_codes' => array_values(array_filter(
+                    array_map('intval', preg_split('/\s*,\s*/', (string) env('WATCHLIST_WS_SIGNAL_CODES', '2,3,4,5,6,7,8,9,10'), -1, PREG_SPLIT_NO_EMPTY)),
+                    fn ($v) => $v > 0
+                )),
+            
+                // Reason-code based hard AVOID bucket for WEEKLY_SWING (docs/watchlist/policy/weekly_swing.md).
+                // Quality fails (RR too low / trend gate fail) should land in WATCH_ONLY, not AVOID.
+                // Default: liquidity/tick/volatility hard avoid reasons.
+                'avoid_reason_codes' => (function () {
+                    $raw = trim((string) env('WATCHLIST_WS_AVOID_REASON_CODES', ''));
+                    if ($raw === '') {
+                        $raw = 'WS_MIN_DV20_IDR,WS_MAX_TICK_PCT,WS_MIN_ATR_PCT';
+                    }
+                    return array_values(array_filter(
+                        array_map('trim', preg_split('/\s*,\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY)),
+                        fn ($v) => $v !== ''
+                    ));
+                })(),
             ],
         ],
         // IMPORTANT: These are score_total fractions (0..1), not percent.

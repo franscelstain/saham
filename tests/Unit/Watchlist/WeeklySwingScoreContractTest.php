@@ -107,6 +107,56 @@ class WeeklySwingScoreContractTest extends TestCase
         $this->assertContains('WS_MIN_DV20_IDR', $codes);
     }
 
+    public function testRrTooLowIsWatchOnlyNotAvoid(): void
+    {
+        $candidate = $this->makeCandidateHardFailRr();
+        $engine = $this->makeEngineWithCandidate($candidate, true);
+
+        $doc = $engine->buildPreopen([
+            'policy' => 'WEEKLY_SWING',
+            'eod_date' => '2026-01-30',
+            'capital_idr' => null,
+            'now_ts' => '2026-02-03T08:00:00+07:00',
+        ]);
+
+        (new PreopenContractValidator())->validate($doc);
+
+        $foundGroup = null;
+        foreach ((array)($doc['groups'] ?? []) as $groupName => $items) {
+            foreach ((array)$items as $it) {
+                if (($it['ticker'] ?? null) === 'BBCA') { $foundGroup = (string)$groupName; break 2; }
+            }
+        }
+
+        $this->assertNotNull($foundGroup, 'BBCA should remain in preopen payload groups');
+        $this->assertSame('watch_only', $foundGroup, 'RR too low must land in watch_only (monitoring), not avoid');
+    }
+
+    public function testTrendGateFailIsWatchOnlyNotAvoid(): void
+    {
+        $candidate = $this->makeCandidateTrendGateFail();
+        $engine = $this->makeEngineWithCandidate($candidate, true);
+
+        $doc = $engine->buildPreopen([
+            'policy' => 'WEEKLY_SWING',
+            'eod_date' => '2026-01-30',
+            'capital_idr' => null,
+            'now_ts' => '2026-02-03T08:00:00+07:00',
+        ]);
+
+        (new PreopenContractValidator())->validate($doc);
+
+        $foundGroup = null;
+        foreach ((array)($doc['groups'] ?? []) as $groupName => $items) {
+            foreach ((array)$items as $it) {
+                if (($it['ticker'] ?? null) === 'BBCA') { $foundGroup = (string)$groupName; break 2; }
+            }
+        }
+
+        $this->assertNotNull($foundGroup, 'BBCA should remain in preopen payload groups');
+        $this->assertSame('watch_only', $foundGroup, 'Trend gate fail must land in watch_only (monitoring), not avoid');
+    }
+
     private function clamp01(float $v): float
     {
         if ($v < 0.0) return 0.0;
@@ -154,6 +204,26 @@ class WeeklySwingScoreContractTest extends TestCase
         // Must pass Universe liquidity gate (default 2B) but fail WEEKLY_SWING policy gate (5B)
         $c->dv20 = 3_000_000_000;
         $c->dv20Idr = 3_000_000_000;
+        return $c;
+    }
+
+
+    private function makeCandidateHardFailRr(): CandidateInput
+    {
+        $c = $this->makeCandidateGood();
+        // Make RR too low: widen R by pushing ll5 lower so stop gets much lower.
+        $c->ll5 = 900;
+        return $c;
+    }
+
+    private function makeCandidateTrendGateFail(): CandidateInput
+    {
+        $c = $this->makeCandidateGood();
+        // Force close < ma20 and ma20 < ma50 so both condA/condB fail.
+        $c->ma20 = 1100;
+        $c->ma50 = 1200;
+        // Keep hh20 so resistance20 exists but close is still below it.
+        $c->hh20 = 1300;
         return $c;
     }
 

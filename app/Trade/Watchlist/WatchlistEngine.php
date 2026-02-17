@@ -317,6 +317,11 @@ class WatchlistEngine
             $n = (int) (config('trade.watchlist.policies.weekly_swing.signal_recent_days') ?? 5);
             if ($n < 1) $n = 1;
 
+            // Allowlist of actionable signal codes. DO NOT use signal_code<>0 as a marker,
+            // because many datasets use a non-zero default (commonly "1").
+            $signalCodes = (array) (config('trade.watchlist.policies.weekly_swing.signal_codes') ?? []);
+            $signalCodes = array_values(array_filter(array_map('intval', $signalCodes), fn($v) => $v > 0));
+
             // Prefer market_calendar for trading-day windows; fallback to OHLC distinct dates.
             $datesWindow = [];
             try {
@@ -339,7 +344,7 @@ class WatchlistEngine
             }
 
             if (!empty($datesWindow)) {
-                $relevantTickerIds = $this->watchRepo->tickerIdsWithSignalsOnDates($datesWindow);
+                $relevantTickerIds = $this->watchRepo->tickerIdsWithSignalsOnDates($datesWindow, $signalCodes);
             }
         }
 
@@ -625,15 +630,27 @@ class WatchlistEngine
                 continue;
             }
 
-            // Failed hard rules policy: MUST remain visible in PREOPEN groups (docs + tests).
-            // Do not exclude just because score_total is below watch_only_min_score.
-            // Blocked entries are surfaced as AVOID (not watch_only) with reasons + eligibility_block_codes.
-            // eligibility_block_codes are stored at row root (contract) and may be mirrored under plan in some legacy paths.
-            $blocks = (array)($rows[$i]['eligibility_block_codes'] ?? ($rows[$i]['plan']['eligibility_block_codes'] ?? []));
-            if (!empty($blocks)) {
-                $rows[$i]['group'] = 'avoid';
+            // Failed eligibility/hard rules policy: MUST remain visible in PREOPEN groups (docs + tests).
+            // For WEEKLY_SWING: avoid is reserved for HARD AVOID reasons (liquidity/tick/volatility).
+            // Quality fails like RR too low / trend gate fail are surfaced as WATCH_ONLY (monitoring), not AVOID.
+            if (strtoupper((string)$policy) === 'WEEKLY_SWING') {
+                $avoidReasonCodes = (array) config('trade.watchlist.policies.weekly_swing.avoid_reason_codes', []);
+                $reasonCodes2 = [];
+                $allReasons = array_merge(
+                    (array)($rows[$i]['reasons'] ?? []),
+                    (array)($rows[$i]['plan']['reasons'] ?? [])
+                );
+                foreach ($allReasons as $rr) {
+                    $c = is_array($rr) ? (string)($rr['code'] ?? '') : '';
+                    if ($c !== '') { $reasonCodes2[] = $c; }
+                }
+                $reasonCodes2 = array_values(array_unique($reasonCodes2));
+                $isHardAvoid = !empty($avoidReasonCodes) && !empty(array_intersect($avoidReasonCodes, $reasonCodes2));
+                $rows[$i]['group'] = $isHardAvoid ? 'avoid' : 'watch_only';
             } else {
-                $rows[$i]['group'] = 'watch_only';
+                // Default: if we have explicit block codes, surface as AVOID, otherwise WATCH_ONLY.
+                $blocks = (array)($rows[$i]['eligibility_block_codes'] ?? ($rows[$i]['plan']['eligibility_block_codes'] ?? []));
+                $rows[$i]['group'] = !empty($blocks) ? 'avoid' : 'watch_only';
             }
         }
 

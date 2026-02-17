@@ -466,25 +466,37 @@ class WatchlistRepository
     }
 
     /**
-     * Return ticker_ids that have a non-zero signal_code on any of the given trade dates.
+     * Return ticker_ids that have a signal_code on any of the given trade dates.
+     *
+     * IMPORTANT: In real datasets, many tickers may have a non-zero default signal_code
+     * (e.g., "1") which is NOT an actionable marker. For that reason, callers SHOULD
+     * pass an allowlist of actionable signal codes.
      *
      * Used for per-policy relevance gating (universe filter) so watch/avoid buckets
      * do not explode by processing the entire market.
      *
      * @param array<int,string> $tradeDates
+     * @param array<int,int>|null $signalCodes Allowlist. If null/empty, falls back to non-zero.
      * @return array<int,bool> map[ticker_id] => true
      */
-    public function tickerIdsWithSignalsOnDates(array $tradeDates): array
+    public function tickerIdsWithSignalsOnDates(array $tradeDates, ?array $signalCodes = null): array
     {
         if (empty($tradeDates)) return [];
         if (!$this->hasTable('ticker_signals_daily')) return [];
+
+        $signalCodes = $signalCodes ?? [];
+        $signalCodes = array_values(array_filter(array_map('intval', $signalCodes), fn($v) => $v > 0));
 
         $ids = DB::table('ticker_signals_daily')
             ->select('ticker_id')
             ->whereIn('trade_date', $tradeDates)
             ->where('is_deleted', '=', 0)
             ->whereNotNull('signal_code')
-            ->where('signal_code', '<>', 0)
+            ->when(!empty($signalCodes), function ($q) use ($signalCodes) {
+                return $q->whereIn('signal_code', $signalCodes);
+            }, function ($q) {
+                return $q->where('signal_code', '<>', 0);
+            })
             ->distinct()
             ->pluck('ticker_id');
 
