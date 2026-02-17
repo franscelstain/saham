@@ -464,4 +464,35 @@ class WatchlistRepository
             ->values()
             ->all();
     }
+
+    /**
+     * Return ticker_ids that have a non-zero signal_code on any of the given trade dates.
+     *
+     * Used for per-policy relevance gating (universe filter) so watch/avoid buckets
+     * do not explode by processing the entire market.
+     *
+     * @param array<int,string> $tradeDates
+     * @return array<int,bool> map[ticker_id] => true
+     */
+    public function tickerIdsWithSignalsOnDates(array $tradeDates): array
+    {
+        if (empty($tradeDates)) return [];
+        if (!$this->hasTable('ticker_signals_daily')) return [];
+
+        $ids = DB::table('ticker_signals_daily')
+            ->select('ticker_id')
+            ->whereIn('trade_date', $tradeDates)
+            ->where('is_deleted', '=', 0)
+            ->whereNotNull('signal_code')
+            ->where('signal_code', '<>', 0)
+            ->distinct()
+            ->pluck('ticker_id');
+
+        $out = [];
+        foreach ($ids as $id) {
+            $tid = (int)$id;
+            if ($tid > 0) $out[$tid] = true;
+        }
+        return $out;
+    }
 }

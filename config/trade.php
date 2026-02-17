@@ -229,6 +229,15 @@ return [
             'secondary_min_score' => $__gsSecondaryMin,
             'watch_only_min_score' => $__gsWatchOnlyMin,
         ],
+
+        // Per-policy knobs (LOCKED by docs/watchlist/policy/*.md)
+        'policies' => [
+            'weekly_swing' => [
+                // Trading-day window for relevance gating via ticker_signals_daily.signal_code.
+                // Tickers without recent signals are excluded from PREOPEN output to avoid watch_only explosions.
+                'signal_recent_days' => (int) env('WATCHLIST_WS_SIGNAL_RECENT_DAYS', 5),
+            ],
+        ],
         // IMPORTANT: These are score_total fractions (0..1), not percent.
         // Liquidity proxy (dv20 = SMA20 of close*volume over 20 prior trading days; exclude today)
         'liq' => [

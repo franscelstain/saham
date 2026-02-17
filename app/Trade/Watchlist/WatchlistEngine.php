@@ -309,6 +309,40 @@ class WatchlistEngine
         // Load datasets for candidate rules
         $candidates = $this->watchRepo->getEodCandidates((string)$eodDate);
 
+        // --- Per-policy relevance gate (universe filter) ---
+        // WEEKLY_SWING relevance is driven by ticker_signals_daily.signal_code within a recent trading-day window.
+        // This prevents watch_only from exploding by processing the entire market.
+        $relevantTickerIds = [];
+        if (strtoupper((string)$policy) === 'WEEKLY_SWING') {
+            $n = (int) (config('trade.watchlist.policies.weekly_swing.signal_recent_days') ?? 5);
+            if ($n < 1) $n = 1;
+
+            // Prefer market_calendar for trading-day windows; fallback to OHLC distinct dates.
+            $datesWindow = [];
+            try {
+                $start = $this->calRepo->lookbackStartDate((string)$eodDate, $n);
+                $datesWindow = $this->calRepo->tradingDatesBetween($start, (string)$eodDate);
+            } catch (\Throwable $e) {
+                $datesWindow = [];
+            }
+
+            if (empty($datesWindow)) {
+                $op = '<=';
+                $rows = \DB::table('ticker_ohlc_daily')
+                    ->select('trade_date')
+                    ->where('trade_date', $op, (string)$eodDate)
+                    ->distinct()
+                    ->orderByDesc('trade_date')
+                    ->limit($n)
+                    ->pluck('trade_date');
+                foreach ($rows as $d) { $datesWindow[] = (string)$d; }
+            }
+
+            if (!empty($datesWindow)) {
+                $relevantTickerIds = $this->watchRepo->tickerIdsWithSignalsOnDates($datesWindow);
+            }
+        }
+
         // Ticker status is resolved STRICTLY on execTradeDate.
         // IMPORTANT: If there is no status data at all for this trade date, we still default to REGULAR
         // and we DO NOT spam per-ticker DEFAULT_ASSUMED reasons (docs/watchlist/watchlist.md 2.6).
@@ -322,6 +356,14 @@ class WatchlistEngine
             $ci = ($ciRaw instanceof \App\DTO\Watchlist\CandidateInput)
                 ? $ciRaw
                 : new \App\DTO\Watchlist\CandidateInput((array)$ciRaw);
+
+            // Relevance gate: skip tickers without recent signal_code for WEEKLY_SWING.
+            if (!empty($relevantTickerIds)) {
+                $tid = (int)($ci->tickerId ?? 0);
+                if ($tid > 0 && !isset($relevantTickerIds[$tid])) {
+                    continue;
+                }
+            }
 
             $this->derivedBuilder->enrich($ci);
             // labels are part of output contract; keep mapping out of DTO (docs/DTO.md)
@@ -585,8 +627,14 @@ class WatchlistEngine
 
             // Failed hard rules policy: MUST remain visible in PREOPEN groups (docs + tests).
             // Do not exclude just because score_total is below watch_only_min_score.
-            // Blocked entries are surfaced as watch_only with reasons + eligibility_block_codes.
-            $rows[$i]['group'] = 'watch_only';
+            // Blocked entries are surfaced as AVOID (not watch_only) with reasons + eligibility_block_codes.
+            // eligibility_block_codes are stored at row root (contract) and may be mirrored under plan in some legacy paths.
+            $blocks = (array)($rows[$i]['eligibility_block_codes'] ?? ($rows[$i]['plan']['eligibility_block_codes'] ?? []));
+            if (!empty($blocks)) {
+                $rows[$i]['group'] = 'avoid';
+            } else {
+                $rows[$i]['group'] = 'watch_only';
+            }
         }
 
         // Recommendations (allocations) use top-picks as the universe, but do NOT cap top-picks.

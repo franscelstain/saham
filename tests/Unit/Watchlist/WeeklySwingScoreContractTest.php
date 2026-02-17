@@ -71,7 +71,7 @@ class WeeklySwingScoreContractTest extends TestCase
         $this->assertEqualsWithDelta($expected * 100.0, (float)($res['score'] ?? 0.0), 2.0);
     }
 
-    public function testHardRuleFailStaysInPreopenAsWatchOnlyNotExcluded(): void
+    public function testHardRuleFailStaysInPreopenAsAvoidNotExcluded(): void
     {
         $candidate = $this->makeCandidateHardFailDv20();
         $engine = $this->makeEngineWithCandidate($candidate, true);
@@ -100,7 +100,7 @@ class WeeklySwingScoreContractTest extends TestCase
         }
 
         $this->assertNotNull($foundGroup, 'BBCA should remain in preopen payload groups');
-        $this->assertSame('watch_only', $foundGroup, 'BBCA hard-rule fail must land in watch_only group');
+        $this->assertSame('avoid', $foundGroup, 'BBCA hard-rule fail must land in avoid group');
 
         $reasons = (array)($foundItem['reasons'] ?? []);
         $codes = array_map(fn($r) => (string)($r['code'] ?? ''), $reasons);
