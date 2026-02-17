@@ -17,7 +17,7 @@
           {
             "code": "WS_SIGNAL",
             "message": "Setup breakout valid",
-            "severity": "info"
+            "severity_level": "info"
           }
         ],
         "eod_bar": {
@@ -49,7 +49,7 @@
               "reason": {
                 "code": "PLAN_TR1",
                 "message": "Tranche 1",
-                "severity": "info"
+                "severity_level": "info"
               }
             },
             {
@@ -63,7 +63,7 @@
               "reason": {
                 "code": "PLAN_TR2",
                 "message": "Tranche 2",
-                "severity": "info"
+                "severity_level": "info"
               }
             }
           ]
@@ -90,7 +90,7 @@
           {
             "code": "WS_ALLOC_TOP1",
             "message": "Allocated top pick",
-            "severity": "info"
+            "severity_level": "info"
           }
         ],
         "setup_type": "BREAKOUT",
@@ -109,7 +109,7 @@
             "reason": {
               "code": "REC_TR1",
               "message": "Tranche 1",
-              "severity": "info"
+              "severity_level": "info"
             }
           },
           {
@@ -123,7 +123,7 @@
             "reason": {
               "code": "REC_TR2",
               "message": "Tranche 2",
-              "severity": "info"
+              "severity_level": "info"
             }
           }
         ]

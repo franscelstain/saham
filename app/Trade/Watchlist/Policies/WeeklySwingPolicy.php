@@ -15,6 +15,61 @@ class WeeklySwingPolicy implements WatchlistPolicyInterface
         return 'WEEKLY_SWING';
     }
 
+
+    public function enrichPlanRow(array &$row, array $opts, array $policyMeta, WatchlistEngine $engine): void
+    {
+        // WeeklySwing: evaluate viability only when capital is provided.
+        $capitalTotal = $opts['capital_idr'] ?? ($opts['capital_total'] ?? null); // legacy fallback
+        if (!isset($row['plan']) || !is_array($row['plan'])) $row['plan'] = [];
+        if (!isset($row['plan']['trade_viability']) || !is_array($row['plan']['trade_viability'])) {
+            $row['plan']['trade_viability'] = ['evaluated' => false, 'is_viable' => null, 'reason_codes' => []];
+        }
+
+        $row['plan']['trade_viability']['evaluated'] = ($capitalTotal !== null);
+        if ($capitalTotal === null) {
+            // Capital not provided: viability is not evaluated (contract-safe: do not block grouping).
+            $row['plan']['trade_viability']['is_viable'] = null;
+            $row['plan']['trade_viability']['reason_codes'] = ['WS_VIABILITY_NOT_EVALUATED'];
+            return;
+        }
+
+        $levels = is_array($row['levels'] ?? null) ? (array)$row['levels'] : [];
+        $sizing = is_array($row['sizing'] ?? null) ? (array)$row['sizing'] : [];
+
+        $lotSize = (int)($sizing['lot_size'] ?? 100);
+        $entry = $levels['entry_trigger_price'] ?? null;
+
+        $isViable = true;
+        $reasons = [];
+
+        $lotsRec = $sizing['lots_recommended'] ?? null;
+        $minLots = (int)($policyMeta['min_lots'] ?? 1);
+        if ($lotsRec !== null && (int)$lotsRec < $minLots) {
+            $isViable = false;
+            $reasons[] = 'WS_MIN_LOTS_FAIL';
+        }
+
+        $profitNet = $sizing['profit_tp2_net'] ?? null;
+        $edge = ($entry !== null)
+            ? $engine->netEdgePct((int)$entry, $lotSize, is_int($profitNet) ? (int)$profitNet : null)
+            : null;
+
+        $minEdge = (float)($policyMeta['min_net_edge_pct'] ?? 0.0);
+        if ($edge !== null && $edge < $minEdge) {
+            $isViable = false;
+            $reasons[] = 'WS_MIN_NET_EDGE_FAIL';
+        }
+
+        $row['plan']['trade_viability']['is_viable'] = $isViable;
+        $row['plan']['trade_viability']['reason_codes'] = array_values(array_unique($reasons));
+    }
+
+    public function defaultActionWindows(array $session): array
+    {
+        // Prefer explicit, deterministic windows (avoid the noisiest first minutes).
+        return ['09:20-10:30', '13:35-14:30', '14:30-close'];
+    }
+
     public function apply(array $x, array $reasonCodes, WatchlistEngine $engine): array
     {
         // PLAN-only rules (EOD). CONFIRM rules are handled elsewhere.
@@ -121,11 +176,13 @@ class WeeklySwingPolicy implements WatchlistPolicyInterface
             $blockCodes[] = 'WS_MAX_TICK_PCT';
         }
 
-        // Hard-rule fails => DROP (gugur dari kandidat policy ini).
-        if (!empty($blockCodes)) {
-            $drop = true;
-            return $this->policyRes($drop, 0.0, $entryStyle, 'Low', $reasonCodes, $blockCodes);
-        }
+        // IMPORTANT (docs/tests): policy hard-rule fails MUST NOT silently DROP the ticker from PREOPEN.
+        // Instead, surface it in groups.* (usually WATCH_ONLY) with eligibility_block_codes populated,
+        // so the user can see *why* it is blocked.
+        //
+        // DROP is reserved for cases where PLAN cannot be formed at all (e.g., invalid stop/rr).
+        // Here, we continue building levels + scoring even if there are block codes.
+        $drop = false;
 
         // Build plan levels (deterministic, EOD-only)
         $levels = $this->buildWeeklySwingLevels(

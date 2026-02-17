@@ -15,6 +15,55 @@ class DividendSwingPolicy implements WatchlistPolicyInterface
         return 'DIVIDEND_SWING';
     }
 
+
+    public function enrichPlanRow(array &$row, array $opts, array $policyMeta, WatchlistEngine $engine): void
+    {
+        // DividendSwing: hard viability rules block NEW ENTRY but keep ticker for monitoring (watch_only).
+        if (!isset($row['plan']) || !is_array($row['plan'])) $row['plan'] = [];
+        if (!isset($row['plan']['block_codes']) || !is_array($row['plan']['block_codes'])) $row['plan']['block_codes'] = [];
+        if (!isset($row['plan']['is_eligible_new_entry'])) $row['plan']['is_eligible_new_entry'] = true;
+        if (!isset($row['reason_codes']) || !is_array($row['reason_codes'])) $row['reason_codes'] = [];
+
+        $levels = is_array($row['levels'] ?? null) ? (array)$row['levels'] : [];
+        $entry = $levels['entry_trigger_price'] ?? null;
+        $sl   = $levels['stop_loss_price'] ?? null;
+        $tp1  = $levels['take_profit_1_price'] ?? ($levels['tp1_price'] ?? null);
+
+        if ($entry === null || $sl === null || $tp1 === null) {
+            $row['plan']['is_eligible_new_entry'] = false;
+            $row['plan']['block_codes'][] = 'DS_LEVELS_INCOMPLETE';
+            $row['reason_codes'][] = 'DS_LEVELS_INCOMPLETE';
+        }
+
+        $rval = ($entry !== null && $sl !== null && $tp1 !== null)
+            ? $engine->rrRatio((int)$entry, (int)$sl, (int)$tp1)
+            : null;
+
+        $sizing = is_array($row['sizing'] ?? null) ? (array)$row['sizing'] : [];
+        $lotSize = (int)($sizing['lot_size'] ?? 100);
+        $profitNet = $sizing['profit_tp2_net'] ?? null;
+
+        $edge = ($entry !== null)
+            ? $engine->netEdgePct((int)$entry, $lotSize, is_int($profitNet) ? (int)$profitNet : null)
+            : null;
+
+        $minEdge = (float)($policyMeta['min_net_edge_pct'] ?? 0.0);
+
+        if (($rval !== null && $rval < 1.8) || ($edge !== null && $edge < $minEdge)) {
+            $row['reason_codes'][] = 'DS_MIN_TRADE_VIABILITY_FAIL';
+            $row['plan']['is_eligible_new_entry'] = false;
+            $row['plan']['block_codes'][] = 'DS_MIN_TRADE_VIABILITY_FAIL';
+        }
+
+        $row['plan']['block_codes'] = array_values(array_unique($row['plan']['block_codes']));
+        $row['reason_codes'] = array_values(array_unique($row['reason_codes']));
+    }
+
+    public function defaultActionWindows(array $session): array
+    {
+        return ['09:20-10:30', '13:35-14:30'];
+    }
+
     public function apply(array $x, array $reasonCodes, WatchlistEngine $engine): array
     {
         $drop = false;

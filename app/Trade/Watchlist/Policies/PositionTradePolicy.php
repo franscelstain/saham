@@ -15,6 +15,17 @@ class PositionTradePolicy implements WatchlistPolicyInterface
         return 'POSITION_TRADE';
     }
 
+
+    public function enrichPlanRow(array &$row, array $opts, array $policyMeta, WatchlistEngine $engine): void
+    {
+        // No extra PLAN mutation required for POSITION_TRADE at this layer.
+    }
+
+    public function defaultActionWindows(array $session): array
+    {
+        return ['09:20-10:30', '13:35-14:30'];
+    }
+
     /**
      * @param array<string,mixed> $x
      * @param array<int,string> $reasonCodes

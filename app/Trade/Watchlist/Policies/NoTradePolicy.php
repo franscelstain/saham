@@ -14,6 +14,22 @@ class NoTradePolicy implements WatchlistPolicyInterface
         return 'NO_TRADE';
     }
 
+
+    public function enrichPlanRow(array &$row, array $opts, array $policyMeta, WatchlistEngine $engine): void
+    {
+        // NO_TRADE never eligible for new entry.
+        if (!isset($row['plan']) || !is_array($row['plan'])) $row['plan'] = [];
+        $row['plan']['is_eligible_new_entry'] = false;
+        if (!isset($row['plan']['block_codes']) || !is_array($row['plan']['block_codes'])) $row['plan']['block_codes'] = [];
+        $row['plan']['block_codes'][] = 'NT_MONITOR_ONLY';
+        $row['plan']['block_codes'] = array_values(array_unique($row['plan']['block_codes']));
+    }
+
+    public function defaultActionWindows(array $session): array
+    {
+        return ['open-close'];
+    }
+
     public function apply(array $x, array $reasonCodes, WatchlistEngine $engine): array
     {
         $blockCodes = ['GL_POLICY_INACTIVE'];
