@@ -2179,6 +2179,12 @@ private function toIsoCheckedAt(string $updatedAt, string $tradeDate, string $ch
 		}
 		$scoreTotal = WatchlistScoreScale::toScore01($rawScoreTotal);
 
+		// no_trade is not a ranked bucket; never surface it as a "perfect" score.
+		if ($group === 'no_trade') {
+			$scoreTotal = 0.0;
+		}
+
+
 		$entryStyle = (string)($policyRes['entry_style'] ?? 'Default');
 		if ($policyHardFail) {
 			// Ensure we actually block eligibility even if policy forgot to populate block codes.
