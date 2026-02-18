@@ -144,8 +144,11 @@ class ScorecardConfig
         $band = $this->policyValue($policy, 'breakout_band_pct', $this->breakoutBandPctDefault);
         $maxRetry = $this->policyValue($policy, 'max_retry_windows', $this->maxRetryWindowsDefault);
         $depthTopN = $this->policyValue($policy, 'depth_top_n', 0);
-        $minDepthBid = $this->policyValue($policy, 'min_depth_lots_bid', $this->minDepthLotsBidDefault);
-        $minDepthAsk = $this->policyValue($policy, 'min_depth_lots_ask', $this->minDepthLotsAskDefault);
+        $minDepthBoth = $this->policyValue($policy, 'min_depth_lots', null);
+        // Dynamic default: depth guard thresholds depend on N (docs: 2000 lots for N=3, 3000 lots for N=5).
+        $defaultMin = ($depthTopN >= 5) ? 3000 : (($depthTopN >= 3) ? 2000 : $this->minDepthLotsBidDefault);
+        $minDepthBid = $this->policyValue($policy, 'min_depth_lots_bid', $minDepthBoth ?? $defaultMin);
+        $minDepthAsk = $this->policyValue($policy, 'min_depth_lots_ask', $minDepthBoth ?? $defaultMin);
 
         return [
             'max_chase_pct' => (float)$maxChase,

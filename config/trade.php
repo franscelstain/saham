@@ -337,6 +337,8 @@ return [
                     'spread_max_pct' => 0.010,
                     'breakout_band_pct' => 0.004,
                     'max_retry_windows' => 1,
+                    'depth_top_n' => 3,
+                    'min_depth_lots' => 2000,
                     'entry_windows' => ['09:05-09:45','13:35-14:10'],
                     'avoid_windows' => ['09:00-09:05','11:30-13:30','15:00-16:00'],
                 ],
