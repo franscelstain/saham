@@ -635,16 +635,16 @@ class WatchlistEngine
             // Quality fails like RR too low / trend gate fail are surfaced as WATCH_ONLY (monitoring), not AVOID.
             if (strtoupper((string)$policy) === 'WEEKLY_SWING') {
                 $avoidReasonCodes = (array) config('trade.watchlist.policies.weekly_swing.avoid_reason_codes', []);
-                $reasonCodes2 = [];
-                $allReasons = array_merge(
-                    (array)($rows[$i]['reasons'] ?? []),
-                    (array)($rows[$i]['plan']['reasons'] ?? [])
+                // NOTE: policy validators store reason codes as string arrays under plan.reason_codes
+                // (and sometimes under plan.eligibility_block_codes). The strict contract reasons[]
+                // objects are mapped later, so we must NOT rely on row.reasons here.
+                $reasonCodes2 = array_merge(
+                    (array)($rows[$i]['plan']['reason_codes'] ?? []),
+                    (array)($rows[$i]['plan']['eligibility_block_codes'] ?? []),
+                    (array)($rows[$i]['reason_codes'] ?? []),
+                    (array)($rows[$i]['eligibility_block_codes'] ?? [])
                 );
-                foreach ($allReasons as $rr) {
-                    $c = is_array($rr) ? (string)($rr['code'] ?? '') : '';
-                    if ($c !== '') { $reasonCodes2[] = $c; }
-                }
-                $reasonCodes2 = array_values(array_unique($reasonCodes2));
+                $reasonCodes2 = array_values(array_unique(array_filter(array_map('strval', $reasonCodes2), fn($v) => $v !== '')));
                 $isHardAvoid = !empty($avoidReasonCodes) && !empty(array_intersect($avoidReasonCodes, $reasonCodes2));
                 $rows[$i]['group'] = $isHardAvoid ? 'avoid' : 'watch_only';
             } else {

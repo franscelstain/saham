@@ -248,16 +248,10 @@ return [
                 // Reason-code based hard AVOID bucket for WEEKLY_SWING (docs/watchlist/policy/weekly_swing.md).
                 // Quality fails (RR too low / trend gate fail) should land in WATCH_ONLY, not AVOID.
                 // Default: liquidity/tick/volatility hard avoid reasons.
-                'avoid_reason_codes' => (function () {
-                    $raw = trim((string) env('WATCHLIST_WS_AVOID_REASON_CODES', ''));
-                    if ($raw === '') {
-                        $raw = 'WS_MIN_DV20_IDR,WS_MAX_TICK_PCT,WS_MIN_ATR_PCT';
-                    }
-                    return array_values(array_filter(
-                        array_map('trim', preg_split('/\s*,\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY)),
-                        fn ($v) => $v !== ''
-                    ));
-                })(),
+                'avoid_reason_codes' => array_values(array_filter(
+                    array_map('trim', preg_split('/\s*,\s*/', (string) env('WATCHLIST_WS_AVOID_REASON_CODES', 'WS_MIN_DV20_IDR,WS_MAX_TICK_PCT,WS_MIN_ATR_PCT'), -1, PREG_SPLIT_NO_EMPTY)),
+                    fn ($v) => $v !== ''
+                )),
             ],
         ],
         // IMPORTANT: These are score_total fractions (0..1), not percent.
