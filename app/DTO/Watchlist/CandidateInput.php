@@ -6,57 +6,57 @@ use App\DTO\BaseDto;
 
 class CandidateInput extends BaseDto
 {
-    public int $tickerId;
-    public string $tickerCode;
+    private int $tickerId;
+    private string $tickerCode;
 
     // EOD OHLC
-    public ?float $open;
-    public ?float $high;
-    public ?float $low;
-    public ?float $close;
-    public ?float $volume;
+    private ?float $open;
+    private ?float $high;
+    private ?float $low;
+    private ?float $close;
+    private ?float $volume;
 
     // Previous close (for gap)
-    public ?float $prevClose;
-    public ?float $prevOpen;
-    public ?float $prevHigh;
-    public ?float $prevLow;
+    private ?float $prevClose;
+    private ?float $prevOpen;
+    private ?float $prevHigh;
+    private ?float $prevLow;
 
     // Indicators - classification + score (docs/watchlist)
-    public ?float $scoreTotal;
-    public ?int $decisionCode;
-    public ?int $signalCode;
-    public ?int $volumeLabelCode;
-    public ?int $signalAgeDays;
-    public ?float $volSma20;
+    private ?float $scoreTotal;
+    private ?int $decisionCode;
+    private ?int $signalCode;
+    private ?int $volumeLabelCode;
+    private ?int $signalAgeDays;
+    private ?float $volSma20;
 
     // Indicators
-    public ?float $ma20;
-    public ?float $ma50;
-    public ?float $ma200;
-    public ?float $rsi14;
-    public ?float $atr14;
-    public ?float $volRatio;
-    public ?float $support20d;
-    public ?float $resistance20d;
+    private ?float $ma20;
+    private ?float $ma50;
+    private ?float $ma200;
+    private ?float $rsi14;
+    private ?float $atr14;
+    private ?float $volRatio;
+    private ?float $support20d;
+    private ?float $resistance20d;
 
     // Liquidity (IDR)
-    public ?float $dv20;
-    public ?float $turnover20;
+    private ?float $dv20;
+    private ?float $turnover20;
 
     // Weekly Swing helpers (computed from OHLC before trade_date)
-    public ?float $hh20;
-    public ?float $ll5;
-    public ?float $roc20;
+    private ?float $hh20;
+    private ?float $ll5;
+    private ?float $roc20;
 
     // Intraday Light helpers (computed from OHLC before trade_date)
-    public ?float $hh10;
-    public ?float $ll3;
-    public ?float $roc5;
+    private ?float $hh10;
+    private ?float $ll3;
+    private ?float $roc5;
 
     // Classification outputs
-    public ?string $liqBucket;
-    public ?array $candle;
+    private ?string $liqBucket;
+    private ?array $candle;
 
     public function __construct(array $data = [])
     {

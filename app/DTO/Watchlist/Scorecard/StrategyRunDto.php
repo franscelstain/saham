@@ -2,32 +2,32 @@
 
 namespace App\DTO\Watchlist\Scorecard;
 
+use App\DTO\BaseDto;
 use App\Trade\Watchlist\Config\ScorecardConfig;
 
 /**
  * Strategy Run DTO (stored plan for scorecard).
- * PHP 7.3 compatible.
+ *
+ * Phase 2A:
+ * - Make fields private (immutable).
+ * - Keep read-only "$dto->field" access via BaseDto::__get.
+ *
+ * PHP 7.4 compatible.
  */
-class StrategyRunDto
+class StrategyRunDto extends BaseDto
 {
-    /** @var int */
-    public $runId;
-    /** @var string */
-    public $tradeDate;
-    /** @var string */
-    public $execDate;
-    /** @var string */
-    public $policy;
-    /** @var string */
-    public $recommendationMode;
-    /** @var string */
-    public $generatedAt;
+    private int $runId;
+    private string $tradeDate;
+    private string $execDate;
+    private string $policy;
+    private string $recommendationMode;
+    private string $generatedAt;
     /** @var CandidateDto[] */
-    public $topPicks;
+    private array $topPicks;
     /** @var CandidateDto[] */
-    public $secondary;
+    private array $secondary;
     /** @var CandidateDto[] */
-    public $watchOnly;
+    private array $watchOnly;
 
     /**
      * @param int $runId
@@ -105,7 +105,7 @@ class StrategyRunDto
     /**
      * @return array<string,mixed>
      */
-    public function toPayloadArray()
+    public function toPayloadArray(): array
     {
         $top = [];
         foreach ($this->topPicks as $c) {

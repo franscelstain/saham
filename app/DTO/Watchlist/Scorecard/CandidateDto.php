@@ -2,46 +2,56 @@
 
 namespace App\DTO\Watchlist\Scorecard;
 
+use App\DTO\BaseDto;
+
 /**
  * Scorecard candidate DTO.
- * Keeps backward compatibility with legacy watchlist payloads, but can also carry strict CONFIRM plan fields.
- * PHP 7.3 compatible.
+ *
+ * Phase 2A (PHP 7.4):
+ * - Keep legacy array payload compatibility.
+ * - Enforce immutability by making fields private.
+ * - Preserve read-only "$dto->field" access via BaseDto::__get.
  */
-class CandidateDto
+class CandidateDto extends BaseDto
 {
-    /** @var string */
-    public $ticker;
-    /** @var bool */
-    public $hasPosition;
-    /** @var int */
-    public $score;
-    /** @var int */
-    public $rank;
-    /** @var int|null */
-    public $entryTrigger;
-    /** @var EntryBandDto */
-    public $entryBand;
-    /** @var CandidateTimingDto */
-    public $timing;
-    /** @var int */
-    public $slices;
+    private string $ticker;
+    private bool $hasPosition;
+    private int $score;
+    private int $rank;
+    private ?int $entryTrigger;
+    private EntryBandDto $entryBand;
+    private CandidateTimingDto $timing;
+    private int $slices;
     /** @var float[] */
-    public $slicePct;
+    private array $slicePct;
     /** @var string[] */
-    public $reasonCodes;
+    private array $reasonCodes;
 
     // --- strict CONFIRM plan fields ---
-    /** @var string */
-    public $setupType;
-    /** @var float|null */
-    public $stopPrice;
-    /** @var float|null */
-    public $tp1Price;
-    /** @var float|null */
-    public $rrEst;
+    private string $setupType;
+    private ?float $stopPrice;
+    private ?float $tp1Price;
+    private ?float $rrEst;
     /** @var array<int,array<string,mixed>> */
-    public $executionSlices;
+    private array $executionSlices;
 
+    /**
+     * @param string $ticker
+     * @param bool $hasPosition
+     * @param int $score
+     * @param int $rank
+     * @param int|null $entryTrigger
+     * @param EntryBandDto $entryBand
+     * @param CandidateTimingDto $timing
+     * @param int $slices
+     * @param float[] $slicePct
+     * @param string[] $reasonCodes
+     * @param string $setupType
+     * @param float|null $stopPrice
+     * @param float|null $tp1Price
+     * @param float|null $rrEst
+     * @param array<int,array<string,mixed>> $executionSlices
+     */
     public function __construct(
         $ticker,
         $hasPosition,
@@ -183,10 +193,8 @@ class CandidateDto
         );
     }
 
-    
     /**
      * Return a copy with execution_slices replaced.
-     * Keeps DTO immutable in practice (no mutation after construction).
      *
      * @param array<int,array<string,mixed>> $executionSlices
      * @return self
@@ -215,7 +223,7 @@ class CandidateDto
     /**
      * @return array<string,mixed>
      */
-    public function toArray()
+    public function toArray(): array
     {
         $a = [
             'ticker' => $this->ticker,
