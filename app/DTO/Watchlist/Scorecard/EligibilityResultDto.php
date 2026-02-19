@@ -1,9 +1,6 @@
 <?php
 
 namespace App\DTO\Watchlist\Scorecard;
-
-use App\Trade\Explain\ReasonCatalog;
-
 /**
  * Per-ticker eligibility result.
  * Output schema is LOCKED by docs/watchlist/scorecard.md.

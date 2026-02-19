@@ -134,10 +134,6 @@ class CandidateDto
         }
 
         $guards = CandidateGuardsDto::fromArray($guardsArr, ($guardsFallback instanceof CandidateGuardsDto) ? $guardsFallback : null);
-        // Backward compat: max chase can be stored in levels.
-        if (isset($levels['max_chase_from_close_pct']) && is_numeric($levels['max_chase_from_close_pct']) && !isset($guardsArr['max_chase_pct'])) {
-            $guards = new CandidateGuardsDto((float)$levels['max_chase_from_close_pct'], $guards->gapUpBlockPct, $guards->spreadMaxPct);
-        }
 
         $timing = CandidateTimingDto::fromArray($timingArr);
 
