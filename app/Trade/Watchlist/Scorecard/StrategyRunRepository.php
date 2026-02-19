@@ -25,11 +25,16 @@ class StrategyRunRepository
     {
         $syn = new ExecutionSlicesSynthesizer();
 
-        $map = function (array $list) use ($syn) {
+        // CandidateDto no longer carries guards.* in the strict scorecard schema.
+        // Keep synthesis here (repo layer) and source thresholds from injected config (policy override aware).
+        $guards = $this->cfg->guardsForPolicy((string)$dto->policy);
+        $maxChasePct = (float)($guards['max_chase_pct'] ?? $this->cfg->maxChasePctDefault);
+
+        $map = function (array $list) use ($syn, $maxChasePct) {
             $out = [];
             foreach ($list as $c) {
                 if (!$c instanceof CandidateDto) continue;
-                $slices = $syn->synthesizeIfMissing((array)$c->executionSlices, $c->entryTrigger, (float)$c->guards->maxChasePct);
+                $slices = $syn->synthesizeIfMissing((array)$c->executionSlices, $c->entryTrigger, $maxChasePct);
                 $out[] = $c->withExecutionSlices($slices);
             }
             return $out;
