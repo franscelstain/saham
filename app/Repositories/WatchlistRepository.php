@@ -170,7 +170,21 @@ class WatchlistRepository
         }
     }
 
+    
     /**
+     * Public wrapper for last N distinct OHLC trade dates.
+     * This is used as a fallback when market_calendar is unavailable.
+     *
+     * SRP note: Engine must not query DB directly; this keeps DB access in Repository.
+     *
+     * @return string[] dates ascending
+     */
+    public function lastNOhlcDatesFallback(string $endDate, int $n, bool $includeEnd = true): array
+    {
+        return $this->lastNOhlcDates($endDate, $n, $includeEnd);
+    }
+
+/**
      * Build list of last N distinct trade dates from OHLC table.
      * Fallback if market_calendar isn't available.
      *

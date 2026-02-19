@@ -114,7 +114,12 @@ class AppServiceProvider extends ServiceProvider
                 (float) config('trade.watchlist.corporate_action.suspect_ratio_max', 1.80),
                 (float) config('trade.watchlist.candle.long_wick_pct', 0.55),
                 (bool) config('trade.watchlist.confirm_enabled', true),
-                $confirmGuards
+                $confirmGuards,
+                (int) config('trade.watchlist.policies.weekly_swing.signal_recent_days', 5),
+                (array) config('trade.watchlist.policies.weekly_swing.signal_codes', []),
+                (array) config('trade.watchlist.policies.weekly_swing.avoid_reason_codes', []),
+                (array) config('trade.watchlist.group_semantics', []),
+                (array) config('trade.watchlist.universe', [])
             );
         });
 

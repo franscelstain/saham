@@ -314,12 +314,11 @@ class WatchlistEngine
         // This prevents watch_only from exploding by processing the entire market.
         $relevantTickerIds = [];
         if (strtoupper((string)$policy) === 'WEEKLY_SWING') {
-            $n = (int) (config('trade.watchlist.policies.weekly_swing.signal_recent_days') ?? 5);
-            if ($n < 1) $n = 1;
+            $n = max(1, (int) $this->cfg->weeklySwingSignalRecentDays());
 
             // Allowlist of actionable signal codes. DO NOT use signal_code<>0 as a marker,
             // because many datasets use a non-zero default (commonly "1").
-            $signalCodes = (array) (config('trade.watchlist.policies.weekly_swing.signal_codes') ?? []);
+            $signalCodes = (array) $this->cfg->weeklySwingSignalCodes();
             $signalCodes = array_values(array_filter(array_map('intval', $signalCodes), fn($v) => $v > 0));
 
             // Prefer market_calendar for trading-day windows; fallback to OHLC distinct dates.
@@ -332,15 +331,8 @@ class WatchlistEngine
             }
 
             if (empty($datesWindow)) {
-                $op = '<=';
-                $rows = \DB::table('ticker_ohlc_daily')
-                    ->select('trade_date')
-                    ->where('trade_date', $op, (string)$eodDate)
-                    ->distinct()
-                    ->orderByDesc('trade_date')
-                    ->limit($n)
-                    ->pluck('trade_date');
-                foreach ($rows as $d) { $datesWindow[] = (string)$d; }
+                // Repository fallback (SRP: Engine must not query DB directly)
+                $datesWindow = $this->watchRepo->lastNOhlcDatesFallback((string)$eodDate, $n, true);
             }
 
             if (!empty($datesWindow)) {
@@ -369,12 +361,6 @@ class WatchlistEngine
                     continue;
                 }
             }
-
-            $this->derivedBuilder->enrich($ci);
-            // labels are part of output contract; keep mapping out of DTO (docs/DTO.md)
-            $ci->decisionLabel = LabelCatalog::decision($ci->decisionCode);
-            $ci->signalLabel = LabelCatalog::signal($ci->signalCode);
-            $ci->volumeLabel = LabelCatalog::volumeLabel($ci->volumeLabelCode);
             $row = $this->buildCandidate(
                 $ci,
                 $policy,
@@ -545,7 +531,7 @@ class WatchlistEngine
 
         // --- Group semantics cutoffs (anti salah tafsir) ---
         // score_total is 0..1 (NOT percent). All cutoffs/top_cut are computed on score_total (0..1).
-        $gs = (array) (config('trade.watchlist.group_semantics') ?? []);
+        $gs = (array) ($this->cfg->groupSemantics() ?? []);
         // Guard anti salah tafsir: values below are fractions (0..1), not percent (0..100).
         foreach (['toppick_min_score','toppick_score_gap','secondary_min_score','watch_only_min_score'] as $k) {
             if (array_key_exists($k, $gs) && is_numeric($gs[$k]) && (float)$gs[$k] > 1.0) {
@@ -634,7 +620,7 @@ class WatchlistEngine
             // For WEEKLY_SWING: avoid is reserved for HARD AVOID reasons (liquidity/tick/volatility).
             // Quality fails like RR too low / trend gate fail are surfaced as WATCH_ONLY (monitoring), not AVOID.
             if (strtoupper((string)$policy) === 'WEEKLY_SWING') {
-                $avoidReasonCodes = (array) config('trade.watchlist.policies.weekly_swing.avoid_reason_codes', []);
+                $avoidReasonCodes = (array) $this->cfg->weeklySwingAvoidReasonCodes();
                 // NOTE: policy validators store reason codes as string arrays under plan.reason_codes
                 // (and sometimes under plan.eligibility_block_codes). The strict contract reasons[]
                 // objects are mapped later, so we must NOT rely on row.reasons here.
@@ -2014,10 +2000,12 @@ class WatchlistEngine
         if ($atr14 === null || !is_numeric($atr14) || (float)$atr14 <= 0) return null;
 
         // Universe gates (docs/watchlist/watchlist.md): liquidity, price sanity, extreme volatility.
-        $minPrice = (float)config('trade.watchlist.universe.min_price', 50);
-        $maxAtrPct = (float)config('trade.watchlist.universe.max_atr_pct_universe', 0.20);
-        $minDv20 = (float)config('trade.watchlist.universe.min_dv20_idr', 2000000000);
-        $minTurnover20 = (float)config('trade.watchlist.universe.min_turnover20_idr', 2000000000);
+        $u = (array) $this->cfg->universe();
+
+        $minPrice = (float) ($u['min_price'] ?? 50);
+        $maxAtrPct = (float) ($u['max_atr_pct_universe'] ?? 0.20);
+        $minDv20 = (float) ($u['min_dv20_idr'] ?? 2000000000);
+        $minTurnover20 = (float) ($u['min_turnover20_idr'] ?? 2000000000);
 
         if ($close < $minPrice) return null;
 
