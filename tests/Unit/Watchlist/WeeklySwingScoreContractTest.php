@@ -15,7 +15,6 @@ use App\Trade\Pricing\FeeConfig;
 use App\Trade\Pricing\TickLadderConfig;
 use App\Trade\Pricing\TickRule;
 use App\Trade\Support\TradeClockConfig;
-use App\Trade\Watchlist\CandidateDerivedMetricsBuilder;
 use App\Trade\Watchlist\Config\ScorecardConfig;
 use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
 use App\Trade\Watchlist\Contracts\PolicyDocLocator;
@@ -311,8 +310,6 @@ class WeeklySwingScoreContractTest extends TestCase
         $feeCfg = new FeeConfig(0.0015, 0.0025, 0.0, 0.0, 0.0005);
         $clockCfg = new TradeClockConfig('Asia/Jakarta', 16, 0);
         $scorecardCfg = new ScorecardConfig(false, 0.01, 0.015, 0.004, '09:00', '15:50');
-        $metricsBuilder = new CandidateDerivedMetricsBuilder($cfg);
-
         $watchRepo = new class($candidate, $canonicalReady) extends WatchlistRepository {
             private CandidateInput $c;
             private bool $ok;
@@ -399,7 +396,6 @@ class WeeklySwingScoreContractTest extends TestCase
                 case FeeConfig::class: $args[] = $feeCfg; break;
                 case TradeClockConfig::class: $args[] = $clockCfg; break;
                 case ScorecardConfig::class: $args[] = $scorecardCfg; break;
-                case CandidateDerivedMetricsBuilder::class: $args[] = $metricsBuilder; break;
                 case WatchlistPolicyConfig::class: $args[] = $cfg; break;
                 case PolicyDocLocator::class: $args[] = $policyDocs; break;
                 default:

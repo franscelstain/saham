@@ -11,7 +11,6 @@ use App\Trade\Support\TradeClock;
 use App\Trade\Support\TradeClockConfig;
 use App\Trade\Support\TradePerf;
 use App\Trade\Support\TradePerfConfig;
-use App\Trade\Watchlist\CandidateDerivedMetricsBuilder;
 use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
 use Illuminate\Support\ServiceProvider;
 
@@ -121,10 +120,6 @@ class AppServiceProvider extends ServiceProvider
                 (array) config('trade.watchlist.group_semantics', []),
                 (array) config('trade.watchlist.universe', [])
             );
-        });
-
-        $this->app->singleton(CandidateDerivedMetricsBuilder::class, function ($app) {
-            return new CandidateDerivedMetricsBuilder($app->make(WatchlistPolicyConfig::class));
         });
     }
 

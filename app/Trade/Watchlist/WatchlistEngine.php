@@ -50,7 +50,6 @@ class WatchlistEngine
     private PreopenContractValidator $preopenValidator;
     private SetupTypeClassifier $setupClassifier;
 
-    private CandidateDerivedMetricsBuilder $derivedBuilder;
     private TradeClockConfig $clockCfg;
     private WatchlistPolicyConfig $cfg;
     private ScorecardConfig $scorecardCfg;
@@ -75,8 +74,7 @@ class WatchlistEngine
         TradeClockConfig $clockCfg,
         WatchlistPolicyConfig $cfg,
         ScorecardConfig $scorecardCfg,
-        PolicyDocLocator $policyDocs,
-        CandidateDerivedMetricsBuilder $derivedBuilder
+        PolicyDocLocator $policyDocs
     ) {
         $this->watchRepo = $watchRepo;
         $this->breadthRepo = $breadthRepo;
@@ -92,7 +90,6 @@ class WatchlistEngine
         $this->cfg = $cfg;
         $this->scorecardCfg = $scorecardCfg;
         $this->policyDocs = $policyDocs;
-        $this->derivedBuilder = $derivedBuilder;
 
         $this->preopenValidator = new PreopenContractValidator();
         $this->setupClassifier = new SetupTypeClassifier();

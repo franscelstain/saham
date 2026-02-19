@@ -468,7 +468,6 @@ class WatchlistRepository
             ->orderBy('t.ticker_code', 'asc');
 
         // IMPORTANT: return DTO objects, not arrays.
-        // CandidateDerivedMetricsBuilder::enrich() expects CandidateInput.
         // Using Collection::toArray() would call CandidateInput::toArray() and
         // convert each DTO into an array, causing a TypeError.
         return $q->get()

@@ -14,7 +14,6 @@ use App\Trade\Pricing\FeeConfig;
 use App\Trade\Pricing\TickLadderConfig;
 use App\Trade\Pricing\TickRule;
 use App\Trade\Support\TradeClockConfig;
-use App\Trade\Watchlist\CandidateDerivedMetricsBuilder;
 use App\Trade\Watchlist\Config\ScorecardConfig;
 use App\Trade\Watchlist\Config\WatchlistPolicyConfig;
 use App\Trade\Watchlist\Contracts\PolicyDocLocator;
@@ -303,8 +302,6 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
         $feeCfg = new FeeConfig(0.0015, 0.0025, 0.0, 0.0, 0.0005);
         $clockCfg = new TradeClockConfig('Asia/Jakarta', 16, 0);
         $scorecardCfg = new ScorecardConfig(false, 0.01, 0.015, 0.004, '09:00', '15:50');
-        $metricsBuilder = new CandidateDerivedMetricsBuilder($cfg);
-
         // Bare stubs; allocator test does not hit DB repos.
         $watchRepo = new class extends WatchlistRepository {
             public function __construct() {}
@@ -355,7 +352,6 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
                 case WatchlistPolicyConfig::class: $args[] = $cfg; break;
                 case ScorecardConfig::class: $args[] = $scorecardCfg; break;
                 case PolicyDocLocator::class: $args[] = $policyDocs; break;
-                case CandidateDerivedMetricsBuilder::class: $args[] = $metricsBuilder; break;
                 default:
                     $args[] = $p->isDefaultValueAvailable() ? $p->getDefaultValue() : null;
                     break;
