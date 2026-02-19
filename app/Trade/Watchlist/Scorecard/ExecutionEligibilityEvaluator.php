@@ -364,7 +364,7 @@ if ($hasPlace) {
                 $computed['gap_pct'],
                 $computed['spread_pct'],
                 $computed['chase_pct'],
-                ['CF_OK'],
+                $this->reasonsFromCodes(['CF_OK']),
                 '',
                 'APPROVE',
                 null,
@@ -431,7 +431,7 @@ if ($hasPlace) {
             $computed['gap_pct'] ?? null,
             $computed['spread_pct'] ?? null,
             $computed['chase_pct'] ?? null,
-            $reasonCodes,
+            $this->reasonsFromCodes($reasonCodes),
             '',
             'REJECT',
             null,
@@ -478,7 +478,7 @@ if ($hasPlace) {
                 $computed['gap_pct'] ?? null,
                 $computed['spread_pct'] ?? null,
                 $computed['chase_pct'] ?? null,
-                $reasonCodes,
+                $this->reasonsFromCodes($reasonCodes),
                 '',
                 'REJECT',
                 null,
@@ -498,7 +498,7 @@ if ($hasPlace) {
             $computed['gap_pct'] ?? null,
             $computed['spread_pct'] ?? null,
             $computed['chase_pct'] ?? null,
-            $reasonCodes,
+            $this->reasonsFromCodes($reasonCodes),
             '',
             'DELAY',
             $next,
@@ -758,4 +758,24 @@ if ($hasPlace) {
 
         return null;
     }
+
+    /**
+     * Normalize legacy reason code lists into structured reason DTO payloads.
+     * DTOs must not perform mapping from string codes, so this stays in domain layer.
+     *
+     * @param array<int,mixed> $codes
+     * @return array<int,array<string,mixed>>
+     */
+    private function reasonsFromCodes(array $codes): array
+    {
+        $out = [];
+        foreach ($codes as $c) {
+            if (!is_string($c)) continue;
+            $c = strtoupper(trim($c));
+            if ($c === '') continue;
+            $out[] = ['code' => $c];
+        }
+        return $out;
+    }
+
 }

@@ -105,6 +105,66 @@ class EligibilityResultDto
     }
 
     /**
+     * Build DTO from array WITHOUT performing any domain mapping.
+     *
+     * Notes:
+     * - Legacy string reason codes are ignored here.
+     * - Structured reasons (array/object) are accepted as-is.
+     *
+     * @param array<string,mixed> $a
+     * @return self
+     */
+    public static function fromArray(array $a)
+    {
+        $ticker = (string)($a['ticker_code'] ?? ($a['ticker'] ?? ''));
+        $eligible = (bool)($a['eligible_now'] ?? ($a['is_eligible'] ?? false));
+        $decision = (string)($a['decision'] ?? 'REJECT');
+        $next = $a['next_check_at'] ?? ($a['nextCheckAt'] ?? null);
+
+        $flags = (isset($a['flags']) && is_array($a['flags'])) ? $a['flags'] : [];
+        $gap = $a['gap_pct'] ?? ($a['gapPct'] ?? null);
+        $spread = $a['spread_pct'] ?? ($a['spreadPct'] ?? null);
+        $chase = $a['chase_pct'] ?? ($a['chasePct'] ?? null);
+        $notes = (string)($a['notes'] ?? '');
+
+        $reasonsIn = (isset($a['reasons']) && is_array($a['reasons'])) ? $a['reasons'] : [];
+        $reasons = [];
+        foreach ($reasonsIn as $r) {
+            if ($r instanceof CandidateReasonDto) {
+                $reasons[] = $r;
+                continue;
+            }
+            if (is_array($r)) {
+                $reasons[] = CandidateReasonDto::fromArray($r);
+                continue;
+            }
+            // Ignore legacy string reasons here (DTO must not map domain codes).
+        }
+
+        $plan = (isset($a['plan']) && is_array($a['plan'])) ? $a['plan'] : [];
+        $computed = (isset($a['computed']) && is_array($a['computed'])) ? $a['computed'] : [];
+        $live = (isset($a['live']) && is_array($a['live'])) ? $a['live'] : [];
+        $orders = (isset($a['recommended_orders']) && is_array($a['recommended_orders'])) ? $a['recommended_orders'] : [];
+
+        return new self(
+            $ticker,
+            $eligible,
+            $flags,
+            $gap,
+            $spread,
+            $chase,
+            $reasons,
+            $notes,
+            $decision,
+            $next,
+            $plan,
+            $computed,
+            $live,
+            $orders
+        );
+    }
+
+    /**
      * Strict output.
      *
      * @return array<string,mixed>

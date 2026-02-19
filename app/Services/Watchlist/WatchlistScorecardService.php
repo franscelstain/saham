@@ -200,15 +200,10 @@ class WatchlistScorecardService
 
 
         $groups = (array)($payload['groups'] ?? []);
-        $guardsFallback = new \App\DTO\Watchlist\Scorecard\CandidateGuardsDto(
-            $this->cfg->maxChasePctDefault,
-            $this->cfg->gapUpBlockPctDefault,
-            $this->cfg->spreadMaxPctDefault
-        );
 
-        $top = $this->normalizeCandidateList($groups['top_picks'] ?? [], $guardsFallback);
-        $sec = $this->normalizeCandidateList($groups['secondary'] ?? [], $guardsFallback);
-        $wo = $this->normalizeCandidateList($groups['watch_only'] ?? [], $guardsFallback);
+        $top = $this->normalizeCandidateList($groups['top_picks'] ?? []);
+        $sec = $this->normalizeCandidateList($groups['secondary'] ?? []);
+        $wo  = $this->normalizeCandidateList($groups['watch_only'] ?? []);
 
         return StrategyRunDto::fromNormalized($tradeDate, $execDate, $policy, $mode, $generatedAt, $top, $sec, $wo);
     }
@@ -220,10 +215,9 @@ class WatchlistScorecardService
      */
     /**
      * @param mixed $rows
-     * @param \App\DTO\Watchlist\Scorecard\CandidateGuardsDto $guardsFallback
      * @return \App\DTO\Watchlist\Scorecard\CandidateDto[]
      */
-    private function normalizeCandidateList($rows, \App\DTO\Watchlist\Scorecard\CandidateGuardsDto $guardsFallback): array
+    private function normalizeCandidateList($rows): array
     {
         if (!is_array($rows)) return [];
         $out = [];
@@ -231,8 +225,9 @@ class WatchlistScorecardService
         $rank = 1;
         foreach ($rows as $cand) {
             if (!is_array($cand)) continue;
-            $dto = \App\DTO\Watchlist\Scorecard\CandidateDto::fromArray($cand, $guardsFallback, $rank);
-            $slices = $syn->synthesizeIfMissing((array)$dto->executionSlices, $dto->entryTrigger, (float)$dto->guards->maxChasePct);
+            $dto = \App\DTO\Watchlist\Scorecard\CandidateDto::fromArray($cand, $rank);
+            $maxChase = (float)$this->cfg->maxChasePctDefault;
+            $slices = $syn->synthesizeIfMissing((array)$dto->executionSlices, $dto->entryTrigger, $maxChase);
             $dto = $dto->withExecutionSlices($slices);
             if ($dto->ticker !== '') {
                 $out[] = $dto;
@@ -320,7 +315,15 @@ class WatchlistScorecardService
             if (!is_array($row)) continue;
             $computed = isset($row['computed']) && is_array($row['computed']) ? $row['computed'] : [];
             $flags = isset($row['flags']) && is_array($row['flags']) ? array_map('strval', $row['flags']) : [];
-            $rawReasons = isset($row['reasons']) && is_array($row['reasons']) ? $row['reasons'] : [];
+            $rawReasons = [];
+            if (isset($row['reasons'])) {
+                if (is_array($row['reasons'])) {
+                    $rawReasons = $row['reasons'];
+                } elseif (is_string($row['reasons']) && trim($row['reasons']) !== '') {
+                    // Backward-compat: single reason code as string.
+                    $rawReasons = [trim($row['reasons'])];
+                }
+            }
             $reasons = [];
             foreach ($rawReasons as $rr) {
                 if ($rr instanceof \App\DTO\Watchlist\Scorecard\CandidateReasonDto) {

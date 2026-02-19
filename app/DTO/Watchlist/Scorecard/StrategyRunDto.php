@@ -76,12 +76,10 @@ class StrategyRunDto
         }
         $generatedAt = $gen ?? '';
 
-        $guardsFallback = new CandidateGuardsDto($cfg->maxChasePctDefault, $cfg->gapUpBlockPctDefault, $cfg->spreadMaxPctDefault);
-
         $groups = is_array($payload['groups'] ?? null) ? $payload['groups'] : [];
-        $tp = self::buildCandidateList($groups['top_picks'] ?? [], $guardsFallback);
-        $sec = self::buildCandidateList($groups['secondary'] ?? [], $guardsFallback);
-        $wo = self::buildCandidateList($groups['watch_only'] ?? [], $guardsFallback);
+        $tp = self::buildCandidateList($groups['top_picks'] ?? []);
+        $sec = self::buildCandidateList($groups['secondary'] ?? []);
+        $wo = self::buildCandidateList($groups['watch_only'] ?? []);
 
         return new self($runId, $tradeDate, $execDate, $policy, $mode, $generatedAt, $tp, $sec, $wo);
     }
@@ -140,17 +138,16 @@ class StrategyRunDto
 
     /**
      * @param mixed $rows
-     * @param CandidateGuardsDto $guardsFallback
      * @return CandidateDto[]
      */
-    private static function buildCandidateList($rows, CandidateGuardsDto $guardsFallback)
+    private static function buildCandidateList($rows)
     {
         if (!is_array($rows)) return [];
         $out = [];
         $rank = 1;
         foreach ($rows as $cand) {
             if (!is_array($cand)) continue;
-            $dto = CandidateDto::fromArray($cand, $guardsFallback, $rank);
+            $dto = CandidateDto::fromArray($cand, $rank);
             if ($dto->ticker !== '') {
                 $out[] = $dto;
                 $rank++;

@@ -21,8 +21,6 @@ class CandidateDto
     public $entryTrigger;
     /** @var EntryBandDto */
     public $entryBand;
-    /** @var CandidateGuardsDto */
-    public $guards;
     /** @var CandidateTimingDto */
     public $timing;
     /** @var int */
@@ -51,7 +49,6 @@ class CandidateDto
         $rank,
         $entryTrigger,
         EntryBandDto $entryBand,
-        CandidateGuardsDto $guards,
         CandidateTimingDto $timing,
         $slices,
         array $slicePct,
@@ -68,7 +65,6 @@ class CandidateDto
         $this->rank = (int)$rank;
         $this->entryTrigger = ($entryTrigger === null) ? null : (int)$entryTrigger;
         $this->entryBand = $entryBand;
-        $this->guards = $guards;
         $this->timing = $timing;
         $this->slices = (int)$slices;
         $this->slicePct = array_values($slicePct);
@@ -83,18 +79,16 @@ class CandidateDto
 
     /**
      * @param array<string,mixed> $a
-     * @param CandidateGuardsDto|null $guardsFallback
      * @param int $fallbackRank
      * @return self
      */
-    public static function fromArray(array $a, $guardsFallback = null, $fallbackRank = 0)
+    public static function fromArray(array $a, $fallbackRank = 0)
     {
         $ticker = strtoupper(trim((string)($a['ticker'] ?? ($a['ticker_code'] ?? ''))));
 
         $pos = (is_array($a['position'] ?? null)) ? $a['position'] : [];
         $levels = (is_array($a['levels'] ?? null)) ? $a['levels'] : [];
         $timingArr = (is_array($a['timing'] ?? null)) ? $a['timing'] : [];
-        $guardsArr = (is_array($a['guards'] ?? null)) ? $a['guards'] : [];
         $bandArr = (is_array($a['entry_band'] ?? null)) ? $a['entry_band'] : [];
 
         // strict payload may wrap plan under ticker_plan
@@ -132,8 +126,6 @@ class CandidateDto
                 }
             }
         }
-
-        $guards = CandidateGuardsDto::fromArray($guardsArr, ($guardsFallback instanceof CandidateGuardsDto) ? $guardsFallback : null);
 
         $timing = CandidateTimingDto::fromArray($timingArr);
 
@@ -179,7 +171,6 @@ class CandidateDto
             $rank,
             $entryTrigger,
             $band,
-            $guards,
             $timing,
             $slices,
             $slicePct,
@@ -209,7 +200,6 @@ class CandidateDto
             $this->rank,
             $this->entryTrigger,
             $this->entryBand,
-            $this->guards,
             $this->timing,
             $this->slices,
             $this->slicePct,
@@ -234,7 +224,6 @@ class CandidateDto
             'rank' => (int)$this->rank,
             'entry_trigger' => $this->entryTrigger,
             'entry_band' => $this->entryBand->toArray(),
-            'guards' => $this->guards->toArray(),
             'timing' => $this->timing->toArray(),
             'slices' => (int)$this->slices,
             'slice_pct' => array_values($this->slicePct),

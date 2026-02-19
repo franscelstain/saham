@@ -21,7 +21,6 @@ use App\Trade\Watchlist\Support\WatchlistScoreScale;
 use App\Trade\Watchlist\Contracts\PolicyDocLocator;
 use App\Trade\Watchlist\Contracts\PreopenContractValidator;
 use App\DTO\Watchlist\Scorecard\CandidateDto;
-use App\DTO\Watchlist\Scorecard\CandidateGuardsDto;
 use App\DTO\Watchlist\Scorecard\StrategyRunDto;
 use App\DTO\Watchlist\Scorecard\LiveSnapshotDto;
 use App\DTO\Watchlist\Scorecard\LiveTickerDto;
@@ -1504,13 +1503,6 @@ class WatchlistEngine
 	    $sessionOpen = (string)($session['open_time'] ?? $this->scorecardCfg->sessionOpenTimeDefault);
 	    $sessionClose = (string)($session['close_time'] ?? $this->scorecardCfg->sessionCloseTimeDefault);
 
-	    $guardsFallback = new CandidateGuardsDto(
-	        (float)$this->scorecardCfg->maxChasePctDefault,
-	        (float)$this->scorecardCfg->gapUpBlockPctDefault,
-	        (float)$this->scorecardCfg->spreadMaxPctDefault,
-	        (float)$this->scorecardCfg->breakoutBandPctDefault
-	    );
-
 	    $evaluator = new ExecutionEligibilityEvaluator($this->scorecardCfg);
 	    $byTicker = [];
 
@@ -1540,9 +1532,10 @@ class WatchlistEngine
 	        $candArr['entry_trigger'] = isset($tp['plan_entry']) ? (float)$tp['plan_entry'] : null;
 	        $candArr['execution_slices'] = (array)($tp['execution_slices'] ?? []);
 
-	        $candDto = CandidateDto::fromArray($candArr, $guardsFallback, (int)($candArr['rank'] ?? 0));
+	        $candDto = CandidateDto::fromArray($candArr, (int)($candArr['rank'] ?? 0));
 	        $syn = new \App\Trade\Watchlist\Scorecard\ExecutionSlicesSynthesizer();
-	        $slices = $syn->synthesizeIfMissing((array)$candDto->executionSlices, $candDto->entryTrigger, (float)$candDto->guards->maxChasePct);
+	        $maxChase = (float)$this->scorecardCfg->maxChasePctDefault;
+	        $slices = $syn->synthesizeIfMissing((array)$candDto->executionSlices, $candDto->entryTrigger, $maxChase);
 	        $candDto = $candDto->withExecutionSlices($slices);
 	        $run = StrategyRunDto::fromNormalized(
 	            (string)($p['trade_date'] ?? ''),
