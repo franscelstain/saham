@@ -80,9 +80,9 @@ class WeeklySwingScoreContractTest extends TestCase
         $this->assertArrayHasKey('signal_code', $in);
         $this->assertArrayHasKey('volume_label_code', $in);
 
-        $this->assertSame($candidate->decisionCode, $in['decision_code']);
-        $this->assertSame($candidate->signalCode, $in['signal_code']);
-        $this->assertSame($candidate->volumeLabelCode, $in['volume_label_code']);
+        $this->assertSame($candidate->decisionCode(), $in['decision_code']);
+        $this->assertSame($candidate->signalCode(), $in['signal_code']);
+        $this->assertSame($candidate->volumeLabelCode(), $in['volume_label_code']);
     }
 
     public function testHardRuleFailStaysInPreopenAsAvoidNotExcluded(): void
@@ -250,27 +250,27 @@ class WeeklySwingScoreContractTest extends TestCase
     {
         // Mimic the core policy input built by WatchlistEngine::buildCandidate()
         return [
-            'ticker_id' => $c->tickerId,
-            'ticker_code' => $c->tickerCode,
+            'ticker_id' => $c->tickerId(),
+            'ticker_code' => $c->tickerCode(),
             // ensure policy gets the same pattern/signal classifiers that engine provides
-            'decision_code' => $c->decisionCode,
-            'signal_code' => $c->signalCode,
-            'volume_label_code' => $c->volumeLabelCode,
-            'open' => $c->open,
-            'high' => $c->high,
-            'low' => $c->low,
-            'close' => $c->close,
-            'ma20' => $c->ma20,
-            'ma50' => $c->ma50,
-            'ma200' => $c->ma200,
-            'atr14' => $c->atr14,
-            'atr_pct' => ($c->atr14 !== null && $c->close > 0) ? ((float)$c->atr14 / (float)$c->close) : null,
-            'vol_ratio' => $c->volRatio,
-            'dv20' => $c->dv20,
+            'decision_code' => $c->decisionCode(),
+            'signal_code' => $c->signalCode(),
+            'volume_label_code' => $c->volumeLabelCode(),
+            'open' => $c->open(),
+            'high' => $c->high(),
+            'low' => $c->low(),
+            'close' => $c->close(),
+            'ma20' => $c->ma20(),
+            'ma50' => $c->ma50(),
+            'ma200' => $c->ma200(),
+            'atr14' => $c->atr14(),
+            'atr_pct' => ($c->atr14() !== null && (float)$c->close() > 0) ? ((float)$c->atr14() / (float)$c->close()) : null,
+            'vol_ratio' => $c->volRatio(),
+            'dv20' => $c->dv20(),
 
-            'hh20' => $c->hh20,
-            'll5' => $c->ll5,
-            'roc20' => $c->roc20,
+            'hh20' => $c->hh20(),
+            'll5' => $c->ll5(),
+            'roc20' => $c->roc20(),
             'setup_type' => 'Base',
         ];
     }

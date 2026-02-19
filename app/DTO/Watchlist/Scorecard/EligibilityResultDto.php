@@ -105,6 +105,14 @@ class EligibilityResultDto
     }
 
     /**
+     * Phase 2B: prefer getters over public property access.
+     */
+    public function tickerCode(): string
+    {
+        return (string)$this->tickerCode;
+    }
+
+    /**
      * Build DTO from array WITHOUT performing any domain mapping.
      *
      * Notes:

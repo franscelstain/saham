@@ -223,6 +223,19 @@ class CandidateDto extends BaseDto
     /**
      * @return array<string,mixed>
      */
+    /**
+     * Phase 2B.2: forbid legacy property access (use getters).
+     */
+    public function __get($name)
+    {
+        throw new \LogicException('CandidateDto is immutable and does not expose public properties. Use getters like ticker(), score(), rank(), entryTrigger(), executionSlices(), etc.');
+    }
+
+    public function __isset($name): bool
+    {
+        return false;
+    }
+
     public function ticker(): string { return $this->ticker; }
     public function hasPosition(): bool { return (bool)$this->hasPosition; }
     public function score(): int { return (int)$this->score; }

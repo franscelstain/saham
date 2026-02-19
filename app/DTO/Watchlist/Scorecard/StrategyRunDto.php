@@ -105,6 +105,19 @@ class StrategyRunDto extends BaseDto
     /**
      * @return array<string,mixed>
      */
+    /**
+     * Phase 2B.2: forbid legacy property access (use getters).
+     */
+    public function __get($name)
+    {
+        throw new \LogicException('StrategyRunDto is immutable and does not expose public properties. Use getters like runId(), tradeDate(), policy(), topPicks(), etc.');
+    }
+
+    public function __isset($name): bool
+    {
+        return false;
+    }
+
     public function runId(): int { return (int)$this->runId; }
     public function tradeDate(): string { return $this->tradeDate; }
     public function execDate(): string { return $this->execDate; }

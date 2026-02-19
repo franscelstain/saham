@@ -86,13 +86,13 @@ class ExecutionEligibilityEvaluator
         foreach ($results as $r) {
             if (!$r instanceof EligibilityResultDto) continue;
             if ($r->decision === 'APPROVE') {
-                $recTicker = $r->tickerCode;
+                $recTicker = $r->tickerCode();
                 $recWhy = 'APPROVE: ada tranche yang bisa dieksekusi sekarang.';
                 break;
             }
         }
         if ($recTicker === null && isset($results[0]) && $results[0] instanceof EligibilityResultDto) {
-            $recTicker = $results[0]->tickerCode;
+            $recTicker = $results[0]->tickerCode();
             $recWhy = 'Tidak ada APPROVE; fokus ke ticker pertama untuk review.';
         }
 

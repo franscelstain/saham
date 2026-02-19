@@ -227,9 +227,9 @@ class WatchlistScorecardService
             if (!is_array($cand)) continue;
             $dto = \App\DTO\Watchlist\Scorecard\CandidateDto::fromArray($cand, $rank);
             $maxChase = (float)$this->cfg->maxChasePctDefault;
-            $slices = $syn->synthesizeIfMissing((array)$dto->executionSlices, $dto->entryTrigger, $maxChase);
+            $slices = $syn->synthesizeIfMissing((array)$dto->executionSlices(), $dto->entryTrigger(), $maxChase);
             $dto = $dto->withExecutionSlices($slices);
-            if ($dto->ticker !== '') {
+            if ($dto->ticker() !== '') {
                 $out[] = $dto;
                 $rank++;
             }
@@ -258,8 +258,8 @@ class WatchlistScorecardService
         // Update retry state (fail-soft)
         $this->bestEffortUpdateIntradayRetryState($execDate, $snapshot, $resultDto);
 
-        if ($run->runId > 0) {
-            $this->checkRepo->insertCheckFromDto($run->runId, $snapshot, $resultDto);
+        if ($run->runId() > 0) {
+            $this->checkRepo->insertCheckFromDto($run->runId(), $snapshot, $resultDto);
         }
 
         return $resultDto;
@@ -280,26 +280,26 @@ class WatchlistScorecardService
             throw new \RuntimeException("strategy run not found: $tradeDate/$execDate/$policy (source=$source)");
         }
 
-        if ($run->runId <= 0) throw new \RuntimeException('invalid run_id');
+        if ($run->runId() <= 0) throw new \RuntimeException('invalid run_id');
 
-        $latest = $this->checkRepo->getLatestCheckDto($run->runId);
+        $latest = $this->checkRepo->getLatestCheckDto($run->runId());
         $latestCheckDto = $latest ? $this->mapEligibilityCheckFromArray($latest->result) : null;
 
         // Repo call stays in service (orchestrator). Calculator stays pure.
         $tickers = [];
-        foreach (array_merge($run->topPicks, $run->secondary) as $c) {
-            if (is_object($c) && isset($c->ticker) && $c->ticker !== '') {
-                $tickers[] = (string)$c->ticker;
+        foreach (array_merge($run->topPicks(), $run->secondary()) as $c) {
+            if (is_object($c) && $c instanceof \App\DTO\Watchlist\Scorecard\CandidateDto && $c->ticker() !== '') {
+                $tickers[] = (string)$c->ticker();
             }
         }
         $tickers = array_values(array_unique($tickers));
         $ohlc = [];
-        if ($run->execDate !== '' && !empty($tickers)) {
-            $ohlc = $this->ohlcRepo->mapOhlcByTickerCodesForDate($run->execDate, $tickers);
+        if ($run->execDate() !== '' && !empty($tickers)) {
+            $ohlc = $this->ohlcRepo->mapOhlcByTickerCodesForDate($run->execDate(), $tickers);
         }
 
         $calc = $this->calculator->compute($run, $latestCheckDto, $ohlc);
-        $this->scoreRepo->upsertScorecardFromDto($run->runId, $calc);
+        $this->scoreRepo->upsertScorecardFromDto($run->runId(), $calc);
 
         return $calc;
     }

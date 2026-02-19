@@ -12,7 +12,8 @@ class SetupTypeClassifier
 {
     public function classify(CandidateInput $c): string
     {
-        $signal = (int) ($c->signalCode ?? 0);
+        // Phase 2B: CandidateInput is getter-only (immutable).
+        $signal = (int) ($c->signalCode() ?? 0);
 
         // mapping paling deterministik: ikuti LabelCatalog signalMap
         if (in_array($signal, [4, 5], true)) return 'Breakout';

@@ -113,6 +113,19 @@ class CandidateInput extends BaseDto
         $this->candle = isset($data['candle']) && is_array($data['candle']) ? $data['candle'] : null;
     }
 
+    /**
+     * Phase 2B.2: forbid legacy property access (use getters).
+     */
+    public function __get($name)
+    {
+        throw new \LogicException('CandidateInput is immutable and does not expose public properties. Use getters like tickerId(), close(), signalCode(), etc.');
+    }
+
+    public function __isset($name): bool
+    {
+        return false;
+    }
+
     public function tickerId(): int { return $this->tickerId; }
     public function tickerCode(): string { return $this->tickerCode; }
 
