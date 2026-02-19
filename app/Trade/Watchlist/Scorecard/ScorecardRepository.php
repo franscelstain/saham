@@ -9,7 +9,13 @@ class ScorecardRepository
 {
     public function upsertScorecardFromDto(int $runId, ScorecardMetricsDto $dto): void
     {
-        $this->upsertScorecard($runId, $dto->feasibleRate, $dto->fillRate, $dto->outcomeRate, $dto->payload);
+        $this->upsertScorecard(
+            $runId,
+            $dto->feasibleRate(),
+            $dto->fillRate(),
+            $dto->outcomeRate(),
+            $dto->payload()
+        );
     }
 
     private function upsertScorecard(int $runId, ?float $feasibleRate, ?float $fillRate, ?float $outcomeRate, array $payload = []): void
