@@ -17,6 +17,7 @@ use App\Trade\Watchlist\Scorecard\ScorecardMetricsCalculator;
 use App\Trade\Watchlist\Scorecard\ScorecardRepository;
 use App\Trade\Watchlist\Scorecard\StrategyCheckRepository;
 use App\Trade\Watchlist\Scorecard\StrategyRunRepository;
+use App\Trade\Watchlist\Scorecard\ExecutionSlicesSynthesizer;
 
 class WatchlistScorecardService
 {
@@ -226,10 +227,13 @@ class WatchlistScorecardService
     {
         if (!is_array($rows)) return [];
         $out = [];
+        $syn = new ExecutionSlicesSynthesizer();
         $rank = 1;
         foreach ($rows as $cand) {
             if (!is_array($cand)) continue;
             $dto = \App\DTO\Watchlist\Scorecard\CandidateDto::fromArray($cand, $guardsFallback, $rank);
+            $slices = $syn->synthesizeIfMissing((array)$dto->executionSlices, $dto->entryTrigger, (float)$dto->guards->maxChasePct);
+            $dto = $dto->withExecutionSlices($slices);
             if ($dto->ticker !== '') {
                 $out[] = $dto;
                 $rank++;
@@ -316,7 +320,30 @@ class WatchlistScorecardService
             if (!is_array($row)) continue;
             $computed = isset($row['computed']) && is_array($row['computed']) ? $row['computed'] : [];
             $flags = isset($row['flags']) && is_array($row['flags']) ? array_map('strval', $row['flags']) : [];
-            $reasons = isset($row['reasons']) && is_array($row['reasons']) ? array_map('strval', $row['reasons']) : [];
+            $rawReasons = isset($row['reasons']) && is_array($row['reasons']) ? $row['reasons'] : [];
+            $reasons = [];
+            foreach ($rawReasons as $rr) {
+                if ($rr instanceof \App\DTO\Watchlist\Scorecard\CandidateReasonDto) {
+                    $reasons[] = $rr;
+                    continue;
+                }
+                if (is_array($rr)) {
+                    $reasons[] = \App\DTO\Watchlist\Scorecard\CandidateReasonDto::fromArray($rr);
+                    continue;
+                }
+
+                $code = is_string($rr) ? strtoupper(trim($rr)) : (string)$rr;
+                if ($code === '') continue;
+
+                // Stable legacy mapping: keep it here (service), not inside DTO.
+                $lvl = ($code === 'CF_OK') ? 'INFO' : (strpos($code, 'CF_') === 0 ? 'SOFT_BLOCK' : 'INFO');
+
+                $reasons[] = new \App\DTO\Watchlist\Scorecard\CandidateReasonDto(
+                    $code,
+                    \App\Trade\Explain\ReasonCatalog::getMessage($code),
+                    $lvl
+                );
+            }
             $results[] = new EligibilityResultDto(
                 strtoupper(trim((string)($row['ticker'] ?? ''))),
                 (bool)($row['eligible_now'] ?? false),

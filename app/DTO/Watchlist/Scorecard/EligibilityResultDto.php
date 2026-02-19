@@ -98,14 +98,7 @@ class EligibilityResultDto
                 $this->reasons[] = CandidateReasonDto::fromArray($r);
                 continue;
             }
-            $code = (string)$r;
-            if ($code !== '') {
-                // Default severity_level mapping (LOCKED behavior):
-                // - CF_OK is INFO
-                // - other CF_* reasons are SOFT_BLOCK by default (can be refined in evaluator later)
-                $lvl = ($code === 'CF_OK') ? 'INFO' : (strpos($code, 'CF_') === 0 ? 'SOFT_BLOCK' : 'INFO');
-                $this->reasons[] = new CandidateReasonDto($code, ReasonCatalog::getMessage($code), $lvl);
-            }
+            // Ignore invalid reason entries (strict DTO contract).
         }
 
         $this->plan = $plan;

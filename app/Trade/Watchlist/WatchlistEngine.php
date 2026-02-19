@@ -1541,6 +1541,9 @@ class WatchlistEngine
 	        $candArr['execution_slices'] = (array)($tp['execution_slices'] ?? []);
 
 	        $candDto = CandidateDto::fromArray($candArr, $guardsFallback, (int)($candArr['rank'] ?? 0));
+	        $syn = new \App\Trade\Watchlist\Scorecard\ExecutionSlicesSynthesizer();
+	        $slices = $syn->synthesizeIfMissing((array)$candDto->executionSlices, $candDto->entryTrigger, (float)$candDto->guards->maxChasePct);
+	        $candDto = $candDto->withExecutionSlices($slices);
 	        $run = StrategyRunDto::fromNormalized(
 	            (string)($p['trade_date'] ?? ''),
 	            (string)($p['exec_trade_date'] ?? ''),

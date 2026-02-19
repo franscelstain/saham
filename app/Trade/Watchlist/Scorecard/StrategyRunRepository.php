@@ -3,6 +3,7 @@
 namespace App\Trade\Watchlist\Scorecard;
 
 use App\DTO\Watchlist\Scorecard\StrategyRunDto;
+use App\DTO\Watchlist\Scorecard\CandidateDto;
 use App\Trade\Watchlist\Config\ScorecardConfig;
 use Illuminate\Support\Facades\DB;
 
@@ -14,6 +15,37 @@ class StrategyRunRepository
     public function __construct(ScorecardConfig $cfg)
     {
         $this->cfg = $cfg;
+    }
+
+
+    /**
+     * Ensure backward-compatible execution_slices are present, without pushing synthesis logic into DTO.
+     */
+    private function normalizeRunDto(StrategyRunDto $dto): StrategyRunDto
+    {
+        $syn = new ExecutionSlicesSynthesizer();
+
+        $map = function (array $list) use ($syn) {
+            $out = [];
+            foreach ($list as $c) {
+                if (!$c instanceof CandidateDto) continue;
+                $slices = $syn->synthesizeIfMissing((array)$c->executionSlices, $c->entryTrigger, (float)$c->guards->maxChasePct);
+                $out[] = $c->withExecutionSlices($slices);
+            }
+            return $out;
+        };
+
+        return new StrategyRunDto(
+            $dto->runId,
+            $dto->tradeDate,
+            $dto->execDate,
+            $dto->policy,
+            $dto->recommendationMode,
+            $dto->generatedAt,
+            $map((array)$dto->topPicks),
+            $map((array)$dto->secondary),
+            $map((array)$dto->watchOnly)
+        );
     }
 
     /**
@@ -112,7 +144,8 @@ class StrategyRunRepository
         $payload = json_decode((string)$row->payload_json, true);
         if (!is_array($payload)) return null;
 
-        return StrategyRunDto::fromPayloadArray($payload, (int)$row->run_id, $this->cfg);
+        $dto = StrategyRunDto::fromPayloadArray($payload, (int)$row->run_id, $this->cfg);
+        return $this->normalizeRunDto($dto);
     }
 
     private function getRunId(string $tradeDate, string $execDate, string $policy, string $source = 'watchlist'): int

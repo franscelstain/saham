@@ -173,17 +173,6 @@ class CandidateDto
             ];
         }
 
-        // If absent, synthesize a single tranche from entry_trigger and guards.max_chase_pct
-        if (empty($normSlices) && $entryTrigger !== null) {
-            $cap = (float)$entryTrigger * (1.0 + (float)$guards->maxChasePct);
-            $normSlices[] = [
-                'tranche' => 1,
-                'lots' => null,
-                'plan_limit_price' => (float)$entryTrigger,
-                'plan_price_cap' => $cap,
-            ];
-        }
-
         $slicePct = array_map('floatval', array_values($slicePct));
         $reasonCodes = array_map('strval', $reasonCodes);
 
@@ -204,6 +193,36 @@ class CandidateDto
             $tp1,
             $rr,
             $normSlices
+        );
+    }
+
+    
+    /**
+     * Return a copy with execution_slices replaced.
+     * Keeps DTO immutable in practice (no mutation after construction).
+     *
+     * @param array<int,array<string,mixed>> $executionSlices
+     * @return self
+     */
+    public function withExecutionSlices(array $executionSlices)
+    {
+        return new self(
+            $this->ticker,
+            $this->hasPosition,
+            $this->score,
+            $this->rank,
+            $this->entryTrigger,
+            $this->entryBand,
+            $this->guards,
+            $this->timing,
+            $this->slices,
+            $this->slicePct,
+            $this->reasonCodes,
+            $this->setupType,
+            $this->stopPrice,
+            $this->tp1Price,
+            $this->rrEst,
+            $executionSlices
         );
     }
 

@@ -163,9 +163,12 @@ class WeeklySwingScoreContractTest extends TestCase
         return $v;
     }
 
-    private function makeCandidateGood(): CandidateInput
+    private function makeCandidateGood(array $overrides = []): CandidateInput
     {
-        $c = new CandidateInput([
+        $data = [
+            'signal_code' => 5,
+            'decision_code' => 5,
+            'volume_label_code' => 4,
             'ticker_id' => 1,
             'ticker_code' => 'BBCA',
             'open' => 1000,
@@ -188,43 +191,45 @@ class WeeklySwingScoreContractTest extends TestCase
             'roc20' => 0.10,
             // Canonical liquidity field is dv20_idr (average daily traded value 20d in IDR)
             'dv20_idr' => 50_000_000_000,
-            // Also keep dv20 for backward compatibility in some code paths.
+            // Keep dv20 for backward compatibility in some code paths.
             'dv20' => 50_000_000_000,
-        ]);
-        $c->decisionCode = 5;
-        $c->signalCode = 5; // s_pattern=1.0
-        $c->volumeLabelCode = 4;
-        return $c;
+        ];
+
+        foreach ($overrides as $k => $v) {
+            $data[$k] = $v;
+        }
+
+        return new CandidateInput($data);
     }
 
     private function makeCandidateHardFailDv20(): CandidateInput
     {
-        $c = $this->makeCandidateGood();
         // Must pass Universe liquidity gate (default 2B) but fail WEEKLY_SWING policy gate (5B)
-        $c->dv20 = 3_000_000_000;
-        $c->dv20 = 3_000_000_000;
-        return $c;
+        return $this->makeCandidateGood([
+            'dv20_idr' => 3_000_000_000,
+            'dv20' => 3_000_000_000,
+        ]);
     }
+
 
 
     private function makeCandidateHardFailRr(): CandidateInput
     {
-        $c = $this->makeCandidateGood();
         // Make RR too low: widen R by pushing ll5 lower so stop gets much lower.
-        $c->ll5 = 900;
-        return $c;
+        return $this->makeCandidateGood(['ll5' => 900]);
     }
+
 
     private function makeCandidateTrendGateFail(): CandidateInput
     {
-        $c = $this->makeCandidateGood();
-        // Force close < ma20 and ma20 < ma50 so both condA/condB fail.
-        $c->ma20 = 1100;
-        $c->ma50 = 1200;
-        // Keep hh20 so resistance20 exists but close is still below it.
-        $c->hh20 = 1300;
-        return $c;
+        // Force close < ma20 and ma20 < ma50 so both condA/condB fail, and keep hh20 so resistance20 exists.
+        return $this->makeCandidateGood([
+            'ma20' => 1100,
+            'ma50' => 1200,
+            'hh20' => 1300,
+        ]);
     }
+
 
     private function candidateToPolicyInput(CandidateInput $c): array
     {
@@ -242,11 +247,11 @@ class WeeklySwingScoreContractTest extends TestCase
             'atr14' => $c->atr14,
             'atr_pct' => ($c->atr14 !== null && $c->close > 0) ? ((float)$c->atr14 / (float)$c->close) : null,
             'vol_ratio' => $c->volRatio,
-            'dv20' => (property_exists($c, 'dv20') ? $c->dv20 : (property_exists($c, 'dv20_idr') ? $c->dv20_idr : null)),
+            'dv20' => $c->dv20,
+
             'hh20' => $c->hh20,
             'll5' => $c->ll5,
             'roc20' => $c->roc20,
-            'signal_code' => $c->signalCode,
             'setup_type' => 'Base',
         ];
     }

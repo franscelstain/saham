@@ -113,6 +113,9 @@ class WatchlistPreopenContractPerPolicyTest extends TestCase
         $clockCfg = new TradeClockConfig('Asia/Jakarta', 16, 0);
         $scorecardCfg = new ScorecardConfig(false, 0.01, 0.015, 0.004, '09:00', '15:50');
         $candidate = new CandidateInput([
+            'signal_code' => 7,
+            'decision_code' => 5,
+            'volume_label_code' => 4,
             'ticker_id' => 1,
             'ticker_code' => 'BBCA',
             'open' => 1000,
@@ -131,9 +134,6 @@ class WatchlistPreopenContractPerPolicyTest extends TestCase
             'll5' => 980,
             'dv20' => 50_000_000_000,
         ]);
-        $candidate->decisionCode = 5;
-        $candidate->signalCode = 7;
-        $candidate->volumeLabelCode = 4;
 
         $watchRepo = new class($candidate, $canonicalReady) extends WatchlistRepository {
             private CandidateInput $c;
