@@ -70,6 +70,21 @@ class WeeklySwingScoreContractTest extends TestCase
         $this->assertEqualsWithDelta($expected * 100.0, (float)($res['score'] ?? 0.0), 2.0);
     }
 
+    public function testCandidateToPolicyInputMustCarryClassifierFields(): void
+    {
+        $candidate = $this->makeCandidateGood();
+        $in = $this->candidateToPolicyInput($candidate);
+
+        // If these go missing, policy scoring will silently drift (e.g., s_pattern falls back to default).
+        $this->assertArrayHasKey('decision_code', $in);
+        $this->assertArrayHasKey('signal_code', $in);
+        $this->assertArrayHasKey('volume_label_code', $in);
+
+        $this->assertSame($candidate->decisionCode, $in['decision_code']);
+        $this->assertSame($candidate->signalCode, $in['signal_code']);
+        $this->assertSame($candidate->volumeLabelCode, $in['volume_label_code']);
+    }
+
     public function testHardRuleFailStaysInPreopenAsAvoidNotExcluded(): void
     {
         $candidate = $this->makeCandidateHardFailDv20();
