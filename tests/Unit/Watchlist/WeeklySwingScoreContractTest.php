@@ -237,6 +237,10 @@ class WeeklySwingScoreContractTest extends TestCase
         return [
             'ticker_id' => $c->tickerId,
             'ticker_code' => $c->tickerCode,
+            // ensure policy gets the same pattern/signal classifiers that engine provides
+            'decision_code' => $c->decisionCode,
+            'signal_code' => $c->signalCode,
+            'volume_label_code' => $c->volumeLabelCode,
             'open' => $c->open,
             'high' => $c->high,
             'low' => $c->low,
