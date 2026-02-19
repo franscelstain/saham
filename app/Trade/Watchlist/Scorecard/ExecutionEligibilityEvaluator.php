@@ -36,29 +36,29 @@ class ExecutionEligibilityEvaluator
         $planByTicker = [];
 
         $lists = [
-            'top' => $run->topPicks,
-            'secondary' => $run->secondary,
-            'watch' => $run->watchOnly,
+            'top' => $run->topPicks(),
+            'secondary' => $run->secondary(),
+            'watch' => $run->watchOnly(),
         ];
 
         foreach ($lists as $k => $arr) {
             if ($k === 'watch' && !$cfg->includeWatchOnly) continue;
             foreach ((array)$arr as $cand) {
                 if (!$cand || !($cand instanceof \App\DTO\Watchlist\Scorecard\CandidateDto)) continue;
-                $t = strtoupper(trim((string)$cand->ticker));
+                $t = strtoupper(trim((string)$cand->ticker()));
                 if ($t === '') continue;
                 $planByTicker[$t] = [
-                    'setup_type' => $cand->setupType,
-                    'entry_trigger' => ($cand->entryTrigger === null) ? null : (float)$cand->entryTrigger,
-                    'stop' => $cand->stopPrice,
-                    'tp1' => $cand->tp1Price,
-                    'rr_est' => $cand->rrEst,
-                    'execution_slices' => (array)$cand->executionSlices,
+                    'setup_type' => $cand->setupType(),
+                    'entry_trigger' => ($cand->entryTrigger() === null) ? null : (float)$cand->entryTrigger(),
+                    'stop' => $cand->stopPrice(),
+                    'tp1' => $cand->tp1Price(),
+                    'rr_est' => $cand->rrEst(),
+                    'execution_slices' => (array)$cand->executionSlices(),
                 ];
             }
         }
 
-        return $this->evaluateSnapshot($run->tradeDate, $run->execDate, $run->policy, $snapshot, $planByTicker);
+        return $this->evaluateSnapshot($run->tradeDate(), $run->execDate(), $run->policy(), $snapshot, $planByTicker);
     }
 
     /**

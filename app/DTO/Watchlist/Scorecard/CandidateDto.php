@@ -223,6 +223,23 @@ class CandidateDto extends BaseDto
     /**
      * @return array<string,mixed>
      */
+    public function ticker(): string { return $this->ticker; }
+    public function hasPosition(): bool { return (bool)$this->hasPosition; }
+    public function score(): int { return (int)$this->score; }
+    public function rank(): int { return (int)$this->rank; }
+    public function entryTrigger(): ?int { return $this->entryTrigger; }
+    public function entryBand(): EntryBandDto { return $this->entryBand; }
+    public function timing(): CandidateTimingDto { return $this->timing; }
+    public function slices(): int { return (int)$this->slices; }
+    public function slicePct(): array { return array_values($this->slicePct); }
+    public function reasonCodes(): array { return array_values($this->reasonCodes); }
+
+    public function setupType(): string { return $this->setupType; }
+    public function stopPrice(): ?float { return $this->stopPrice; }
+    public function tp1Price(): ?float { return $this->tp1Price; }
+    public function rrEst(): ?float { return $this->rrEst; }
+    public function executionSlices(): array { return array_values($this->executionSlices); }
+
     public function toArray(): array
     {
         $a = [

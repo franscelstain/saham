@@ -113,6 +113,50 @@ class CandidateInput extends BaseDto
         $this->candle = isset($data['candle']) && is_array($data['candle']) ? $data['candle'] : null;
     }
 
+    public function tickerId(): int { return $this->tickerId; }
+    public function tickerCode(): string { return $this->tickerCode; }
+
+    public function open(): ?float { return $this->open; }
+    public function high(): ?float { return $this->high; }
+    public function low(): ?float { return $this->low; }
+    public function close(): ?float { return $this->close; }
+    public function volume(): ?float { return $this->volume; }
+
+    public function prevOpen(): ?float { return $this->prevOpen; }
+    public function prevHigh(): ?float { return $this->prevHigh; }
+    public function prevLow(): ?float { return $this->prevLow; }
+    public function prevClose(): ?float { return $this->prevClose; }
+
+    public function scoreTotal(): ?float { return $this->scoreTotal; }
+    public function decisionCode(): ?int { return $this->decisionCode; }
+    public function signalCode(): ?int { return $this->signalCode; }
+    public function volumeLabelCode(): ?int { return $this->volumeLabelCode; }
+    public function signalAgeDays(): ?int { return $this->signalAgeDays; }
+    public function volSma20(): ?float { return $this->volSma20; }
+
+    public function ma20(): ?float { return $this->ma20; }
+    public function ma50(): ?float { return $this->ma50; }
+    public function ma200(): ?float { return $this->ma200; }
+    public function rsi14(): ?float { return $this->rsi14; }
+    public function atr14(): ?float { return $this->atr14; }
+    public function volRatio(): ?float { return $this->volRatio; }
+    public function support20d(): ?float { return $this->support20d; }
+    public function resistance20d(): ?float { return $this->resistance20d; }
+
+    public function dv20(): ?float { return $this->dv20; }
+    public function turnover20(): ?float { return $this->turnover20; }
+
+    public function hh20(): ?float { return $this->hh20; }
+    public function ll5(): ?float { return $this->ll5; }
+    public function roc20(): ?float { return $this->roc20; }
+
+    public function hh10(): ?float { return $this->hh10; }
+    public function ll3(): ?float { return $this->ll3; }
+    public function roc5(): ?float { return $this->roc5; }
+
+    public function liqBucket(): ?string { return $this->liqBucket; }
+    public function candle(): ?array { return $this->candle; }
+
     public function toArray(): array
     {
         return [

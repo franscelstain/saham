@@ -34,13 +34,13 @@ class ScorecardMetricsCalculator
         }
 
         // Fill rate: use EOD high/low on exec_date and compare against entry levels.
-        $candidates = array_merge($run->topPicks, $run->secondary);
+        $candidates = array_merge($run->topPicks(), $run->secondary());
         $filled = 0;
         $totalSlices = 0;
         $sliceDetails = [];
 
         foreach ($candidates as $cand) {
-            $t = $cand->ticker;
+            $t = $cand->ticker();
             if ($t === '' || empty($ohlcByTicker[$t])) continue;
 
             $day = $ohlcByTicker[$t];
@@ -62,7 +62,7 @@ class ScorecardMetricsCalculator
 
             $sliceDetails[] = [
                 'ticker' => $t,
-                'slices' => $cand->slices,
+                'slices' => $cand->slices(),
                 'slice_prices' => $prices,
                 'day_low' => $lo,
                 'day_high' => $hi,
@@ -73,8 +73,8 @@ class ScorecardMetricsCalculator
         if ($totalSlices > 0) $fill = $filled / $totalSlices;
 
         $payload = [
-            'policy' => $run->policy,
-            'exec_trade_date' => $run->execDate,
+            'policy' => $run->policy(),
+            'exec_trade_date' => $run->execDate(),
             'slice_details' => $sliceDetails,
         ];
 
@@ -90,11 +90,11 @@ class ScorecardMetricsCalculator
      */
     private function deriveSlicePrices($cand): array
     {
-        $entry = $cand->entryTrigger !== null ? (float)$cand->entryTrigger : null;
-        $low = $cand->entryBand->low !== null ? (float)$cand->entryBand->low : null;
-        $high = $cand->entryBand->high !== null ? (float)$cand->entryBand->high : null;
+        $entry = $cand->entryTrigger() !== null ? (float)$cand->entryTrigger() : null;
+        $low = $cand->entryBand()->low !== null ? (float)$cand->entryBand()->low : null;
+        $high = $cand->entryBand()->high !== null ? (float)$cand->entryBand()->high : null;
 
-        $slices = $cand->slices;
+        $slices = $cand->slices();
         if ($slices <= 1) {
             return $entry !== null ? [$entry] : [];
         }

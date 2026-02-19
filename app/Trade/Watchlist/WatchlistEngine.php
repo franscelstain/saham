@@ -352,7 +352,7 @@ class WatchlistEngine
 
             // Relevance gate: skip tickers without recent signal_code for WEEKLY_SWING.
             if (!empty($relevantTickerIds)) {
-                $tid = (int)($ci->tickerId ?? 0);
+                $tid = (int)$ci->tickerId();
                 if ($tid > 0 && !isset($relevantTickerIds[$tid])) {
                     continue;
                 }
@@ -1535,7 +1535,7 @@ class WatchlistEngine
 	        $candDto = CandidateDto::fromArray($candArr, (int)($candArr['rank'] ?? 0));
 	        $syn = new \App\Trade\Watchlist\Scorecard\ExecutionSlicesSynthesizer();
 	        $maxChase = (float)$this->scorecardCfg->maxChasePctDefault;
-	        $slices = $syn->synthesizeIfMissing((array)$candDto->executionSlices, $candDto->entryTrigger, $maxChase);
+	        $slices = $syn->synthesizeIfMissing((array)$candDto->executionSlices(), $candDto->entryTrigger(), $maxChase);
 	        $candDto = $candDto->withExecutionSlices($slices);
 	        $run = StrategyRunDto::fromNormalized(
 	            (string)($p['trade_date'] ?? ''),

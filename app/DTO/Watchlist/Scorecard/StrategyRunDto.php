@@ -105,6 +105,16 @@ class StrategyRunDto extends BaseDto
     /**
      * @return array<string,mixed>
      */
+    public function runId(): int { return (int)$this->runId; }
+    public function tradeDate(): string { return $this->tradeDate; }
+    public function execDate(): string { return $this->execDate; }
+    public function policy(): string { return $this->policy; }
+    public function recommendationMode(): string { return $this->recommendationMode; }
+    public function generatedAt(): string { return $this->generatedAt; }
+    public function topPicks(): array { return array_values($this->topPicks); }
+    public function secondary(): array { return array_values($this->secondary); }
+    public function watchOnly(): array { return array_values($this->watchOnly); }
+
     public function toPayloadArray(): array
     {
         $top = [];
@@ -148,7 +158,7 @@ class StrategyRunDto extends BaseDto
         foreach ($rows as $cand) {
             if (!is_array($cand)) continue;
             $dto = CandidateDto::fromArray($cand, $rank);
-            if ($dto->ticker !== '') {
+            if ($dto->ticker() !== '') {
                 $out[] = $dto;
                 $rank++;
             }
