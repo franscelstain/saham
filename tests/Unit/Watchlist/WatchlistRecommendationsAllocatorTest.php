@@ -270,21 +270,22 @@ class WatchlistRecommendationsAllocatorTest extends TestCase
             [2,3,4,5,6,7,8,9,10],
             ['WS_MIN_DV20_IDR','WS_MAX_TICK_PCT','WS_MIN_ATR_PCT'],
             [
-                'option' => 'A',
+                'option' => 'FIXED',
                 'toppick_max' => 10,
                 'secondary_max' => 10,
                 'watch_only_max' => 50,
                 'top_pick_max' => 10,
-                'toppick_min_score' => 0.70,
+                'toppick_min_score' => 0.66,
                 'toppick_score_gap' => 0.08,
-                'secondary_min_score' => 0.62,
+                'secondary_min_score' => 0.50,
                 'watch_only_min_score' => 0.50,
             ],
             [
                 'min_price' => 50,
-                'min_dv20_idr' => 2000000000,
-                'min_turnover20_idr' => 2000000000,
-                'max_atr_pct_universe' => 0.20,
+                'min_dv20_idr' => 3000000000,
+                'min_turnover20_idr' => 3000000000,
+                'max_atr_pct_universe' => 0.09,
+                'min_vol_ratio_universe' => 1.05,
             ]
         );
 
