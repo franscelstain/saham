@@ -547,10 +547,16 @@ class WatchlistEngine
         $top1 = $scores01[0] ?? 0.0;
         // NOTE (CONTRACT): top_pick_max is a DISPLAY/selection cap only.
         // It MUST NOT affect the cutoff formula (docs/watchlist group semantics Option A LOCKED).
-        // top_cut = max(TOPPICK_MIN_SCORE, S0 - TOPPICK_SCORE_GAP)
-        $scoreCutTop = max($toppickMin, ($top1 - $toppickGap));
-        if ($scoreCutTop < 0.0) $scoreCutTop = 0.0;
-        if ($scoreCutTop > 1.0) $scoreCutTop = 1.0;
+        // Option FIXED: top_cut = TOPPICK_MIN_SCORE (calibrated threshold)
+        // Option A (legacy): top_cut = max(TOPPICK_MIN_SCORE, S0 - TOPPICK_SCORE_GAP)
+        $gsOption = strtoupper((string)($gs['option'] ?? 'A'));
+        if ($gsOption === 'FIXED') {
+            $scoreCutTop = $toppickMin;
+        } else {
+            $scoreCutTop = max($toppickMin, ($top1 - $toppickGap));
+            if ($scoreCutTop < 0.0) $scoreCutTop = 0.0;
+            if ($scoreCutTop > 1.0) $scoreCutTop = 1.0;
+        }
 
 
         // --- Diagnostics / acceptance metrics (docs/watchlist/watchlist.md) ---
@@ -698,7 +704,7 @@ class WatchlistEngine
 			// Expose thresholds & unit conventions in *internal* payload to avoid score confusion in downstream UI/conditions.
 			// NOTE: strict preopen contract mapping intentionally ignores these extra meta keys.
 			$groupSemanticsMeta = [
-			    'option' => 'A',
+			    'option' => $gsOption,
 			    // score_total is FRACTION [0..1]. For display/scoring, score_0_100 is score_total * 100.
 			    'score_total_unit' => 'fraction_0_1',
 			    'score_0_100_unit' => 'percent_0_100',
@@ -1831,6 +1837,7 @@ class WatchlistEngine
                 $base['min_alloc_idr'] = 500000;
                 $base['min_lots'] = 1;
                 $base['min_net_edge_pct'] = 0.008;
+                $base['weights'] = (array) config('trade.watchlist.policies.weekly_swing.weights', []);
                 break;
             case 'DIVIDEND_SWING':
                 $base['risk_per_trade_pct'] = 0.0060;
@@ -1850,6 +1857,7 @@ class WatchlistEngine
                 $base['max_positions'] = 3;
                 $base['min_alloc_idr'] = 1000000;
                 $base['min_lots'] = 1;
+                $base['weights'] = (array) config('trade.watchlist.policies.position_trade.weights', []);
                 break;
             case 'NO_TRADE':
             default:
@@ -1999,12 +2007,19 @@ class WatchlistEngine
         $maxAtrPct = (float) ($u['max_atr_pct_universe'] ?? 0.20);
         $minDv20 = (float) ($u['min_dv20_idr'] ?? 2000000000);
         $minTurnover20 = (float) ($u['min_turnover20_idr'] ?? 2000000000);
+        $minVolRatio = (float) ($u['min_vol_ratio_universe'] ?? 0.0);
 
         if ($close < $minPrice) return null;
 
         $atrPctUniverse = ($close > 0 && $atr14 !== null && is_numeric($atr14)) ? ((float)$atr14 / (float)$close) : null;
         if ($atrPctUniverse === null) return null;
         if ($atrPctUniverse > $maxAtrPct) return null;
+
+        // Volume ratio gate (optional; enabled when min_vol_ratio_universe > 0)
+        if ($minVolRatio > 0.0) {
+            if ($volRatio === null || !is_numeric($volRatio)) return null;
+            if ((float)$volRatio < $minVolRatio) return null;
+        }
 
         // Liquidity gate (dv20_idr preferred, else turnover20_idr fallback) — both in IDR, same scale.
         // Backward-compat keys: dv20/turnover20 may appear in older fixtures.

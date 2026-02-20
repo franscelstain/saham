@@ -267,14 +267,28 @@ class WeeklySwingPolicy implements WatchlistPolicyInterface
             $invAtr = $atrPctF !== null ? (1.0 - $this->norm01($atrPctF, 0.01, 0.12)) : 0.0;
             $sRisk = $this->clamp01(0.5 * $invStop + 0.5 * $invAtr);
 
-            // LOCKED weights (docs/watchlist/1.contracts.md):
-            // pattern 0.30, trend 0.25, momentum 0.20, volume 0.15, risk 0.10
+            // Scoring weights sourced from ENV/config (calibrated via backtest), normalized at runtime.
+            $w = is_array($policyMeta['weights'] ?? null) ? (array)$policyMeta['weights'] : [];
+            $wTrend = (float)($w['w_trend'] ?? 0.25);
+            $wMom  = (float)($w['w_momentum'] ?? 0.20);
+            $wVol  = (float)($w['w_volume'] ?? 0.15);
+            $wBreak= (float)($w['w_breakout'] ?? 0.30); // breakout/pattern
+            $wRisk = (float)($w['w_risk'] ?? 0.10);
+
+            $sumW = max(1e-9, ($wTrend + $wMom + $wVol + $wBreak + $wRisk));
+            $wnTrend = $wTrend / $sumW;
+            $wnMom   = $wMom / $sumW;
+            $wnVol   = $wVol / $sumW;
+            $wnBreak = $wBreak / $sumW;
+            $wnRisk  = $wRisk / $sumW;
+
+            // Risk is a penalty (higher risk => lower score): subtract normalized risk component.
             $scoreTotal = $this->clamp01(
-                0.30 * $sPattern +
-                0.25 * $sTrend +
-                0.20 * $sMomentum +
-                0.15 * $sVolume +
-                0.10 * $sRisk
+                ($wnTrend * $sTrend) +
+                ($wnMom * $sMomentum) +
+                ($wnVol * $sVolume) +
+                ($wnBreak * $sPattern) -
+                ($wnRisk * (1.0 - $sRisk))
             );
         }
 

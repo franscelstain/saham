@@ -244,6 +244,17 @@ return [
                     array_map('intval', preg_split('/\s*,\s*/', (string) env('WATCHLIST_WS_SIGNAL_CODES', '2,3,4,5,6,7,8,9,10'), -1, PREG_SPLIT_NO_EMPTY)),
                     fn ($v) => $v > 0
                 )),
+
+                // Scoring weights (normalized at runtime; sum need not be 1.0).
+                // Source-of-truth: ENV (calibrated via backtest), fallback to defaults for safety.
+                'weights' => [
+                    'w_trend' => (float) env('WATCHLIST_WS_W_TREND', 0.25),
+                    'w_momentum' => (float) env('WATCHLIST_WS_W_MOMENTUM', 0.20),
+                    'w_volume' => (float) env('WATCHLIST_WS_W_VOLUME', 0.15),
+                    'w_breakout' => (float) env('WATCHLIST_WS_W_BREAKOUT', 0.30),
+                    'w_risk' => (float) env('WATCHLIST_WS_W_RISK', 0.10),
+                ],
+
             
                 // Reason-code based hard AVOID bucket for WEEKLY_SWING (docs/watchlist/policy/weekly_swing.md).
                 // Quality fails (RR too low / trend gate fail) should land in WATCH_ONLY, not AVOID.
@@ -252,6 +263,17 @@ return [
                     array_map('trim', preg_split('/\s*,\s*/', (string) env('WATCHLIST_WS_AVOID_REASON_CODES', 'WS_MIN_DV20_IDR,WS_MAX_TICK_PCT,WS_MIN_ATR_PCT'), -1, PREG_SPLIT_NO_EMPTY)),
                     fn ($v) => $v !== ''
                 )),
+            ],
+
+            'position_trade' => [
+                // Scoring weights (normalized at runtime; sum need not be 1.0).
+                'weights' => [
+                    'w_trend' => (float) env('WATCHLIST_PT_W_TREND', 0.30),
+                    'w_structure' => (float) env('WATCHLIST_PT_W_STRUCTURE', 0.25),
+                    'w_pattern' => (float) env('WATCHLIST_PT_W_PATTERN', 0.15),
+                    'w_volume' => (float) env('WATCHLIST_PT_W_VOLUME', 0.15),
+                    'w_risk' => (float) env('WATCHLIST_PT_W_RISK', 0.15),
+                ],
             ],
         ],
         // IMPORTANT: These are score_total fractions (0..1), not percent.
@@ -287,6 +309,13 @@ return [
         // NOTE: This is the preferred config source for CONFIRM.
         'scorecard' => [
             'include_watch_only' => (bool) env('WATCHLIST_SCORECARD_INCLUDE_WATCH_ONLY', false),
+
+            // DTO strict-ban (guardrail): only affects App\\DTO\\Watchlist\\Scorecard\\* via BaseDto.
+            // OFF by default so we can migrate callsites gradually.
+            'dto_strict_ban' => (bool) env('WATCHLIST_SCORECARD_DTO_STRICT_BAN', false),
+            // Optional: log every legacy access for cleanup.
+            'dto_legacy_log' => (bool) env('WATCHLIST_SCORECARD_DTO_LEGACY_LOG', false),
+
             // Defaults (LOCKED by docs/watchlist/scorecard.md)
             // NOTE: Per-policy overrides below are the real source; these defaults are only fallbacks.
             'max_chase_pct_default' => 0.010,

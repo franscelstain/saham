@@ -201,12 +201,27 @@ class PositionTradePolicy implements WatchlistPolicyInterface
             $invAtr  = 1.0 - $this->norm01Clamped($atrPct, 0.01, 0.12);
             $sRisk = $this->clamp01(0.5 * $invStop + 0.5 * $invAtr);
 
+            // Scoring weights sourced from ENV/config (calibrated via backtest), normalized at runtime.
+            $w = is_array($policyMeta['weights'] ?? null) ? (array)$policyMeta['weights'] : [];
+            $wTrend = (float)($w['w_trend'] ?? 0.30);
+            $wStruct = (float)($w['w_structure'] ?? 0.25);
+            $wPattern = (float)($w['w_pattern'] ?? 0.15);
+            $wVol = (float)($w['w_volume'] ?? 0.15);
+            $wRisk = (float)($w['w_risk'] ?? 0.15);
+
+            $sumW = max(1e-9, ($wTrend + $wStruct + $wPattern + $wVol + $wRisk));
+            $wnTrend = $wTrend / $sumW;
+            $wnStruct = $wStruct / $sumW;
+            $wnPattern = $wPattern / $sumW;
+            $wnVol = $wVol / $sumW;
+            $wnRisk = $wRisk / $sumW;
+
             $scoreTotal = $this->clamp01(
-                0.30 * $sTrend
-                + 0.25 * $sStructure
-                + 0.15 * $sPattern
-                + 0.15 * $sVolume
-                + 0.15 * $sRisk
+                ($wnTrend * $sTrend)
+                + ($wnStruct * $sStructure)
+                + ($wnPattern * $sPattern)
+                + ($wnVol * $sVolume)
+                + ($wnRisk * $sRisk)
             );
 
             // Soft labels
