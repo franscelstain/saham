@@ -2,6 +2,9 @@
 
 Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 
+> **Scope (LOCKED):** Dokumen ini mendefinisikan **schema output API/UI** (response payload) untuk ditampilkan ke user.
+> Ini **bukan** schema tabel/database maupun bentuk record persistence.
+> Field `meta` dan `items[]` adalah **view model** yang boleh berasal dari agregasi beberapa tabel/record (mis. plan_run/plan_item + metrics + confirm overlay).
 > Prinsip utama: **CONFIRM tidak boleh mengubah PLAN**. Output CONFIRM harus terpisah.
 
 ---
@@ -18,6 +21,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     "paramset_id": "string-or-int",
     "paramset_hash": "sha256-hex",
     "plan_hash": "sha256-hex",
+    "data_batch_hash": "sha256-hex",
     "generated_at": "YYYY-MM-DDTHH:MM:SSZ",
     "source": {
       "vendor": "string",
@@ -80,6 +84,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 - `meta.paramset_id`: identitas paramset yang dipakai (id/version).
 - `meta.paramset_hash`: hash paramset canonical (sha256 hex).
 - `meta.plan_hash`: hash PLAN canonical (sha256 hex) sesuai kontrak hash policy.
+- `meta.data_batch_hash`: hash batch data input (sha256 hex) yang dipakai membentuk PLAN (untuk audit/traceability).
 - `meta.generated_at`: timestamp saat PLAN dibuat.
 - `meta.source.coverage_ratio`: rasio coverage data yang dipakai untuk gate readiness (0..1).
 

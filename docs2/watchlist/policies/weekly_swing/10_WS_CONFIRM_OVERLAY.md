@@ -51,7 +51,6 @@ Tentukan label berdasarkan severity tertinggi dari reason CONFIRM:
 3) Else jika hanya ada reason severity **INFO** (contoh: `WS_SPR_NA`) ⇒ label **NEUTRAL**.
 4) Else (tidak ada reason) ⇒ label **CONFIRMED**.
 
- deterministik
 - DELAY: stale atau missing runtime price
 - CAUTION: ada warning drift/band/spread
 - CONFIRMED: tidak ada warning dan runtime ada

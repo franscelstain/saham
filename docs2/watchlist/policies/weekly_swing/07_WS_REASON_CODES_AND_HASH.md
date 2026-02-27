@@ -75,7 +75,7 @@ Ticker diurutkan: `ticker_id ASC`.
 
 **Human index only.** Source-of-truth tetap: `db/REASON_CODES_SEED.sql`.
 
-- `seed_sha256`: `ac919a05cf7a1b567a9029bf67963b6996b3c588014f470dd57a0c1fc493f269`
+- `seed_sha256`: d64dd6641f446317be3e62a789246210aadfaefea7ba3888b5b0a23528288fd3
 - `last_updated`: `2026-02-22`
 
 ## Reference

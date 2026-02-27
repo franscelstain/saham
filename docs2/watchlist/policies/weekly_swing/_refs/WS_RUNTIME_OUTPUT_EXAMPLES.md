@@ -4,9 +4,11 @@
 Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tidak berbeda-beda.
 
 ## Notes
-- Contoh ini bersifat ilustratif.
-- Struktur field harus mengikuti kontrak runtime yang dipakai implementasi.
-- Nilai angka hanya contoh, bukan rekomendasi trading.
+- **LOCKED:** File ini berisi dua jenis contoh:
+  - **API/UI RESPONSE**: contoh payload yang harus sesuai `WS_RUNTIME_OUTPUT_SCHEMA.md`.
+  - **PERSISTENCE RECORD**: contoh bentuk record `plan_run` / `plan_item` untuk audit/debug.
+- Contoh **PERSISTENCE RECORD** bukan kontrak UI, dan tidak wajib 1:1 dengan schema API/UI.
+- Kontrak payload API/UI yang wajib diikuti ada di `WS_RUNTIME_OUTPUT_SCHEMA.md`.
 
 ## Example A — plan_run
 ```json
@@ -18,7 +20,7 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "plan_trade_date": "2026-02-28",
   "param_set_id": 55,
   "run_status": "OK",
-  "data_batch_hash": "abc123def456",
+  "data_batch_hash": "d64dd6641f446317be3e62a789246210aadfaefea7ba3888b5b0a23528288fd3",
   "eligible_count": 87,
   "top_picks_count": 5,
   "secondary_count": 10,
@@ -144,7 +146,7 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "plan_trade_date": "2026-02-28",
   "param_set_id": 55,
   "run_status": "NO_TRADE",
-  "data_batch_hash": "def789ghi012",
+  "data_batch_hash": "ac919a05cf7a1b567a9029bf67963b6996b3c588014f470dd57a0c1fc493f269",
   "eligible_count": 12,
   "top_picks_count": 0,
   "secondary_count": 0,
@@ -166,7 +168,7 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "plan_trade_date": "2026-02-28",
   "param_set_id": 55,
   "run_status": "ABORT",
-  "data_batch_hash": null,
+  "data_batch_hash": "0000000000000000000000000000000000000000000000000000000000000000",
   "eligible_count": 0,
   "top_picks_count": 0,
   "secondary_count": 0,
