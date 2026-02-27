@@ -228,12 +228,19 @@ class CandidateDto extends BaseDto
      */
     public function __get($name)
     {
-        throw new \LogicException('CandidateDto is immutable and does not expose public properties. Use getters like ticker(), score(), rank(), entryTrigger(), executionSlices(), etc.');
+        // Guarded strict-ban (scoped in BaseDto to App\\DTO\\Watchlist\\Scorecard\\*).
+        // When strict-ban is OFF, allow legacy access through BaseDto (ReflectionProperty) to avoid breaking callsites.
+        if ($this->shouldStrictBanLegacyAccess()) {
+            throw new \LogicException('CandidateDto is immutable and does not expose public properties. Use getters like ticker(), score(), rank(), entryTrigger(), executionSlices(), etc.');
+        }
+
+        return parent::__get($name);
     }
 
     public function __isset($name): bool
     {
-        return false;
+        if ($this->shouldStrictBanLegacyAccess()) return false;
+        return parent::__isset($name);
     }
 
     public function ticker(): string { return $this->ticker; }

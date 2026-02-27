@@ -110,12 +110,19 @@ class StrategyRunDto extends BaseDto
      */
     public function __get($name)
     {
-        throw new \LogicException('StrategyRunDto is immutable and does not expose public properties. Use getters like runId(), tradeDate(), policy(), topPicks(), etc.');
+        // Guarded strict-ban (scoped in BaseDto to App\\DTO\\Watchlist\\Scorecard\\*).
+        // When strict-ban is OFF, allow legacy access through BaseDto (ReflectionProperty) to avoid breaking callsites.
+        if ($this->shouldStrictBanLegacyAccess()) {
+            throw new \LogicException('StrategyRunDto is immutable and does not expose public properties. Use getters like runId(), tradeDate(), policy(), topPicks(), etc.');
+        }
+
+        return parent::__get($name);
     }
 
     public function __isset($name): bool
     {
-        return false;
+        if ($this->shouldStrictBanLegacyAccess()) return false;
+        return parent::__isset($name);
     }
 
     public function runId(): int { return (int)$this->runId; }

@@ -1,0 +1,29 @@
+-- 04_DB_SEED_GLOBAL.sql
+-- Seed global tables for Watchlist platform (lintas policy)
+-- Catatan: struktur tabel global dibuat oleh 05_DB_DDL_MARIADB.sql; file ini hanya melakukan INSERT seed.
+
+-- A) FAIL CODES (global)
+INSERT INTO watchlist_fail_codes (fail_code, scope, severity, description_id) VALUES
+('PLAN_ABORT_PARAMSET_INVALID','PLAN','ERROR','Param set tidak valid / tidak match policy_version.'),
+('PLAN_ABORT_CALENDAR_MISSING','PLAN','ERROR','Market calendar tidak tersedia untuk menentukan target trading day.'),
+('PLAN_ABORT_DATA_INCOMPLETE','PLAN','ERROR','Batch data tidak lengkap menurut readiness/coverage rules policy.'),
+('PLAN_ABORT_ALREADY_EXISTS','PLAN','ERROR','PLAN untuk target date ini sudah ada; gunakan mode rerun jika ingin buat ulang.'),
+('PLAN_ABORT_LOCK_TIMEOUT','PLAN','ERROR','Gagal memperoleh lock eksekusi PLAN.'),
+('PLAN_ABORT_HASH_FAILED','PLAN','ERROR','Gagal menghitung data_batch_hash.'),
+('PLAN_ABORT_DB_WRITE_FAILED','PLAN','ERROR','Gagal menulis snapshot PLAN (DB error).'),
+('CONFIRM_ABORT_NO_ACTIVE_PLAN','CONFIRM','ERROR','Tidak ada PLAN aktif untuk target date ini.'),
+('CONFIRM_ABORT_PARAMSET_INVALID','CONFIRM','ERROR','Param set pada plan_run tidak valid / mismatch.'),
+('CONFIRM_ABORT_DB_WRITE_FAILED','CONFIRM','ERROR','Gagal menulis hasil CONFIRM ke database.');
+
+-- B) REASON CODES (global; per policy_code)
+CREATE TABLE IF NOT EXISTS watchlist_reason_codes (
+  policy_code VARCHAR(16) NOT NULL,
+  reason_code VARCHAR(64) NOT NULL,
+  scope ENUM('PLAN','CONFIRM') NOT NULL,
+  severity ENUM('INFO','WARN','BLOCK') NOT NULL,
+  short_id VARCHAR(32) NOT NULL,
+  description_id TEXT NOT NULL,
+  description_en TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (policy_code, reason_code)
+) ENGINE=InnoDB;

@@ -1,0 +1,155 @@
+# 06 — ParamSet Validator Spec — WS_EOD_PLAN_CONFIRM
+
+## Purpose
+Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika gagal.
+
+## Prerequisites
+### Weekly Swing
+05_WS_PARAMETER_REGISTRY_COMPLETE.md
+
+## Inputs
+- params_json WS
+
+## Process
+
+### 1) JSON & identity
+- params_json valid JSON object
+- policy_code='WS'
+- policy_version='WS_EOD_PLAN_CONFIRM'
+- schema_version='PARAMSET_JSON'
+
+### 2) Enum rules
+- origin enum: DET, MAN, BT, DET+MAN, MAN+BT, DET+BT
+- status enum: ACTIVE, TEMP, DEPRECATED
+- TEMP => bt_target=true
+- origin=BT => status != TEMP
+
+### 3) Type rules (ringkas)
+- boolean: reject_if_eod_incomplete, enabled flags, no_trade_hides_all
+- number: thresholds, weights, bounds
+- integer: dv20_idr, counts, dp scales
+- string: *mode keys
+- array: exclude_tickers, sort_keys
+
+### 4) Numeric sanity
+Liquidity:
+- min_dv20_idr > 0
+- dv20_strong_idr > min_dv20_idr
+
+ATR:
+- min_atr14_pct > 0
+- max_atr14_pct > min_atr14_pct
+- atr_ideal_low >= min_atr14_pct
+- atr_ideal_high <= max_atr14_pct
+- atr_ideal_low <= atr_ideal_high
+
+Momentum:
+- roc_lo < roc_hi
+
+Breakout:
+- bo_near_below_pct > 0
+- bo_max_ext_pct > 0
+
+Weights:
+- all weights >= 0
+- sum(weights) > 0
+
+Caps / targets ordering:
+- top_picks_target >= 0
+- secondary_target >= 0
+- Dynamic targets are derived per-run and may be 0 only under explicit stop condition (NO_TRADE).
+
+Plan:
+- entry_band_pct > 0
+Risk:
+- stop_atr_mult > 0
+- min_rr > 0
+
+Confirm:
+- confirm_overlay.snapshot_max_age_sec > 0
+- confirm_overlay.max_drift_from_entry_pct > 0
+- confirm_overlay.spread_max_pct > 0
+
+No Trade:
+- no_trade.min_eligible_count >= 1
+
+Outlier:
+- if enabled: max_abs_return_1d_pct > 0, max_high_low_range_1d_pct > 0
+- data_contract.required_fields (required, list non-empty)
+- data_contract.required_sources (required, list non-empty)
+- data_contract.disabled_fields (optional, list)
+
+### 5) Locked invariants (must match exact)
+- scoring.combine_mode.value == 'NORM_WEIGHTED_SUM_CLAMP01'
+- grouping.grouping_mode.value == 'QUALIFIED_POOLS_QUANTILE_CUTOFF'
+- grouping.rounding_mode.value == 'FLOOR'
+- setup.bo_trigger_mode.value == 'CLOSE_GT_HH20'
+- risk.stop_mode.value == 'ATR'
+- plan_levels.entry_mode.value == 'BREAKOUT'
+- no_trade.no_trade_hides_all.value == true
+
+sort_keys exact order:
+1) score_total_desc
+2) score_breakout_desc
+3) score_momentum_desc
+4) dv20_idr_desc
+5) atr14_pct_asc
+6) ticker_id_asc
+
+hash_contract lock:
+- order_by == 'ticker_id_asc'
+- null_handling == 'EXCLUDE_FROM_HASH_PAYLOAD'
+- scales dp:
+  - close_price_dp=4
+  - hh20_dp=4
+  - roc20_dp=6
+  - atr14_pct_dp=4
+  - dv20_idr_dp=0
+
+Catatan LOCKED: nilai dp ini **harus identik** dengan definisi di `07_WS_REASON_CODES_AND_HASH.md` dan test vector hash di sana.
+
+## Outputs
+- PASS/FAIL + daftar error.
+
+### Data readiness: coverage gate (LOCKED)
+
+- Required: `data_readiness.min_coverage_ratio`
+- Type: number
+- Range: `0.0 <= value <= 1.0`
+
+### Cutoff quantiles (LOCKED)
+
+- Required: `top_min_score_q`, `secondary_min_score_q`
+- Type: number
+- Range: `0.0 <= value <= 1.0`
+
+Relasi (LOCKED):
+- `top_min_score_q >= secondary_min_score_q`
+
+### NO_TRADE gate (LOCKED)
+- Required: no_trade.min_eligible_count
+- Type: integer
+- Range: value >= 1
+
+Rasional: TOP_PICKS harus punya cutoff minimal yang **tidak lebih longgar** daripada SECONDARY.
+
+## Plan immutability check (LOCKED)
+
+Tujuan: memastikan implementasi tidak pernah “menyentuh” PLAN saat menjalankan CONFIRM.
+
+Contract check:
+- Input: satu `plan_record` (hasil PLAN yang tersimpan) + runtime input CONFIRM.
+- Hitung `plan_hash_before` dari `plan_record` (menggunakan canonical hash contract).
+- Jalankan CONFIRM overlay.
+- Hitung `plan_hash_after` dari `plan_record` yang sama.
+- Wajib: `plan_hash_before == plan_hash_after`.
+
+Catatan:
+- Check ini bukan validasi paramset; ini **contract test/invariant** untuk pipeline eksekusi.
+
+## Reference
+- `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`
+
+## Next
+### Weekly Swing
+- 07_WS_REASON_CODES_AND_HASH.md

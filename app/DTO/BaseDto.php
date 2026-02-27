@@ -27,22 +27,29 @@ abstract class BaseDto
      */
     public function __get($name)
     {
-        if (!is_string($name) || $name === '') {
-            trigger_error('Invalid DTO property access', E_USER_NOTICE);
-            return null;
+        if ($this->shouldStrictBanLegacyAccess()) {
+            throw new \LogicException(static::class . " blocks legacy property access ($name). Use getters.");
         }
 
-        $rc = new \ReflectionClass($this);
-        if (!$rc->hasProperty($name)) {
-            // mimic native behaviour
-            $cls = $rc->getName();
-            trigger_error("Undefined property: {$cls}::\${$name}", E_USER_NOTICE);
-            return null;
+        // guardrail: kalau masih pakai legacy access, log biar kamu bisa bersihin callsite bertahap
+        if ($this->shouldLogLegacyAccess()) {
+            // jangan spam log production kalau nggak mau; bisa gate by env
+            \Log::warning(static::class . " legacy property access: $" . "dto->$name", [
+                'class' => static::class,
+                'field' => $name,
+            ]);
         }
 
-        $rp = $rc->getProperty($name);
-        $rp->setAccessible(true);
-        return $rp->getValue($this);
+        $method = $this->getterMethodName($name);
+        if (method_exists($this, $method)) {
+            return $this->$method();
+        }
+
+        throw new \InvalidArgumentException(sprintf(
+            'Property "%s" does not exist on %s',
+            $name,
+            static::class
+        ));
     }
 
     /**
@@ -87,5 +94,27 @@ abstract class BaseDto
     public function toArray(): array
     {
         return [];
+    }
+
+    protected function shouldStrictBanLegacyAccess(): bool
+    {
+        // hanya scope ke Scorecard DTO
+        if (strpos(static::class, 'App\\DTO\\Watchlist\\Scorecard\\') !== 0) {
+            return false;
+        }
+
+        return (bool) config('trade.watchlist.scorecard.dto_strict_ban', false);
+    }
+
+    protected function shouldLogLegacyAccess(): bool
+    {
+        if (strpos(static::class, 'App\\DTO\\Watchlist\\Scorecard\\') !== 0) {
+            return false;
+        }
+        // log cuma saat strict ban OFF (biar jadi “early warning” sebelum strict ON)
+        if ((bool) config('trade.watchlist.scorecard.dto_strict_ban', false)) {
+            return false;
+        }
+        return (bool) config('trade.watchlist.scorecard.dto_legacy_log', true);
     }
 }
