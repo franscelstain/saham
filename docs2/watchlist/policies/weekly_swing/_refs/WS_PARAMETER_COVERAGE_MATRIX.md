@@ -16,21 +16,19 @@ last_updated=2026-02-22
 
 | param_key | in_03 | in_09 | in_10 | used_in | provenance | default |
 |---|---:|---:|---:|---|---|---|
-| `confirm_overlay.enabled` | Y | Y | N |  | see 09 | see 03 |
-| `confirm_overlay.max_drift_from_entry_pct` | Y | Y | Y | 06 | see 09 | see 03 |
-| `confirm_overlay.snapshot_max_age_sec` | Y | Y | Y | 06,07 | see 09 | see 03 |
-| `confirm_overlay.spread_max_pct` | Y | Y | Y | 06,07 | see 09 | see 03 |
+| `confirm_overlay.max_drift_from_entry_pct` | Y | Y | Y | 06,10 | see 09 | see 03 |
+| `confirm_overlay.snapshot_max_age_sec` | Y | Y | Y | 06,07,10 | see 09 | see 03 |
+| `confirm_overlay.spread_max_pct` | Y | Y | Y | 06,07,10 | see 09 | see 03 |
 | `data_contract.disabled_fields` | Y | Y | Y | 06 | see 09 | see 03 |
 | `data_contract.required_fields` | Y | Y | Y | 06 | see 09 | see 03 |
 | `data_contract.required_sources` | Y | Y | Y | 06 | see 09 | see 03 |
-| `data_readiness.max_missing_bar_days_60d` | Y | Y | N |  | see 09 | see 03 |
+| `data_readiness.max_missing_bar_days_60d` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `data_readiness.min_coverage_ratio` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
-| `data_readiness.min_history_days` | Y | Y | N |  | see 09 | see 03 |
-| `data_readiness.outlier_ruleset.value.enabled` | Y | Y | N |  | see 09 | see 03 |
-| `data_readiness.outlier_ruleset.value.max_abs_return_1d_pct` | Y | Y | N |  | see 09 | see 03 |
-| `data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct` | Y | Y | N |  | see 09 | see 03 |
+| `data_readiness.min_history_days` | Y | Y | Y | 06,08 | see 09 | see 03 |
+| `data_readiness.outlier_ruleset.value.enabled` | Y | Y | Y | 06,08 | see 09 | see 03 |
+| `data_readiness.outlier_ruleset.value.max_abs_return_1d_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
+| `data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `data_readiness.reject_if_eod_incomplete` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
-| `grouping.display_caps.value` | Y | Y | N |  | see 09 | see 03 |
 | `grouping.grouping_mode` | Y | Y | Y | 06,12 | see 09 | see 03 |
 | `grouping.rounding_mode` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `grouping.sort_keys` | Y | Y | Y | 06,12 | see 09 | see 03 |
@@ -40,8 +38,6 @@ last_updated=2026-02-22
 | `liquidity.dv20_strong_idr` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `liquidity.exclude_tickers` | Y | Y | Y | 06,08,11 | see 09 | see 03 |
 | `liquidity.min_dv20_idr` | Y | Y | Y | 06,07,08 | see 09 | see 03 |
-| `meta.cost_model` | Y | Y | N |  | see 09 | see 03 |
-| `meta.dv20_unit` | Y | Y | N |  | see 09 | see 03 |
 | `no_trade.min_eligible_count` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
 | `no_trade.no_trade_hides_all.value` | Y | Y | Y | 06 | see 09 | see 03 |
 | `plan_levels.entry_band_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
@@ -60,7 +56,7 @@ last_updated=2026-02-22
 | `setup.bo_max_ext_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.bo_near_below_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.bo_trigger_mode.value` | Y | Y | Y | 06 | see 09 | see 03 |
-| `setup.mom_roc20_soft_min` | Y | Y | N |  | see 09 | see 03 |
+| `setup.mom_roc20_soft_min` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.roc_hi` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.roc_lo` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `top_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |

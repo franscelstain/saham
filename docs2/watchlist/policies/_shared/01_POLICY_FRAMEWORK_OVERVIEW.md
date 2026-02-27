@@ -9,4 +9,4 @@ Yang dianggap **global**:
 - Kontrak auditability (reason codes, fail codes, batch hash)
 
 Dokumen policy spesifik (contoh Weekly Swing) berada di:
-- `../weekly_swing/` (baca berurutan dari `../weekly_swing/01_WS_BOOK_OVERVIEW.md`).
+- `../weekly_swing/` (baca berurutan dari `../weekly_swing/01_WS_OVERVIEW.md`).

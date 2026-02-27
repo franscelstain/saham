@@ -85,6 +85,11 @@ Ticker diurutkan: `ticker_id ASC`.
 | code | scope | severity | message_id / default message | when emitted | fields to include |
 |---|---|---|---|---|---|
 | `WS_DATA_MISSING` | PLAN | BLOCK | data_missing / Data wajib tidak lengkap untuk ticker ini (field input minimal tidak tersedia). | Saat field input minimal untuk ticker tidak tersedia pada batch EOD. |  |
+| `WS_HIST_SHORT` | PLAN | BLOCK | hist_short / Histori data tidak cukup (min_history_days) sehingga ticker ditolak. | Saat jumlah bar historis ticker < data_readiness.min_history_days. | min_history_days, history_days |
+| `WS_MISSING_BARS_60D` | PLAN | BLOCK | missing_bars_60d / Data OHLC bolong melebihi batas pada 60 hari trading terakhir. | Saat missing bars pada 60 trading days terakhir > `data_readiness.max_missing_bar_days_60d`. | `max_missing_bar_days_60d`, `missing_bars_60d` |
+| `WS_OUTLIER_RET1D` | PLAN | BLOCK | outlier_ret1d / Outlier return 1 hari melebihi batas. | Saat enabled=true dan abs(ret_1d) > `max_abs_return_1d_pct`. | `max_abs_return_1d_pct`, `ret_1d_abs` |
+| `WS_OUTLIER_RANGE1D` | PLAN | BLOCK | outlier_range1d / Outlier range high-low 1 hari melebihi batas. | Saat enabled=true dan (high/low - 1) > `max_high_low_range_1d_pct`. | `max_high_low_range_1d_pct`, `range_1d` |
+| `WS_MOM_SOFT_MIN` | PLAN | WARN | mom_soft_min / Momentum (ROC20) di bawah ambang soft; skor momentum dinolkan. | Saat roc20 < `setup.mom_roc20_soft_min`. | `mom_roc20_soft_min`, `roc20` |
 | `WS_DATA_OUTLIER` | PLAN | BLOCK | data_outlier / Terdeteksi bar outlier (indikasi data korup/tidak wajar) sehingga ticker ditolak. | Saat bar/harga/indikator terdeteksi outlier (indikasi data korup/tidak wajar). |  |
 | `WS_EOD_ABORT` | PLAN | BLOCK | eod_abort / Batch data EOD dianggap tidak lengkap; PLAN dibatalkan (fail-fast). | Saat batch EOD dianggap tidak lengkap dan run PLAN dibatalkan (fail-fast). |  |
 | `WS_LIQ_FAIL` | PLAN | BLOCK | liq_fail / Likuiditas gagal: dv20 di bawah batas minimum. | Saat ticker gagal guard likuiditas (dv20_idr di bawah minimum). | `dv20_idr`, `min_dv20_idr` |

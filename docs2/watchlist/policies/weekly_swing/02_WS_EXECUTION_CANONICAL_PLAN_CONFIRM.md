@@ -10,7 +10,7 @@ Mendefinisikan eksekusi end-to-end WS secara deterministik:
 
 ## Prerequisites
 ### Weekly Swing
-01_WS_BOOK_OVERVIEW.md
+01_WS_OVERVIEW.md
 
 ## Inputs
 PLAN:

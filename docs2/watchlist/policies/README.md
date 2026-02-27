@@ -13,4 +13,4 @@
 - `weekly_swing/` (contoh policy yang tersedia saat ini) — dokumen spesifik policy.
 
 ## Katalog policy
-- `weekly_swing/` — Weekly Swing (EOD). Mulai dari `weekly_swing/01_WS_BOOK_OVERVIEW.md`.
+- `weekly_swing/` — Weekly Swing (EOD). Mulai dari `weekly_swing/01_WS_OVERVIEW.md`.

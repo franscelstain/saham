@@ -25,30 +25,33 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 - origin=BT => status != TEMP
 
 ### 3) Type rules (ringkas)
-- boolean: reject_if_eod_incomplete, enabled flags, no_trade_hides_all
+- boolean: data_readiness.reject_if_eod_incomplete, enabled flags, no_trade_hides_all
 - number: thresholds, weights, bounds
 - integer: dv20_idr, counts, dp scales
 - string: *mode keys
-- array: exclude_tickers, sort_keys
+- array: liquidity.exclude_tickers, grouping.sort_keys
 
 ### 4) Numeric sanity
 Liquidity:
-- min_dv20_idr > 0
-- dv20_strong_idr > min_dv20_idr
+- liquidity.min_dv20_idr > 0
+- liquidity.dv20_strong_idr > liquidity.min_dv20_idr
 
 ATR:
-- min_atr14_pct > 0
-- max_atr14_pct > min_atr14_pct
-- atr_ideal_low >= min_atr14_pct
-- atr_ideal_high <= max_atr14_pct
-- atr_ideal_low <= atr_ideal_high
+- risk.min_atr14_pct > 0
+- risk.max_atr14_pct > risk.min_atr14_pct
+- risk.atr_ideal_low >= risk.min_atr14_pct
+- risk.atr_ideal_high <= risk.max_atr14_pct
+- risk.atr_ideal_low <= risk.atr_ideal_high
 
 Momentum:
-- roc_lo < roc_hi
+- setup.roc_lo < setup.roc_hi
 
 Breakout:
-- bo_near_below_pct > 0
-- bo_max_ext_pct > 0
+- setup.bo_near_below_pct > 0
+- setup.bo_max_ext_pct > 0
+- setup.mom_roc20_soft_min is required
+- setup.mom_roc20_soft_min is number
+- -1 <= setup.mom_roc20_soft_min <= 1
 
 Weights:
 - all weights >= 0
@@ -60,10 +63,10 @@ Caps / targets ordering:
 - Dynamic targets are derived per-run and may be 0 only under explicit stop condition (NO_TRADE).
 
 Plan:
-- entry_band_pct > 0
+- plan_levels.entry_band_pct > 0
 Risk:
-- stop_atr_mult > 0
-- min_rr > 0
+- risk.stop_atr_mult > 0
+- risk.min_rr > 0
 
 Confirm:
 - confirm_overlay.snapshot_max_age_sec > 0
@@ -116,6 +119,25 @@ Catatan LOCKED: nilai dp ini **harus identik** dengan definisi di `07_WS_REASON_
 - Required: `data_readiness.min_coverage_ratio`
 - Type: number
 - Range: `0.0 <= value <= 1.0`
+
+- Required: `data_readiness.min_history_days`
+- Type: integer
+- Range: value >= 1
+
+- Required: `data_readiness.max_missing_bar_days_60d`
+- Type: integer
+- Range: value >= 0
+
+- Required: `data_readiness.outlier_ruleset.value.enabled`
+- Type: boolean
+
+- Required: `data_readiness.outlier_ruleset.value.max_abs_return_1d_pct`
+- Type: number
+- Range: 0 < value <= 1
+
+- Required: `data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct`
+- Type: number
+- Range: 0 < value <= 2
 
 ### Cutoff quantiles (LOCKED)
 

@@ -14,8 +14,6 @@ Daftar parameter WS yang **exhaustive**: semua yang boleh dipakai code. Jika cod
 Gunakan registry ini sebagai sumber kebenaran definisi per key.
 
 ### A. Meta & data contract
-- meta.dv20_unit (DET/ACTIVE)
-- meta.cost_model (MAN/ACTIVE)
 - data_contract.required_sources (DET/ACTIVE)
 - data_contract.required_fields.* (DET/ACTIVE)
 - data_contract.disabled_fields (DET+MAN/ACTIVE)
@@ -45,6 +43,7 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 
 ### E. Setup
 - setup.roc_lo (MAN/ACTIVE, bt_target=true)
+- setup.mom_roc20_soft_min + provenance + rationale + kapan diubah
 - setup.roc_hi (MAN/ACTIVE, bt_target=true)
 - setup.mom_roc20_soft_min (MAN/TEMP, bt_target=true)
 - setup.bo_trigger_mode (DET/ACTIVE)
@@ -63,7 +62,6 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - grouping.grouping_mode (DET/ACTIVE)
 - grouping.sort_keys (DET/ACTIVE, locked)
 - grouping.rounding_mode (DET/ACTIVE, locked)
-- grouping.display_caps.value.* (MAN/ACTIVE)
 
 ### H. Plan levels
 - plan_levels.entry_mode (DET+MAN/ACTIVE)
@@ -74,7 +72,6 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - no_trade.no_trade_hides_all (DET/ACTIVE, locked)
 
 ### J. Confirm overlay
-- confirm_overlay.enabled (DET/ACTIVE)
 - confirm_overlay.snapshot_max_age_sec (DET/ACTIVE)
 - confirm_overlay.max_drift_from_entry_pct (MAN/ACTIVE, bt_target=true)
 - confirm_overlay.spread_max_pct (MAN/ACTIVE, bt_target=true)
@@ -194,6 +191,15 @@ Catatan implementasi (LOCKED):
   Alasan: mencegah PLAN dibangun dari data EOD yang tidak lengkap sehingga output menyesatkan.  
   Kapan diubah: bila pipeline data berubah dan coverage realistis bergeser, atau jika audit menunjukkan false abort/false pass.  
   Cara ubah: ubah nilai di paramset dan jalankan contract tests.
+
+### Data history gate (DET) (LOCKED)
+- `data_readiness.min_history_days` + origin/rationale/change_triggers/cara ubah (format ikut gaya section  190–197)
+
+### Missing bars gate (MAN/BT) (LOCKED)
+- `data_readiness.max_missing_bar_days_60d` + origin/rationale/change_triggers/cara ubah
+
+### Outlier ruleset (DET/MAN) (LOCKED)
+- 3 key di atas + origin/rationale/change_triggers/cara ubah
 
 ### Confirm overlay thresholds (MAN) (LOCKED)
 

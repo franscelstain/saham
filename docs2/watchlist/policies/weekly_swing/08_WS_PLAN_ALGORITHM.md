@@ -19,6 +19,10 @@ Universe = semua ticker aktif (master tickers), dikurangi `liquidity.exclude_tic
 ### Step 1 — Data readiness
 Untuk setiap ticker:
 - required fields tersedia? jika tidak => AVOID + reason WS_DATA_MISSING
+- jika jumlah bar historis < data_readiness.min_history_days => AVOID + reason WS_HIST_SHORT
+- jika missing bars pada 60 trading days terakhir > data_readiness.max_missing_bar_days_60d => AVOID + reason WS_MISSING_BARS_60D
+- jika data_readiness.outlier_ruleset.value.enabled=true dan abs(ret_1d) > data_readiness.outlier_ruleset.value.max_abs_return_1d_pct => AVOID + reason WS_OUTLIER_RET1D
+- jika data_readiness.outlier_ruleset.value.enabled=true dan (high/low - 1) > data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct => AVOID + reason WS_OUTLIER_RANGE1D
 - outlier check (jika enabled) => AVOID + reason WS_DATA_OUTLIER
 Catatan: coverage check run-level dilakukan di execution (lihat `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`).
 
@@ -31,6 +35,7 @@ Jika salah satu gagal => AVOID:
 ### Step 3 — Compute component scores (0..1)
 WS memakai 4 komponen:
 1) score_momentum: clamp01((roc20 - roc_lo)/(roc_hi - roc_lo))
+   - jika roc20 < setup.mom_roc20_soft_min => set score_momentum = 0 dan tambah reason WS_MOM_SOFT_MIN
 2) score_breakout:
    - jika close >= hh20: 1.0 tapi turun jika extended (bo_max_ext_pct)
    - jika close < hh20: naik jika near (bo_near_below_pct)

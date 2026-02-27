@@ -44,7 +44,7 @@ Baca framework policy global (urut):
 - `policies/_shared/05_EXECUTION_CANONICAL_GLOBAL.md`
 
 Lalu baca policy Weekly Swing (urut):
-- `policies/weekly_swing/01_WS_BOOK_OVERVIEW.md`
+- `policies/weekly_swing/01_WS_OVERVIEW.md`
 - `policies/weekly_swing/02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
 - `policies/weekly_swing/03_WS_DATA_MODEL_MARIADB.md`
 - `policies/weekly_swing/04_WS_PARAMSET_JSON_CONTRACT.md`

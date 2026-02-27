@@ -3,28 +3,6 @@
   "policy_version": "WS_EOD_PLAN_CONFIRM",
   "schema_version": "PARAMSET_JSON",
 
-  "meta": {
-    "dv20_unit": {
-      "value": "IDR",
-      "origin": "DET",
-      "status": "ACTIVE",
-      "bt_target": false,
-      "rationale": "Unit canonical untuk DV20 di policy Weekly Swing.",
-      "change_triggers": []
-    },
-    "cost_model": {
-      "value": "FEE_SLIPPAGE_V1",
-      "origin": "MAN",
-      "status": "ACTIVE",
-      "bt_target": false,
-      "rationale": "Model biaya/slippage yang dipakai untuk evaluasi hasil net.",
-      "change_triggers": [
-        "Perubahan fee broker",
-        "Perubahan asumsi slippage"
-      ]
-    }
-  },
-
   "data_contract": {
     "required_sources": {
       "value": [
@@ -413,12 +391,6 @@
       ]
     },
     "display_caps": {
-      "value": {
-        "top_picks": 20,
-        "secondary": 30,
-        "watch_only": 50,
-        "avoid": 999
-      },
       "origin": "MAN",
       "status": "ACTIVE",
       "bt_target": false,
@@ -473,14 +445,6 @@
   },
 
   "confirm_overlay": {
-    "enabled": {
-      "value": true,
-      "origin": "DET",
-      "status": "ACTIVE",
-      "bt_target": false,
-      "rationale": "CONFIRM overlay adalah bagian canonical policy ini.",
-      "change_triggers": []
-    },
     "snapshot_max_age_sec": {
       "value": 300,
       "origin": "DET",

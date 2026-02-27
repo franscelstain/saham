@@ -26,12 +26,12 @@ hanya ticker yang PLAN display_bucket=SHOW (fokus).
 ### Compute checks
 1) drift_from_entry_pct:
    - dibandingkan entry_ref/entry band
-   - jika drift > max_drift_from_entry_pct => CAUTION (WS_DRIFT_FAR)
+   - jika drift > confirm_overlay.max_drift_from_entry_pct => CAUTION (WS_DRIFT_FAR)
 2) entry band check:
    - jika last_price di luar band => CAUTION (WS_OUT_BAND)
 3) spread check (jika bid/ask ada):
    - spread_pct = (ask-bid)/mid*100
-   - jika > spread_max_pct => CAUTION (WS_SPR_WIDE)
+   - jika > confirm_overlay.spread_max_pct => CAUTION (WS_SPR_WIDE)
    - jika bid/ask tidak ada => INFO (WS_SPR_NA)
 
 ### Label

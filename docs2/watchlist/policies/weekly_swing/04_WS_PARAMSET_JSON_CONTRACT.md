@@ -25,17 +25,16 @@ Mengunci struktur params_json WS agar code tidak memakai parameter implicit/hard
 
 ### 2) Key wajib WS (ringkas)
 WS wajib memiliki blok berikut:
-- meta (dv20_unit, cost_model)
 - data_contract (required_sources, required_fields, disabled_fields)
 - data_readiness (min_history_days, max_missing_bar_days_60d, reject_if_eod_incomplete, outlier_ruleset, min_coverage_ratio)
 - liquidity (min_dv20_idr, dv20_strong_idr, exclude_tickers)
 - risk (min/max atr14_pct, ideal band, stop_mode, stop_atr_mult, min_rr)
 - setup (roc bounds, bo trigger, near/ext bounds)
 - scoring (combine_mode, weights)
-- grouping (grouping_mode, sort_keys, rounding_mode, thresholds, percentiles, min_count_overrides, display_caps)
+- grouping (grouping_mode, sort_keys, rounding_mode, thresholds, percentiles, min_count_overrides)
 - plan_levels (entry_mode, entry_band_pct)
 - no_trade (min_eligible_count, no_trade_hides_all)
-- confirm_overlay (enabled, snapshot_max_age_sec, max_drift_from_entry_pct, spread_max_pct)
+- confirm_overlay (snapshot_max_age_sec, max_drift_from_entry_pct, spread_max_pct)
 - hash_contract (order_by, scales, null_handling)
 
 ### 3) Tambahan wajib deterministik (anti drift)
