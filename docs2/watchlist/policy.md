@@ -56,5 +56,11 @@ Lalu baca policy Weekly Swing (urut):
 - `policies/weekly_swing/10_WS_CONFIRM_OVERLAY.md`
 - `policies/weekly_swing/11_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md`
 - `policies/weekly_swing/12_WS_CONTRACT_TEST_CHECKLIST.md`
-- `policies/weekly_swing/13_WS_CANONICAL_PARAMSET_PROCEDURES.md`
+- `policies/weekly_swing/13_WS_BT_COVERAGE_MATRIX_LOCKED.md`
+- `policies/weekly_swing/14_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`
+- `policies/weekly_swing/15_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`
+- `policies/weekly_swing/16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`
+- `policies/weekly_swing/17_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`
+- `policies/weekly_swing/18_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md`
+- `policies/weekly_swing/19_WS_CANONICAL_PARAMSET_PROCEDURES.md`
 - `policies/_shared/06_SCHEMA_PARITY_RULES.md`

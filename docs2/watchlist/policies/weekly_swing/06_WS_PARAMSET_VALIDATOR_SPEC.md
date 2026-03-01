@@ -33,51 +33,51 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 
 ### 4) Numeric sanity
 Liquidity:
-- liquidity.min_dv20_idr > 0
-- liquidity.dv20_strong_idr > liquidity.min_dv20_idr
+- liquidity.min_dv20_idr.value > 0
+- liquidity.dv20_strong_idr.value > liquidity.min_dv20_idr.value
 
 ATR:
-- risk.min_atr14_pct > 0
-- risk.max_atr14_pct > risk.min_atr14_pct
-- risk.atr_ideal_low >= risk.min_atr14_pct
-- risk.atr_ideal_high <= risk.max_atr14_pct
-- risk.atr_ideal_low <= risk.atr_ideal_high
+- risk.min_atr14_pct.value > 0
+- risk.max_atr14_pct.value > risk.min_atr14_pct.value
+- risk.atr_ideal_low.value >= risk.min_atr14_pct.value
+- risk.atr_ideal_high.value <= risk.max_atr14_pct.value
+- risk.atr_ideal_low.value <= risk.atr_ideal_high.value
 
 Momentum:
-- setup.roc_lo < setup.roc_hi
+- setup.roc_lo.value < setup.roc_hi.value
 
 Breakout:
-- setup.bo_near_below_pct > 0
-- setup.bo_max_ext_pct > 0
-- setup.mom_roc20_soft_min is required
-- setup.mom_roc20_soft_min is number
-- -1 <= setup.mom_roc20_soft_min <= 1
+- setup.bo_near_below_pct.value > 0
+- setup.bo_max_ext_pct.value > 0
+- setup.mom_roc20_soft_min.value is required
+- setup.mom_roc20_soft_min.value is number
+- -1 <= setup.mom_roc20_soft_min.value <= 1
 
 Weights:
 - all weights >= 0
 - sum(weights) > 0
 
 Caps / targets ordering:
-- top_picks_target >= 0
-- secondary_target >= 0
+- grouping.top_picks_target.value >= 0
+- grouping.secondary_target.value >= 0
 - Dynamic targets are derived per-run and may be 0 only under explicit stop condition (NO_TRADE).
 
 Plan:
-- plan_levels.entry_band_pct > 0
+- plan_levels.entry_band_pct.value > 0
 Risk:
-- risk.stop_atr_mult > 0
-- risk.min_rr > 0
+- risk.stop_atr_mult.value > 0
+- risk.min_rr.value > 0
 
 Confirm:
-- confirm_overlay.snapshot_max_age_sec > 0
-- confirm_overlay.max_drift_from_entry_pct > 0
-- confirm_overlay.spread_max_pct > 0
+- confirm_overlay.snapshot_max_age_sec.value > 0
+- confirm_overlay.max_drift_from_entry_pct.value > 0
+- confirm_overlay.spread_max_pct.value > 0
 
 No Trade:
-- no_trade.min_eligible_count >= 1
+- no_trade.min_eligible_count.value >= 1
 
 Outlier:
-- if enabled: max_abs_return_1d_pct > 0, max_high_low_range_1d_pct > 0
+- if enabled: max_abs_return_1d_pct.value > 0, max_high_low_range_1d_pct.value > 0
 - data_contract.required_fields (required, list non-empty)
 - data_contract.required_sources (required, list non-empty)
 - data_contract.disabled_fields (optional, list)
@@ -141,12 +141,12 @@ Catatan LOCKED: nilai dp ini **harus identik** dengan definisi di `07_WS_REASON_
 
 ### Cutoff quantiles (LOCKED)
 
-- Required: `top_min_score_q`, `secondary_min_score_q`
+- Required: `grouping.top_min_score_q`, `grouping.secondary_min_score_q`
 - Type: number
 - Range: `0.0 <= value <= 1.0`
 
 Relasi (LOCKED):
-- `top_min_score_q >= secondary_min_score_q`
+- `grouping.top_min_score_q.value >= grouping.secondary_min_score_q.value`
 
 ### NO_TRADE gate (LOCKED)
 - Required: no_trade.min_eligible_count

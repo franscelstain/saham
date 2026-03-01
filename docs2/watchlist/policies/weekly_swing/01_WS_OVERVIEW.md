@@ -42,7 +42,13 @@ Policy ini menghasilkan:
 - 10: CONFIRM overlay WS
 - 11: Backtest schema & calibration WS
 - 12: Contract tests WS (tambahan di atas global)
-- 13: Canonical procedures WS (paramset promotion & active pick)
+- 13: BT Coverage Matrix (LOCKED)
+- 14: Universe & Data-Quality Equivalence Contract (LOCKED)
+- 15: Evaluation Metrics Sufficiency (LOCKED)
+- 16: Walk-forward / Out-of-Sample Proof (LOCKED)
+- 17: Backtest Artifact Manifest (LOCKED)
+- 18: Deprecated / Non-scope Artifacts Ledger
+- 19: Canonical procedures WS (paramset promotion & active pick)
 - Catatan: artefak SQL (seed/promote/backtest DDL) berada di folder `db/` pada level Weekly Swing.
 
 ## Artefak SQL

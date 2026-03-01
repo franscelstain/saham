@@ -71,8 +71,8 @@ Perhitungan:
 
 ## Step 4 — Grouping / Dynamic Selection
 Misal hasil hari itu:
-- `top_min_score_q = 0.80`
-- `secondary_min_score_q = 0.65`
+- `grouping.top_min_score_q.value = 0.80`
+- `grouping.secondary_min_score_q.value = 0.65`
 - `top_cutoff_today = 0.812000`
 - `secondary_cutoff_today = 0.701000`
 

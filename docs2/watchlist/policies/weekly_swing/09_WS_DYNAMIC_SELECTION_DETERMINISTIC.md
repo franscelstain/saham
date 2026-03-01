@@ -69,9 +69,9 @@ Urutan berikut **wajib** dan menjadi acuan implementasi:
 
 3) **Cutoff quantile (BT)**
    - Hitung cutoff dinamis harian dari distribusi `score_total`:
-     - `top_cutoff_today = quantile(score_total, top_min_score_q)`
-     - `secondary_cutoff_today = quantile(score_total, secondary_min_score_q)`
-   - `top_min_score_q` dan `secondary_min_score_q` berasal dari backtest (BT).
+     - `top_cutoff_today = quantile(score_total, grouping.top_min_score_q.value)`
+     - `secondary_cutoff_today = quantile(score_total, grouping.secondary_min_score_q.value)`
+   - `grouping.top_min_score_q` dan `grouping.secondary_min_score_q` berasal dari backtest (BT).
 
 4) **Qualified pools**
    - `top_pool = { ticker ∈ eligible_pool | score_total >= top_cutoff_today }`
@@ -92,12 +92,12 @@ Untuk semua ticker di eligible pool, hitung `score_total` (0..1).
 Agar kualitas tetap terjaga pada hari “skor rendah” maupun “skor tinggi”, cutoff untuk TOP/SECONDARY dihitung **dinamis** dari distribusi `score_total` hari itu.
 
 Parameter (asal-usul: **BT** via kalibrasi backtest 2 tahun):
-- `top_min_score_q` (0..1)
-- `secondary_min_score_q` (0..1)
+- `grouping.top_min_score_q` (0..1)
+- `grouping.secondary_min_score_q` (0..1)
 
 Definisi:
-- `top_cutoff_today = quantile(score_total eligible_pool, top_min_score_q)`
-- `secondary_cutoff_today = quantile(score_total eligible_pool, secondary_min_score_q)`
+- `top_cutoff_today = quantile(score_total eligible_pool, grouping.top_min_score_q.value)`
+- `secondary_cutoff_today = quantile(score_total eligible_pool, grouping.secondary_min_score_q.value)`
 
 Cutoff harian ini disimpan di `watchlist_plan_runs.run_metrics_json` untuk audit.
 
@@ -127,8 +127,8 @@ Jika `top_pool` kosong (mis. cutoff tinggi + core signals tidak terpenuhi), TOP_
 
 ## Target dinamis (LOCKED)
 Paramset menyimpan base target (MAN):
-- `top_picks_target`
-- `secondary_target`
+- `grouping.top_picks_target`
+- `grouping.secondary_target`
 
 Saat PLAN run, sistem menurunkan target dinamis per-run dan menyimpan ke `run_metrics_json`:
 - `top_picks_target_dynamic`

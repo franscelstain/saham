@@ -56,10 +56,10 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - `scoring.weights.value.{momentum,breakout,volume,risk}` (MAN/ACTIVE, bt_target=true)
 
 ### G. Grouping (dynamic selection)
-- `secondary_target` (MAN/ACTIVE)
-- `top_picks_target` (MAN/ACTIVE)
-- `secondary_min_score_q` (BT/ACTIVE, bt_target=true)
-- `top_min_score_q` (BT/ACTIVE, bt_target=true)
+- `grouping.secondary_target` (MAN/ACTIVE)
+- `grouping.top_picks_target` (MAN/ACTIVE)
+- `grouping.secondary_min_score_q` (BT/ACTIVE, bt_target=true)
+- `grouping.top_min_score_q` (BT/ACTIVE, bt_target=true)
 - `grouping.grouping_mode` (DET/ACTIVE)
 - `grouping.sort_keys` (DET/ACTIVE, locked)
 - `grouping.rounding_mode` (DET/ACTIVE, locked)
@@ -109,6 +109,10 @@ Parameter **tidak** diubah karena “feeling”. Ubah hanya jika ada sinyal obje
 - Origin **BT**: hanya boleh diubah via proses backtest calibration + promote ke paramset baru.
 - Origin **DET**: perubahan harus disertai reasoning tertulis (prinsip pasar) dan dites pada window historis minimum.
 - Origin **MAN**: perubahan boleh manual, tapi wajib tercatat (who/when/why) dan menghasilkan paramset baru.
+
+### Rule (LOCKED): BT origin must be proven
+Parameter boleh origin=BT hanya jika tercakup pada `13_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
+Jika tidak, origin wajib MAN/DET sampai coverage valid.
 
 ## Namespace rules (LOCKED)
 Catatan (LOCKED): di dokumen, `a.b.c` adalah notasi referensi; JSON paramset tetap nested (`{a:{b:{c:...}}}`).
@@ -319,25 +323,25 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 ### G. Grouping (dynamic selection)
 
-- `top_picks_target` (integer >= 0) — base target TOP_PICKS.
+- `grouping.top_picks_target` (integer >= 0) — base target TOP_PICKS.
   - Origin: MAN
   - Alasan: kontrol output (tidak overload).
   - Kapan diubah: kebutuhan output berubah.
   - Cara ubah: promote paramset baru.
 
-- `secondary_target` (integer >= 0) — base target SECONDARY.
+- `grouping.secondary_target` (integer >= 0) — base target SECONDARY.
   - Origin: MAN
   - Alasan: kandidat cadangan tanpa memaksa TOP.
   - Kapan diubah: kebutuhan coverage berubah.
   - Cara ubah: promote paramset baru.
 
-- `top_min_score_q` (0..1) — quantile cutoff TOP_PICKS.
+- `grouping.top_min_score_q` (0..1) — quantile cutoff TOP_PICKS.
   - Origin: BT
   - Alasan: cutoff adaptif terhadap distribusi score harian.
   - Kapan diubah: hanya via recalibration BT.
   - Cara ubah: kalibrasi BT → promote paramset.
 
-- `secondary_min_score_q` (0..1) — quantile cutoff SECONDARY.
+- `grouping.secondary_min_score_q` (0..1) — quantile cutoff SECONDARY.
   - Origin: BT
   - Alasan: menjaga kualitas SECONDARY.
   - Kapan diubah: hanya via recalibration BT.
@@ -428,6 +432,48 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Alasan: determinisme hash saat ada null.
   - Kapan diubah: bila policy null berubah (breaking change).
   - Cara ubah: ubah di paramset + contract tests.
+
+### L. Evaluation (backtest & OOS)
+
+- `ws.eval.min_trades_oos` (integer >= 0) — minimum jumlah trade di OOS agar proof tidak bias sample kecil.
+  - Origin: DET
+  - Alasan: mencegah OOS “lulus” karena trade terlalu sedikit.
+  - Kapan diubah: bila rentang backtest dipersingkat/diperpanjang signifikan.
+  - Cara ubah: update paramset + jalankan ulang OOS proof.
+
+- `ws.eval.min_trades` (integer >= 0) — minimum jumlah trade untuk evaluasi in-sample.
+  - Origin: DET
+  - Alasan: mencegah param menang karena sample kecil.
+  - Kapan diubah: bila rentang backtest berubah signifikan.
+  - Cara ubah: update paramset + rerun calibration.
+
+- `ws.eval.min_days_covered` (integer >= 0) — minimum jumlah hari trading yang tercakup dalam window evaluasi agar hasil tidak bias karena coverage parsial.
+  - Origin: DET
+  - Default: ceil(0.70 * total_trading_days_in_window)
+  - Alasan: mencegah pemilihan param yang hanya “aktif” pada sebagian kecil hari dalam window.
+  - Kapan diubah: jika definisi `days_covered` berubah atau window backtest dipersingkat/diperpanjang signifikan.
+  - Cara ubah: update paramset evaluasi + jalankan ulang kalibrasi.
+
+- `ws.eval.min_p25_ret_net_top` (decimal) — batas bawah percentile 25% return net untuk TOP bucket (downside bound sederhana).
+  - Origin: DET
+  - Default: -0.030000
+  - Alasan: mencegah param terbaik yang avg bagus tapi downside terlalu dalam.
+  - Kapan diubah: jika karakter volatilitas market berubah signifikan atau strategi ingin lebih agresif/defensif.
+  - Cara ubah: update paramset evaluasi + jalankan ulang kalibrasi.
+
+- `ws.eval.min_month_win_rate_min` (decimal 0..1) — batas minimal win_rate bulanan terendah (stability gate).
+  - Origin: DET
+  - Default: 0.450000
+  - Alasan: mencegah param menang karena 1 periode ekstrem, tapi buruk di bulan lain.
+  - Kapan diubah: jika window evaluasi bukan bulanan atau definisi period berubah.
+  - Cara ubah: update paramset evaluasi + jalankan ulang kalibrasi.
+
+- `ws.eval.min_month_avg_ret_net_min` (decimal) — batas minimal avg return net bulanan terendah (stability gate).
+  - Origin: DET
+  - Default: -0.010000
+  - Alasan: membatasi kondisi terburuk per bulan agar param tidak memiliki “bulan jeblok” yang terlalu dalam.
+  - Kapan diubah: jika strategi ingin lebih agresif/defensif atau definisi period berubah.
+  - Cara ubah: update paramset evaluasi + jalankan ulang kalibrasi.
 
 ## Next
 ### Weekly Swing

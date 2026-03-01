@@ -1,28 +1,45 @@
-# 11 — Backtest Schema & Calibration — Weekly Swing (2Y)
+# 11 — Backtest Schema & Calibration — Weekly Swing
+
+Default backtest window: 2 tahun (configurable).
 
 ## Purpose
+Dokumen ini mengunci schema backtest dan aturan perhitungan evaluasi untuk Weekly Swing agar kalibrasi reproducible, audit-able, dan konsisten dengan kontrak PLAN/CONFIRM.
+Dokumen ini juga menetapkan syarat validasi: BT coverage, universe equivalence, metric sufficiency, dan OOS proof.
+
 ## Scope lock (yang dikerjakan)
-Backtest Weekly Swing yang akan diimplementasikan dibatasi pada tiga tabel berikut (dan hanya ini):
+Backtest Weekly Swing mengikuti artefak resmi yang didefinisikan pada:
+`17_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`.
 
-- `Backtest Weekly Swing memiliki **3 tabel evaluasi inti** dan **1 tabel audit universe (wajib)**:
+**Schema backtest (LOCKED)**
+Schema tabel backtest mengikuti: `db/BACKTEST_SCHEMA_DDL.sql`.
 
-**Tabel evaluasi inti (LOCKED)**
-- `watchlist_bt_param_grid`
-- `watchlist_bt_eval`
-- `watchlist_bt_picks_ws`
+Dokumen ini tidak menduplikasi daftar tabel; semua daftar artefak wajib merujuk ke Manifest.
 
-**Tabel audit universe (LOCKED, wajib untuk reproducibility)**
-- `watchlist_bt_universe_ws (asof_eod_date, ticker_id, required_ok, reason_code)`
+Catatan audit: universe harian dan picks harian wajib tersedia untuk replay dan audit; lihat Manifest (17) untuk daftar artefak resminya.
 
-Catatan: `watchlist_bt_universe_ws` bukan “opsional kosmetik”. Ini adalah kontrak audit untuk memastikan backtest bisa direplay dan evaluasi param grid fair ketika coverage data berubah.
-`watchlist_bt_picks_ws` — picks per tanggal untuk audit dan analisis.
-
-Artefak DDL ada di: `db/BACKTEST_SCHEMA_DDL.sql`.
-
-Di luar tiga tabel tersebut adalah **out of scope** untuk versi ini dan tidak ditulis sebagai bagian spesifikasi implementasi.
+Artefak yang tidak tercantum pada Manifest dianggap tidak digunakan dan tidak boleh diasumsikan ada.
 
 Menetapkan mekanisme kalibrasi parameter WS dari backtest 2 tahun:
 - menghasilkan param_set baru (origin=BT) yang dapat dipromosikan menjadi ACTIVE.
+
+## Proof of BT coverage (LOCKED)
+Semua parameter dengan origin=BT wajib tercakup di:
+`13_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
+
+Kalibrasi backtest dianggap tidak valid jika ada parameter origin=BT yang:
+- tidak punya mapping ke kolom `watchlist_bt_param_grid`, atau
+- tidak punya bukti audit (universe/picks/eval), atau
+- tidak lolos test `BT_COVERAGE_GUARD`.
+
+## Universe equivalence (LOCKED)
+Backtest universe (`watchlist_bt_universe_ws`) wajib setara dengan production PLAN universe
+untuk tanggal EOD yang sama sesuai:
+`14_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`.
+
+Bukti equivalence WAJIB menggunakan snapshot dari production PLAN yang mengikuti schema resmi:
+`db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`.
+
+Kalibrasi dianggap tidak valid jika tidak ada bukti equivalence (pass/fail + canonical reason).
 
 ## Prerequisites
 ### Weekly Swing
@@ -34,7 +51,7 @@ Menetapkan mekanisme kalibrasi parameter WS dari backtest 2 tahun:
 
 ## Backtest execution assumptions (LOCKED)
 
-Bagian ini mengunci cara backtest dihitung agar hasil kalibrasi 2Y reproducible dan tidak berubah karena implementasi berbeda.
+Bagian ini mengunci cara backtest dihitung agar hasil kalibrasi 2 tahun reproducible dan tidak berubah karena implementasi berbeda.
 
 ### A. Data & Kalender
 - Universe: hanya ticker yang lolos gate WS pada `asof_eod_date`.
@@ -106,11 +123,17 @@ Catatan: jika fee real di Ajaib tersedia sebagai “biaya transaksi” per order
   - `is_win = (ret_net > 0)`
 
 **Aggregasi metrik (LOCKED):**
+- Definisi group: `group=TOP` merujuk pada picks dengan `bucket_code='TOP_PICKS'`.
 - `avg_ret_net_top`: rata-rata `ret_net` untuk trades dari picks `group=TOP` di seluruh periode backtest.
 - `win_rate_top`: persentase `is_win` untuk trades dari picks `group=TOP` di seluruh periode backtest.
 - `picks_count`: jumlah trade yang benar-benar dieksekusi (setelah skip rules).
 
 ### G. Risk & Activity Metrics (LOCKED)
+
+Rule (LOCKED):
+Metrik di section G bersifat **computed at query/report time** untuk analisis risiko/aktivitas,
+dan **bukan** kolom wajib pada `watchlist_bt_eval`, kecuali schema `watchlist_bt_eval` secara eksplisit ditambah.
+
 - `stopout_rate_top`:
   - Definisi: `(# trade group=TOP yang exit karena STOP) / (# trade group=TOP yang dieksekusi)`
   - Exit karena STOP mengikuti aturan Assumptions → C.
@@ -149,28 +172,70 @@ Catatan: jika fee real di Ajaib tersedia sebagai “biaya transaksi” per order
 - Monitor `turnover_top_per_week` dan `picks_count`
 
 ### 2) Output backtest wajib
-- `watchlist_bt_param_grid` (grid parameter)
-- `watchlist_bt_eval` (hasil evaluasi per param_id)
-- WAJIB/LOCKED `watchlist_bt_picks_ws` (top picks per date)
+- `watchlist_bt_param_grid`
+- `watchlist_bt_eval`
+- `watchlist_bt_picks_ws`
+- `watchlist_bt_universe_ws`
+- `watchlist_bt_cutoffs_ws`
+
+Tanpa `watchlist_bt_oos_eval_ws` (OOS proof), kalibrasi tidak boleh dipromote menjadi ACTIVE.
 
 ### 3) Calibration procedure (ringkas)
 1) Generate param grid dari seed MAN (TEMP/bt_target=true).
 2) Run backtest 2 tahun untuk semua param_id.
 3) Pilih best param_id dengan query canonical:
-   SELECT *
-   FROM watchlist_bt_param_grid
-   WHERE policy_code='WS'
-     AND param_id = (
-       SELECT param_id
-       FROM watchlist_bt_eval
-       WHERE policy_code='WS'
-       ORDER BY avg_ret_net_top DESC
-       LIMIT 1
-     );
+
+   Rule (LOCKED):
+   Nilai threshold `:min_*` WAJIB berasal dari Parameter Registry (05) / paramset evaluasi.
+   Tidak boleh hardcode angka di implementasi.
+
+   Mapping parameter (LOCKED):
+   - `:min_trades` -> `ws.eval.min_trades`
+   - `:min_days_covered` -> `ws.eval.min_days_covered`
+   - `:min_p25_ret_net_top` -> `ws.eval.min_p25_ret_net_top`
+   - `:min_month_win_rate_min` -> `ws.eval.min_month_win_rate_min`
+   - `:min_month_avg_ret_net_min` -> `ws.eval.min_month_avg_ret_net_min`
+
+   SQL (canonical):
+   ```sql
+   SELECT pg.*
+   FROM watchlist_bt_param_grid pg
+   JOIN watchlist_bt_eval ev
+     ON ev.policy_code = pg.policy_code
+    AND ev.param_id    = pg.param_id
+   WHERE pg.policy_code = 'WS'
+     AND ev.picks_count >= :min_trades
+     AND ev.days_covered >= :min_days_covered
+     AND ev.avg_ret_net_top > 0
+     AND ev.median_ret_net_top >= 0
+     AND ev.p25_ret_net_top >= :min_p25_ret_net_top
+     AND ev.month_win_rate_min >= :min_month_win_rate_min
+     AND ev.month_avg_ret_net_min >= :min_month_avg_ret_net_min
+   ORDER BY
+     ev.avg_ret_net_top DESC,
+     ev.median_ret_net_top DESC,
+     ev.month_win_rate_min DESC,
+     ev.p25_ret_net_top DESC,
+     ev.win_rate_top DESC
+   LIMIT 1;
+   ```
 4) Buat param_set baru (DRAFT):
    - parameter terkalibrasi => origin=BT, status=ACTIVE
    - parameter deterministik => origin=DET, status=ACTIVE
 5) Promote param_set BT menjadi ACTIVE (lihat dok 02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md).
+
+## Evaluation metrics sufficiency (LOCKED)
+Metrik pada `watchlist_bt_eval` wajib memenuhi spesifikasi:
+`15_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`.
+
+Kalibrasi param_id dianggap tidak valid jika metrik minimum tidak tersedia atau gagal gating rules.
+
+## Walk-forward / OOS proof (LOCKED)
+Kalibrasi WS wajib memiliki bukti out-of-sample sesuai:
+`16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`.
+
+Ringkasan OOS wajib tersimpan di:
+`watchlist_bt_oos_eval_ws`.
 
 ## Outputs
 - Paramset BT validated + audit trail.
@@ -183,14 +248,48 @@ Schema backtest (DDL) disimpan sebagai artefak di: `db/BACKTEST_SCHEMA_DDL.sql`.
 
 ## Universe rule (DET) (LOCKED)
 
-Universe backtest untuk Weekly Swing harus deterministik dan bisa diulang. Aturan universe (per `asof_eod_date`):
-1) Ambil semua ticker aktif dari tabel master (mis. `tickers`) yang memiliki OHLC EOD pada `asof_eod_date`.
-2) Exclude ticker yang ada di `liquidity.exclude_tickers` (paramset MAN).
-3) Field required minimal untuk masuk universe: `close`, `volume`, dan indikator yang dipakai guards/scoring (`dv20_idr`, `atr14_pct`, `roc20`, `hh20`). Jika field required NULL → ticker tetap tercatat di universe dengan flag `required_ok=FALSE`.
+Universe backtest untuk Weekly Swing harus deterministik dan bisa diulang.
 
-Untuk audit/re-run **wajib** menyimpan universe harian sebagai tabel ringkas (dibuat di `db/BACKTEST_SCHEMA_DDL.sql`):
-- `watchlist_bt_universe_ws(asof_eod_date, ticker_id, required_ok, reason_code)`
-Reason_code memakai dictionary WS_* (contoh: `WS_DATA_MISSING`).
+### 1) Sumber ticker
+Per `asof_eod_date`:
+1) Ambil semua ticker aktif dari tabel master (mis. `tickers`) yang memiliki data OHLC EOD pada `asof_eod_date`.
+2) Exclude ticker yang ada di `liquidity.exclude_tickers` (paramset MAN).
+
+### 2) Data-quality vs eligibility (LOCKED)
+Dokumen ini membedakan dua hal:
+- **required_ok** = data-quality untuk kebutuhan guardrails & snapshot metrics.
+- **eligible_ok** = hasil akhir eligibility untuk backtest universe, yaitu:
+  `eligible_ok = required_ok AND guard_ok`.
+
+### 3) Required fields untuk guardrails (LOCKED)
+Field required minimal agar `required_ok=TRUE`:
+- OHLC: `close` (dan `high/low/open` untuk evaluasi trade setelah pick)
+- Volume: `volume`
+- Guard/metrics snapshot: `dv20_idr`, `atr14_pct`, `vol_ratio`
+
+Jika salah satu field di atas NULL/invalid:
+- ticker tetap dicatat di `watchlist_bt_universe_ws` dengan `required_ok=FALSE`,
+- `missing_fields` wajib diisi,
+- `eligible_ok=FALSE`,
+- `reason_code` mengikuti prioritas canonical reason pada dok 14 (contoh: `WS_DATA_MISSING`).
+
+### 4) Field untuk scoring (LOCKED)
+Indikator yang dipakai untuk menghitung `score_total` (contoh: `roc20`, `hh20`, dll) **tidak termasuk** daftar required fields guardrails kecuali policy WS secara eksplisit menetapkannya sebagai requirement eligibility.
+
+Jika indikator scoring missing (LOCKED):
+- ticker tetap boleh eligible selama guardrails terpenuhi,
+- skor komponen yang membutuhkan indikator tersebut = 0,
+- `missing_fields` tetap mencatat indikator yang missing (untuk audit), namun tidak menjatuhkan `required_ok`.
+Aturan ini harus konsisten dengan production PLAN.
+
+Rule (LOCKED):
+`missing_fields` boleh berisi gabungan field guardrails dan field scoring; namun `required_ok` hanya dipengaruhi oleh required fields guardrails (lihat Section 3).
+
+### 5) Audit storage (LOCKED)
+Untuk audit/re-run **wajib** menyimpan universe harian di `watchlist_bt_universe_ws` (lihat `db/BACKTEST_SCHEMA_DDL.sql`) minimal berisi:
+- `required_ok, missing_fields, guard_ok, eligible_ok, dv20_idr, atr14_pct, vol_ratio, reason_code`
+
+Reason_code memakai dictionary WS_* (contoh: `WS_DATA_MISSING`, `WS_GUARD_LIQUIDITY_FAIL`, dll) sesuai prioritas canonical reason di dok 14.
 
 ## Schema: watchlist_bt_universe_ws (AUDIT) (LOCKED)
 
@@ -201,13 +300,18 @@ Lokasi DDL: `db/BACKTEST_SCHEMA_DDL.sql`
 Kolom (harus match DDL):
 - `asof_eod_date` (DATE, NOT NULL) — tanggal EOD universe
 - `ticker_id` (INT, NOT NULL) — id ticker
-- `required_ok` (TINYINT(1), NOT NULL) — 1 jika field required tersedia, 0 jika tidak
+- `required_ok` (TINYINT(1), NOT NULL) — data-quality only (bukan eligibility final)
 - `reason_code` (VARCHAR(32), NULL) — reason WS_* (contoh: `WS_DATA_MISSING`) saat `required_ok=0`
+- `missing_fields` — daftar field required yang missing/invalid (CSV string)
+- `guard_ok` — 1 jika lolos semua guardrail, 0 jika tidak
+- `eligible_ok` — 1 jika required_ok=1 dan guard_ok=1
+- `dv20_idr`, `atr14_pct`, `vol_ratio` — metric snapshot untuk debug equivalence
 Primary key:
 - `(asof_eod_date, ticker_id)`
 Indexes:
 - `idx_bt_univ_ws_req (asof_eod_date, required_ok)`
 - `idx_bt_univ_ws_reason (asof_eod_date, reason_code)`
+- `idx_bt_univ_ws_elig (asof_eod_date, eligible_ok)`
 
 ## Next
 ### Weekly Swing

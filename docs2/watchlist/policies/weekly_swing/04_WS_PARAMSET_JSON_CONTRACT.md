@@ -4,6 +4,7 @@
 
 Dokumen memakai **dotted notation** (contoh: `risk.min_rr`, `data_readiness.min_coverage_ratio`) hanya sebagai cara referensi teks.
 Struktur **JSON paramset yang sebenarnya** tetap **nested object** sesuai kontrak file ini (contoh: `{ "risk": { "min_rr": ... } }`).
+**Aturan:** jika konteksnya validasi/perbandingan angka, gunakan `<path>.value`. Jika konteksnya registri/daftar key, cukup `<path>`.
 
 ## Purpose
 Mengunci struktur params_json WS agar code tidak memakai parameter implicit/hardcode.
@@ -56,8 +57,8 @@ Implementasi harus memuat field audit: origin/status/bt_target/rationale/change_
 ## Cutoff dinamis (BT)
 Paramset WS wajib memuat cutoff quantile untuk menjaga kualitas picks.
 
-- `top_min_score_q` (0..1): quantile untuk cutoff TOP_PICKS.
-- `secondary_min_score_q` (0..1): quantile untuk cutoff SECONDARY.
+- `grouping.top_min_score_q` (0..1): quantile untuk cutoff TOP_PICKS.
+- `grouping.secondary_min_score_q` (0..1): quantile untuk cutoff SECONDARY.
 
 Catatan:
 - Nilai quantile berasal dari kalibrasi backtest 2 tahun (BT) dan **bukan** dihitung ulang lewat backtest harian.
@@ -65,8 +66,8 @@ Catatan:
 
 ## Target dinamis (turunan per-run)
 Paramset menyimpan **base target**:
-- `top_picks_target`
-- `secondary_target`
+- `grouping.top_picks_target`
+- `grouping.secondary_target`
 
 Saat PLAN dibuat, sistem menghitung nilai turunan per-run:
 - `top_picks_target_dynamic`

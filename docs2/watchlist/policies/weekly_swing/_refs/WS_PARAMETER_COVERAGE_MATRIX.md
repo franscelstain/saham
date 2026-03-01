@@ -51,14 +51,14 @@ last_updated=2026-02-22
 | `risk.stop_mode.value` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `scoring.combine_mode.value` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `scoring.weights.value` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `secondary_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |
-| `secondary_target` | Y | Y | Y | 06,09 | see 09 | see 03 |
+| `grouping.secondary_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |
+| `grouping.secondary_target` | Y | Y | Y | 06,09 | see 09 | see 03 |
 | `setup.bo_max_ext_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.bo_near_below_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.bo_trigger_mode.value` | Y | Y | Y | 06 | see 09 | see 03 |
 | `setup.mom_roc20_soft_min` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.roc_hi` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `setup.roc_lo` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `top_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |
-| `top_picks_target` | Y | Y | Y | 06,09 | see 09 | see 03 |
+| `grouping.top_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |
+| `grouping.top_picks_target` | Y | Y | Y | 06,09 | see 09 | see 03 |
 
