@@ -26,7 +26,7 @@ CONFIRM memakai intraday snapshot manual. Failure yang harus eksplisit:
   Snapshot belum diinput → CONFIRM wajib `confirm_label=DELAY`.
 
 - `WS_STALE` (BLOCK, CONFIRM)  
-  Snapshot melewati TTL (15 menit; `snapshot_max_age_sec=900`) → CONFIRM wajib downgrade `confirm_label=DELAY` (atau NO_TRADE sesuai policy).
+  Snapshot melewati TTL (15 menit; `snapshot_max_age_sec=900`) → CONFIRM wajib menghasilkan `confirm_label=DELAY`.
 
 Catatan:
 - Kode lain seperti `WS_SPR_NA`, `WS_SPR_WIDE`, `WS_OUT_BAND` bersifat WARN/INFO (overlay), namun **tidak boleh** mengubah PLAN.

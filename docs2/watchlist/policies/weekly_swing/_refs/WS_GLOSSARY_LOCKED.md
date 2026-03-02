@@ -31,7 +31,7 @@ Waktu saat CONFIRM dijalankan.
 ## TTL CONFIRM (LOCKED)
 Batas usia snapshot agar sah:
 - `snapshot_max_age_sec = 900` (15 menit)
-- Jika `checked_at - effective_captured_at > 900` → snapshot **EXPIRED** → CONFIRM wajib downgrade menjadi DELAY/NO_TRADE + reason `WS_STALE`.
+- Jika `checked_at - effective_captured_at > 900` → snapshot **EXPIRED** → CONFIRM wajib menghasilkan `confirm_label = DELAY` + reason `WS_STALE`.
 
 ## Top of Book
 Bid/ask level teratas:

@@ -48,9 +48,10 @@ Hitung:
 
 Aturan:
 - Jika `snapshot_age_sec > 900` → snapshot **EXPIRED** → output CONFIRM **wajib**:
-  - `confirm_label = DELAY` (atau NO_TRADE sesuai policy)
+  - `confirm_label = DELAY`
   - reason code wajib: `WS_STALE`
 - Jika tidak ada snapshot → `confirm_label = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
+- LOCKED: `NO_TRADE` bukan label CONFIRM. `NO_TRADE` hanya berlaku untuk status run PLAN/global selection, sedangkan label CONFIRM hanya boleh `CONFIRMED`, `NEUTRAL`, `CAUTION`, atau `DELAY`.
 
 **LOCKED:** snapshot yang diambil masa lalu tapi baru diinput sekarang **tetap sah sebagai snapshot**, namun bisa menjadi **EXPIRED** karena TTL.
 
