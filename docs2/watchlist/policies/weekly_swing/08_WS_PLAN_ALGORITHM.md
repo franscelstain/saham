@@ -13,6 +13,16 @@ Menetapkan algoritma PLAN WS dari EOD snapshot sampai menghasilkan plan_items de
 - OHLCV(D), indicators(D): dv20_idr, atr14_pct, roc20, hh20 (lihat kontrak: `../../../db/04_EOD_INDICATORS.md`)
 - params_json WS (ACTIVE)
 
+## LOCKED — Units & Scales for Indicator Inputs
+Agar implementasi tidak drift (mis. persen vs desimal), unit/scale berikut **wajib**:
+- `dv20_idr` = nilai transaksi harian rata-rata 20 hari dalam **IDR** (contoh: `15_000_000_000`).
+- `atr14_pct` = **persentase** ATR14 terhadap harga (contoh: `3.25` berarti 3.25%, **bukan** `0.0325`).
+- `roc20` = **persentase** return 20 hari (contoh: `12.5` berarti 12.5%, **bukan** `0.125`).
+- `hh20` = harga **price-level** (bukan persen), high tertinggi 20 hari.
+- `close`/`asof_close` = harga **price-level** pada `asof_eod_date`.
+
+Jika kontrak indikator (`../../../db/04_EOD_INDICATORS.md`) berbeda, maka kontrak indikator menang. PLAN wajib mengikuti kontrak indikator.
+
 ## Process
 ### Step 0 — Build universe
 Universe = semua ticker aktif (master tickers), dikurangi `liquidity.exclude_tickers`.
@@ -80,9 +90,24 @@ Jika pass_guard tapi:
 - rr < min_rr atau invalid => group_semantic=WATCH_ONLY (forced) reason WS_FW_RR_LOW / WS_FW_RR_INV
 
 ### Step 6 — Group semantic default
+Jika pass_guard tapi:
+- breakout extended (close terlalu jauh di atas hh20) => group_semantic=WATCH_ONLY (forced) reason WS_FW_EXT
+- rr < min_rr atau invalid => group_semantic=WATCH_ONLY (forced) reason WS_FW_RR_LOW / WS_FW_RR_INV
+
+### Step 6 — Group semantic default
 Jika pass_guard dan tidak forced:
 - kandidat masuk ranking pool:
   - group_semantic sementara: TOP_PICKS/SECONDARY/WATCH_ONLY ditentukan oleh selection (dok 09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)
+
+**LOCKED — Ranking sort key (PLAN output & selection):**
+Ranking deterministik **wajib** mengikuti `grouping.sort_keys` (dok 09), urutan exact:
+1) `score_total DESC`
+2) `score_breakout DESC`
+3) `score_momentum DESC`
+4) `dv20_idr DESC`
+5) `atr14_pct ASC`
+6) `ticker_id ASC`
+
 Jika AVOID => group_semantic=AVOID
 
 ### Step 7 — Plan levels (entry/stop/tp)
