@@ -86,10 +86,9 @@ Hasil:
 
 ## Step 5 — PLAN Levels
 - `plan_levels.entry_band_pct = 0.01`
-- `entry_band_mid = close = 1020`
-- `entry_ref = entry_band_mid = 1020`
-- `entry_min = entry_ref * (1 - 0.01) = 1009.80`
-- `entry_max = entry_ref * (1 + 0.01) = 1030.20`
+- `entry_ref = close = 1020`
+- `entry_min = 1020 * (1 - 0.01) = 1009.80`
+- `entry_max = 1020 * (1 + 0.01) = 1030.20`
 
 Stop:
 - `risk.stop_mode = ATR`

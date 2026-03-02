@@ -96,6 +96,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     - `SECONDARY`
     - `WATCH_ONLY`
     - `AVOID`
+    - `NO_TRADE`
   - `score_total`: skor akhir 0..1 (setelah clamp).
   - `scores.*`: sub-skor yang dipakai membentuk `score_total` (0..1).
   - `levels.*`: level harga deterministik:
@@ -106,7 +107,6 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
   - `flags.eligible`: true bila lulus guard & readiness.
   - `flags.hidden`: true bila item tidak ditampilkan (mis. hide cap), namun tetap bisa ada di audit internal.
   - `reasons[]`: daftar alasan deterministic (code, severity, message singkat, payload).
-  - `NO_TRADE` tidak boleh muncul sebagai `group_semantic` item; `NO_TRADE` hanya boleh muncul pada level `summary`/status run.
 
 ---
 
@@ -161,7 +161,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     - `CAUTION`
     - `DELAY`
   - `reasons[]`: alasan deterministic (code, severity, message, payload).
-  - Untuk CONFIRM, field output item yang sah hanya `ticker`, `label`, dan `reasons[]`; alias seperti `confirm_label`, `confirm_reasons`, atau `reason_codes` tidak boleh dipakai di output final.
+  - Untuk CONFIRM, field output yang sah hanya `label` dan `reasons[]`; alias seperti `confirm_label`, `confirm_reasons`, atau `reason_codes` tidak boleh dipakai di output final.
 
 ---
 

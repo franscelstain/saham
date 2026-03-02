@@ -31,7 +31,6 @@ Menetapkan mapping kebutuhan WS terhadap schema global watchlist (tabel global a
 - asof_eod_date, plan_trade_date
 - param_set_id (FK)
 - run_status (OK/NO_TRADE/FAILED)
-  - `FAILED` dipakai untuk hard-stop / abort behavior; nilai `ABORT` tidak dipakai sebagai status persistence final.
 - data_batch_hash, hash_count, missing_required_count
 - processed_count, eligible_count
 - supersedes_plan_run_id (nullable)

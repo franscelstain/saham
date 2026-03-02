@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS watchlist_plan_runs (
   asof_eod_date DATE NOT NULL,
   plan_trade_date DATE NOT NULL,
   param_set_id BIGINT NOT NULL,
-    run_status ENUM('OK','NO_TRADE','FAILED') NOT NULL, -- FAILED covers hard-stop / abort behavior
+  run_status ENUM('OK','NO_TRADE','FAILED') NOT NULL,
   data_batch_hash CHAR(64) NOT NULL,
   hash_count INT NOT NULL DEFAULT 0,
   missing_required_count INT NOT NULL DEFAULT 0,

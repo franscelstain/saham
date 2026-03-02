@@ -32,12 +32,11 @@ Aturan yang dikunci:
 
 Tujuan stop conditions adalah mencegah PLAN dibangun dari data yang tidak layak, dan memastikan perilaku NO_TRADE **konsisten** dengan eksekusi canonical.
 
-### 1) Coverage gate (hard fail)
+### 1) Coverage gate (abort)
 
-Jika `data_readiness.reject_if_eod_incomplete = true` dan `coverage_ratio < data_readiness.min_coverage_ratio` ⇒ **FAILED RUN** (tidak ada PLAN dihasilkan).
+Jika `data_readiness.reject_if_eod_incomplete = true` dan `coverage_ratio < data_readiness.min_coverage_ratio` ⇒ **ABORT RUN** (tidak ada PLAN dihasilkan).
 - `coverage_ratio` dihitung sebagai: `eligible_with_complete_required_fields / eligible_total`.
 - Coverage gate ini adalah “hard fail” untuk menjaga kualitas output.
-- Istilah “abort run” boleh dipakai sebagai deskripsi perilaku, tetapi `run_status` final yang sah adalah `FAILED`.
 
 ### 2) Minimum eligible gate (NO_TRADE)
 
@@ -77,7 +76,7 @@ Urutan berikut **wajib** dan menjadi acuan implementasi:
 4) **Qualified pools**
    - `top_pool = { ticker ∈ eligible_pool | score_total >= top_cutoff_today }`
    - `secondary_pool = { ticker ∈ eligible_pool | score_total >= secondary_cutoff_today } - top_pool`
-   - Jika pool kosong karena data/coverage failure, hasilnya `FAILED`; jika pool kosong pada run yang valid tetapi tidak ada kandidat yang layak, hasilnya `NO_TRADE`.
+   - Jika pool kosong karena data/coverage buruk, evaluasi stop condition (NO_TRADE).
 
 ## Qualified pools — details
 
@@ -178,23 +177,14 @@ Wajib tersimpan untuk setiap PLAN run:
 Semua diletakkan di `watchlist_plan_runs.run_metrics_json`.
 
 ## Failure modes & stop condition
+Stop condition (NO_TRADE) harus eksplisit dan tercatat, contoh:
+- data EOD belum lengkap / batch invalid,
+- coverage eligible terlalu kecil,
+- market check gagal.
 
-### FAILED stop condition
-Kondisi berikut adalah **hard-fail** dan wajib menghasilkan `run_status = FAILED`:
-- data EOD belum lengkap / batch invalid
-- coverage eligible terlalu kecil
-- required source / required field tidak memenuhi kontrak data
-
-Kondisi FAILED berarti run tidak menghasilkan PLAN yang layak dipakai. Istilah “abort run” boleh dipakai sebagai deskripsi perilaku hard-stop, tetapi nilai `run_status` final yang sah tetap `FAILED`.
-
-### NO_TRADE stop condition
-Kondisi berikut **bukan hard-fail**, tetapi valid menghasilkan `run_status = NO_TRADE`:
-- `eligible_total < min_eligible_count`
-- setelah seluruh filter, scoring, dan guardrail dijalankan, tidak ada kandidat yang layak
-- target dinamis turun ke 0 sesuai aturan policy
-- market/data valid, tetapi kualitas kandidat tidak cukup untuk menampilkan PLAN
-
-Kondisi NO_TRADE berarti run valid, namun sistem sengaja tidak menampilkan kandidat.
+Jika stop condition aktif:
+- `top_picks_target_dynamic=0`, `secondary_target_dynamic=0`,
+- hasil PLAN kosong, dan reason disimpan sebagai fail code + held reason.
 
 ## Next
 ### Weekly Swing
