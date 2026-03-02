@@ -140,16 +140,3 @@ INSERT INTO watchlist_reason_codes (policy_code, reason_code, scope, severity, s
 ('WS','WS_SPR_NA','CONFIRM','INFO','spr_na',
  'Data bid/ask tidak diinput; spread tidak dievaluasi.',
  'Bid/ask not provided; spread not evaluated.'),
-
-('WS','WS_LBL_OK','CONFIRM','INFO','lbl_ok',
- 'CONFIRMED: kondisi runtime mendukung eksekusi (sekadar tambahan keyakinan).',
- 'CONFIRMED: runtime supports execution (confidence overlay only).'),
-('WS','WS_LBL_NEU','CONFIRM','INFO','lbl_neu',
- 'NEUTRAL: tidak ada sinyal negatif kuat, tetapi data runtime terbatas.',
- 'NEUTRAL: no strong negative signal, but runtime data limited.'),
-('WS','WS_LBL_WARN','CONFIRM','INFO','lbl_warn',
- 'CAUTION: ada warning (drift/spread/band), pertimbangkan tunda/lebih hati-hati.',
- 'CAUTION: warnings present (drift/spread/band), be careful or delay.'),
-('WS','WS_LBL_DELAY','CONFIRM','INFO','lbl_delay',
- 'DELAY: hasil confirm tidak valid (stale/missing data).',
- 'DELAY: confirm invalid (stale/missing data).');

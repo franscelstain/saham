@@ -48,9 +48,9 @@ Hitung:
 
 Aturan:
 - Jika `snapshot_age_sec > 900` → snapshot **EXPIRED** → output CONFIRM **wajib**:
-  - `decision = DELAY` (atau NO_TRADE sesuai policy)
+  - `confirm_label = DELAY` (atau NO_TRADE sesuai policy)
   - reason code wajib: `WS_STALE`
-- Jika tidak ada snapshot → `decision = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
+- Jika tidak ada snapshot → `confirm_label = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
 
 **LOCKED:** snapshot yang diambil masa lalu tapi baru diinput sekarang **tetap sah sebagai snapshot**, namun bisa menjadi **EXPIRED** karena TTL.
 
@@ -67,7 +67,7 @@ CONFIRM menghasilkan output terpisah, minimal:
   - `ticker_code`
   - `plan_group_semantic` (dari PLAN, immutable)
   - `plan_score_total` (dari PLAN, immutable)
-  - `confirm_decision` (BUY_OK / WAIT / DELAY / AVOID sesuai implementasi)
+  - `confirm_label` (`CONFIRMED` / `NEUTRAL` / `CAUTION` / `DELAY`)
   - `confirm_reasons[]` (reason codes CONFIRM)
 
 ---
@@ -100,8 +100,24 @@ Cara enforce (wajib ada di test/contract):
 
 1) Load PLAN untuk `trade_date=T`
 2) Load snapshot terbaru untuk `(policy_code='WS', trade_date=T)` berdasarkan `captured_at DESC`
-3) Hitung TTL berdasarkan `effective_captured_at`
-4) Jika invalid → hasilkan CONFIRM output dengan `DELAY + WS_STALE`
-5) Jika valid → hitung rules CONFIRM sesuai implementasi (menggunakan fields snapshot)
-6) Output CONFIRM **tidak mengubah PLAN** (invariant harus lolos)
+3) Hitung `snapshot_age_sec = checked_at - effective_captured_at`
+4) Jika `snapshot_age_sec > snapshot_max_age_sec` → hasilkan `confirm_label = DELAY` + `WS_STALE`
+5) Jika snapshot tidak ada → hasilkan `confirm_label = DELAY` + `WS_SNAPSHOT_MISSING`
+6) Jika `last_price` tidak ada → hasilkan `confirm_label = DELAY` + `WS_NO_PRICE`
+7) Jika snapshot valid:
+   - hitung `drift_pct = abs(last_price - entry_ref) / entry_ref`
+   - jika `drift_pct > max_drift_from_entry_pct` → tambah `WS_DRIFT_FAR`
+   - jika bid1/ask1 tersedia:
+     - hitung `spread = ask1_price - bid1_price`
+     - hitung `spread_pct = spread / last_price`
+     - jika `spread_pct > spread_max_pct` → tambah `WS_SPR_WIDE`
+   - jika bid1/ask1 tidak tersedia → tambah `WS_SPR_NA`
+8) Mapping label:
+   - ada `BLOCK` → `DELAY`
+   - else ada `WARN` → `CAUTION`
+   - else ada `INFO` saja → `NEUTRAL`
+   - else → `CONFIRMED`
+   - LOCKED: CONFIRM tidak boleh menambahkan reason code yang hanya mengulang label akhir.
+  `CONFIRMED`, `NEUTRAL`, `CAUTION`, dan `DELAY` adalah label hasil evaluasi, bukan reason code tersendiri.
+9) Output CONFIRM **tidak mengubah PLAN** (invariant harus lolos)
 

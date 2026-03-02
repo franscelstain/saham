@@ -55,8 +55,8 @@ Spesifikasi tabel + kolom + contoh data:
 
 Aturan:
 - Jika `checked_at - effective_captured_at > 900 detik` → snapshot **EXPIRED**
-  - CONFIRM wajib menghasilkan `decision = DELAY` + `WS_STALE`
-- Jika snapshot tidak ada → `decision = DELAY` + `WS_SNAPSHOT_MISSING`
+  - CONFIRM wajib menghasilkan `confirm_label = DELAY` + `WS_STALE`
+- Jika snapshot tidak ada → `confirm_label = DELAY` + `WS_SNAPSHOT_MISSING`
 
 ---
 
@@ -83,7 +83,7 @@ Output akhir di UI harus menampilkan dua hal terpisah:
 
 2) **CONFIRM untuk snapshot tertentu**  
    - `checked_at`, `snapshot_id`, `captured_at`, `snapshot_age_sec`, valid/expired
-   - per ticker: confirm_decision + confirm_reasons
+   - per ticker: `confirm_label` + `confirm_reasons`
 
 **LOCKED:** CONFIRM tidak boleh mengubah tampilan PLAN (ranking/score/group) untuk besok.
 

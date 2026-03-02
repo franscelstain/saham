@@ -190,8 +190,10 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 - `label` ditentukan oleh severity tertinggi di reasons:
   - ada `BLOCK` → `DELAY`
   - else ada `WARN` → `CAUTION`
-  - else hanya `INFO` → `NEUTRAL`
+  - else ada `INFO` → `NEUTRAL`
   - else (tidak ada reasons) → `CONFIRMED`
+- CONFIRM tidak memakai reason code khusus label seperti `WS_LBL_OK`, `WS_LBL_NEU`, atau `WS_LBL_WARN`.
+- `label` adalah hasil interpretasi akhir dari reason CONFIRM, bukan reason tambahan.
 - Jika snapshot stale melebihi `confirm_overlay.snapshot_max_age_sec`, label harus `DELAY`.
 
 ### 3.4 Summary rules

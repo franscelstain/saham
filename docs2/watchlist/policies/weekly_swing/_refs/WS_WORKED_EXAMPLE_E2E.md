@@ -112,12 +112,13 @@ Misal data runtime:
 - `drift_pct = (1028 - 1020) / 1020 = 0.007843`
 
 Check:
-- `snapshot_age_sec <= 300` → PASS
-- `spread_pct <= 0.01` → PASS
-- `drift_pct <= 0.03` → PASS
+- `snapshot_age_sec <= 900` → valid
+- `spread_pct <= 0.01` → pass
+- `drift_pct <= 0.03` → pass
 
 Hasil:
-- `confirm_result = PASS`
+- `confirm_label = CONFIRMED`
+- `reason_codes` tetap kosong karena tidak ada warning/block/info tambahan dari CONFIRM
 
 ## Final Output Summary
 - `plan_trade_date = 2026-02-28`
@@ -129,5 +130,5 @@ Hasil:
 - `entry_max = 1030.20`
 - `stop_price = 937.38`
 - `tp1_price = 1143.93`
-- `confirm_result = PASS`
-- `reason_codes = ["WS_LIQ_OK", "WS_ATR_OK", "WS_SECONDARY_Q_PASS", "WS_CONFIRM_PASS"]`
+- `confirm_label = CONFIRMED`
+- `reason_codes = ["WS_LIQ_OK", "WS_ATR_OK", "WS_SECONDARY_Q_PASS"]`

@@ -153,13 +153,22 @@ Header snapshot intraday untuk CONFIRM (append-only).
 Detail per ticker untuk snapshot.
 - snapshot_item_id (PK)
 - snapshot_id (FK)
-- ticker_id
+- ticker_code
+- ticker_id (nullable)
 - last_price
-- bid_price (nullable)
-- ask_price (nullable)
-- bid_size (nullable)
-- ask_size (nullable)
-- data_json
+- bid1_price
+- bid1_lots
+- ask1_price
+- ask1_lots
+- bid_lots_sum_5
+- ask_lots_sum_5
+- bid_lots_sum_10
+- ask_lots_sum_10
+- spread
+- spread_pct
+- imbalance_5
+- imbalance_10
+- orderbook_json
 - item_hash
 - created_at
 

@@ -17,10 +17,10 @@ Mengunci perilaku sistem saat kondisi invalid, stale, atau kualitas data buruk a
 | secondary_pool kosong | Dynamic selection | Low | `SECONDARY = 0`, lanjut proses | OK | SECONDARY kosong | WS_SECONDARY_EMPTY |
 | RR < min_rr | Plan algorithm | Medium | Forced WATCH_ONLY | OK | Tampilkan WATCH_ONLY | WS_RR_TOO_LOW |
 | Breakout terlalu extended | Plan algorithm | Medium | Forced WATCH_ONLY | OK | Tampilkan WATCH_ONLY | WS_BREAKOUT_EXTENDED |
-| Snapshot stale | Confirm overlay | Medium | Confirm caution / delay | OK | Label CAUTION atau DELAY | WS_SNAPSHOT_STALE |
-| Spread > spread_max_pct | Confirm overlay | Medium | Confirm caution / avoid | OK | Label CAUTION | WS_SPREAD_WIDE |
-| Drift > max_drift_from_entry_pct | Confirm overlay | Medium | Confirm caution / delay | OK | Label CAUTION | WS_DRIFT_HIGH |
-| Bid/ask runtime tidak tersedia | Confirm overlay | Low | Lanjut tanpa spread-based decision | OK | Label sesuai check lain | WS_BIDASK_MISSING |
+| Snapshot stale | Confirm overlay | Medium | Confirm delay | OK | Label DELAY | WS_STALE |
+| Spread > spread_max_pct | Confirm overlay | Medium | Confirm caution | OK | Label CAUTION | WS_SPR_WIDE |
+| Drift > max_drift_from_entry_pct | Confirm overlay | Medium | Confirm caution | OK | Label CAUTION | WS_DRIFT_FAR |
+| Bid/ask runtime tidak tersedia | Confirm overlay | Low | Lanjut tanpa spread-based decision | OK | Label sesuai check lain | WS_SPR_NA |
 | Hash mismatch (PLAN immutability) | Contract test / audit | Hard | Fail test / reject release | FAIL_TEST | Tidak relevan untuk UI runtime | WS_PLAN_HASH_MISMATCH |
 
 ## Notes

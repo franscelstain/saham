@@ -114,19 +114,62 @@ CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshot_items (
   snapshot_item_id BIGINT NOT NULL AUTO_INCREMENT,
   snapshot_id BIGINT NOT NULL,
-  ticker_id BIGINT NOT NULL,
+  ticker_code VARCHAR(16) NOT NULL,
+  ticker_id BIGINT NULL,
   last_price DECIMAL(18,2) NOT NULL,
-  bid_price DECIMAL(18,2) NULL,
-  ask_price DECIMAL(18,2) NULL,
-  bid_size BIGINT NULL,
-  ask_size BIGINT NULL,
-  data_json LONGTEXT NOT NULL,
+  bid1_price DECIMAL(18,2) NOT NULL,
+  bid1_lots BIGINT NOT NULL,
+  ask1_price DECIMAL(18,2) NOT NULL,
+  ask1_lots BIGINT NOT NULL,
+  bid_lots_sum_5 BIGINT NOT NULL,
+  ask_lots_sum_5 BIGINT NOT NULL,
+  bid_lots_sum_10 BIGINT NOT NULL,
+  ask_lots_sum_10 BIGINT NOT NULL,
+  spread DECIMAL(18,2) NOT NULL,
+  spread_pct DECIMAL(10,6) NOT NULL,
+  imbalance_5 DECIMAL(10,6) NOT NULL,
+  imbalance_10 DECIMAL(10,6) NOT NULL,
+  orderbook_json LONGTEXT NOT NULL,
   item_hash CHAR(64) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (snapshot_item_id),
-  KEY IDX_snapshot_items_snap_ticker (snapshot_id, ticker_id),
+  UNIQUE KEY UQ_snapshot_items_snapshot_ticker (snapshot_id, ticker_code),
+  KEY IDX_snapshot_items_snapshot (snapshot_id),
+  KEY IDX_snapshot_items_ticker_code (ticker_code),
   CONSTRAINT FK_snapshot_items_header FOREIGN KEY (snapshot_id) REFERENCES watchlist_confirm_snapshots(snapshot_id)
 ) ENGINE=InnoDB;
+
+DELIMITER //
+
+CREATE TRIGGER trg_wcsi_no_update
+BEFORE UPDATE ON watchlist_confirm_snapshot_items
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_snapshot_items is append-only (UPDATE blocked)';
+END//
+
+CREATE TRIGGER trg_wcsi_no_delete
+BEFORE DELETE ON watchlist_confirm_snapshot_items
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_snapshot_items is append-only (DELETE blocked)';
+END//
+
+CREATE TRIGGER trg_wcs_no_update
+BEFORE UPDATE ON watchlist_confirm_snapshots
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_snapshots is append-only (UPDATE blocked)';
+END//
+
+CREATE TRIGGER trg_wcs_no_delete
+BEFORE DELETE ON watchlist_confirm_snapshots
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_snapshots is append-only (DELETE blocked)';
+END//
+
+DELIMITER ;
 
 CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
   fail_code VARCHAR(64) NOT NULL,

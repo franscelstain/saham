@@ -401,7 +401,7 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: jika frekuensi snapshot/latensi ingest berubah.
   - Cara ubah: update paramset.
 
-- `confirm_overlay.max_drift_from_entry_pct` (0..1) — drift max dari `entry_ref` ke mid runtime; lebih jauh → `WS_DRIFT_FAR`.
+- `confirm_overlay.max_drift_from_entry_pct` (0..1) — drift max dari `entry_ref` ke `last_price`; lebih jauh → `WS_DRIFT_FAR`.
   - Origin: MAN/BT
   - Alasan: mencegah buy saat harga sudah lari.
   - Kapan diubah: regime volatilitas berubah atau false delay terlalu sering.

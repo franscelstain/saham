@@ -94,10 +94,8 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "snapshot_age_sec": 120,
   "drift_pct": 0.007843,
   "spread_pct": 0.006000,
-  "confirm_result": "PASS",
-  "reason_codes": [
-    "WS_CONFIRM_PASS"
-  ],
+  "confirm_label": "CONFIRMED",
+  "reason_codes": [],
   "created_at": "2026-02-28T09:15:01+07:00"
 }
 ```
@@ -108,14 +106,12 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "run_id": 1001,
   "ticker_id": "ABCD",
   "group_semantic": "SECONDARY",
-  "confirm_label": "PASS",
+  "confirm_label": "CONFIRMED",
   "last_price": 1028.0000,
   "drift_pct": 0.007843,
   "spread_pct": 0.006000,
   "action_hint": "ok",
-  "reason_codes": [
-    "WS_CONFIRM_PASS"
-  ]
+  "reason_codes": []
 }
 ```
 
@@ -131,7 +127,7 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "spread_pct": 0.011000,
   "action_hint": "delay",
   "reason_codes": [
-    "WS_SPREAD_WIDE"
+    "WS_SPR_WIDE"
   ]
 }
 ```
