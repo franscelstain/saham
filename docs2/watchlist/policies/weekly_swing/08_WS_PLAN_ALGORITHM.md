@@ -33,19 +33,40 @@ Jika salah satu gagal => AVOID:
 - atr14_pct > risk.max_atr14_pct => WS_ATR_HIGH
 
 ### Step 3 — Compute component scores (0..1)
-WS memakai 4 komponen:
-1) score_momentum: clamp01((roc20 - roc_lo)/(roc_hi - roc_lo))
-   - jika roc20 < setup.mom_roc20_soft_min => set score_momentum = 0 dan tambah reason WS_MOM_SOFT_MIN
-2) score_breakout:
-   - jika close >= hh20: 1.0 tapi turun jika extended (bo_max_ext_pct)
-   - jika close < hh20: naik jika near (bo_near_below_pct)
-3) score_volume:
-   - 0 jika dv20 < min_dv20
-   - 1 jika dv20 >= dv20_strong
-   - linear di antaranya
-4) score_risk:
-   - peak di [atr_ideal_low..atr_ideal_high]
-   - turun menuju 0 saat mendekati min/max guard
+WS memakai 4 komponen. Semua komponen **wajib** deterministik dengan rumus berikut.
+
+Definisi helper (LOCKED):
+- `clamp01(x) = min(1, max(0, x))`
+
+1) **score_momentum** (ROC20):
+   - `roc_lo = setup.roc_lo`, `roc_hi = setup.roc_hi` (wajib `roc_hi > roc_lo`, divalidasi)
+   - `score_momentum = clamp01((roc20 - roc_lo) / (roc_hi - roc_lo))`
+   - Jika `roc20 < setup.mom_roc20_soft_min` ⇒ set `score_momentum = 0` dan tambah reason `WS_MOM_SOFT_MIN`.
+
+2) **score_breakout** (HH20):
+   - `level = hh20`
+   - `near = setup.bo_near_below_pct` (0..1), `ext = setup.bo_max_ext_pct` (0..1)
+   - Jika `setup.bo_trigger_mode = OFF` ⇒ `score_breakout = 0`.
+   - Jika `close >= level` (breakout):
+      - `p = (close / level) - 1`
+      - `score_breakout = clamp01(1 - (p / ext))`
+   - Jika `close < level` (near-breakout):
+      - `p = (level / close) - 1`
+      - `score_breakout = clamp01(1 - (p / near))`
+
+3) **score_volume** (DV20):
+   - `dv_min = liquidity.min_dv20_idr`, `dv_strong = liquidity.dv20_strong_idr` (wajib `dv_strong > dv_min`, divalidasi)
+   - Jika `dv20_idr <= dv_min` ⇒ `score_volume = 0`
+   - Jika `dv20_idr >= dv_strong` ⇒ `score_volume = 1`
+   - Selain itu ⇒ `score_volume = (dv20_idr - dv_min) / (dv_strong - dv_min)`
+
+4) **score_risk** (ATR14% band):
+   - `atr_min = risk.min_atr14_pct`, `atr_max = risk.max_atr14_pct`
+   - `atr_i_low = risk.atr_ideal_low`, `atr_i_high = risk.atr_ideal_high` (wajib `atr_min < atr_i_low <= atr_i_high < atr_max`, divalidasi)
+   - Jika `atr14_pct <= atr_min` atau `atr14_pct >= atr_max` ⇒ `score_risk = 0`
+   - Jika `atr_i_low <= atr14_pct <= atr_i_high` ⇒ `score_risk = 1`
+   - Jika `atr_min < atr14_pct < atr_i_low` ⇒ `score_risk = (atr14_pct - atr_min) / (atr_i_low - atr_min)`
+   - Jika `atr_i_high < atr14_pct < atr_max` ⇒ `score_risk = (atr_max - atr14_pct) / (atr_max - atr_i_high)`
 
 ### Step 4 — Combine total score
 score_total = clamp01( Σ(w_i * score_i) / Σw_i )
@@ -98,8 +119,13 @@ Rumus (R-multiple):
 - Jika `risk_per_share <= 0` ⇒ forced WATCH_ONLY dengan reason `WS_FW_RR_INV`.
 - `tp1_price = entry_ref + (rr_target * risk_per_share)`
 
-Catatan rounding (LOCKED):
-- `tp1_price` dibulatkan sesuai aturan rounding output PLAN yang sudah dikunci (lihat `grouping.rounding_mode` / output rounding spec).
+Catatan rounding & tick-size (LOCKED):
+- **Kontrak PLAN menyimpan angka hasil perhitungan tanpa pembulatan tick-size broker.**
+- Untuk mencegah drift floating-point, semua angka turunan PLAN **wajib** dinormalisasi sebelum disimpan/output/hashing:
+  - `PRICE_SCALE = 6` untuk: `entry_band_low`, `entry_band_high`, `entry_band_mid`, `entry_ref`, `stop_price`, `tp1_price`.
+  - `RATIO_SCALE = 6` untuk: `risk_per_share`, `rr`.
+  - Normalisasi menggunakan `ROUND_HALF_UP`.
+- `grouping.rounding_mode` **tidak** dipakai untuk rounding harga; itu hanya untuk rounding target dinamis (dok 09).
 
 - rr dihitung dan disimpan
 

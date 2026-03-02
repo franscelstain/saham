@@ -16,9 +16,13 @@ Aturan yang dikunci:
 - Urutan pipeline **wajib**: **Eligible → Score → Cutoff quantile → Qualified pools → Target dinamis → Final mapping**.
 - **Qualified pool wajib** untuk masuk **TOP_PICKS** dan **SECONDARY**.
 - **Target dinamis** boleh bernilai **0** (contoh: stop condition / pool kosong) dan kondisi ini **wajib tercatat**.
-- Ranking dan tie-break:
-  - sort utama: `score_total DESC`
-  - tie-break: `ticker_id ASC`
+- Ranking final mengikuti `grouping.sort_keys` (LOCKED) dengan urutan exact:
+  1. `score_total DESC`
+  2. `score_breakout DESC`
+  3. `score_momentum DESC`
+  4. `dv20_idr DESC`
+  5. `atr14_pct ASC`
+  6. `ticker_id ASC`
 - Reason codes **wajib** menggunakan dictionary reason codes (tidak boleh membuat code baru di output):
   - dipilih (TOP_PICKS/SECONDARY): `WS_SEL_PCT`
   - eligible tapi tersembunyi karena cutoff/target: `WS_HID_PCT`
@@ -72,6 +76,15 @@ Urutan berikut **wajib** dan menjadi acuan implementasi:
      - `top_cutoff_today = quantile(score_total, grouping.top_min_score_q.value)`
      - `secondary_cutoff_today = quantile(score_total, grouping.secondary_min_score_q.value)`
    - `grouping.top_min_score_q` dan `grouping.secondary_min_score_q` berasal dari backtest (BT).
+
+**Definisi `quantile()` (LOCKED, deterministic):**
+- Input: daftar nilai `score_total` dari `eligible_pool` (N buah), dengan setiap item punya `ticker_id`.
+- Jika `N=0` (eligible_pool kosong) ⇒ `top_cutoff_today` dan `secondary_cutoff_today` = `NULL` dan run wajib menghasilkan status `NO_TRADE`.
+- Urutkan ascending dengan kunci deterministik: `(score_total ASC, ticker_id ASC)`.
+- Untuk `q` di [0..1], definisikan indeks diskrit:
+  - `k = ceil(q * N)` dengan batas `k ∈ [1..N]` (jika `q=0` ⇒ `k=1`; jika `q=1` ⇒ `k=N`).
+- Output: `quantile = score_total` pada posisi ke-`k` (1-based) dari list terurut.
+- Ini setara dengan **percentile_disc**. Tidak boleh pakai interpolasi (`percentile_cont`).
 
 4) **Qualified pools**
    - `top_pool = { ticker ∈ eligible_pool | score_total >= top_cutoff_today }`
@@ -146,13 +159,13 @@ Jika ada `min-count overrides`, override hanya boleh:
 ## Final mapping: group semantics + reason codes (LOCKED)
 
 ### A) TOP_PICKS
-- Ambil `top_picks_target_dynamic` ticker teratas dari `top_pool` (sort by `score_total DESC`, tie-break `ticker_id ASC`).
+- Ambil `top_picks_target_dynamic` ticker teratas dari `top_pool` menggunakan `grouping.sort_keys` (LOCKED).
 - Beri decision/group: `TOP_PICKS`
 - Reason code:
   - `WS_SEL_PCT` (dipilih karena lolos cutoff quantile dan masuk peringkat).
 
 ### B) SECONDARY
-- Ambil `secondary_target_dynamic` ticker teratas dari `secondary_pool` (sort rule sama).
+- Ambil `secondary_target_dynamic` ticker teratas dari `secondary_pool` menggunakan `grouping.sort_keys` (LOCKED).
 - Group: `SECONDARY`
 - Reason code:
   - `WS_SEL_PCT`
@@ -181,8 +194,7 @@ Semua diletakkan di `watchlist_plan_runs.run_metrics_json`.
 ### FAILED stop condition
 Kondisi berikut adalah hard-fail dan wajib menghasilkan `run_status = FAILED`:
 - data EOD belum lengkap / batch invalid,
-- coverage eligible terlalu kecil,
-- market check gagal.
+- coverage eligible terlalu kecil.
 
 Jika FAILED aktif:
 - `top_picks_target_dynamic=0`, `secondary_target_dynamic=0`,

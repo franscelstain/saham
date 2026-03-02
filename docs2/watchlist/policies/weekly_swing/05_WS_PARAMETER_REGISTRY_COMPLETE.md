@@ -347,17 +347,24 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: hanya via recalibration BT.
   - Cara ubah: kalibrasi BT → promote paramset.
 
-- `grouping.grouping_mode` (enum: `QUANTILE_DYNAMIC` | `TARGET_ONLY`) — mode pembentukan grup.
+- `grouping.grouping_mode` (LOCKED enum: `QUALIFIED_POOLS_QUANTILE_CUTOFF`) — mode pembentukan grup.
   - Origin: DET
-  - Alasan: supaya semantik grup konsisten lintas run.
-  - Kapan diubah: jika policy grouping diubah.
-  - Cara ubah: ubah di paramset + contract tests.
+  - Alasan: selection Weekly Swing hanya menggunakan qualified pools + cutoff quantile + target dinamis.
+  - Kapan diubah: hanya jika desain selection policy berubah secara breaking.
+  - Cara ubah: ubah registry + validator + contract tests secara serempak.
 
-- `grouping.sort_keys` (array<string>) — urutan kunci sort untuk ranking final (LOCKED).
+- `grouping.sort_keys` (LOCKED array<string>) — urutan kunci sort untuk ranking final.
+  - Exact order:
+    1. `score_total_desc`
+    2. `score_breakout_desc`
+    3. `score_momentum_desc`
+    4. `dv20_idr_desc`
+    5. `atr14_pct_asc`
+    6. `ticker_id_asc`
   - Origin: DET
   - Alasan: determinisme ranking (anti “reranking” tidak sengaja).
   - Kapan diubah: hanya saat desain ranking berubah (breaking change).
-  - Cara ubah: ubah di paramset + update hash_contract + contract tests.
+  - Cara ubah: ubah registry + validator + hash_contract + contract tests secara serempak.
 
 - `grouping.rounding_mode` (enum: `FLOOR` | `ROUND` | `CEIL`) — aturan pembulatan target dinamis (LOCKED).
   - Origin: DET
@@ -367,11 +374,11 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 ### H. Plan levels
 
-- `plan_levels.entry_mode` (enum: `CLOSE_AS_REF` | `BAND` | `OFF`) — mode pembentukan `entry_ref`/band.
-  - Origin: DET+MAN
-  - Alasan: PLAN butuh level entry yang eksplisit untuk CONFIRM drift check.
-  - Kapan diubah: jika definisi entry plan berubah.
-  - Cara ubah: ubah di paramset + contract tests.
+- `plan_levels.entry_mode` (LOCKED enum: `BREAKOUT`) — mode pembentukan entry band.
+  - Origin: DET
+  - Alasan: Weekly Swing menggunakan entry band breakout yang diturunkan menjadi `entry_ref`, `entry_min`, dan `entry_max`.
+  - Kapan diubah: hanya jika desain PLAN berubah secara breaking.
+  - Cara ubah: ubah registry + validator + active paramset + algorithm docs secara serempak.
 
 - `plan_levels.entry_band_pct` (0..1) — lebar band entry ±% dari `entry_ref` jika `entry_mode=BAND`.
   - Origin: MAN/BT

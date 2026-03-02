@@ -16,7 +16,7 @@ Mengunci struktur params_json WS agar code tidak memakai parameter implicit/hard
 03_WS_DATA_MODEL_MARIADB.md
 
 ## Inputs
-- Daftar parameter WS (lihat 09 registry)
+- Daftar parameter WS (lihat 05 registry)
 
 ## Process
 ### 1) Identity lock
@@ -45,7 +45,7 @@ WS wajib memiliki blok berikut:
 - hash_contract dp fixed
 
 ### 4) Contoh params_json
-File ini tidak menyertakan JSON penuh; gunakan 09 registry + validator 10 sebagai sumber kebenaran.
+File ini tidak menyertakan JSON penuh; gunakan 05 registry + validator 06 sebagai sumber kebenaran.
 Implementasi harus memuat field audit: origin/status/bt_target/rationale/change_triggers untuk tiap parameter.
 
 ## Outputs
