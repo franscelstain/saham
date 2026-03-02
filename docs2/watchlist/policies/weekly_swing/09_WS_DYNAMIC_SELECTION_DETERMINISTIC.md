@@ -9,13 +9,13 @@ Kontrak utama:
 
 ## Normative Summary (LOCKED)
 
-Bagian ini bersifat **normatif (mengikat)**; contoh bersifat **non-normatif (ilustrasi)**. Jika terjadi konflik, yang dipakai adalah aturan normatif.
+Bagian ini bersifat **normatif (mengikat)**. Bagian ilustrasi (jika ada) bersifat **non-normatif**. Jika terjadi konflik, yang dipakai adalah aturan normatif.
 
 Aturan yang dikunci:
 - Sistem selection **hanya satu**: **Qualified Pools + Cutoff Quantile (BT) + target dinamis**. Tidak ada metode selection lain.
 - Urutan pipeline **wajib**: **Eligible → Score → Cutoff quantile → Qualified pools → Target dinamis → Final mapping**.
 - **Qualified pool wajib** untuk masuk **TOP_PICKS** dan **SECONDARY**.
-- **Target dinamis** boleh bernilai **0** (contoh: stop condition / pool kosong) dan kondisi ini **wajib tercatat**.
+- **Target dinamis** boleh bernilai **0** dan kondisi ini **wajib tercatat**.
 - Ranking final mengikuti `grouping.sort_keys` (LOCKED) dengan urutan exact:
   1. `score_total DESC`
   2. `score_breakout DESC`
@@ -64,7 +64,7 @@ Urutan berikut **wajib** dan menjadi acuan implementasi:
 
 1) **Eligible pool**
    - Mulai dari universe WS.
-   - Terapkan guardrails (likuiditas/volatilitas/dll) + `data_ready`.
+   - Terapkan guardrails: likuiditas (dv20_idr), volatilitas (atr14_pct), dan exclude_tickers; lalu terapkan `data_ready`.
    - Hasil: `eligible_pool`.
 
 2) **Score**
@@ -135,8 +135,8 @@ Cutoff harian ini disimpan di `watchlist_plan_runs.run_metrics_json` untuk audit
 - AVOID:
   - fail guardrails berat atau data tidak siap (reason code wajib).
 
-### F) Pool bisa 0 walaupun ada skor tinggi
-Jika `top_pool` kosong (mis. cutoff tinggi + core signals tidak terpenuhi), TOP_PICKS bisa 0. Ini valid untuk menjaga kualitas.
+### F) Pool boleh 0 walaupun ada ticker skor tinggi
+Jika `top_pool` kosong (misalnya cutoff tinggi + core signals tidak terpenuhi), maka `TOP_PICKS` boleh bernilai 0. Ini valid untuk menjaga kualitas.
 
 ## Target dinamis (LOCKED)
 Paramset menyimpan base target (MAN):
@@ -199,7 +199,7 @@ Kondisi berikut adalah hard-fail dan wajib menghasilkan `run_status = FAILED`:
 Jika FAILED aktif:
 - `top_picks_target_dynamic=0`, `secondary_target_dynamic=0`,
 - hasil PLAN tidak ditampilkan,
-- reason run-level disimpan sebagai `fail_code`.
+- `fail_code` run-level **wajib** diisi.
 
 ### NO_TRADE stop condition
 Kondisi berikut valid menghasilkan `run_status = NO_TRADE`:
@@ -210,7 +210,7 @@ Jika NO_TRADE aktif:
 - `top_picks_target_dynamic=0`, `secondary_target_dynamic=0`,
 - output API/UI tidak menampilkan kandidat,
 - persistence audit tetap menyimpan item dengan `display_bucket = HIDE`,
-- reason run-level disimpan sebagai `fail_code`.
+- `fail_code` run-level **wajib** diisi.
 
 ## Next
 ### Weekly Swing

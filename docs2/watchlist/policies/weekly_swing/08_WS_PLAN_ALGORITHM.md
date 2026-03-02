@@ -5,11 +5,12 @@ Menetapkan algoritma PLAN WS dari EOD snapshot sampai menghasilkan plan_items de
 
 ## Prerequisites
 ### Weekly Swing
-07_WS_REASON_CODES_AND_HASH.md
+- 07_WS_REASON_CODES_AND_HASH.md
+- ../../../db/04_EOD_INDICATORS.md (LOCKED — definisi indikator EOD: dv20_idr, atr14_pct, roc20, hh20)
 
 ## Inputs
 - asof_eod_date D
-- OHLCV(D), indicators(D): dv20_idr, atr14_pct, roc20, hh20
+- OHLCV(D), indicators(D): dv20_idr, atr14_pct, roc20, hh20 (lihat kontrak: `../../../db/04_EOD_INDICATORS.md`)
 - params_json WS (ACTIVE)
 
 ## Process
@@ -127,9 +128,6 @@ Catatan rounding & tick-size (LOCKED):
   - Normalisasi menggunakan `ROUND_HALF_UP`.
 - `grouping.rounding_mode` **tidak** dipakai untuk rounding harga; itu hanya untuk rounding target dinamis (dok 09).
 
-- rr dihitung dan disimpan
-
-Catatan: Rounding & tick-size mengikuti input harga yang tersedia; kontrak watchlist menyimpan angka hasil perhitungan tanpa pembulatan tick-size (pembulatan dilakukan saat eksekusi manual di broker).
 
 ## Outputs
 - per ticker: scores + plan levels + preliminary classification + reasons.
