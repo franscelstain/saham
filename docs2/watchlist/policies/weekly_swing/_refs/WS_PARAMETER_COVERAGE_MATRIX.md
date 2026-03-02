@@ -29,14 +29,14 @@ last_updated=2026-02-22
 | `data_readiness.outlier_ruleset.value.max_abs_return_1d_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `data_readiness.reject_if_eod_incomplete` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
-| `grouping.grouping_mode` | Y | Y | Y | 06,12 | see 09 | see 03 |
+| `grouping.grouping_mode` | Y | Y | Y | 06,13 | see 09 | see 03 |
 | `grouping.rounding_mode` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `grouping.sort_keys` | Y | Y | Y | 06,12 | see 09 | see 03 |
+| `grouping.sort_keys` | Y | Y | Y | 06,13 | see 09 | see 03 |
 | `hash_contract.null_handling` | Y | Y | Y | 06 | see 09 | see 03 |
 | `hash_contract.order_by` | Y | Y | Y | 06,07 | see 09 | see 03 |
 | `hash_contract.scales` | Y | Y | Y | 06 | see 09 | see 03 |
 | `liquidity.dv20_strong_idr` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `liquidity.exclude_tickers` | Y | Y | Y | 06,08,11 | see 09 | see 03 |
+| `liquidity.exclude_tickers` | Y | Y | Y | 06,08,12 | see 09 | see 03 |
 | `liquidity.min_dv20_idr` | Y | Y | Y | 06,07,08 | see 09 | see 03 |
 | `no_trade.min_eligible_count` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
 | `no_trade.no_trade_hides_all.value` | Y | Y | Y | 06 | see 09 | see 03 |

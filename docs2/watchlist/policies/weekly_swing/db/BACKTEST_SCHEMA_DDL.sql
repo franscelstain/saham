@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS watchlist_bt_universe_ws (
   atr14_pct       DECIMAL(10,6) NULL,
   vol_ratio       DECIMAL(10,6) NULL,
 
-  -- canonical reason for NOT eligible (must follow priority in doc 14)
+  -- canonical reason for NOT eligible (must follow priority in doc 15)
   reason_code     VARCHAR(32) NULL,
 
   PRIMARY KEY (asof_eod_date, ticker_id),

@@ -94,6 +94,40 @@ CREATE TABLE IF NOT EXISTS watchlist_confirm_items (
   CONSTRAINT FK_confirm_items_check FOREIGN KEY (confirm_check_id) REFERENCES watchlist_confirm_checks(confirm_check_id)
 ) ENGINE=InnoDB;
 
+
+-- 6) watchlist_confirm_snapshots (manual intraday snapshot source for CONFIRM)
+CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
+  snapshot_id BIGINT NOT NULL AUTO_INCREMENT,
+  policy_code VARCHAR(16) NOT NULL,
+  trade_date DATE NOT NULL,
+  captured_at DATETIME NOT NULL,
+  inserted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source VARCHAR(32) NOT NULL,
+  note TEXT NULL,
+  snapshot_hash CHAR(64) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (snapshot_id),
+  KEY IDX_snapshots_policy_date_time (policy_code, trade_date, captured_at)
+) ENGINE=InnoDB;
+
+-- 7) watchlist_confirm_snapshot_items (manual intraday snapshot items)
+CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshot_items (
+  snapshot_item_id BIGINT NOT NULL AUTO_INCREMENT,
+  snapshot_id BIGINT NOT NULL,
+  ticker_id BIGINT NOT NULL,
+  last_price DECIMAL(18,2) NOT NULL,
+  bid_price DECIMAL(18,2) NULL,
+  ask_price DECIMAL(18,2) NULL,
+  bid_size BIGINT NULL,
+  ask_size BIGINT NULL,
+  data_json LONGTEXT NOT NULL,
+  item_hash CHAR(64) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (snapshot_item_id),
+  KEY IDX_snapshot_items_snap_ticker (snapshot_id, ticker_id),
+  CONSTRAINT FK_snapshot_items_header FOREIGN KEY (snapshot_id) REFERENCES watchlist_confirm_snapshots(snapshot_id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
   fail_code VARCHAR(64) NOT NULL,
   scope ENUM('PLAN','CONFIRM','BOTH') NOT NULL,

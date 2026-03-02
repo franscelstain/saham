@@ -1,4 +1,4 @@
-# 14 - WS Universe & Data-Quality Equivalence Contract (LOCKED)
+# 15 - WS Universe & Data-Quality Equivalence Contract (LOCKED)
 
 ## Purpose (LOCKED)
 Backtest WS dianggap valid hanya jika universe selection dan data-quality guardrails pada backtest
@@ -14,7 +14,7 @@ Dokumen ini bersifat LOCKED dan menjadi kontrak anti-drift.
 
 ## Prerequisites
 ### Weekly Swing
-13_WS_BT_COVERAGE_MATRIX_LOCKED.md
+14_WS_BT_COVERAGE_MATRIX_LOCKED.md
 
 ---
 
@@ -181,4 +181,4 @@ Jika production belum punya export, wajib ditambahkan karena kontrak ini menuntu
 
 ## Next
 ### Weekly Swing
-- 15_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md
+- 16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md

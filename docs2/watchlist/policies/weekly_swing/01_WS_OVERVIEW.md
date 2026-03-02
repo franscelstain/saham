@@ -30,7 +30,7 @@ Policy ini menghasilkan:
 - CONFIRM overlay intraday (bisa berubah 5–10 menit), hanya memberi label dan alasan tambahan.
 
 ## Isi dokumen (urut)
-02 → 13 berurutan:
+02 → 20 berurutan:
 - 02: Eksekusi canonical (PLAN + CONFIRM) — urutan eksekusi
 - 03: Schema & data model WS (MariaDB 10.4) 
 - 04: Kontrak params_json WS (termasuk key deterministik)
@@ -40,22 +40,23 @@ Policy ini menghasilkan:
 - 08: Algoritma PLAN WS
 - 09: Selection dinamis deterministik (SHOW/HIDE)
 - 10: CONFIRM overlay WS
-- 11: Backtest schema & calibration WS
-- 12: Contract tests WS (tambahan di atas global)
-- 13: BT Coverage Matrix (LOCKED)
-- 14: Universe & Data-Quality Equivalence Contract (LOCKED)
-- 15: Evaluation Metrics Sufficiency (LOCKED)
-- 16: Walk-forward / Out-of-Sample Proof (LOCKED)
-- 17: Backtest Artifact Manifest (LOCKED)
-- 18: Deprecated / Non-scope Artifacts Ledger
-- 19: Canonical procedures WS (paramset promotion & active pick)
+- 11: Tabel Input Manual Intraday Snapshot (CONFIRM)
+- 12: Backtest schema & calibration WS
+- 13: Contract tests WS (tambahan di atas global)
+- 14: BT Coverage Matrix (LOCKED)
+- 15: Universe & Data-Quality Equivalence Contract (LOCKED)
+- 16: Evaluation Metrics Sufficiency (LOCKED)
+- 17: Walk-forward / Out-of-Sample Proof (LOCKED)
+- 18: Backtest Artifact Manifest (LOCKED)
+- 19: Deprecated / Non-scope Artifacts Ledger
+- 20: Canonical procedures WS (paramset promotion & active pick)
 - Catatan: artefak SQL (seed/promote/backtest DDL) berada di folder `db/` pada level Weekly Swing.
 
 ## Artefak SQL
 
 - Backtest universe (wajib): `watchlist_bt_universe_ws` dibuat di `db/BACKTEST_SCHEMA_DDL.sql`.
  (bukan dokumen bernomor)
-Artefak SQL untuk Weekly Swing berada di folder `db/` dan **bukan** bagian dari urutan dokumen `01_..13_` (MD).
+Artefak SQL untuk Weekly Swing berada di folder `db/` dan **bukan** bagian dari urutan dokumen `01_..20_` (MD).
 
 File yang tersedia saat ini:
 - `db/BACKTEST_SCHEMA_DDL.sql`

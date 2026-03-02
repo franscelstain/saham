@@ -1,4 +1,4 @@
-# 13 - WS Backtest Coverage Matrix (LOCKED)
+# 14 - WS Backtest Coverage Matrix (LOCKED)
 
 ## Purpose (LOCKED)
 Dokumen ini adalah bukti formal bahwa parameter ber-origin **BT**:
@@ -11,7 +11,7 @@ maka origin BT dianggap **tidak valid** (harus downgrade ke MAN/DET sampai cover
 
 ## Prerequisites
 ### Weekly Swing
-- 12_WS_CONTRACT_TEST_CHECKLIST.md
+- 13_WS_CONTRACT_TEST_CHECKLIST.md
 
 ---
 
@@ -78,4 +78,4 @@ Untuk setiap pick:
 
 ## Next
 ### Weekly Swing
-- 14_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md
+- 15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md

@@ -1,4 +1,4 @@
-# WS Evaluation Metrics Sufficiency (LOCKED)
+# 16 - WS Evaluation Metrics Sufficiency (LOCKED)
 
 ## Purpose (LOCKED)
 Menetapkan bahwa metrik di `watchlist_bt_eval` cukup untuk:
@@ -10,7 +10,7 @@ Kalibrasi WS dianggap TIDAK VALID jika metrik minimum pada dokumen ini tidak ter
 
 ## Prerequisites
 ### Weekly Swing
-14_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md
+15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md
 
 ---
 
@@ -134,4 +134,4 @@ Agar metrik cukup dan repeatable, wajib ada:
 
 ## Next
 ### Weekly Swing
-- 16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
+- 17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md

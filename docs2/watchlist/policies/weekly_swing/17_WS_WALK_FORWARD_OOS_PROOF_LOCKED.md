@@ -1,4 +1,4 @@
-# 16 - WS Walk-Forward / Out-of-Sample Proof (LOCKED)
+# 17 - WS Walk-Forward / Out-of-Sample Proof (LOCKED)
 
 ## Purpose (LOCKED)
 Membuktikan bahwa parameter terbaik hasil kalibrasi tidak hanya menang di in-sample,
@@ -12,7 +12,7 @@ Tanpa OOS proof, hasil kalibrasi hanya boleh berstatus DRAFT.
 
 ## Prerequisites
 ### Weekly Swing
-15_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md
+16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md
 
 ---
 
@@ -32,7 +32,7 @@ Split harus berbasis urutan waktu (time series), bukan random split.
 ### Step 1: Calibrate on IS
 - Jalankan backtest grid pada IS window.
 - Pilih `param_id_best_is` dengan ranking policy + gating rules dari:
-  `15_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`
+  `16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`
 
 ### Step 2: Evaluate on OOS
 - Jalankan evaluasi pada OOS window menggunakan `param_id_best_is` TANPA re-tuning.
@@ -88,4 +88,4 @@ Contoh:
 
 ## Next
 ### Weekly Swing
-- 17_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md
+- 18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md

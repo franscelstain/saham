@@ -68,3 +68,16 @@ Menetapkan mapping kebutuhan WS terhadap schema global watchlist (tabel global a
 ## Next
 ### Weekly Swing
 - 04_WS_PARAMSET_JSON_CONTRACT.md
+
+---
+
+## CONFIRM Snapshot Tables (LOCKED)
+
+Weekly Swing CONFIRM menggunakan snapshot manual yang disimpan di DB:
+- `watchlist_confirm_snapshots`
+- `watchlist_confirm_snapshot_items`
+
+Spesifikasi tabel + kolom wajib + contoh data:
+- 11_WS_INTRADAY_SNAPSHOT_TABLES.md
+
+TTL (LOCKED): `snapshot_max_age_sec = 900` dihitung dari `effective_captured_at = LEAST(captured_at, inserted_at)`.

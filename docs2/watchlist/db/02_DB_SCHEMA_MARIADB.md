@@ -133,3 +133,102 @@ Index minimal:
 
 ## DDL
 DDL lengkap tabel global watchlist ada di: `05_DB_DDL_MARIADB.sql`.
+
+
+## D) Intraday snapshot (manual input for CONFIRM)
+
+### 1) watchlist_confirm_snapshots
+Header snapshot intraday untuk CONFIRM (append-only).
+- snapshot_id (PK)
+- policy_code
+- trade_date
+- captured_at
+- inserted_at
+- source
+- note
+- snapshot_hash
+- created_at
+
+### 2) watchlist_confirm_snapshot_items
+Detail per ticker untuk snapshot.
+- snapshot_item_id (PK)
+- snapshot_id (FK)
+- ticker_id
+- last_price
+- bid_price (nullable)
+- ask_price (nullable)
+- bid_size (nullable)
+- ask_size (nullable)
+- data_json
+- item_hash
+- created_at
+
+---
+
+## CONFIRM (Intraday Snapshot Manual) Tables (LOCKED)
+
+Weekly Swing CONFIRM memakai snapshot manual yang disimpan di DB (bukan real-time). Struktur tabel berikut adalah FINAL.
+
+Lihat juga: `watchlist/policies/weekly_swing/11_WS_INTRADAY_SNAPSHOT_TABLES.md`.
+
+### Table: watchlist_confirm_snapshots
+```sql
+CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
+  snapshot_id       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  policy_code       VARCHAR(8)  NOT NULL,
+  trade_date        DATE        NOT NULL,
+  captured_at       DATETIME    NOT NULL,
+  inserted_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source            VARCHAR(32) NOT NULL DEFAULT 'manual',
+  note              VARCHAR(255) NULL,
+  snapshot_hash     CHAR(64)    NULL,
+  created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (snapshot_id),
+  KEY idx_snap_policy_trade_captured (policy_code, trade_date, captured_at),
+  KEY idx_snap_trade_inserted (trade_date, inserted_at)
+) ENGINE=InnoDB;
+```
+
+### Table: watchlist_confirm_snapshot_items
+```sql
+CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshot_items (
+  item_id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  snapshot_id       BIGINT UNSIGNED NOT NULL,
+
+  ticker_code       VARCHAR(16) NOT NULL,
+  ticker_id         BIGINT UNSIGNED NULL,
+
+  last_price        INT UNSIGNED NOT NULL,
+  bid1_price        INT UNSIGNED NOT NULL,
+  bid1_lots         INT UNSIGNED NOT NULL,
+  ask1_price        INT UNSIGNED NOT NULL,
+  ask1_lots         INT UNSIGNED NOT NULL,
+
+  bid_lots_sum_5    INT UNSIGNED NOT NULL,
+  ask_lots_sum_5    INT UNSIGNED NOT NULL,
+  bid_lots_sum_10   INT UNSIGNED NOT NULL,
+  ask_lots_sum_10   INT UNSIGNED NOT NULL,
+
+  spread            INT UNSIGNED NOT NULL,
+  spread_pct        DECIMAL(10,6) NOT NULL,
+  imbalance_5       DECIMAL(10,6) NOT NULL,
+  imbalance_10      DECIMAL(10,6) NOT NULL,
+
+  orderbook_json    JSON NOT NULL,
+  item_hash         CHAR(64) NULL,
+
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (item_id),
+  UNIQUE KEY uq_snap_ticker (snapshot_id, ticker_code),
+  KEY idx_item_snap (snapshot_id),
+  KEY idx_item_ticker (ticker_code),
+
+  CONSTRAINT fk_wcs_items_snapshot
+    FOREIGN KEY (snapshot_id)
+    REFERENCES watchlist_confirm_snapshots(snapshot_id)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT
+) ENGINE=InnoDB;
+```

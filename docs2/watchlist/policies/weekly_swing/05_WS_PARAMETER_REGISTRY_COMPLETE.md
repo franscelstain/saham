@@ -111,7 +111,7 @@ Parameter **tidak** diubah karena “feeling”. Ubah hanya jika ada sinyal obje
 - Origin **MAN**: perubahan boleh manual, tapi wajib tercatat (who/when/why) dan menghasilkan paramset baru.
 
 ### Rule (LOCKED): BT origin must be proven
-Parameter boleh origin=BT hanya jika tercakup pada `13_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
+Parameter boleh origin=BT hanya jika tercakup pada `14_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
 Jika tidak, origin wajib MAN/DET sampai coverage valid.
 
 ## Namespace rules (LOCKED)

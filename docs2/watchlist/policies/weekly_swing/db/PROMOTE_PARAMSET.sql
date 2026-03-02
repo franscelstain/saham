@@ -1,4 +1,4 @@
--- 14_WS_PROMOTE_PARAMSET.sql
+-- 15_WS_PROMOTE_PARAMSET.sql
 -- Util script khusus WS untuk promosi param_set. Validasi JSON tetap wajib di app layer.
 
 SET @POLICY := 'WS';

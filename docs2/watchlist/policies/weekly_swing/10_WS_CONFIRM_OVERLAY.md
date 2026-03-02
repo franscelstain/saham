@@ -1,73 +1,107 @@
-# 10 — CONFIRM Overlay (Intraday) — Weekly Swing
+# 10 — CONFIRM Overlay (Intraday Snapshot) — Weekly Swing
 
 ## Purpose
-Menetapkan CONFIRM sebagai pengecekan keyakinan runtime yang tidak boleh mengubah PLAN.
+Menetapkan CONFIRM sebagai **pengecekan keyakinan** berbasis **intraday snapshot manual** yang:
+
+- **tidak boleh mengubah PLAN** (PLAN immutability),
+- **tidak mengklaim real-time** (snapshot = sumber kebenaran CONFIRM),
+- otomatis **tidak sah** (EXPIRED) jika snapshot melewati TTL,
+- memaksa output yang **tidak bisa diperdebatkan**: benar/salahnya CONFIRM hanya ditentukan oleh **snapshot yang diinput** dan **usia snapshot**.
 
 ## Prerequisites
-### Weekly Swing
-09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md
+- 09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md
+- 11_WS_INTRADAY_SNAPSHOT_TABLES.md (tabel & kolom input manual CONFIRM)
 
-## Inputs
-- plan_run aktif untuk plan_trade_date T
-- runtime price (last_price) per ticker (minimal)
-- bid/ask opsional (manual input)
-- checked_at, snapshot_age_sec
+---
 
-## Process
-### Universe confirm
-hanya ticker yang PLAN display_bucket=SHOW (fokus).
+## Inputs (LOCKED)
 
-### Staleness rule
-- Jika snapshot_age_sec > confirm_overlay.snapshot_max_age_sec:
-  - label = DELAY
-  - reason WS_STALE
-  - tetap disimpan (audit)
+### A) PLAN
+- `plan_run_id` untuk `trade_date = T`
+- `plan_items[]` (ranking, group_semantic, score_total, reasons PLAN)
 
-### Compute checks
-1) drift_from_entry_pct:
-   - dibandingkan entry_ref/entry band
-   - jika drift > confirm_overlay.max_drift_from_entry_pct => CAUTION (WS_DRIFT_FAR)
-2) entry band check:
-   - jika last_price di luar band => CAUTION (WS_OUT_BAND)
-3) spread check (jika bid/ask ada):
-   - spread_pct = (ask-bid)/mid*100
-   - jika > confirm_overlay.spread_max_pct => CAUTION (WS_SPR_WIDE)
-   - jika bid/ask tidak ada => INFO (WS_SPR_NA)
+### B) CONFIRM snapshot (manual, dari DB)
+Snapshot berasal dari tabel:
+- `watchlist_confirm_snapshots`
+- `watchlist_confirm_snapshot_items`
 
-### Label
+**Kolom wajib per ticker** dan contoh data wajib mengikuti:
+- 11_WS_INTRADAY_SNAPSHOT_TABLES.md
 
-### Mapping label ↔ label code (LOCKED)
+### C) Timestamps
+- `captured_at` (diisi manual)
+- `inserted_at` (otomatis)
+- `checked_at` (waktu CONFIRM dijalankan)
 
-- CONFIRMED = `WS_LBL_OK`
-- NEUTRAL   = `WS_LBL_NEU`
-- CAUTION   = `WS_LBL_WARN`
-- DELAY     = `WS_LBL_DELAY`
+**LOCKED anti-manipulasi:**
+- `effective_captured_at = LEAST(captured_at, inserted_at)`
 
-### Label decision rule (LOCKED)
+---
 
-Tentukan label berdasarkan severity tertinggi dari reason CONFIRM:
-1) Jika ada reason severity **BLOCK** ⇒ label **DELAY**.
-2) Else jika ada reason severity **WARN** ⇒ label **CAUTION**.
-3) Else jika hanya ada reason severity **INFO** (contoh: `WS_SPR_NA`) ⇒ label **NEUTRAL**.
-4) Else (tidak ada reason) ⇒ label **CONFIRMED**.
+## Validity & TTL (LOCKED)
 
-- DELAY: stale atau missing runtime price
-- CAUTION: ada warning drift/band/spread
-- CONFIRMED: tidak ada warning dan runtime ada
-- NEUTRAL: runtime ada tapi evaluasi terbatas (mis tanpa bid/ask) dan tidak warning
+### TTL CONFIRM (Weekly Swing)
+- `snapshot_max_age_sec = 900` (**15 menit**)
 
-## Outputs
-- confirm_check + confirm_items tersimpan terpisah.
-- Tidak ada update ke plan tables.
+Hitung:
+- `snapshot_age_sec = checked_at - effective_captured_at`
 
-## Failure modes
-- Tidak ada plan aktif => CONFIRM tidak dijalankan jika tidak ada PLAN aktif (plan snapshot belum dibuat).
+Aturan:
+- Jika `snapshot_age_sec > 900` → snapshot **EXPIRED** → output CONFIRM **wajib**:
+  - `decision = DELAY` (atau NO_TRADE sesuai policy)
+  - reason code wajib: `WS_STALE`
+- Jika tidak ada snapshot → `decision = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
 
-## Reference
-- `_refs/WS_WORKED_EXAMPLE_E2E.md`
-- `_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`
-- `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`
+**LOCKED:** snapshot yang diambil masa lalu tapi baru diinput sekarang **tetap sah sebagai snapshot**, namun bisa menjadi **EXPIRED** karena TTL.
 
-## Next
-### Weekly Swing
-- 11_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md
+---
+
+## Output Model (LOCKED)
+
+CONFIRM menghasilkan output terpisah, minimal:
+- `confirm_run_id`
+- `checked_at`
+- `snapshot_id` (yang dipakai)
+- `snapshot_age_sec`
+- `items[]`:
+  - `ticker_code`
+  - `plan_group_semantic` (dari PLAN, immutable)
+  - `plan_score_total` (dari PLAN, immutable)
+  - `confirm_decision` (BUY_OK / WAIT / DELAY / AVOID sesuai implementasi)
+  - `confirm_reasons[]` (reason codes CONFIRM)
+
+---
+
+## PLAN Immutability (LOCKED Invariant)
+
+CONFIRM **dilarang**:
+- mengubah record PLAN
+- mengubah ranking PLAN
+- mengubah `score_total`
+- mengubah `group_semantic`
+- mengganti top picks / secondary
+
+Cara enforce (wajib ada di test/contract):
+- `plan_hash_before == plan_hash_after`
+- jumlah item PLAN tidak berubah
+- urutan ranking PLAN tidak berubah
+
+---
+
+## Snapshot Storage Rules (LOCKED)
+
+- Snapshot bersifat **append-only** (UPDATE/DELETE dilarang).
+- Jika input ulang snapshot untuk ticker yang sama, buat **snapshot baru** (snapshot_id baru).
+- `orderbook_json` boleh `{}` jika tidak menyimpan ladder; namun kolom ringkasan (`sum_5/sum_10`, spread, imbalance) **wajib** terisi.
+
+---
+
+## Execution Steps (reference)
+
+1) Load PLAN untuk `trade_date=T`
+2) Load snapshot terbaru untuk `(policy_code='WS', trade_date=T)` berdasarkan `captured_at DESC`
+3) Hitung TTL berdasarkan `effective_captured_at`
+4) Jika invalid → hasilkan CONFIRM output dengan `DELAY + WS_STALE`
+5) Jika valid → hitung rules CONFIRM sesuai implementasi (menggunakan fields snapshot)
+6) Output CONFIRM **tidak mengubah PLAN** (invariant harus lolos)
+

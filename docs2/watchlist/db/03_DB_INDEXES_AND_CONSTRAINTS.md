@@ -52,3 +52,8 @@ Mengunci constraint dan invariants agar snapshot immutable, deterministik, dan d
 
 ## Next
 04_DB_SEED_GLOBAL.sql
+
+## Intraday snapshot (CONFIRM manual)
+- `watchlist_confirm_snapshots.IDX_snapshots_policy_date_time` (policy_code, trade_date, captured_at)
+- `watchlist_confirm_snapshot_items.IDX_snapshot_items_snap_ticker` (snapshot_id, ticker_id)
+- FK: snapshot_items_header (snapshot_id) -> watchlist_confirm_snapshots(snapshot_id)

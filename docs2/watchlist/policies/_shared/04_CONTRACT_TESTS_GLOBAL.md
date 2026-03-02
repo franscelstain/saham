@@ -6,4 +6,4 @@ Test global yang wajib ada:
 - Reason codes & fail codes: setiap code yang dipakai output harus ada di dictionary.
 - Hash reproducibility: input sama menghasilkan hash sama (canonical string locked).
 
-Test policy-spesifik berada di folder policy masing-masing (contoh: Weekly Swing Doc 11).
+Test policy-spesifik berada di folder policy masing-masing (contoh: Weekly Swing Doc 12).

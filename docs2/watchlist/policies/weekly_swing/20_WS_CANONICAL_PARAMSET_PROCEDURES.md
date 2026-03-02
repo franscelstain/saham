@@ -1,4 +1,4 @@
-# 19 — Canonical ParamSet Procedures — Weekly Swing
+# 20 — Canonical ParamSet Procedures — Weekly Swing
 
 ## Purpose
 Menetapkan cara:
@@ -7,14 +7,14 @@ Menetapkan cara:
 
 Rule (LOCKED):
 Paramset hasil kalibrasi tidak boleh dipromote menjadi ACTIVE tanpa OOS proof yang lulus sesuai:
-`16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`.
+`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`.
 
 Tanpa OOS proof, paramset hanya boleh berstatus DRAFT.
 
 ## Prerequisites
 ### Weekly Swing
-- 18_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md
-- 16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
+- 19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md
+- 17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
 
 ## Inputs
 - watchlist_param_sets

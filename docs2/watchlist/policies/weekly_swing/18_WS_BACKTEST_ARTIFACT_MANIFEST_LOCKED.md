@@ -13,7 +13,7 @@ Dokumen ini mencegah drift akibat referensi artefak “hantu”.
 
 ## Prerequisites
 ### Weekly Swing
-16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
+17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
 
 ---
 
@@ -29,7 +29,7 @@ Catatan audit (wajib):
 - watchlist_bt_picks_ws wajib menyimpan bucket_code untuk membuktikan hasil grouping terhadap cutoff score.
 
 Catatan (LOCKED):
-- watchlist_bt_oos_eval_ws wajib ada untuk promote paramset menjadi ACTIVE (lihat dok 16).
+- watchlist_bt_oos_eval_ws wajib ada untuk promote paramset menjadi ACTIVE (lihat dok 17).
 
 ---
 
@@ -39,12 +39,12 @@ Catatan (LOCKED):
 ---
 
 ## C) Official docs that govern these artifacts (LOCKED)
-- 11_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md
-- 13_WS_BT_COVERAGE_MATRIX_LOCKED.md
-- 14_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md
-- 15_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md
-- 16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
+- 12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md
+- 14_WS_BT_COVERAGE_MATRIX_LOCKED.md
+- 15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md
+- 16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md
+- 17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
 
 ## Next
 ### Weekly Swing
-- 18_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md
+- 19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md

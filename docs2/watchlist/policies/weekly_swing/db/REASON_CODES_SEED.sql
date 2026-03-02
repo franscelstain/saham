@@ -1,4 +1,4 @@
--- 12_WS_REASON_CODES_SEED.sql
+-- REASON_CODES_SEED.sql
 -- Policy: WS_EOD_PLAN_CONFIRM
 -- Table: watchlist_reason_codes(reason_code PK, scope, severity, short_id, description_id, description_en)
 
@@ -118,6 +118,9 @@ INSERT INTO watchlist_reason_codes (policy_code, reason_code, scope, severity, s
  'Jumlah kandidat melebihi batas tampilan; sebagian disembunyikan.',
  'Candidates exceeded display cap; some were hidden.'),
 
+('WS','WS_SNAPSHOT_MISSING','CONFIRM','BLOCK','snap_missing',
+ 'Snapshot intraday belum diinput; CONFIRM tidak bisa dijalankan.',
+ 'Intraday snapshot not provided; confirm cannot run.'),
 ('WS','WS_STALE','CONFIRM','BLOCK','stale',
  'Data runtime terlalu tua (stale), hasil CONFIRM tidak bisa dipercaya.',
  'Runtime data too old (stale), confirm cannot be trusted.'),

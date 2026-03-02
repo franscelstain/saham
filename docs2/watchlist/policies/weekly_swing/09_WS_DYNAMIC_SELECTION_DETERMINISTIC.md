@@ -194,6 +194,6 @@ Jika stop condition aktif:
 - `05_WS_PARAMETER_REGISTRY_COMPLETE.md` untuk registry,
 - `06_WS_PARAMSET_VALIDATOR_SPEC.md` untuk validator,
 - `07_WS_REASON_CODES_AND_HASH.md` untuk data_batch_hash canonical,
-- `12_WS_CONTRACT_TEST_CHECKLIST.md` untuk checklist.
+- `13_WS_CONTRACT_TEST_CHECKLIST.md` untuk checklist.
 - `_refs/WS_WORKED_EXAMPLE_E2E.md`
 - `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`

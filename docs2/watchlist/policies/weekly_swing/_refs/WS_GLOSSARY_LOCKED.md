@@ -1,32 +1,46 @@
-# WS Locked Glossary
+# WS Glossary (LOCKED)
 
-last_updated=2026-02-22
+Istilah di dokumen Weekly Swing yang **wajib** dipahami sama oleh semua implementasi.
 
-Definisi istilah di bawah **LOCKED** untuk mencegah drift.
+## PLAN
+Output rekomendasi berbasis EOD untuk `trade_date = T` (besok). PLAN berisi ranking + group_semantic + score_total + reasons.
 
-## coverage_ratio
-`coverage_ratio = eligible_with_complete_required_fields / eligible_total`
+## CONFIRM
+Pengecekan keyakinan yang memakai **intraday snapshot manual**, bukan real-time. CONFIRM menghasilkan output terpisah dan **dilarang mengubah PLAN**.
 
-## eligible_total
-Jumlah ticker yang lolos universe eligibility + guards untuk PLAN pada `asof_eod_date`.
+## Snapshot (CONFIRM Snapshot)
+Data intraday yang diinput manual dan disimpan ke DB untuk dipakai CONFIRM.
 
-## required_ok
-Flag bahwa semua field “required” tersedia untuk ticker pada tanggal itu (dipakai untuk coverage).
+- Snapshot = sumber kebenaran CONFIRM.
+- Jika snapshot diambil di masa lalu tapi baru diinput sekarang, isi snapshot **tidak diperdebatkan**.
+- Yang dinilai hanya **validitas usia snapshot (TTL)**.
 
-## stale
-Runtime snapshot dianggap stale jika `now - snapshot_ts > confirm_overlay.snapshot_max_age_sec`.
+## captured_at
+Waktu ketika data order book **diambil** (manual input, dari jam perangkat saat mengambil data).
 
-## spread_pct
-`spread_pct = (ask - bid) / mid`, dengan `mid = (bid + ask) / 2`.
+## inserted_at
+Waktu ketika snapshot masuk database (otomatis).
 
-## drift_pct
-`drift_pct = abs(mid - entry_ref) / entry_ref`.
+## effective_captured_at (LOCKED)
+Timestamp konservatif untuk TTL:
+- `effective_captured_at = LEAST(captured_at, inserted_at)`
 
-## entry_ref
-Sumber tunggal untuk RR/stop/TP1 di PLAN. **LOCKED:** `entry_ref = entry_band_mid` (lihat Doc 04).
+## checked_at
+Waktu saat CONFIRM dijalankan.
 
-## stop_price
-Harga stop hasil rule `risk.stop_mode` dan/atau `risk.stop_atr_mult`.
+## TTL CONFIRM (LOCKED)
+Batas usia snapshot agar sah:
+- `snapshot_max_age_sec = 900` (15 menit)
+- Jika `checked_at - effective_captured_at > 900` → snapshot **EXPIRED** → CONFIRM wajib downgrade menjadi DELAY/NO_TRADE + reason `WS_STALE`.
 
-## tp1_price
-Target profit deterministik. **LOCKED:** `tp1_price = entry_ref + (risk.min_rr * (entry_ref - stop_price))` (lihat Doc 04).
+## Top of Book
+Bid/ask level teratas:
+- `bid1_price`, `bid1_lots`, `ask1_price`, `ask1_lots`
+
+## Depth Summary (Top 5 / Top 10)
+Ringkasan lot:
+- `bid_lots_sum_5`, `ask_lots_sum_5`, `bid_lots_sum_10`, `ask_lots_sum_10`
+
+## Imbalance
+Tekanan bid vs ask:
+- `imbalance_n = (bid_sum_n - ask_sum_n) / (bid_sum_n + ask_sum_n)` untuk n=5 dan n=10.

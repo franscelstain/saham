@@ -1,4 +1,4 @@
-# 11 — Backtest Schema & Calibration — Weekly Swing
+# 12 — Backtest Schema & Calibration — Weekly Swing
 
 Default backtest window: 2 tahun (configurable).
 
@@ -8,14 +8,14 @@ Dokumen ini juga menetapkan syarat validasi: BT coverage, universe equivalence, 
 
 ## Scope lock (yang dikerjakan)
 Backtest Weekly Swing mengikuti artefak resmi yang didefinisikan pada:
-`17_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`.
+`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`.
 
 **Schema backtest (LOCKED)**
 Schema tabel backtest mengikuti: `db/BACKTEST_SCHEMA_DDL.sql`.
 
 Dokumen ini tidak menduplikasi daftar tabel; semua daftar artefak wajib merujuk ke Manifest.
 
-Catatan audit: universe harian dan picks harian wajib tersedia untuk replay dan audit; lihat Manifest (17) untuk daftar artefak resminya.
+Catatan audit: universe harian dan picks harian wajib tersedia untuk replay dan audit; lihat Manifest (18) untuk daftar artefak resminya.
 
 Artefak yang tidak tercantum pada Manifest dianggap tidak digunakan dan tidak boleh diasumsikan ada.
 
@@ -24,7 +24,7 @@ Menetapkan mekanisme kalibrasi parameter WS dari backtest 2 tahun:
 
 ## Proof of BT coverage (LOCKED)
 Semua parameter dengan origin=BT wajib tercakup di:
-`13_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
+`14_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
 
 Kalibrasi backtest dianggap tidak valid jika ada parameter origin=BT yang:
 - tidak punya mapping ke kolom `watchlist_bt_param_grid`, atau
@@ -34,7 +34,7 @@ Kalibrasi backtest dianggap tidak valid jika ada parameter origin=BT yang:
 ## Universe equivalence (LOCKED)
 Backtest universe (`watchlist_bt_universe_ws`) wajib setara dengan production PLAN universe
 untuk tanggal EOD yang sama sesuai:
-`14_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`.
+`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`.
 
 Bukti equivalence WAJIB menggunakan snapshot dari production PLAN yang mengikuti schema resmi:
 `db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`.
@@ -43,7 +43,7 @@ Kalibrasi dianggap tidak valid jika tidak ada bukti equivalence (pass/fail + can
 
 ## Prerequisites
 ### Weekly Swing
-10_WS_CONFIRM_OVERLAY.md
+11_WS_INTRADAY_SNAPSHOT_TABLES
 
 ## Inputs
 - Dataset historis 2 tahun (EOD OHLCV + indicators)
@@ -226,13 +226,13 @@ Tanpa `watchlist_bt_oos_eval_ws` (OOS proof), kalibrasi tidak boleh dipromote me
 
 ## Evaluation metrics sufficiency (LOCKED)
 Metrik pada `watchlist_bt_eval` wajib memenuhi spesifikasi:
-`15_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`.
+`16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`.
 
 Kalibrasi param_id dianggap tidak valid jika metrik minimum tidak tersedia atau gagal gating rules.
 
 ## Walk-forward / OOS proof (LOCKED)
 Kalibrasi WS wajib memiliki bukti out-of-sample sesuai:
-`16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`.
+`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`.
 
 Ringkasan OOS wajib tersimpan di:
 `watchlist_bt_oos_eval_ws`.
@@ -271,7 +271,7 @@ Jika salah satu field di atas NULL/invalid:
 - ticker tetap dicatat di `watchlist_bt_universe_ws` dengan `required_ok=FALSE`,
 - `missing_fields` wajib diisi,
 - `eligible_ok=FALSE`,
-- `reason_code` mengikuti prioritas canonical reason pada dok 14 (contoh: `WS_DATA_MISSING`).
+- `reason_code` mengikuti prioritas canonical reason pada dok 15 (contoh: `WS_DATA_MISSING`).
 
 ### 4) Field untuk scoring (LOCKED)
 Indikator yang dipakai untuk menghitung `score_total` (contoh: `roc20`, `hh20`, dll) **tidak termasuk** daftar required fields guardrails kecuali policy WS secara eksplisit menetapkannya sebagai requirement eligibility.
@@ -289,7 +289,7 @@ Rule (LOCKED):
 Untuk audit/re-run **wajib** menyimpan universe harian di `watchlist_bt_universe_ws` (lihat `db/BACKTEST_SCHEMA_DDL.sql`) minimal berisi:
 - `required_ok, missing_fields, guard_ok, eligible_ok, dv20_idr, atr14_pct, vol_ratio, reason_code`
 
-Reason_code memakai dictionary WS_* (contoh: `WS_DATA_MISSING`, `WS_GUARD_LIQUIDITY_FAIL`, dll) sesuai prioritas canonical reason di dok 14.
+Reason_code memakai dictionary WS_* (contoh: `WS_DATA_MISSING`, `WS_GUARD_LIQUIDITY_FAIL`, dll) sesuai prioritas canonical reason di dok 15.
 
 ## Schema: watchlist_bt_universe_ws (AUDIT) (LOCKED)
 
@@ -315,4 +315,4 @@ Indexes:
 
 ## Next
 ### Weekly Swing
-- 12_WS_CONTRACT_TEST_CHECKLIST.md
+- 13_WS_CONTRACT_TEST_CHECKLIST.md
