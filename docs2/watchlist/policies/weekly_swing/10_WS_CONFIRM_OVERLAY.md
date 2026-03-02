@@ -65,15 +65,15 @@ CONFIRM menghasilkan output terpisah, minimal:
 - `snapshot_id` (yang dipakai)
 - `snapshot_age_sec`
 - `items[]`:
-  - `ticker_code`
-  - `plan_group_semantic` (dari PLAN, immutable)
-  - `plan_score_total` (dari PLAN, immutable)
+  - `ticker`
   - `label` (`CONFIRMED` / `NEUTRAL` / `CAUTION` / `DELAY`)
   - `reasons[]`:
     - `code`
     - `severity`
     - `message`
     - `payload`
+
+**LOCKED:** item CONFIRM final tidak boleh menduplikasi field PLAN seperti `group_semantic`, `score_total`, atau field ranking lainnya. Jika UI perlu menampilkan konteks PLAN, ambil dari output PLAN terpisah menggunakan `ticker` sebagai penghubung.
 
 ---
 

@@ -100,32 +100,22 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
 }
 ```
 
-## Example E — confirm_item
+## Example E — confirm_output_item
 ```json
 {
   "run_id": 1001,
   "ticker": "ABCD",
-  "group_semantic": "SECONDARY",
   "label": "CONFIRMED",
-  "last_price": 1028.0000,
-  "drift_pct": 0.007843,
-  "spread_pct": 0.006000,
-  "action_hint": "ok",
   "reasons": []
 }
 ```
 
-## Example F — confirm_item (CAUTION)
+## Example F — confirm_output_item (CAUTION)
 ```json
 {
   "run_id": 1001,
   "ticker": "IJKL",
-  "group_semantic": "TOP_PICKS",
   "label": "CAUTION",
-  "last_price": 2115.0000,
-  "drift_pct": 0.012500,
-  "spread_pct": 0.011000,
-  "action_hint": "delay",
   "reasons": [
     {
       "code": "WS_SPR_WIDE",
@@ -162,7 +152,7 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "created_at": "2026-02-27T18:11:00+07:00"
 }
 ```
-## Example H — abort run
+## Example H — failed run (hard abort behavior)
 ```json
 {
   "run_id": 1003,
@@ -171,7 +161,7 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
   "trade_date": "2026-02-27",
   "plan_trade_date": "2026-02-28",
   "param_set_id": 55,
-  "run_status": "ABORT",
+  "run_status": "FAILED",
   "data_batch_hash": "0000000000000000000000000000000000000000000000000000000000000000",
   "eligible_count": 0,
   "top_picks_count": 0,

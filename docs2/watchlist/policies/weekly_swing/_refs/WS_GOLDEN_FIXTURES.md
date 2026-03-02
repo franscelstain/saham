@@ -43,10 +43,10 @@ Expected:
 - `expected_confirm.json` berisi label CONFIRMED/NEUTRAL/CAUTION sesuai rule confirm
 
 ## Fixture B: EOD Incomplete (LOCKED)
-Tujuan: memaksa ABORT/NO_TRADE sesuai rule data readiness.
+Tujuan: memaksa FAILED sesuai rule data readiness.
 - coverage < min_coverage_ratio
 Expected:
-- PLAN tidak menghasilkan picks (atau menghasilkan status ABORT sesuai `02` canonical)
+- PLAN tidak menghasilkan picks dan menghasilkan status FAILED sesuai `02` canonical
 - Reason code harus mencantumkan data readiness failure
 
 ## Fixture C: Outlier Day (LOCKED)
