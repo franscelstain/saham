@@ -5,10 +5,13 @@
 -- A) FAIL CODES (global)
 INSERT INTO watchlist_fail_codes (fail_code, scope, severity, description_id) VALUES
 ('PLAN_ABORT_PARAMSET_INVALID','PLAN','ERROR','Param set tidak valid / tidak match policy_version.'),
+('PLAN_ABORT_PARAMSET_NOT_FOUND','PLAN','ERROR','ACTIVE param_set tidak ditemukan untuk policy/rule yang dijalankan.'),
 ('PLAN_ABORT_CALENDAR_MISSING','PLAN','ERROR','Market calendar tidak tersedia untuk menentukan target trading day.'),
 ('PLAN_ABORT_DATA_INCOMPLETE','PLAN','ERROR','Batch data tidak lengkap menurut readiness/coverage rules policy.'),
+('PLAN_ABORT_COVERAGE_LOW','PLAN','ERROR','Coverage eligible di bawah minimum sehingga PLAN gagal dijalankan.'),
 ('PLAN_ABORT_ALREADY_EXISTS','PLAN','ERROR','PLAN untuk target date ini sudah ada; gunakan mode rerun jika ingin buat ulang.'),
 ('PLAN_ABORT_LOCK_TIMEOUT','PLAN','ERROR','Gagal memperoleh lock eksekusi PLAN.'),
+('PLAN_ABORT_DATA_CONTRACT','PLAN','ERROR','Required source atau required field tidak memenuhi kontrak data PLAN.'),
 ('PLAN_ABORT_HASH_FAILED','PLAN','ERROR','Gagal menghitung data_batch_hash.'),
 ('PLAN_ABORT_DB_WRITE_FAILED','PLAN','ERROR','Gagal menulis snapshot PLAN (DB error).'),
 ('CONFIRM_ABORT_NO_ACTIVE_PLAN','CONFIRM','ERROR','Tidak ada PLAN aktif untuk target date ini.'),

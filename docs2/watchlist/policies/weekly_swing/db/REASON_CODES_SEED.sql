@@ -118,6 +118,14 @@ INSERT INTO watchlist_reason_codes (policy_code, reason_code, scope, severity, s
  'Jumlah kandidat melebihi batas tampilan; sebagian disembunyikan.',
  'Candidates exceeded display cap; some were hidden.'),
 
+('WS','WS_NO_TRADE_MIN_ELIGIBLE','PLAN','INFO','no_trade_min_eligible',
+ 'Run valid tetapi tidak menampilkan kandidat karena jumlah eligible lebih kecil dari batas minimum.',
+ 'Valid run with no displayed candidates because eligible count is below the minimum threshold.'),
+
+('WS','WS_PLAN_HASH_MISMATCH','PLAN','BLOCK','plan_hash_mismatch',
+ 'Hash PLAN berubah setelah CONFIRM atau setelah proses audit; ini melanggar invariant immutability.',
+ 'PLAN hash changed after CONFIRM or audit process; this violates the immutability invariant.'),
+
 ('WS','WS_SNAPSHOT_MISSING','CONFIRM','BLOCK','snap_missing',
  'Snapshot intraday belum diinput; CONFIRM tidak bisa dijalankan.',
  'Intraday snapshot not provided; confirm cannot run.'),

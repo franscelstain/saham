@@ -38,7 +38,7 @@ Mengunci anti-drift khusus WS (di atas framework global).
 ### E) GroupSemanticsRulesTest (WS)
 - Guard fail => AVOID + HIDE + reason guard
 - Forced watch-only => WATCH_ONLY (cannot become TOP/SECONDARY)
-- NO_TRADE => semua HIDE (LOCKED)
+- NO_TRADE => output API/UI tidak menampilkan kandidat; persistence audit tetap menyimpan item dan seluruhnya `HIDE` (LOCKED)
 
 ## Outputs
 - Test checklist yang wajib ada sebelum deploy.

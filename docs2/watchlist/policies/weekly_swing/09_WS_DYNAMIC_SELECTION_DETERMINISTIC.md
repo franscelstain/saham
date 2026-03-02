@@ -23,7 +23,7 @@ Aturan yang dikunci:
   - dipilih (TOP_PICKS/SECONDARY): `WS_SEL_PCT`
   - eligible tapi tersembunyi karena cutoff/target: `WS_HID_PCT`
   - tersembunyi karena cap: `WS_HID_CAP`
-- Stop condition **NO_TRADE** menghasilkan PLAN kosong; alasan disimpan sebagai `fail_code` + `held_reason`.
+- Stop condition **NO_TRADE** menghasilkan PLAN kosong pada output API/UI; alasan run-level disimpan sebagai `fail_code`.
 - Auditability wajib tersimpan di `run_metrics_json`: cutoff hari ini, target dinamis, ukuran pool, dan `data_batch_hash` (lihat `07_WS_REASON_CODES_AND_HASH.md`).
 
 ## Purpose & invariants (LOCKED)
@@ -32,9 +32,9 @@ Aturan yang dikunci:
 
 Tujuan stop conditions adalah mencegah PLAN dibangun dari data yang tidak layak, dan memastikan perilaku NO_TRADE **konsisten** dengan eksekusi canonical.
 
-### 1) Coverage gate (abort)
+### 1) Coverage gate (hard fail)
 
-Jika `data_readiness.reject_if_eod_incomplete = true` dan `coverage_ratio < data_readiness.min_coverage_ratio` ⇒ **ABORT RUN** (tidak ada PLAN dihasilkan).
+Jika `data_readiness.reject_if_eod_incomplete = true` dan `coverage_ratio < data_readiness.min_coverage_ratio` ⇒ **FAILED RUN** (tidak ada PLAN dihasilkan).
 - `coverage_ratio` dihitung sebagai: `eligible_with_complete_required_fields / eligible_total`.
 - Coverage gate ini adalah “hard fail” untuk menjaga kualitas output.
 
@@ -76,7 +76,7 @@ Urutan berikut **wajib** dan menjadi acuan implementasi:
 4) **Qualified pools**
    - `top_pool = { ticker ∈ eligible_pool | score_total >= top_cutoff_today }`
    - `secondary_pool = { ticker ∈ eligible_pool | score_total >= secondary_cutoff_today } - top_pool`
-   - Jika pool kosong karena data/coverage buruk, evaluasi stop condition (NO_TRADE).
+      - Jika pool kosong, evaluasi stop condition sesuai penyebabnya: `FAILED` untuk data/coverage failure, `NO_TRADE` untuk run valid tanpa kandidat yang layak.
 
 ## Qualified pools — details
 
@@ -166,7 +166,7 @@ Jika ada `min-count overrides`, override hanya boleh:
 
 ### D) AVOID / NO_TRADE
 - Jika gagal guardrails/data_ready → `AVOID` dengan reason sesuai dictionary.
-- Jika stop condition (NO_TRADE) → semua group kosong; simpan `held_reason` dan `fail_code`.
+- Jika stop condition (`NO_TRADE`) → output API/UI tidak menampilkan kandidat; persistence audit tetap tersimpan, dan run menyimpan `fail_code`.
 
 ## Outputs & audit (LOCKED)
 Wajib tersimpan untuk setiap PLAN run:
@@ -177,14 +177,28 @@ Wajib tersimpan untuk setiap PLAN run:
 Semua diletakkan di `watchlist_plan_runs.run_metrics_json`.
 
 ## Failure modes & stop condition
-Stop condition (NO_TRADE) harus eksplisit dan tercatat, contoh:
+
+### FAILED stop condition
+Kondisi berikut adalah hard-fail dan wajib menghasilkan `run_status = FAILED`:
 - data EOD belum lengkap / batch invalid,
 - coverage eligible terlalu kecil,
 - market check gagal.
 
-Jika stop condition aktif:
+Jika FAILED aktif:
 - `top_picks_target_dynamic=0`, `secondary_target_dynamic=0`,
-- hasil PLAN kosong, dan reason disimpan sebagai fail code + held reason.
+- hasil PLAN tidak ditampilkan,
+- reason run-level disimpan sebagai `fail_code`.
+
+### NO_TRADE stop condition
+Kondisi berikut valid menghasilkan `run_status = NO_TRADE`:
+- `eligible_total < no_trade.min_eligible_count`,
+- setelah filter/scoring/guardrail dijalankan tidak ada kandidat yang layak.
+
+Jika NO_TRADE aktif:
+- `top_picks_target_dynamic=0`, `secondary_target_dynamic=0`,
+- output API/UI tidak menampilkan kandidat,
+- persistence audit tetap menyimpan item dengan `display_bucket = HIDE`,
+- reason run-level disimpan sebagai `fail_code`.
 
 ## Next
 ### Weekly Swing

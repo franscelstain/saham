@@ -96,7 +96,6 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     - `SECONDARY`
     - `WATCH_ONLY`
     - `AVOID`
-    - `NO_TRADE`
   - `score_total`: skor akhir 0..1 (setelah clamp).
   - `scores.*`: sub-skor yang dipakai membentuk `score_total` (0..1).
   - `levels.*`: level harga deterministik:
@@ -161,7 +160,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     - `CAUTION`
     - `DELAY`
   - `reasons[]`: alasan deterministic (code, severity, message, payload).
-  - Untuk CONFIRM, field output yang sah hanya `label` dan `reasons[]`; alias seperti `confirm_label`, `confirm_reasons`, atau `reason_codes` tidak boleh dipakai di output final.
+  - Untuk CONFIRM, field output item yang sah hanya `ticker`, `label`, dan `reasons[]`; alias seperti `confirm_label`, `confirm_reasons`, atau `reason_codes` tidak boleh dipakai di output final.
 
 ---
 
@@ -202,11 +201,43 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 - Jika `summary.no_trade=true`, maka:
   - `summary.top_picks_count = 0`
   - `summary.secondary_count = 0`
-  - `summary.no_trade_reason` wajib terisi.
+  - `summary.no_trade_reason` boleh ditampilkan untuk kebutuhan UI.
+  - `summary.no_trade_reason` adalah view-model turunan dari `fail_code` + dictionary, bukan source of truth persistence terpisah.
 
 ---
 
-## 4) Backward/Forward compatibility (LOCKED)
+## 4. Reason Model by Layer (LOCKED)
+
+Agar kontrak PLAN ↔ CONFIRM konsisten, model reason dibedakan tegas per layer:
+
+### 1) Persistence run-level
+- Gunakan `fail_code` tunggal.
+- Berlaku untuk `watchlist_plan_runs` dan `watchlist_confirm_checks`.
+- `fail_code` adalah source of truth run-level untuk status seperti `FAILED` atau `NO_TRADE`.
+
+### 2) Persistence item-level
+- Gunakan `reason_codes_json`.
+- Berlaku untuk `watchlist_plan_items` dan `watchlist_confirm_items`.
+- Isi berupa daftar code dictionary yang tersimpan untuk audit.
+
+### 3) Output API / UI
+- Gunakan `reasons[]`.
+- Setiap item `reasons[]` minimal memuat:
+  - `code`
+  - `message`
+- Dianjurkan juga memuat:
+  - `severity`
+  - `payload`
+
+### 4) View-model turunan
+- Field seperti `summary.no_trade_reason`, jika dipakai, hanyalah view-model turunan dari `fail_code` + dictionary.
+- Field tersebut bukan source of truth persistence terpisah.
+
+### 5) Larangan
+- `held_reason` tidak dipakai dalam kontrak final.
+- `reason_codes` tidak dipakai sebagai output final API / UI.
+
+## 5) Backward/Forward compatibility (LOCKED)
 - Jika schema berubah, harus bump **policy schema version** dan dokumentasi harus menyatakan breaking change.
 - Tidak boleh “diam-diam” menambah field yang mengubah interpretasi UI/audit.
 

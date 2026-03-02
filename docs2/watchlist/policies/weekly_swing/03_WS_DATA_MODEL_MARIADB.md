@@ -65,10 +65,6 @@ Menetapkan mapping kebutuhan WS terhadap schema global watchlist (tabel global a
 ## Failure modes
 - Update plan_items (melanggar append-only) => tidak boleh.
 
-## Next
-### Weekly Swing
-- 04_WS_PARAMSET_JSON_CONTRACT.md
-
 ---
 
 ## CONFIRM Snapshot Tables (LOCKED)
@@ -81,3 +77,7 @@ Spesifikasi tabel + kolom wajib + contoh data:
 - 11_WS_INTRADAY_SNAPSHOT_TABLES.md
 
 TTL (LOCKED): `snapshot_max_age_sec = 900` dihitung dari `effective_captured_at = LEAST(captured_at, inserted_at)`.
+
+## Next
+### Weekly Swing
+- 04_WS_PARAMSET_JSON_CONTRACT.md

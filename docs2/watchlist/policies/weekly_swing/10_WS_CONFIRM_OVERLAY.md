@@ -10,7 +10,6 @@ Menetapkan CONFIRM sebagai **pengecekan keyakinan** berbasis **intraday snapshot
 
 ## Prerequisites
 - 09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md
-- 11_WS_INTRADAY_SNAPSHOT_TABLES.md (tabel & kolom input manual CONFIRM)
 
 ---
 
@@ -126,3 +125,6 @@ Cara enforce (wajib ada di test/contract):
   `CONFIRMED`, `NEUTRAL`, `CAUTION`, dan `DELAY` adalah label hasil evaluasi, bukan reason code tersendiri.
 9) Output CONFIRM **tidak mengubah PLAN** (invariant harus lolos)
 
+## Next
+### Weekly Swing
+- 11_WS_INTRADAY_SNAPSHOT_TABLES.md (tabel & kolom input manual CONFIRM)
