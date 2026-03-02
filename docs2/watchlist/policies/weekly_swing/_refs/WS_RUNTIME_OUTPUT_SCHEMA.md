@@ -161,6 +161,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     - `CAUTION`
     - `DELAY`
   - `reasons[]`: alasan deterministic (code, severity, message, payload).
+  - Untuk CONFIRM, field output yang sah hanya `label` dan `reasons[]`; alias seperti `confirm_label`, `confirm_reasons`, atau `reason_codes` tidak boleh dipakai di output final.
 
 ---
 

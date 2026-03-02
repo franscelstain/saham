@@ -48,9 +48,9 @@ Hitung:
 
 Aturan:
 - Jika `snapshot_age_sec > 900` → snapshot **EXPIRED** → output CONFIRM **wajib**:
-  - `confirm_label = DELAY`
+  - `label = DELAY`
   - reason code wajib: `WS_STALE`
-- Jika tidak ada snapshot → `confirm_label = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
+- Jika tidak ada snapshot → `label = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
 - LOCKED: `NO_TRADE` bukan label CONFIRM. `NO_TRADE` hanya berlaku untuk status run PLAN/global selection, sedangkan label CONFIRM hanya boleh `CONFIRMED`, `NEUTRAL`, `CAUTION`, atau `DELAY`.
 
 **LOCKED:** snapshot yang diambil masa lalu tapi baru diinput sekarang **tetap sah sebagai snapshot**, namun bisa menjadi **EXPIRED** karena TTL.
@@ -68,8 +68,12 @@ CONFIRM menghasilkan output terpisah, minimal:
   - `ticker_code`
   - `plan_group_semantic` (dari PLAN, immutable)
   - `plan_score_total` (dari PLAN, immutable)
-  - `confirm_label` (`CONFIRMED` / `NEUTRAL` / `CAUTION` / `DELAY`)
-  - `confirm_reasons[]` (reason codes CONFIRM)
+  - `label` (`CONFIRMED` / `NEUTRAL` / `CAUTION` / `DELAY`)
+  - `reasons[]`:
+    - `code`
+    - `severity`
+    - `message`
+    - `payload`
 
 ---
 
@@ -102,9 +106,9 @@ Cara enforce (wajib ada di test/contract):
 1) Load PLAN untuk `trade_date=T`
 2) Load snapshot terbaru untuk `(policy_code='WS', trade_date=T)` berdasarkan `captured_at DESC`
 3) Hitung `snapshot_age_sec = checked_at - effective_captured_at`
-4) Jika `snapshot_age_sec > snapshot_max_age_sec` → hasilkan `confirm_label = DELAY` + `WS_STALE`
-5) Jika snapshot tidak ada → hasilkan `confirm_label = DELAY` + `WS_SNAPSHOT_MISSING`
-6) Jika `last_price` tidak ada → hasilkan `confirm_label = DELAY` + `WS_NO_PRICE`
+4) Jika `snapshot_age_sec > snapshot_max_age_sec` → hasilkan `label = DELAY` + `WS_STALE`
+5) Jika snapshot tidak ada → hasilkan `label = DELAY` + `WS_SNAPSHOT_MISSING`
+6) Jika `last_price` tidak ada → hasilkan `label = DELAY` + `WS_NO_PRICE`
 7) Jika snapshot valid:
    - hitung `drift_pct = abs(last_price - entry_ref) / entry_ref`
    - jika `drift_pct > max_drift_from_entry_pct` → tambah `WS_DRIFT_FAR`

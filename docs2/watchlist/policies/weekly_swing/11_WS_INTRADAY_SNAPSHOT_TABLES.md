@@ -18,7 +18,7 @@ Dokumen ini mengunci **struktur tabel**, **kolom wajib**, dan **contoh data** un
 
 4) **TTL CONFIRM (LOCKED): 15 menit**
 - `snapshot_max_age_sec = 900`
-- Jika `NOW() - effective_captured_at > 900 detik` → snapshot **EXPIRED** → CONFIRM wajib menghasilkan `confirm_label = DELAY`, dan wajib mengeluarkan reason `WS_STALE`.
+- Jika `NOW() - effective_captured_at > 900 detik` → snapshot **EXPIRED** → CONFIRM wajib menghasilkan `label = DELAY`, dan wajib mengeluarkan reason `WS_STALE`.
 
 5) Data snapshot bersifat **append-only**:
 - **UPDATE/DELETE dilarang** (wajib diblok dengan trigger).

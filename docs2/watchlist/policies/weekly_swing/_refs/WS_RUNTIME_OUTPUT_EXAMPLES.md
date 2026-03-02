@@ -88,14 +88,14 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
 {
   "confirm_id": 2001,
   "run_id": 1001,
-  "ticker_id": "ABCD",
+  "ticker": "ABCD",
   "snapshot_ts": "2026-02-28T09:15:00+07:00",
   "last_price": 1028.0000,
   "snapshot_age_sec": 120,
   "drift_pct": 0.007843,
   "spread_pct": 0.006000,
-  "confirm_label": "CONFIRMED",
-  "reason_codes": [],
+  "label": "CONFIRMED",
+  "reasons": [],
   "created_at": "2026-02-28T09:15:01+07:00"
 }
 ```
@@ -104,14 +104,14 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
 ```json
 {
   "run_id": 1001,
-  "ticker_id": "ABCD",
+  "ticker": "ABCD",
   "group_semantic": "SECONDARY",
-  "confirm_label": "CONFIRMED",
+  "label": "CONFIRMED",
   "last_price": 1028.0000,
   "drift_pct": 0.007843,
   "spread_pct": 0.006000,
   "action_hint": "ok",
-  "reason_codes": []
+  "reasons": []
 }
 ```
 
@@ -119,15 +119,23 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
 ```json
 {
   "run_id": 1001,
-  "ticker_id": "IJKL",
+  "ticker": "IJKL",
   "group_semantic": "TOP_PICKS",
-  "confirm_label": "CAUTION",
+  "label": "CAUTION",
   "last_price": 2115.0000,
   "drift_pct": 0.012500,
   "spread_pct": 0.011000,
   "action_hint": "delay",
-  "reason_codes": [
-    "WS_SPR_WIDE"
+  "reasons": [
+    {
+      "code": "WS_SPR_WIDE",
+      "severity": "WARN",
+      "message": "Spread runtime melebihi batas maksimum.",
+      "payload": {
+        "spread_pct": 0.011000,
+        "spread_max_pct": 0.010000
+      }
+    }
   ]
 }
 ```
