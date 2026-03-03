@@ -23,6 +23,7 @@ Mengunci struktur params_json WS agar code tidak memakai parameter implicit/hard
 - policy_code = "WS"
 - policy_version = "WS_EOD_PLAN_CONFIRM"
 - schema_version = "PARAMSET_JSON"
+- `paramset_code` (string, opsional tapi direkomendasikan untuk audit; contoh: "WS_ACTIVE_BOOTSTRAP_V1")
 
 ### 2) Key wajib WS (ringkas)
 WS wajib memiliki blok berikut:
@@ -36,6 +37,7 @@ WS wajib memiliki blok berikut:
 - plan_levels (entry_mode, entry_band_pct)
 - no_trade (min_eligible_count, no_trade_hides_all)
 - confirm_overlay (snapshot_max_age_sec, max_drift_from_entry_pct)
+- eval (min_trades_oos, min_trades, min_days_covered, min_p25_ret_net_top, min_month_win_rate_min, min_month_avg_ret_net_min)  <-- NEW
 - hash_contract (order_by, scales, null_handling)
 
 ### 3) Tambahan wajib deterministik (anti drift)
@@ -46,7 +48,10 @@ WS wajib memiliki blok berikut:
 
 ### 4) Contoh params_json
 File ini tidak menyertakan JSON penuh; gunakan 05 registry + validator 06 sebagai sumber kebenaran.
-Implementasi harus memuat field audit: origin/status/bt_target/rationale/change_triggers untuk tiap parameter.
+
+LOCKED (provenance):
+- Setiap parameter **wajib** berupa object audit: `{ value, origin, status, bt_target, rationale, change_triggers }`.
+- Tidak ada `provenance` top-level pada WS; provenance dianggap **implicit** di setiap parameter node.
 
 ## Outputs
 - Kontrak paramset WS yang harus dipatuhi.

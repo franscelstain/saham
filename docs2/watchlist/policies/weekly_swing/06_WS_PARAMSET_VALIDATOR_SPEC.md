@@ -17,12 +17,15 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 - policy_code='WS'
 - policy_version='WS_EOD_PLAN_CONFIRM'
 - schema_version='PARAMSET_JSON'
+- jika `paramset_code` ada: string non-empty, pattern `^[A-Z0-9_]+$` (audit-friendly, stabil)
 
 ### 2) Enum rules
 - origin enum: DET, MAN, BT, DET+MAN, MAN+BT, DET+BT
 - status enum: ACTIVE, TEMP, DEPRECATED
 - TEMP => bt_target=true
 - origin=BT => status != TEMP
+- LOCKED: setiap leaf parameter **wajib** punya field audit `{ value, origin, status, bt_target, rationale, change_triggers }`
+- `change_triggers` wajib array (boleh kosong)
 
 ### 3) Type rules (ringkas)
 - boolean: data_readiness.reject_if_eod_incomplete, enabled flags, no_trade_hides_all
@@ -75,6 +78,12 @@ Confirm:
 
 No Trade:
 - no_trade.min_eligible_count.value >= 1
+
+Eval (backtest & OOS gates):
+- eval.min_trades_oos.value >= 0
+- eval.min_trades.value >= 0
+- eval.min_days_covered.value >= 0
+- 0 <= eval.min_month_win_rate_min.value <= 1
 
 Outlier:
 - if enabled: max_abs_return_1d_pct.value > 0, max_high_low_range_1d_pct.value > 0

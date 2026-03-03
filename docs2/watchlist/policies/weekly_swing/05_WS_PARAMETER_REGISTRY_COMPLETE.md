@@ -15,6 +15,7 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 
 ### A. Meta & data contract
 - `data_contract.required_sources` (DET/ACTIVE)
+- `data_contract.required_fields` (DET/ACTIVE)
 - `data_contract.required_fields.*` (DET/ACTIVE)
 - `data_contract.disabled_fields` (DET+MAN/ACTIVE)
 
@@ -23,6 +24,7 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - `data_readiness.min_history_days` (DET/ACTIVE)
 - `data_readiness.max_missing_bar_days_60d` (MAN/ACTIVE, bt_target=true)
 - `data_readiness.reject_if_eod_incomplete` (DET/ACTIVE)
+- `data_readiness.outlier_ruleset` (DET+MAN/ACTIVE)
 - `data_readiness.outlier_ruleset.value.enabled` (DET+MAN/ACTIVE)
 - `data_readiness.outlier_ruleset.value.max_abs_return_1d_pct` (MAN/ACTIVE, bt_target=true)
 - `data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct` (MAN/ACTIVE, bt_target=true)
@@ -53,6 +55,7 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 
 ### F. Scoring
 - `scoring.combine_mode` (DET/ACTIVE)
+- `scoring.weights` (MAN/ACTIVE, bt_target=true)
 - `scoring.weights.value.{momentum,breakout,volume,risk}` (MAN/ACTIVE, bt_target=true)
 
 ### G. Grouping (dynamic selection)
@@ -63,6 +66,7 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - `grouping.grouping_mode` (DET/ACTIVE)
 - `grouping.sort_keys` (DET/ACTIVE, locked)
 - `grouping.rounding_mode` (DET/ACTIVE, locked)
+- `grouping.min_count_overrides` (MAN/ACTIVE)
 
 ### H. Plan levels
 - `plan_levels.entry_mode` (DET+MAN/ACTIVE)
@@ -77,8 +81,10 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - `confirm_overlay.max_drift_from_entry_pct` (MAN/ACTIVE, bt_target=true)
 
 ### K. Hash contract (reproducibility)
+- `hash_contract.version` (DET/ACTIVE, locked)
 - `hash_contract.order_by` (DET/ACTIVE, locked)
 - `hash_contract.scales` (DET/ACTIVE, locked)
+- `hash_contract.scales.value.{close_price_dp,hh20_dp,roc20_dp,atr14_pct_dp,dv20_idr_dp}` (DET/ACTIVE, locked)
 - `hash_contract.null_handling` (DET/ACTIVE, locked)
 
 ## Outputs
@@ -94,7 +100,7 @@ Parameter **tidak** diubah karena “feeling”. Ubah hanya jika ada sinyal obje
 
 2) **Regime volatilitas berubah** (DET/MAN)
    - ATR14_pct median index/market naik/turun melewati band normal historis.
-   - Tindakan: sesuaikan guard `risk.max_atr14_pct` atau `scoring.weights...risk`.
+   - Tindakan: sesuaikan guard `risk.max_atr14_pct` atau `scoring.weights.value.risk`.
 
 3) **Regime likuiditas berubah** (DET/MAN)
    - DV20 median universe turun sehingga coverage eligible jatuh drastis, atau sebaliknya terlalu longgar.
@@ -129,6 +135,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Alasan: mencegah PLAN dibuat dari input parsial/acak.
   - Kapan diubah: bila pipeline/sumber data berubah.
   - Cara ubah: ubah di paramset + jalankan contract tests.
+
+- `data_contract.required_fields` (object) — container daftar field wajib per source (base audit node).
+  - Origin: DET
+  - Alasan: paramset menyimpan node base sebagai object audit `{ value, origin, ... }`, jadi base key wajib terdaftar agar registry benar-benar exhaustive.
+  - Kapan diubah: hanya jika struktur required_fields berubah (breaking).
+  - Cara ubah: update paramset + update contract tests.
 
 - `data_contract.required_fields.*` (array<string> atau map) — daftar field wajib per source.
   - Origin: DET
@@ -167,6 +179,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Alasan: membuang ticker dengan data bolong yang bikin indikator dan score tidak reliable.
   - Kapan diubah: setelah hasil kalibrasi BT 2Y / audit data quality (false reject/false pass).
   - Cara ubah: ubah nilai di paramset + jalankan contract tests.
+
+- `data_readiness.outlier_ruleset` (object) — container aturan outlier.
+  - Origin: DET+MAN
+  - Alasan: node base wajib ada karena paramset menyimpan audit object di base key (`{ value, origin, ... }`).
+  - Kapan diubah: jarang; berubah hanya jika struktur outlier ruleset berubah (breaking).
+  - Cara ubah: update paramset + contract tests.
 
 - `data_readiness.outlier_ruleset.value.enabled` (bool) — aktif/nonaktif filter outlier.
   - Origin: DET+MAN
@@ -296,6 +314,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: hanya jika desain scoring berubah.
   - Cara ubah: ubah di paramset + update doc + contract tests.
 
+- `scoring.weights` (object) — container bobot scoring.
+  - Origin: MAN/BT
+  - Alasan: node base wajib ada karena paramset menyimpan audit object pada base key (`value` berisi map bobot).
+  - Kapan diubah: saat komposisi bobot berubah (mis. tambah/remove komponen scoring) atau hasil BT/kalibrasi berubah.
+  - Cara ubah: update paramset (BT/MAN) + contract tests.
+
 - `scoring.weights.value.momentum` (number >= 0) — bobot score momentum.
   - Origin: MAN/BT
   - Alasan: mengatur kontribusi momentum ke score_total.
@@ -371,6 +395,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: hanya jika aturan pembulatan policy berubah (breaking change).
   - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
 
+- `grouping.min_count_overrides` (object) — override minimum count per group (opsional; default `{}`).
+  - Origin: MAN
+  - Alasan: disediakan untuk kasus operasional tertentu tanpa mengubah algoritma grouping.
+  - Kapan diubah: saat butuh override minimum count (mis. force minimal TOP/SECONDARY dalam kondisi tertentu).
+  - Cara ubah: update paramset + contract tests.
+
 ### H. Plan levels
 
 - `plan_levels.entry_mode` (LOCKED enum: `BREAKOUT`) — mode pembentukan entry band.
@@ -417,6 +447,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 ### K. Hash contract (reproducibility)
 
+- `hash_contract.version` (integer, LOCKED) — versi kontrak canonical hash.
+  - Origin: DET
+  - Alasan: memastikan perubahan struktur hashing bisa terdeteksi dan di-audit (anti silent change).
+  - Kapan diubah: hanya jika payload canonical hash berubah (breaking change).
+  - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
+
 - `hash_contract.order_by` (array<string>, LOCKED) — urutan field untuk canonical hashing.
   - Origin: DET
   - Alasan: memastikan hash stabil lintas runtime/DB ordering.
@@ -429,6 +465,36 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: bila precision angka berubah di output (breaking change).
   - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
 
+- `hash_contract.scales.value.close_price_dp` (integer >= 0, LOCKED) — decimal places untuk close_price sebelum hashing.
+  - Origin: DET
+  - Alasan: stabilisasi hash untuk harga.
+  - Kapan diubah: jika precision close_price di output berubah (breaking).
+  - Cara ubah: update dok LOCKED + validator + tests + promote paramset baru.
+
+- `hash_contract.scales.value.hh20_dp` (integer >= 0, LOCKED) — decimal places untuk hh20 sebelum hashing.
+  - Origin: DET
+  - Alasan: stabilisasi hash untuk indikator hh20.
+  - Kapan diubah: jika precision hh20 di output berubah (breaking).
+  - Cara ubah: sama seperti close_price_dp.
+
+- `hash_contract.scales.value.roc20_dp` (integer >= 0, LOCKED) — decimal places untuk roc20 sebelum hashing.
+  - Origin: DET
+  - Alasan: stabilisasi hash untuk indikator roc20.
+  - Kapan diubah: jika precision roc20 di output berubah (breaking).
+  - Cara ubah: sama seperti close_price_dp.
+
+- `hash_contract.scales.value.atr14_pct_dp` (integer >= 0, LOCKED) — decimal places untuk atr14_pct sebelum hashing.
+  - Origin: DET
+  - Alasan: stabilisasi hash untuk indikator atr14_pct.
+  - Kapan diubah: jika precision atr14_pct di output berubah (breaking).
+  - Cara ubah: sama seperti close_price_dp.
+
+- `hash_contract.scales.value.dv20_idr_dp` (integer >= 0, LOCKED) — decimal places untuk dv20_idr sebelum hashing.
+  - Origin: DET
+  - Alasan: stabilisasi hash untuk indikator dv20_idr.
+  - Kapan diubah: jika precision dv20_idr di output berubah (breaking).
+  - Cara ubah: sama seperti close_price_dp.
+
 - `hash_contract.null_handling` (enum: `AS_NULL` | `AS_ZERO` | `DROP_FIELD`, LOCKED) — aturan null sebelum hashing.
   - Origin: DET
   - Alasan: determinisme hash saat ada null.
@@ -437,40 +503,40 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 ### L. Evaluation (backtest & OOS)
 
-- `ws.eval.min_trades_oos` (integer >= 0) — minimum jumlah trade di OOS agar proof tidak bias sample kecil.
+- `eval.min_trades_oos` (integer >= 0) — minimum jumlah trade di OOS agar proof tidak bias sample kecil.
   - Origin: DET
   - Alasan: mencegah OOS “lulus” karena trade terlalu sedikit.
   - Kapan diubah: bila rentang backtest dipersingkat/diperpanjang signifikan.
   - Cara ubah: update paramset + jalankan ulang OOS proof.
 
-- `ws.eval.min_trades` (integer >= 0) — minimum jumlah trade untuk evaluasi in-sample.
+- `eval.min_trades` (integer >= 0) — minimum jumlah trade untuk evaluasi in-sample.
   - Origin: DET
   - Alasan: mencegah param menang karena sample kecil.
   - Kapan diubah: bila rentang backtest berubah signifikan.
   - Cara ubah: update paramset + rerun calibration.
 
-- `ws.eval.min_days_covered` (integer >= 0) — minimum jumlah hari trading yang tercakup dalam window evaluasi agar hasil tidak bias karena coverage parsial.
+- `eval.min_days_covered` (integer >= 0) — minimum jumlah hari trading yang tercakup dalam window evaluasi agar hasil tidak bias karena coverage parsial.
   - Origin: DET
   - Default: ceil(0.70 * total_trading_days_in_window)
   - Alasan: mencegah pemilihan param yang hanya “aktif” pada sebagian kecil hari dalam window.
   - Kapan diubah: jika definisi `days_covered` berubah atau window backtest dipersingkat/diperpanjang signifikan.
   - Cara ubah: update paramset evaluasi + jalankan ulang kalibrasi.
 
-- `ws.eval.min_p25_ret_net_top` (decimal) — batas bawah percentile 25% return net untuk TOP bucket (downside bound sederhana).
+- `eval.min_p25_ret_net_top` (decimal) — batas bawah percentile 25% return net untuk TOP bucket (downside bound sederhana).
   - Origin: DET
   - Default: -0.030000
   - Alasan: mencegah param terbaik yang avg bagus tapi downside terlalu dalam.
   - Kapan diubah: jika karakter volatilitas market berubah signifikan atau strategi ingin lebih agresif/defensif.
   - Cara ubah: update paramset evaluasi + jalankan ulang kalibrasi.
 
-- `ws.eval.min_month_win_rate_min` (decimal 0..1) — batas minimal win_rate bulanan terendah (stability gate).
+- `eval.min_month_win_rate_min` (decimal 0..1) — batas minimal win_rate bulanan terendah (stability gate).
   - Origin: DET
   - Default: 0.450000
   - Alasan: mencegah param menang karena 1 periode ekstrem, tapi buruk di bulan lain.
   - Kapan diubah: jika window evaluasi bukan bulanan atau definisi period berubah.
   - Cara ubah: update paramset evaluasi + jalankan ulang kalibrasi.
 
-- `ws.eval.min_month_avg_ret_net_min` (decimal) — batas minimal avg return net bulanan terendah (stability gate).
+- `eval.min_month_avg_ret_net_min` (decimal) — batas minimal avg return net bulanan terendah (stability gate).
   - Origin: DET
   - Default: -0.010000
   - Alasan: membatasi kondisi terburuk per bulan agar param tidak memiliki “bulan jeblok” yang terlalu dalam.

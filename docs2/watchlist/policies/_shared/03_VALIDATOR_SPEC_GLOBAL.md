@@ -2,7 +2,7 @@
 
 Validator global memastikan:
 - Paramset mengikuti kontrak global (`02_PARAMSET_CONTRACT_GLOBAL.md`).
-- Semua parameter punya provenance (BT/DET/MAN) + alasan + kapan harus diubah.
+- Semua parameter punya provenance (BT/DET/MAN) + alasan + kapan harus diubah, **minimal via metadata audit per-parameter**: `{ origin, status, bt_target, rationale, change_triggers }`.
 - Hash contract jelas (field list + formatting policy).
 - Tidak ada referensi dokumen/file yang tidak eksis di paket dokumen.
 
