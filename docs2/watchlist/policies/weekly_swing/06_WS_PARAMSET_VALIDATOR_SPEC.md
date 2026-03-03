@@ -33,6 +33,19 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 - integer: dv20_idr, counts, dp scales
 - string: *mode keys
 - array: liquidity.exclude_tickers, grouping.sort_keys
+- object/map: grouping.min_count_overrides, scoring.weights.value, data_contract.required_fields.value (list), data_contract.required_sources.value (list)
+
+### 3B) Registry completeness check (LOCKED)
+Validator **wajib** menjadikan registry sebagai sumber kebenaran:
+- Load `05_WS_PARAMETER_REGISTRY_COMPLETE.md`, ambil semua key yang terdefinisi:
+  - Expand shorthand `{a,b,c}` menjadi key individual.
+  - Untuk wildcard `.*`, treat sebagai “pattern” (bukan key tunggal).
+- Untuk setiap key non-wildcard:
+  - Key **wajib ada** di `params_json` sebagai node audit `{ value, origin, status, bt_target, rationale, change_triggers }`.
+  - Tipe `value` **wajib** sesuai definisi tipe di registry (bool / integer / number / string / array / object-map). Jika tidak match => FAIL (type drift).
+- Untuk wildcard `X.*`:
+  - Node base `X` **wajib ada** dan `X.value` harus **array(list) atau object(map)** yang **non-empty** (memuat minimal 1 item/entry).
+- Jika ada key di `params_json` yang **tidak ada** di registry (kecuali node base yang dibutuhkan oleh wildcard), maka FAIL (drift).
 
 ### 4) Numeric sanity
 Liquidity:
@@ -57,8 +70,11 @@ Breakout:
 - -1 <= setup.mom_roc20_soft_min.value <= 1
 
 Weights:
-- all weights >= 0
-- sum(weights) > 0
+- scoring.weights.value.momentum >= 0
+- scoring.weights.value.breakout >= 0
+- scoring.weights.value.volume >= 0
+- scoring.weights.value.risk >= 0
+- sum(scoring.weights.value.{momentum,breakout,volume,risk}) > 0
 
 Caps / targets ordering:
 - grouping.top_picks_target.value >= 0
@@ -83,13 +99,15 @@ Eval (backtest & OOS gates):
 - eval.min_trades_oos.value >= 0
 - eval.min_trades.value >= 0
 - eval.min_days_covered.value >= 0
+- eval.min_p25_ret_net_top.value is number
 - 0 <= eval.min_month_win_rate_min.value <= 1
+- eval.min_month_avg_ret_net_min.value is number
 
 Outlier:
 - if enabled: max_abs_return_1d_pct.value > 0, max_high_low_range_1d_pct.value > 0
-- data_contract.required_fields (required, list non-empty)
-- data_contract.required_sources (required, list non-empty)
-- data_contract.disabled_fields (optional, list)
+- data_contract.required_fields.value (required, list non-empty)
+- data_contract.required_sources.value (required, list non-empty)
+- data_contract.disabled_fields.value (optional, list)
 
 ### 5) Locked invariants (must match exact)
 - scoring.combine_mode.value == 'NORM_WEIGHTED_SUM_CLAMP01'
@@ -110,14 +128,13 @@ sort_keys exact order:
 6) ticker_id_asc
 
 hash_contract lock:
-- order_by == 'ticker_id_asc'
-- null_handling == 'EXCLUDE_FROM_HASH_PAYLOAD'
-- scales dp:
-  - close_price_dp=4
-  - hh20_dp=4
-  - roc20_dp=6
-  - atr14_pct_dp=4
-  - dv20_idr_dp=0
+- hash_contract.order_by.value == 'ticker_id_asc'
+- hash_contract.null_handling.value == 'EXCLUDE_FROM_HASH_PAYLOAD'
+- hash_contract.scales.value.close_price_dp == 4
+- hash_contract.scales.value.hh20_dp == 4
+- hash_contract.scales.value.roc20_dp == 6
+- hash_contract.scales.value.atr14_pct_dp == 4
+- hash_contract.scales.value.dv20_idr_dp == 0
 
 Catatan LOCKED: nilai dp ini **harus identik** dengan definisi di `07_WS_REASON_CODES_AND_HASH.md` dan test vector hash di sana.
 

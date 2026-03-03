@@ -1,14 +1,14 @@
 # 05 — Parameter Registry (Complete) — WS_EOD_PLAN_CONFIRM
 
 ## Purpose
-Daftar parameter WS yang **exhaustive**: semua key yang boleh dipakai runtime oleh code. Jika code butuh parameter, key **wajib** ada di file ini **dan** ada di `params_json` (paramset).
+Daftar parameter WS yang **exhaustive**: semua key yang boleh dipakai runtime oleh code. Jika code butuh parameter, key **wajib** ada di file ini **dan** ada di params_json (paramset).
 
 ## Prerequisites
 ### Weekly Swing
 - `04_WS_PARAMSET_JSON_CONTRACT.md`
 
 ## Inputs
-- `params_json` WS
+- params_json WS
 
 ## Process
 Gunakan registry ini sebagai sumber kebenaran definisi per key.
@@ -120,7 +120,7 @@ Parameter boleh origin=BT hanya jika tercakup pada `14_WS_BT_COVERAGE_MATRIX_LOC
 Jika tidak, origin wajib MAN/DET sampai coverage valid.
 
 ## Namespace rules (LOCKED)
-Catatan (LOCKED): di dokumen, `a.b.c` adalah notasi referensi; JSON paramset tetap nested (`{a:{b:{c:...}}}`).
+Catatan (LOCKED): di dokumen, a.b.c adalah notasi referensi; JSON paramset tetap nested (`{a:{b:{c:...}}}`).
 
 Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code wajib membaca key canonical saja:
 - Alias (key alternatif) dilarang di runtime.
