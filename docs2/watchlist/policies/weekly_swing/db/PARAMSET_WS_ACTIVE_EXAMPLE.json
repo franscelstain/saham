@@ -450,10 +450,9 @@
       "origin": "DET",
       "status": "ACTIVE",
       "bt_target": false,
-      "rationale": "Data runtime yang terlalu stale tidak boleh dipakai CONFIRM.",
+      "rationale": "LOCKED: TTL canonical untuk validitas snapshot CONFIRM.",
       "change_triggers": [
-        "Perubahan frekuensi snapshot",
-        "Perubahan feed runtime"
+        "Breaking change: redefinisi 'fresh snapshot' untuk WS (update docs + validator + contract tests)"
       ]
     },
     "max_drift_from_entry_pct": {

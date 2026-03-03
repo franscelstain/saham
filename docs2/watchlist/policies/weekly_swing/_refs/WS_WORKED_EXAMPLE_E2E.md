@@ -113,7 +113,7 @@ Misal data runtime:
 - `drift_pct = (1028 - 1020) / 1020 = 0.007843`
 
 Check:
-- `snapshot_age_sec <= 900` → valid
+- `snapshot_age_sec <= snapshot_max_age_sec` (LOCKED: 900) → valid
 - `turnover_idr > 0 dan volume_shares > 0` → pass
 - `drift_pct <= 0.03` → pass
 
@@ -164,7 +164,7 @@ Tujuan: reviewer/operator bisa mengulang hasil dengan data yang sama.
    - `../db/PARAMSET_WS_ACTIVE_EXAMPLE.json`
 2) Jalankan PLAN untuk `trade_date=2026-02-27` (PLAN rekomendasi untuk `plan_trade_date=2026-02-28`).
 3) Input snapshot CONFIRM manual untuk `trade_date=2026-02-27`:
-   - `captured_at` sesuai contoh (snapshot_age_sec <= 900)
+   - `captured_at` sesuai contoh (snapshot_age_sec <= snapshot_max_age_sec (LOCKED: 900))
    - Items: `last_price=1028`, `volume_shares=39330000`, `turnover_idr=143960000000`
 4) Jalankan CONFIRM overlay.
 5) Assert hasil sesuai “Final Output Summary” di atas.

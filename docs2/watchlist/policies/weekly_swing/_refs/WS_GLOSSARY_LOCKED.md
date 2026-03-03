@@ -31,7 +31,7 @@ Waktu saat CONFIRM dijalankan.
 ## TTL CONFIRM (LOCKED)
 Batas usia snapshot agar sah:
 - `snapshot_max_age_sec = 900` (15 menit)
-- Jika `checked_at - effective_captured_at > 900` → snapshot **EXPIRED** → CONFIRM wajib menghasilkan `label = DELAY` + reason `WS_STALE`.
+- Jika `checked_at - effective_captured_at > snapshot_max_age_sec` (LOCKED: 900) → snapshot **EXPIRED** → CONFIRM wajib menghasilkan `label = DELAY` + reason `WS_STALE`.
 
 ## volume_shares (LOCKED)
 Total volume intraday dalam unit **shares** (bukan lot).

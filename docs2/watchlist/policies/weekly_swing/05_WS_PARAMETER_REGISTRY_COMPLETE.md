@@ -70,10 +70,10 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 
 ### I. No-trade
 - `no_trade.min_eligible_count` (MAN/ACTIVE, bt_target=true)
-- `no_trade.no_trade_hides_all` (DET/ACTIVE, locked)
+- `no_trade.no_trade_hides_all` (DET/ACTIVE, locked, fixed=true)
 
 ### J. Confirm overlay
-- `confirm_overlay.snapshot_max_age_sec` (DET+MAN/ACTIVE)
+- `confirm_overlay.snapshot_max_age_sec` (DET/ACTIVE, locked, fixed=900)
 - `confirm_overlay.max_drift_from_entry_pct` (MAN/ACTIVE, bt_target=true)
 
 ### K. Hash contract (reproducibility)
@@ -365,11 +365,11 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: hanya saat desain ranking berubah (breaking change).
   - Cara ubah: ubah registry + validator + hash_contract + contract tests secara serempak.
 
-- `grouping.rounding_mode` (enum: `FLOOR` | `ROUND` | `CEIL`) — aturan pembulatan target dinamis (LOCKED).
+- `grouping.rounding_mode` (enum: `FLOOR` | `ROUND` | `CEIL`, LOCKED) — aturan pembulatan target dinamis.
   - Origin: DET
   - Alasan: determinisme jumlah picks per grup.
-  - Kapan diubah: jika aturan pembulatan policy berubah.
-  - Cara ubah: ubah di paramset + contract tests.
+  - Kapan diubah: hanya jika aturan pembulatan policy berubah (breaking change).
+  - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
 
 ### H. Plan levels
 
@@ -393,19 +393,21 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: bila universe berubah besar atau data readiness sering reject.
   - Cara ubah: update paramset + contract tests.
 
-- `no_trade.no_trade_hides_all` (bool) — jika TRUE, NO_TRADE menyembunyikan semua grup output (LOCKED).
+- `no_trade.no_trade_hides_all` (bool, LOCKED) — jika TRUE, NO_TRADE menyembunyikan semua grup output.
+  - Fixed value: true
   - Origin: DET
   - Alasan: menghindari user salah eksekusi saat kondisi data/market tidak layak.
   - Kapan diubah: hanya jika UX policy berubah (breaking change).
-  - Cara ubah: ubah di paramset + contract tests.
+  - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru (bukan sekadar tweak).
 
 ### J. Confirm overlay
 
-- `confirm_overlay.snapshot_max_age_sec` (integer > 0) — batas usia snapshot runtime; lebih tua → `WS_STALE`.
-  - Origin: DET/MAN
-  - Alasan: runtime CONFIRM harus memakai data segar.
-  - Kapan diubah: jika frekuensi snapshot/latensi ingest berubah.
-  - Cara ubah: update paramset.
+- `confirm_overlay.snapshot_max_age_sec` (integer, LOCKED) — batas usia snapshot runtime; lebih tua → `WS_STALE`.
+  - Fixed value: 900 (15 menit)
+  - Origin: DET
+  - Alasan: TTL adalah batas validitas minimum untuk mencegah CONFIRM memakai snapshot basi.
+  - Kapan diubah: hanya jika policy WS mengubah definisi “fresh snapshot” (breaking change).
+  - Cara ubah: update dok LOCKED + update contract tests + promote paramset baru (bukan sekadar tweak). 
 
 - `confirm_overlay.max_drift_from_entry_pct` (0..1) — drift max dari `entry_ref` ke `last_price`; lebih jauh → `WS_DRIFT_FAR`.
   - Origin: MAN/BT
@@ -415,23 +417,23 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 ### K. Hash contract (reproducibility)
 
-- `hash_contract.order_by` (array<string>) — urutan field untuk canonical hashing (LOCKED).
+- `hash_contract.order_by` (array<string>, LOCKED) — urutan field untuk canonical hashing.
   - Origin: DET
   - Alasan: memastikan hash stabil lintas runtime/DB ordering.
   - Kapan diubah: jika schema output/hash input berubah (breaking change).
-  - Cara ubah: ubah di paramset + update docs + contract tests.
+  - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
 
-- `hash_contract.scales` (map<string,number>) — skala/rounding angka sebelum hashing (LOCKED).
+- `hash_contract.scales` (map<string,number>, LOCKED) — skala/rounding angka sebelum hashing.
   - Origin: DET
   - Alasan: mencegah drift hash karena floating noise.
-  - Kapan diubah: bila precision angka berubah di output.
-  - Cara ubah: ubah di paramset + contract tests.
+  - Kapan diubah: bila precision angka berubah di output (breaking change).
+  - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
 
-- `hash_contract.null_handling` (enum: `AS_NULL` | `AS_ZERO` | `DROP_FIELD`) — aturan null sebelum hashing (LOCKED).
+- `hash_contract.null_handling` (enum: `AS_NULL` | `AS_ZERO` | `DROP_FIELD`, LOCKED) — aturan null sebelum hashing.
   - Origin: DET
   - Alasan: determinisme hash saat ada null.
   - Kapan diubah: bila policy null berubah (breaking change).
-  - Cara ubah: ubah di paramset + contract tests.
+  - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
 
 ### L. Evaluation (backtest & OOS)
 

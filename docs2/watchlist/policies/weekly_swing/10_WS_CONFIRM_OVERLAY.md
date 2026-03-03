@@ -49,7 +49,7 @@ Hitung:
 - `snapshot_age_sec = checked_at - effective_captured_at`
 
 Aturan:
-- Jika `snapshot_age_sec > 900` → snapshot **EXPIRED** → output CONFIRM **wajib**:
+- Jika `snapshot_age_sec > snapshot_max_age_sec` (LOCKED: 900 detik) → snapshot **EXPIRED** → output CONFIRM **wajib**:
   - `label = DELAY`
   - reason code wajib: `WS_STALE`
 - Jika tidak ada snapshot → `label = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`

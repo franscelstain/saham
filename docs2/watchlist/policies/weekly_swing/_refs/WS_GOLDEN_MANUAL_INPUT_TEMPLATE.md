@@ -26,7 +26,7 @@ Tujuannya: **operator tidak salah input**, data **deterministik**, dan status CO
 
 ### Validitas (LOCKED)
 - `effective_captured_at = LEAST(captured_at, inserted_at)`
-- TTL CONFIRM: snapshot valid jika `snapshot_age_sec <= 900` (15 menit)
+- TTL CONFIRM: snapshot valid jika `snapshot_age_sec <= snapshot_max_age_sec (LOCKED: 900)` (15 menit)
 
 Failure yang wajib (LOCKED):
 - tidak ada snapshot → `DELAY` + `WS_SNAPSHOT_MISSING`
@@ -132,7 +132,7 @@ Saat input:
 
 Sesudah input:
 7) Jalankan query verifikasi.
-8) Jika expired (`snapshot_age_sec > 900`), CONFIRM wajib `DELAY + WS_STALE`.
+8) Jika expired (`snapshot_age_sec > snapshot_max_age_sec (LOCKED: 900)`), CONFIRM wajib `DELAY + WS_STALE`.
 
 ---
 
@@ -168,4 +168,4 @@ SELECT
 FROM watchlist_confirm_snapshots
 WHERE snapshot_id = <<snapshot_id>>;
 ```
-Valid jika `snapshot_age_sec <= 900`.
+Valid jika `snapshot_age_sec <= snapshot_max_age_sec (LOCKED: 900)`.

@@ -70,7 +70,7 @@ Risk:
 - risk.min_rr.value > 0
 
 Confirm:
-- confirm_overlay.snapshot_max_age_sec.value > 0
+- confirm_overlay.snapshot_max_age_sec.value == 900
 - confirm_overlay.max_drift_from_entry_pct.value > 0
 
 No Trade:
@@ -90,6 +90,7 @@ Outlier:
 - risk.stop_mode.value == 'ATR'
 - plan_levels.entry_mode.value == 'BREAKOUT'
 - no_trade.no_trade_hides_all.value == true
+- confirm_overlay.snapshot_max_age_sec.value == 900
 
 sort_keys exact order:
 1) score_total_desc

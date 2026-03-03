@@ -54,7 +54,7 @@ Spesifikasi tabel + kolom + contoh data:
 - TTL = 15 menit → `snapshot_max_age_sec = 900`
 
 Aturan:
-- Jika `checked_at - effective_captured_at > 900 detik` → snapshot **EXPIRED**
+- Jika `checked_at - effective_captured_at > snapshot_max_age_sec` (LOCKED: 900 detik) → snapshot **EXPIRED**
   - CONFIRM wajib menghasilkan `label = DELAY` + `WS_STALE`
 - Jika snapshot tidak ada → `label = DELAY` + `WS_SNAPSHOT_MISSING`
 - `NO_TRADE` tidak dipakai sebagai label hasil CONFIRM; `NO_TRADE` hanya berlaku pada status run PLAN/global selection.

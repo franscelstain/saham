@@ -6,6 +6,11 @@ Policy ini menghasilkan:
 - **PLAN** dari data EOD hari ini untuk rekomendasi besok.
 - **CONFIRM** sebagai overlay runtime yang **tidak boleh** memodifikasi PLAN.
 
+## Policy identifiers (LOCKED)
+- `policy_code` (DB/persistence): `WS`
+- `policy` (UI/meta schema): `WEEKLY_SWING`
+- Aturan: `policy_code` dan `policy` tidak boleh saling menggantikan; keduanya punya domain berbeda (DB vs UI).
+
 ## Prerequisites
 ### Shared Global
 - Baca kontrak global paramset di `../_shared/` (dokumen kontrak paramset global).

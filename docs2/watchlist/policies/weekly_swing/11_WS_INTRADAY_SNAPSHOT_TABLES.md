@@ -18,7 +18,7 @@ Dokumen ini mengunci **struktur tabel**, **kolom wajib**, dan **contoh data** un
 
 4) **TTL CONFIRM (LOCKED): 15 menit**
 - `snapshot_max_age_sec = 900`
-- Jika `NOW() - effective_captured_at > 900 detik` → snapshot **EXPIRED** → CONFIRM wajib menghasilkan `label = DELAY`, dan wajib mengeluarkan reason `WS_STALE`.
+- Jika `NOW() - effective_captured_at > snapshot_max_age_sec` (LOCKED: 900 detik) → snapshot **EXPIRED** → CONFIRM wajib menghasilkan `label = DELAY`, dan wajib mengeluarkan reason `WS_STALE`.
 
 5) Data snapshot bersifat **append-only**:
 - **UPDATE/DELETE dilarang** (wajib diblok dengan trigger).
@@ -226,7 +226,7 @@ SELECT
   inserted_at,
   LEAST(captured_at, inserted_at) AS effective_captured_at,
   TIMESTAMPDIFF(SECOND, LEAST(captured_at, inserted_at), NOW()) AS age_sec,
-  CASE WHEN TIMESTAMPDIFF(SECOND, LEAST(captured_at, inserted_at), NOW()) <= 900
+  CASE WHEN TIMESTAMPDIFF(SECOND, LEAST(captured_at, inserted_at), NOW()) <= :snapshot_max_age_sec -- LOCKED: 900
        THEN 1 ELSE 0 END AS is_valid
 FROM watchlist_confirm_snapshots
 WHERE snapshot_id = :snapshot_id;
