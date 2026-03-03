@@ -71,7 +71,6 @@ Risk:
 Confirm:
 - confirm_overlay.snapshot_max_age_sec.value > 0
 - confirm_overlay.max_drift_from_entry_pct.value > 0
-- confirm_overlay.spread_max_pct.value > 0
 
 No Trade:
 - no_trade.min_eligible_count.value >= 1

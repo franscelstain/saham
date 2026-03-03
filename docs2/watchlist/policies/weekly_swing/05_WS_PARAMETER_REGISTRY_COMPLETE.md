@@ -75,7 +75,6 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 ### J. Confirm overlay
 - `confirm_overlay.snapshot_max_age_sec` (DET+MAN/ACTIVE)
 - `confirm_overlay.max_drift_from_entry_pct` (MAN/ACTIVE, bt_target=true)
-- `confirm_overlay.spread_max_pct` (MAN/ACTIVE, bt_target=true)
 
 ### K. Hash contract (reproducibility)
 - `hash_contract.order_by` (DET/ACTIVE, locked)
@@ -412,12 +411,6 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Origin: MAN/BT
   - Alasan: mencegah buy saat harga sudah lari.
   - Kapan diubah: regime volatilitas berubah atau false delay terlalu sering.
-  - Cara ubah: update paramset (BT/MAN).
-
-- `confirm_overlay.spread_max_pct` (0..1) — spread max; lebih lebar → `WS_SPR_WIDE`.
-  - Origin: MAN/BT
-  - Alasan: spread lebar = likuiditas buruk saat runtime.
-  - Kapan diubah: karakter spread berubah atau terlalu banyak false caution.
   - Cara ubah: update paramset (BT/MAN).
 
 ### K. Hash contract (reproducibility)

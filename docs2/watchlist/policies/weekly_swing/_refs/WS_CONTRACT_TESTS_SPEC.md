@@ -58,7 +58,7 @@ CONFIRM harus menghasilkan `label` dan `reason codes` yang tepat untuk kondisi r
 
 ### Input (fixtures)
 - `plan_output` dari fixture A (minimal 1 item dengan `levels.entry_ref` valid).
-- Snapshot fixture yang dapat diatur: `captured_at`, `last_price`, `bid1_price`, `ask1_price`.
+- Snapshot fixture yang dapat diatur: `captured_at`, `last_price`.
 
 ### Cases & Assert (semua wajib, per-case)
 1) **Snapshot stale**
@@ -74,16 +74,16 @@ CONFIRM harus menghasilkan `label` dan `reason codes` yang tepat untuk kondisi r
 - Assert: `label = DELAY` dan ada reason code `WS_NO_PRICE`
 
 4) **Spread wide**
-- Setup: snapshot valid, `last_price` tersedia, `bid1_price` & `ask1_price` tersedia, `spread_pct > spread_max_pct`
-- Assert: `label = CAUTION` dan ada reason code `WS_SPR_WIDE`
+- Setup: snapshot valid, `last_price` tersedia
+- Assert: jika `turnover_idr` atau `volume_shares` missing → `label = DELAY` dan ada reason code `WS_INPUT_INCOMPLETE` (LOCKED)
 
 5) **Drift far**
 - Setup: snapshot valid, `last_price` tersedia, `abs(last_price - entry_ref)/entry_ref > max_drift_from_entry_pct`
 - Assert: `label = CAUTION` dan ada reason code `WS_DRIFT_FAR`
 
 6) **Bid/ask not available**
-- Setup: snapshot valid, `last_price` tersedia, tetapi `bid1_price` atau `ask1_price` tidak tersedia
-- Assert: ada reason code `WS_SPR_NA` dan `label` mengikuti rule lain (tidak dipaksa menjadi CAUTION jika hanya `WS_SPR_NA`)
+- Setup: snapshot valid, `last_price` tersedia
+- Assert: field non-contract (contoh: `bid1_price`, `ask1_price`, `spread`, `orderbook_json`) tidak mengubah hasil CONFIRM (LOCKED ignore)
 
 ### Notes (LOCKED)
 - Test ini **tidak** boleh mengubah PLAN (tetap wajib lulus Test #2).

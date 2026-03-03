@@ -35,6 +35,10 @@ Snapshot berasal dari tabel:
 **LOCKED anti-manipulasi:**
 - `effective_captured_at = LEAST(captured_at, inserted_at)`
 
+**Contoh (LOCKED):**
+- `captured_at=09:30`, `inserted_at=10:10` ⇒ `effective_captured_at=09:30`
+  (snapshot bisa **EXPIRED** walau baru diinput jam 10:10)
+
 ---
 
 ## Validity & TTL (LOCKED)
@@ -96,14 +100,15 @@ Cara enforce (wajib ada di test/contract):
 
 - Snapshot bersifat **append-only** (UPDATE/DELETE dilarang).
 - Jika input ulang snapshot untuk ticker yang sama, buat **snapshot baru** (snapshot_id baru).
-- `orderbook_json` boleh `{}` jika tidak menyimpan ladder; namun kolom ringkasan (`sum_5/sum_10`, spread, imbalance) **wajib** terisi.
+- Snapshot CONFIRM memakai **intraday aggregate** (harga + volume + turnover) yang bersifat stabil untuk input manual. Order book ladder **bukan** input keputusan CONFIRM.
 
 ---
 
 ## Execution Steps (reference)
 
 1) Load PLAN untuk `trade_date=T`
-2) Load snapshot terbaru untuk `(policy_code='WS', trade_date=T)` berdasarkan `captured_at DESC`
+2) Load snapshot terbaru untuk `(policy_code='WS', trade_date=T)` dengan urutan:
+   - `captured_at DESC`, lalu tie-breaker `snapshot_id DESC` (LOCKED)
 3) Hitung `snapshot_age_sec = checked_at - effective_captured_at`
 4) Jika `snapshot_age_sec > snapshot_max_age_sec` → hasilkan `label = DELAY` + `WS_STALE`
 5) Jika snapshot tidak ada → hasilkan `label = DELAY` + `WS_SNAPSHOT_MISSING`
@@ -111,11 +116,7 @@ Cara enforce (wajib ada di test/contract):
 7) Jika snapshot valid:
    - hitung `drift_pct = abs(last_price - entry_ref) / entry_ref`
    - jika `drift_pct > max_drift_from_entry_pct` → tambah `WS_DRIFT_FAR`
-   - jika bid1/ask1 tersedia:
-     - hitung `spread = ask1_price - bid1_price`
-     - hitung `spread_pct = spread / last_price`
-     - jika `spread_pct > spread_max_pct` → tambah `WS_SPR_WIDE`
-   - jika bid1/ask1 tidak tersedia → tambah `WS_SPR_NA`
+   - jika salah satu dari `volume_shares` atau `turnover_idr` tidak ada → tambah `WS_INPUT_INCOMPLETE` (BLOCK)
 8) Mapping label:
    - ada `BLOCK` → `DELAY`
    - else ada `WARN` → `CAUTION`

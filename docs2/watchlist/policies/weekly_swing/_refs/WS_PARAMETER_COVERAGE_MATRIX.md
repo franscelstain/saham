@@ -18,7 +18,6 @@ last_updated=2026-02-22
 |---|---:|---:|---:|---|---|---|
 | `confirm_overlay.max_drift_from_entry_pct` | Y | Y | Y | 06,10 | see 09 | see 03 |
 | `confirm_overlay.snapshot_max_age_sec` | Y | Y | Y | 06,07,10 | see 09 | see 03 |
-| `confirm_overlay.spread_max_pct` | Y | Y | Y | 06,07,10 | see 09 | see 03 |
 | `data_contract.disabled_fields` | Y | Y | Y | 06 | see 09 | see 03 |
 | `data_contract.required_fields` | Y | Y | Y | 06 | see 09 | see 03 |
 | `data_contract.required_sources` | Y | Y | Y | 06 | see 09 | see 03 |

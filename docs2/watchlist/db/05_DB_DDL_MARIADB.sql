@@ -97,46 +97,46 @@ CREATE TABLE IF NOT EXISTS watchlist_confirm_items (
 
 -- 6) watchlist_confirm_snapshots (manual intraday snapshot source for CONFIRM)
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
-  snapshot_id BIGINT NOT NULL AUTO_INCREMENT,
+  snapshot_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   policy_code VARCHAR(16) NOT NULL,
   trade_date DATE NOT NULL,
   captured_at DATETIME NOT NULL,
   inserted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source VARCHAR(32) NOT NULL,
+  source VARCHAR(32) NOT NULL DEFAULT 'manual',
   note TEXT NULL,
   snapshot_hash CHAR(64) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (snapshot_id),
-  KEY IDX_snapshots_policy_date_time (policy_code, trade_date, captured_at)
+  KEY idx_snap_policy_trade_captured (policy_code, trade_date, captured_at),
+  KEY idx_snap_trade_inserted (trade_date, inserted_at)
 ) ENGINE=InnoDB;
 
 -- 7) watchlist_confirm_snapshot_items (manual intraday snapshot items)
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshot_items (
-  snapshot_item_id BIGINT NOT NULL AUTO_INCREMENT,
-  snapshot_id BIGINT NOT NULL,
-  ticker_code VARCHAR(16) NOT NULL,
-  ticker_id BIGINT NULL,
-  last_price DECIMAL(18,2) NOT NULL,
-  bid1_price DECIMAL(18,2) NOT NULL,
-  bid1_lots BIGINT NOT NULL,
-  ask1_price DECIMAL(18,2) NOT NULL,
-  ask1_lots BIGINT NOT NULL,
-  bid_lots_sum_5 BIGINT NOT NULL,
-  ask_lots_sum_5 BIGINT NOT NULL,
-  bid_lots_sum_10 BIGINT NOT NULL,
-  ask_lots_sum_10 BIGINT NOT NULL,
-  spread DECIMAL(18,2) NOT NULL,
-  spread_pct DECIMAL(10,6) NOT NULL,
-  imbalance_5 DECIMAL(10,6) NOT NULL,
-  imbalance_10 DECIMAL(10,6) NOT NULL,
-  orderbook_json LONGTEXT NOT NULL,
-  item_hash CHAR(64) NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  snapshot_item_id  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  snapshot_id       BIGINT UNSIGNED NOT NULL,
+
+  ticker_code       VARCHAR(16) NOT NULL,
+  ticker_id         BIGINT UNSIGNED NULL,
+
+  last_price        INT UNSIGNED NOT NULL,
+  chg_pct           DECIMAL(8,4) NOT NULL,
+  volume_shares     BIGINT UNSIGNED NOT NULL,
+  turnover_idr      BIGINT UNSIGNED NOT NULL,
+
+  item_hash         CHAR(64) NULL,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
   PRIMARY KEY (snapshot_item_id),
-  UNIQUE KEY UQ_snapshot_items_snapshot_ticker (snapshot_id, ticker_code),
-  KEY IDX_snapshot_items_snapshot (snapshot_id),
-  KEY IDX_snapshot_items_ticker_code (ticker_code),
-  CONSTRAINT FK_snapshot_items_header FOREIGN KEY (snapshot_id) REFERENCES watchlist_confirm_snapshots(snapshot_id)
+  UNIQUE KEY uq_snap_ticker (snapshot_id, ticker_code),
+  KEY idx_item_snap (snapshot_id),
+  KEY idx_item_ticker (ticker_code),
+
+  CONSTRAINT fk_wcs_items_snapshot
+    FOREIGN KEY (snapshot_id)
+    REFERENCES watchlist_confirm_snapshots(snapshot_id)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT
 ) ENGINE=InnoDB;
 
 DELIMITER //

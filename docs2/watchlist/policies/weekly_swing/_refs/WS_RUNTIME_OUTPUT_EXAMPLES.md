@@ -134,7 +134,8 @@ Catatan:
     "last_price": 1028.0000,
     "snapshot_age_sec": 120,
     "drift_pct": 0.007843,
-    "spread_pct": 0.006000
+    "turnover_idr": 143960000000,
+    "volume_shares": 39330000
   },
   "reason_codes_json": [],
   "created_at": "2026-02-28T09:15:01+07:00"
@@ -216,13 +217,8 @@ Catatan:
   "label": "CAUTION",
   "reasons": [
     {
-      "code": "WS_SPR_WIDE",
       "severity": "WARN",
       "message": "Spread runtime melebihi batas maksimum.",
-      "payload": {
-        "spread_pct": 0.011000,
-        "spread_max_pct": 0.010000
-      }
     }
   ]
 }

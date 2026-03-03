@@ -9,7 +9,7 @@ Dokumen ini mengunci **struktur tabel**, **kolom wajib**, dan **contoh data** un
 2) Snapshot yang diinput manual adalah **sumber kebenaran CONFIRM**. Jika data diambil di masa lalu namun baru diinput sekarang, isi datanya **tidak diperdebatkan**. Yang dinilai hanya **validitas usia snapshot**.
 
 3) Snapshot wajib punya **dua timestamp**:
-- `captured_at` = waktu data order book **diambil** (diisi manual, dari jam perangkat saat mengambil data).
+- `captured_at` = waktu data intraday aggregate diambil (diisi manual, dari jam perangkat saat mengambil data).
 - `inserted_at` = waktu record masuk database (otomatis).
 
 **LOCKED (anti-manipulasi):**
@@ -47,12 +47,12 @@ DDL (MariaDB/MySQL):
 ```sql
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
   snapshot_id       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  policy_code       VARCHAR(8)  NOT NULL,
+  policy_code       VARCHAR(16) NOT NULL,
   trade_date        DATE        NOT NULL,
   captured_at       DATETIME    NOT NULL,
   inserted_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   source            VARCHAR(32) NOT NULL DEFAULT 'manual',
-  note              VARCHAR(255) NULL,
+  note              TEXT        NULL,
   snapshot_hash     CHAR(64)    NULL,
   created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -91,46 +91,30 @@ Fungsi: menyimpan snapshot per ticker.
 
 **LOCKED required fields per ticker (tanpa opsi):**
 - `ticker_code`
-- `last_price`
-- `bid1_price`, `bid1_lots`
-- `ask1_price`, `ask1_lots`
-- `bid_lots_sum_5`, `ask_lots_sum_5`
-- `bid_lots_sum_10`, `ask_lots_sum_10`
-- `spread`, `spread_pct`
-- `imbalance_5`, `imbalance_10`
-- `orderbook_json` (boleh `{}` jika tidak menyimpan ladder)
+- `last_price` (IDR, integer)
+- `chg_pct` (persen, decimal) — wajib tersedia (tanpa opsi)
+- `volume_shares` (integer, unit **shares**, bukan lot) (LOCKED)
+  - Jika sumber hanya menyediakan lot, wajib konversi: `shares = lot × 100` sebelum disimpan.
+- `turnover_idr` (integer)
 
 DDL:
 ```sql
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshot_items (
-  item_id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  snapshot_item_id  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   snapshot_id       BIGINT UNSIGNED NOT NULL,
 
   ticker_code       VARCHAR(16) NOT NULL,
   ticker_id         BIGINT UNSIGNED NULL,
 
-  last_price        INT UNSIGNED NOT NULL,
-  bid1_price        INT UNSIGNED NOT NULL,
-  bid1_lots         INT UNSIGNED NOT NULL,
-  ask1_price        INT UNSIGNED NOT NULL,
-  ask1_lots         INT UNSIGNED NOT NULL,
-
-  bid_lots_sum_5    INT UNSIGNED NOT NULL,
-  ask_lots_sum_5    INT UNSIGNED NOT NULL,
-  bid_lots_sum_10   INT UNSIGNED NOT NULL,
-  ask_lots_sum_10   INT UNSIGNED NOT NULL,
-
-  spread            INT UNSIGNED NOT NULL,
-  spread_pct        DECIMAL(10,6) NOT NULL,
-  imbalance_5       DECIMAL(10,6) NOT NULL,
-  imbalance_10      DECIMAL(10,6) NOT NULL,
-
-  orderbook_json    JSON NOT NULL,
+  last_price        INT UNSIGNED NOT NULL,          -- 4.610 -> 4610
+  chg_pct           DECIMAL(8,4) NOT NULL,          -- persen (contoh: 1.2500)
+  volume_shares     BIGINT UNSIGNED NOT NULL,       -- 39,33 M -> 39330000
+  turnover_idr      BIGINT UNSIGNED NOT NULL,       -- 143,96 B -> 143960000000
   item_hash         CHAR(64) NULL,
 
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  PRIMARY KEY (item_id),
+  PRIMARY KEY (snapshot_item_id),
   UNIQUE KEY uq_snap_ticker (snapshot_id, ticker_code),
   KEY idx_item_snap (snapshot_id),
   KEY idx_item_ticker (ticker_code),
@@ -166,37 +150,29 @@ DELIMITER ;
 
 ---
 
-## B. Cara Mengambil Data dari Order Book (LOCKED)
+## B. Cara Mengambil Data dari Ajaib (LOCKED)
 
-### B1) Normalisasi angka dari UI
-UI sering menampilkan pemisah ribuan dengan titik.
+### B1) Sumber field (mapping)
+- `last_price` diambil dari **Close/Last** pada panel Order Book.
+- `volume_shares` diambil dari **Volume** pada panel Order Book (format M/B/T).
+- `turnover_idr` diambil dari **Detail Price → Turnover** (NOMINAL). 
+  **DILARANG** memakai `Turnover %` sebagai `turnover_idr`.
 
-- Harga: `4.350` → `4350`
-- Lot: `1.012` → `1012`
+### B2) Normalisasi angka (LOCKED)
+- Harga: `4.610` → `4610` (hapus pemisah ribuan `.`)
+- Volume: `39,33 M` → `39.33 × 1_000_000` → `39330000`
+- Turnover: `143,96 B` → `143.96 × 1_000_000_000` → `143960000000`
+- Suffix: `K/M/B/T` wajib didukung. Koma `,` adalah desimal.
 
-**LOCKED:** semua kolom price dan lots di DB disimpan sebagai integer hasil normalisasi.
-
-### B2) Field mapping (per ticker)
-Ambil dari order book:
-- `last_price` = harga berjalan
-- `bid1_*` = level bid teratas
-- `ask1_*` = level ask teratas
-- `bid_lots_sum_5` = total lot bid level 1..5
-- `ask_lots_sum_5` = total lot ask level 1..5
-- `bid_lots_sum_10` = total lot bid level 1..10
-- `ask_lots_sum_10` = total lot ask level 1..10
-
-Turunan (wajib dihitung sebelum insert item):
-- `spread = ask1_price - bid1_price`
-- `spread_pct = spread / last_price`
-- `imbalance_n = (bid_sum_n - ask_sum_n) / (bid_sum_n + ask_sum_n)` untuk n=5 dan n=10
-
-`orderbook_json`:
-- boleh isi `{}` jika tidak menyimpan ladder
-- jika menyimpan, format minimal:
-```json
-{"bid":[{"p":4350,"l":1012},...],"ask":[{"p":4360,"l":6649},...]}
-```
+**LOCKED parser rules:**
+- Hapus spasi, ganti `,` → `.` untuk parsing desimal.
+- Jika ada suffix:
+  - `K`×1_000, `M`×1_000_000, `B`×1_000_000_000, `T`×1_000_000_000_000
+- Hasil akhir **wajib integer** dengan aturan pembulatan: `ROUND_HALF_UP` (LOCKED).
+- Reject input (INVALID) jika:
+  - ada karakter selain digit + `.` + `,` + suffix (`K/M/B/T`)
+  - nilai negatif / kosong
+  - format campur yang tidak valid (mis. `39.33 M` atau `39,33,1`)
 
 ---
 
@@ -207,7 +183,7 @@ Turunan (wajib dihitung sebelum insert item):
 INSERT INTO watchlist_confirm_snapshots
 (policy_code, trade_date, captured_at, source, note)
 VALUES
-('WS', '2026-03-01', '2026-03-01 10:05:00', 'manual', 'orderbook manual input');
+('WS', '2026-03-01', '2026-03-01 10:05:00', 'manual', 'intraday aggregate manual input (Ajaib)');
 ```
 
 Misal menghasilkan `snapshot_id = 1001`.
@@ -216,16 +192,10 @@ Misal menghasilkan `snapshot_id = 1001`.
 ```sql
 INSERT INTO watchlist_confirm_snapshot_items (
   snapshot_id, ticker_code,
-  last_price, bid1_price, bid1_lots, ask1_price, ask1_lots,
-  bid_lots_sum_5, ask_lots_sum_5, bid_lots_sum_10, ask_lots_sum_10,
-  spread, spread_pct, imbalance_5, imbalance_10,
-  orderbook_json
+  last_price, chg_pct, volume_shares, turnover_idr
 ) VALUES (
   1001, 'ANTM',
-  4350, 4350, 1012, 4360, 6649,
-  28422, 101080, 60176, 132045,
-  10, 0.002299, -0.560000, -0.374000,
-  '{}'
+  4610, 0.0000, 39330000, 143960000000
 );
 ```
 

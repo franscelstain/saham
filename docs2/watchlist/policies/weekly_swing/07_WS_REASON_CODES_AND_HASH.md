@@ -33,7 +33,6 @@ Untuk menghindari campur aduk code antar layer:
 Contoh:
 - `PLAN_ABORT_DATA_INCOMPLETE` → fail_code run-level PLAN
 - `WS_FW_RR_LOW` → reason code item PLAN
-- `WS_SPR_WIDE` → reason code item CONFIRM
 - `WS_NO_TRADE_MIN_ELIGIBLE` → reason code / fail_code policy-specific untuk NO_TRADE yang valid
 
 ---
@@ -47,16 +46,15 @@ Contoh:
 
 ### A2) Reason codes khusus CONFIRM (LOCKED)
 
-CONFIRM memakai intraday snapshot manual. Failure yang harus eksplisit:
+CONFIRM memakai intraday snapshot manual (intraday aggregate dari Ajaib). Failure yang harus eksplisit:
 
-- `WS_SNAPSHOT_MISSING` (BLOCK, CONFIRM)  
-  Snapshot belum diinput → CONFIRM wajib `label=DELAY`.
-
-- `WS_STALE` (BLOCK, CONFIRM)  
-  Snapshot melewati TTL (15 menit; `snapshot_max_age_sec=900`) → CONFIRM wajib menghasilkan `label=DELAY`.
+- `WS_SNAPSHOT_MISSING` (BLOCK, CONFIRM)
+- `WS_STALE` (BLOCK, CONFIRM)
+- `WS_INPUT_INCOMPLETE` (BLOCK, CONFIRM)
+  Salah satu dari field wajib intraday aggregate tidak ada (mis. turnover/volume).
 
 Catatan:
-- Kode lain seperti `WS_SPR_NA`, `WS_SPR_WIDE`, `WS_OUT_BAND` bersifat WARN/INFO (overlay), namun **tidak boleh** mengubah PLAN.
+- Order book ladder (bid/ask/spread/imbalance) bukan input keputusan CONFIRM dan tidak boleh jadi reason wajib.
 
 ### A3) Reason codes untuk Contract/Test Audit (LOCKED)
 Kode berikut dipakai untuk kegagalan **kontrak** pada test suite/audit, bukan untuk keputusan runtime UI:

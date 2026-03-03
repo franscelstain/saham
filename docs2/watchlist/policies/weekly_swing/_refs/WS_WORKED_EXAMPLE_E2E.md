@@ -108,12 +108,13 @@ TP1:
 Misal data runtime:
 - `last_price = 1028`
 - `snapshot_age_sec = 120`
-- `spread_pct = 0.006`
+- `turnover_idr = 143960000000`
+- `volume_shares = 39330000`
 - `drift_pct = (1028 - 1020) / 1020 = 0.007843`
 
 Check:
 - `snapshot_age_sec <= 900` → valid
-- `spread_pct <= 0.01` → pass
+- `turnover_idr > 0 dan volume_shares > 0` → pass
 - `drift_pct <= 0.03` → pass
 
 Hasil:

@@ -114,7 +114,7 @@ Detail confirm untuk ticker yang dievaluasi.
 - confirm_check_id (FK)
 - ticker_id
 - label (CONFIRMED/NEUTRAL/CAUTION/DELAY)
-- runtime_json (LONGTEXT) — last_price, bid, ask, spread_pct, drift_pct, etc.
+- runtime_json (LONGTEXT) — last_price, chg_pct, volume_shares, turnover_idr, drift_pct, snapshot_age_sec, etc.
 - reason_codes_json (LONGTEXT)
 - created_at
 
@@ -156,19 +156,9 @@ Detail per ticker untuk snapshot.
 - ticker_code
 - ticker_id (nullable)
 - last_price
-- bid1_price
-- bid1_lots
-- ask1_price
-- ask1_lots
-- bid_lots_sum_5
-- ask_lots_sum_5
-- bid_lots_sum_10
-- ask_lots_sum_10
-- spread
-- spread_pct
-- imbalance_5
-- imbalance_10
-- orderbook_json
+- chg_pct
+- volume_shares
+- turnover_idr
 - item_hash
 - created_at
 
@@ -184,12 +174,12 @@ Lihat juga: `watchlist/policies/weekly_swing/11_WS_INTRADAY_SNAPSHOT_TABLES.md`.
 ```sql
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
   snapshot_id       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  policy_code       VARCHAR(8)  NOT NULL,
+  policy_code       VARCHAR(16) NOT NULL,
   trade_date        DATE        NOT NULL,
   captured_at       DATETIME    NOT NULL,
   inserted_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   source            VARCHAR(32) NOT NULL DEFAULT 'manual',
-  note              VARCHAR(255) NULL,
+  note              TEXT        NULL,
   snapshot_hash     CHAR(64)    NULL,
   created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -202,34 +192,21 @@ CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
 ### Table: watchlist_confirm_snapshot_items
 ```sql
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshot_items (
-  item_id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  snapshot_item_id  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   snapshot_id       BIGINT UNSIGNED NOT NULL,
 
   ticker_code       VARCHAR(16) NOT NULL,
   ticker_id         BIGINT UNSIGNED NULL,
 
   last_price        INT UNSIGNED NOT NULL,
-  bid1_price        INT UNSIGNED NOT NULL,
-  bid1_lots         INT UNSIGNED NOT NULL,
-  ask1_price        INT UNSIGNED NOT NULL,
-  ask1_lots         INT UNSIGNED NOT NULL,
-
-  bid_lots_sum_5    INT UNSIGNED NOT NULL,
-  ask_lots_sum_5    INT UNSIGNED NOT NULL,
-  bid_lots_sum_10   INT UNSIGNED NOT NULL,
-  ask_lots_sum_10   INT UNSIGNED NOT NULL,
-
-  spread            INT UNSIGNED NOT NULL,
-  spread_pct        DECIMAL(10,6) NOT NULL,
-  imbalance_5       DECIMAL(10,6) NOT NULL,
-  imbalance_10      DECIMAL(10,6) NOT NULL,
-
-  orderbook_json    JSON NOT NULL,
+  chg_pct           DECIMAL(8,4) NOT NULL,
+  volume_shares     BIGINT UNSIGNED NOT NULL,
+  turnover_idr      BIGINT UNSIGNED NOT NULL,
   item_hash         CHAR(64) NULL,
 
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  PRIMARY KEY (item_id),
+  PRIMARY KEY (snapshot_item_id),
   UNIQUE KEY uq_snap_ticker (snapshot_id, ticker_code),
   KEY idx_item_snap (snapshot_id),
   KEY idx_item_ticker (ticker_code),

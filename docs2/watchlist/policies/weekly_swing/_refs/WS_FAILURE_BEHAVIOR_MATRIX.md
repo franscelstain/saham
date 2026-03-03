@@ -20,9 +20,8 @@ Mengunci perilaku sistem saat kondisi invalid, stale, atau kualitas data buruk a
 | Snapshot stale | Confirm overlay | Medium | Confirm delay | OK | Label DELAY | WS_STALE |
 | Snapshot missing | Confirm overlay | Medium | Confirm delay | OK | Label DELAY | WS_SNAPSHOT_MISSING |
 | last_price tidak tersedia | Confirm overlay | Medium | Confirm delay | OK | Label DELAY | WS_NO_PRICE |
-| Spread > spread_max_pct | Confirm overlay | Medium | Confirm caution | OK | Label CAUTION | WS_SPR_WIDE |
 | Drift > max_drift_from_entry_pct | Confirm overlay | Medium | Confirm caution | OK | Label CAUTION | WS_DRIFT_FAR |
-| Bid/ask runtime tidak tersedia | Confirm overlay | Low | Lanjut tanpa spread-based decision | OK | Label sesuai check lain | WS_SPR_NA |
+| Field intraday aggregate wajib tidak lengkap (turnover/volume) | Confirm overlay | High | Block | DELAY | Tidak sah untuk eksekusi | WS_INPUT_INCOMPLETE |
 | Writeback detected during CONFIRM (writes to PLAN) | Contract test / audit | Hard | Fail test / reject release | FAIL_TEST | Tidak relevan untuk UI runtime | WS_PLAN_WRITEBACK_DETECTED |
 | Hash mismatch (PLAN immutability) | Contract test / audit | Hard | Fail test / reject release | FAIL_TEST | Tidak relevan untuk UI runtime | WS_PLAN_HASH_MISMATCH |
 

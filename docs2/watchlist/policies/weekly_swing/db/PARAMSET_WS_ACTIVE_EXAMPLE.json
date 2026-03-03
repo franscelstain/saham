@@ -466,17 +466,6 @@
         "Regime volatilitas berubah",
         "Audit hasil eksekusi"
       ]
-    },
-    "spread_max_pct": {
-      "value": 0.01,
-      "origin": "MAN",
-      "status": "ACTIVE",
-      "bt_target": true,
-      "rationale": "Spread maksimum agar eksekusi runtime tidak terlalu jelek.",
-      "change_triggers": [
-        "Likuiditas pasar berubah",
-        "Audit hasil eksekusi"
-      ]
     }
   },
 

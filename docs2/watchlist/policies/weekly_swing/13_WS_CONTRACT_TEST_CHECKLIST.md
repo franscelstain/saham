@@ -35,6 +35,18 @@ Mengunci anti-drift khusus WS (di atas framework global).
   - plan_run hash & counts unchanged
   - plan_items unchanged
 
+### D1) ConfirmSnapshotSelectionTest (WS) (LOCKED)
+- Siapkan 2 snapshot untuk `(policy_code, trade_date)`:
+  - snapshot A: `captured_at` lebih lama
+  - snapshot B: `captured_at` lebih baru
+- Assert snapshot terpilih = yang `captured_at DESC`
+- Jika `captured_at` sama, assert tie-breaker = `snapshot_id DESC`
+
+### D2) ConfirmIgnoresOrderBookFieldsTest (WS) (LOCKED)
+- Beri input/payload yang mengandung field non-contract (contoh: `bid1_price`, `ask1_price`, `spread`, `orderbook_json`)
+- Assert hasil CONFIRM **identik** dengan saat field-field itu tidak ada
+- Assert tidak ada reason code yang berasal dari bid/ask/spread/orderbook
+
 ### E) GroupSemanticsRulesTest (WS)
 - Guard fail => AVOID + HIDE + reason guard
 - Forced watch-only => WATCH_ONLY (cannot become TOP/SECONDARY)

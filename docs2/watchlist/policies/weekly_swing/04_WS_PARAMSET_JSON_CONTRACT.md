@@ -35,7 +35,7 @@ WS wajib memiliki blok berikut:
 - grouping (grouping_mode, sort_keys, rounding_mode, thresholds, percentiles, min_count_overrides)
 - plan_levels (entry_mode, entry_band_pct)
 - no_trade (min_eligible_count, no_trade_hides_all)
-- confirm_overlay (snapshot_max_age_sec, max_drift_from_entry_pct, spread_max_pct)
+- confirm_overlay (snapshot_max_age_sec, max_drift_from_entry_pct)
 - hash_contract (order_by, scales, null_handling)
 
 ### 3) Tambahan wajib deterministik (anti drift)
