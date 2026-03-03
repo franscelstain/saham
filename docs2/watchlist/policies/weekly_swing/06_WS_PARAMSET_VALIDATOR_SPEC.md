@@ -25,14 +25,45 @@ LOCKED — CF mapping (validator layer):
 - Hash contract lock violated => `CF_HASH_CONTRACT_VIOLATION`
 - Eval gate invalid => `CF_EVAL_GATE_INVALID`
 
-### 2) JSON & identity
+### 2) Output schema (LOCKED)
+Validator WS **wajib** menghasilkan JSON output dengan schema berikut:
+
+Top-level (LOCKED):
+- `success` (bool) — TRUE jika **tidak ada** error severity `ERROR`; FALSE jika ada minimal 1 `ERROR`.
+- `policy_code` (string) = `WS`
+- `policy_version` (string) = `WS_EOD_PLAN_CONFIRM`
+- `schema_version` (string) = `PARAMSET_JSON`
+- `paramset_code` (string|null) — jika tidak ada di input, isi null (jangan omit).
+- `validated_at` (string) — RFC3339 dengan timezone (contoh `2026-03-03T09:15:00+07:00`).
+- `errors` (array) — wajib ada; empty array jika `success=true`.
+
+Error item schema (LOCKED):
+- `cf_code` (string) — wajib; harus salah satu `CF_*` di `07_CONTRACT_FAILURE_CODES_LOCKED.md`.
+- `severity` (enum) — `ERROR` | `WARN` (default: `ERROR`).
+- `path` (string) — dotted JSON path yang menunjuk lokasi masalah (contoh `risk.max_atr14_pct.value`).
+- `message` (string) — ringkas; boleh, tapi tidak menggantikan `cf_code`.
+- `expected` (string|number|array|null) — optional (dipakai untuk type drift/enum/lock).
+- `actual` (string|number|array|null) — optional.
+- `missing_fields` (array<string>) — optional (khusus `CF_PARAMSET_AUDIT_SCHEMA_INVALID`).
+
+Determinism (LOCKED):
+- `errors[]` harus diurutkan deterministik: sort by `cf_code` ASC, lalu `path` ASC.
+- Batas maksimum errors: 50. Jika lebih, truncate dan tambahkan top-level `truncated: true` (bool).
+
+Examples (non-normative):
+- Success:
+  - `{ "success": true, ..., "errors": [] }`
+- Fail:
+  - `{ "success": false, ..., "errors": [{"cf_code":"CF_PARAMSET_TYPE_DRIFT","severity":"ERROR","path":"risk.max_atr14_pct.value","expected":"number","actual":"string"}] }`
+
+### 3) JSON & identity
 - params_json valid JSON object
 - policy_code='WS'
 - policy_version='WS_EOD_PLAN_CONFIRM'
 - schema_version='PARAMSET_JSON'
 - jika `paramset_code` ada: string non-empty, pattern `^[A-Z0-9_]+$` (audit-friendly, stabil)
 
-### 3) Enum rules
+### 4) Enum rules
 - origin enum: DET, MAN, BT, DET+MAN, MAN+BT, DET+BT
 - status enum: ACTIVE, TEMP, DEPRECATED
 - TEMP => bt_target=true
@@ -40,7 +71,7 @@ LOCKED — CF mapping (validator layer):
 - LOCKED: setiap leaf parameter **wajib** punya field audit `{ value, origin, status, bt_target, rationale, change_triggers }`
 - `change_triggers` wajib array (boleh kosong)
 
-### 4) Type rules (ringkas)
+### 5) Type rules (ringkas)
 - boolean: data_readiness.reject_if_eod_incomplete, enabled flags, no_trade_hides_all
 - number: thresholds, weights, bounds
 - integer: dv20_idr, counts, dp scales
@@ -48,7 +79,7 @@ LOCKED — CF mapping (validator layer):
 - array: liquidity.exclude_tickers, grouping.sort_keys
 - object/map: grouping.min_count_overrides, scoring.weights.value, data_contract.required_fields.value (list), data_contract.required_sources.value (list)
 
-### 5) Registry completeness check (LOCKED)
+### 6) Registry completeness check (LOCKED)
 Validator **wajib** menjadikan registry sebagai sumber kebenaran:
 - Load `05_WS_PARAMETER_REGISTRY_COMPLETE.md`, ambil semua key yang terdefinisi:
   - Expand shorthand `{a,b,c}` menjadi key individual.
@@ -60,7 +91,7 @@ Validator **wajib** menjadikan registry sebagai sumber kebenaran:
   - Node base `X` **wajib ada** dan `X.value` harus **array(list) atau object(map)** yang **non-empty** (memuat minimal 1 item/entry).
 - Jika ada key di `params_json` yang **tidak ada** di registry (kecuali node base yang dibutuhkan oleh wildcard), maka FAIL (drift).
 
-### 6) Numeric sanity
+### 7) Numeric sanity
 Liquidity:
 - liquidity.min_dv20_idr.value > 0
 - liquidity.dv20_strong_idr.value > liquidity.min_dv20_idr.value
@@ -122,7 +153,7 @@ Outlier:
 - data_contract.required_sources.value (required, list non-empty)
 - data_contract.disabled_fields.value (optional, list)
 
-### 7) Locked invariants (must match exact)
+### 8) Locked invariants (must match exact)
 - scoring.combine_mode.value == 'NORM_WEIGHTED_SUM_CLAMP01'
 - grouping.grouping_mode.value == 'QUALIFIED_POOLS_QUANTILE_CUTOFF'
 - grouping.rounding_mode.value == 'FLOOR'
