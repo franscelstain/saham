@@ -13,7 +13,7 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 ## Process
 
 ### 1) Failure output (LOCKED)
-- Setiap VALIDATION FAIL **wajib** mengeluarkan `cf_code` (string) yang canonical, referensi: `watchlist/policies/_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`.
+- Setiap VALIDATION FAIL **wajib** mengeluarkan `cf_code` (string) yang canonical, referensi: `../_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`.
 - Pesan error bebas boleh ada sebagai context, tapi **tidak boleh menggantikan** `cf_code`.
 
 LOCKED — CF mapping (validator layer):

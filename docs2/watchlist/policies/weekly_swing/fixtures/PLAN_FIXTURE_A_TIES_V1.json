@@ -1,0 +1,321 @@
+{
+  "fixture_id": "WS_PLAN_FIXTURE_A_TIES_V1",
+  "policy_code": "WS",
+  "asof_eod_date": "2026-02-13",
+  "description": "Golden fixture untuk PLAN WS: scoring + quantile cutoff + deterministic tie-break (ticker_id ASC) + plan levels.",
+  "inputs": {
+    "params_min": {
+      "setup": {
+        "roc_lo": 0.0,
+        "roc_hi": 20.0,
+        "mom_roc20_soft_min": 2.0,
+        "bo_near_below_pct": 0.05,
+        "bo_max_ext_pct": 0.1,
+        "bo_trigger_mode": "ON"
+      },
+      "liquidity": {
+        "min_dv20_idr": 1000000000,
+        "dv20_strong_idr": 5000000000
+      },
+      "risk": {
+        "min_atr14_pct": 1.0,
+        "max_atr14_pct": 8.0,
+        "atr_ideal_low": 2.0,
+        "atr_ideal_high": 4.0,
+        "stop_atr_mult": 2.0,
+        "min_rr": 2.0
+      },
+      "scoring": {
+        "weights": {
+          "momentum": 1,
+          "breakout": 1,
+          "volume": 1,
+          "risk": 1
+        }
+      },
+      "grouping": {
+        "top_min_score_q": 0.75,
+        "secondary_min_score_q": 0.5,
+        "top_picks_target": 3,
+        "secondary_target": 2
+      },
+      "plan_levels": {
+        "entry_band_pct": 0.01
+      },
+      "hash_contract": {
+        "order_by": "ticker_id_asc",
+        "scales": {
+          "close_price_dp": 4,
+          "hh20_dp": 4,
+          "roc20_dp": 6,
+          "atr14_pct_dp": 4,
+          "dv20_idr_dp": 0
+        },
+        "null_handling": "EXCLUDE_FROM_HASH_PAYLOAD",
+        "canonical_string_format": "{ticker_id},{close},{hh20},{roc20},{atr14_pct},{dv20_idr} joined by \\n"
+      }
+    },
+    "universe": [
+      { "ticker_id": 101, "ticker_code": "AAA", "is_active": "Yes" },
+      { "ticker_id": 102, "ticker_code": "BBB", "is_active": "Yes" },
+      { "ticker_id": 103, "ticker_code": "CCC", "is_active": "Yes" },
+      { "ticker_id": 104, "ticker_code": "DDD", "is_active": "Yes" },
+      { "ticker_id": 105, "ticker_code": "EEE", "is_active": "Yes" }
+    ],
+    "rows": [
+      {
+        "ticker_id": 101,
+        "ticker_code": "AAA",
+        "asof_close": 100.0,
+        "hh20": 100.0,
+        "roc20": 10.0,
+        "atr14_pct": 3.0,
+        "dv20_idr": 3000000000,
+        "data_readiness": {
+          "data_ready": true,
+          "missing_bar_days_60d": 0,
+          "ret_1d": 1.2,
+          "high_low_range_1d_pct": 2.0,
+          "outlier_ruleset": {
+            "enabled": false,
+            "max_abs_return_1d_pct": 30.0,
+            "max_high_low_range_1d_pct": 60.0
+          }
+        }
+      },
+      {
+        "ticker_id": 102,
+        "ticker_code": "BBB",
+        "asof_close": 100.0,
+        "hh20": 100.0,
+        "roc20": 10.0,
+        "atr14_pct": 3.0,
+        "dv20_idr": 3000000000,
+        "data_readiness": {
+          "data_ready": true,
+          "missing_bar_days_60d": 0,
+          "ret_1d": 0.8,
+          "high_low_range_1d_pct": 1.5,
+          "outlier_ruleset": {
+            "enabled": false,
+            "max_abs_return_1d_pct": 30.0,
+            "max_high_low_range_1d_pct": 60.0
+          }
+        }
+      },
+      {
+        "ticker_id": 103,
+        "ticker_code": "CCC",
+        "asof_close": 100.0,
+        "hh20": 101.0,
+        "roc20": 8.0,
+        "atr14_pct": 4.6,
+        "dv20_idr": 4000000000,
+        "data_readiness": {
+          "data_ready": true,
+          "missing_bar_days_60d": 0,
+          "ret_1d": -0.5,
+          "high_low_range_1d_pct": 1.8,
+          "outlier_ruleset": {
+            "enabled": false,
+            "max_abs_return_1d_pct": 30.0,
+            "max_high_low_range_1d_pct": 60.0
+          }
+        }
+      },
+      {
+        "ticker_id": 104,
+        "ticker_code": "DDD",
+        "asof_close": 100.0,
+        "hh20": 102.0,
+        "roc20": 4.0,
+        "atr14_pct": 1.3,
+        "dv20_idr": 3000000000,
+        "data_readiness": {
+          "data_ready": true,
+          "missing_bar_days_60d": 0,
+          "ret_1d": 0.2,
+          "high_low_range_1d_pct": 1.0,
+          "outlier_ruleset": {
+            "enabled": false,
+            "max_abs_return_1d_pct": 30.0,
+            "max_high_low_range_1d_pct": 60.0
+          }
+        }
+      },
+      {
+        "ticker_id": 105,
+        "ticker_code": "EEE",
+        "asof_close": 50.0,
+        "hh20": 55.0,
+        "roc20": 15.0,
+        "atr14_pct": 3.5,
+        "dv20_idr": 500000000,
+        "data_readiness": {
+          "data_ready": true,
+          "missing_bar_days_60d": 0,
+          "ret_1d": 0.1,
+          "high_low_range_1d_pct": 1.0,
+          "outlier_ruleset": {
+            "enabled": false,
+            "max_abs_return_1d_pct": 30.0,
+            "max_high_low_range_1d_pct": 60.0
+          }
+        }
+      }
+    ]
+  },
+  "expected": {
+    "run_metrics": {
+      "eligible_count": 4,
+      "top_cutoff_today": 0.75,
+      "secondary_cutoff_today": 0.7,
+      "top_pool_count": 2,
+      "secondary_pool_count": 1,
+      "top_picks_target_dynamic": 2,
+      "secondary_target_dynamic": 1,
+      "quantile_disc_definition": "k=ceil(q*N), order by (score_total ASC, ticker_id ASC), return score at k (1-based)."
+    },
+    "hashing": {
+      "canonical_payload": "101,100.0000,100.0000,10.000000,3.0000,3000000000\n102,100.0000,100.0000,10.000000,3.0000,3000000000\n103,100.0000,101.0000,8.000000,4.6000,4000000000\n104,100.0000,102.0000,4.000000,1.3000,3000000000\n105,50.0000,55.0000,15.000000,3.5000,500000000",
+      "data_batch_hash_sha256": "57a36134a8b78a1f2a45bda2b622813a53aa68681536c1b8d9ff7466c9029b23"
+    },
+    "items": [
+      {
+        "ticker_id": 101,
+        "ticker_code": "AAA",
+        "asof_close": 100.0,
+        "indicators": { "dv20_idr": 3000000000, "atr14_pct": 3.0, "roc20": 10.0, "hh20": 100.0 },
+        "pass_guard": true,
+        "scores": {
+          "score_momentum": 0.5,
+          "score_breakout": 1.0,
+          "score_volume": 0.5,
+          "score_risk": 1.0,
+          "score_total_raw": 0.75,
+          "score_total": 0.75
+        },
+        "reason_codes": [ "WS_SEL_PCT" ],
+        "levels": {
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "entry_band_mid": 100.0,
+          "entry_ref": 100.0,
+          "atr_value": 3.0,
+          "stop_price": 94.0,
+          "risk_per_share": 6.0,
+          "tp1_price": 112.0,
+          "rr": 2.0
+        },
+        "group_semantic": "TOP_PICKS",
+        "ranking": 1
+      },
+      {
+        "ticker_id": 102,
+        "ticker_code": "BBB",
+        "asof_close": 100.0,
+        "indicators": { "dv20_idr": 3000000000, "atr14_pct": 3.0, "roc20": 10.0, "hh20": 100.0 },
+        "pass_guard": true,
+        "scores": {
+          "score_momentum": 0.5,
+          "score_breakout": 1.0,
+          "score_volume": 0.5,
+          "score_risk": 1.0,
+          "score_total_raw": 0.75,
+          "score_total": 0.75
+        },
+        "reason_codes": [ "WS_SEL_PCT" ],
+        "levels": {
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "entry_band_mid": 100.0,
+          "entry_ref": 100.0,
+          "atr_value": 3.0,
+          "stop_price": 94.0,
+          "risk_per_share": 6.0,
+          "tp1_price": 112.0,
+          "rr": 2.0
+        },
+        "group_semantic": "TOP_PICKS",
+        "ranking": 2
+      },
+      {
+        "ticker_id": 103,
+        "ticker_code": "CCC",
+        "asof_close": 100.0,
+        "indicators": { "dv20_idr": 4000000000, "atr14_pct": 4.6, "roc20": 8.0, "hh20": 101.0 },
+        "pass_guard": true,
+        "scores": {
+          "score_momentum": 0.4,
+          "score_breakout": 0.8,
+          "score_volume": 0.75,
+          "score_risk": 0.85,
+          "score_total_raw": 0.7,
+          "score_total": 0.7
+        },
+        "reason_codes": [ "WS_SEL_PCT" ],
+        "levels": {
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "entry_band_mid": 100.0,
+          "entry_ref": 100.0,
+          "atr_value": 4.6,
+          "stop_price": 90.8,
+          "risk_per_share": 9.2,
+          "tp1_price": 118.4,
+          "rr": 2.0
+        },
+        "group_semantic": "SECONDARY",
+        "ranking": 3
+      },
+      {
+        "ticker_id": 104,
+        "ticker_code": "DDD",
+        "asof_close": 100.0,
+        "indicators": { "dv20_idr": 3000000000, "atr14_pct": 1.3, "roc20": 4.0, "hh20": 102.0 },
+        "pass_guard": true,
+        "scores": {
+          "score_momentum": 0.2,
+          "score_breakout": 0.6,
+          "score_volume": 0.5,
+          "score_risk": 0.3,
+          "score_total_raw": 0.4,
+          "score_total": 0.4
+        },
+        "reason_codes": [ "WS_HID_PCT" ],
+        "levels": {
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "entry_band_mid": 100.0,
+          "entry_ref": 100.0,
+          "atr_value": 1.3,
+          "stop_price": 97.4,
+          "risk_per_share": 2.6,
+          "tp1_price": 105.2,
+          "rr": 2.0
+        },
+        "group_semantic": "WATCH_ONLY",
+        "ranking": 4
+      },
+      {
+        "ticker_id": 105,
+        "ticker_code": "EEE",
+        "asof_close": 50.0,
+        "indicators": { "dv20_idr": 500000000, "atr14_pct": 3.5, "roc20": 15.0, "hh20": 55.0 },
+        "pass_guard": false,
+        "scores": {
+          "score_momentum": 0.0,
+          "score_breakout": 0.0,
+          "score_volume": 0.0,
+          "score_risk": 0.0,
+          "score_total_raw": 0.0,
+          "score_total": 0.0
+        },
+        "reason_codes": [ "WS_LIQ_FAIL" ],
+        "levels": null,
+        "group_semantic": "AVOID",
+        "ranking": null
+      }
+    ]
+  }
+}

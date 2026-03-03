@@ -23,6 +23,27 @@ Agar implementasi tidak drift (mis. persen vs desimal), unit/scale berikut **waj
 
 Jika kontrak indikator (`../../../db/04_EOD_INDICATORS.md`) berbeda, maka kontrak indikator menang. PLAN wajib mengikuti kontrak indikator.
 
+## LOCKED — Precision, Rounding, dan Comparator
+
+Agar hasil tidak drift antar implementasi:
+
+- Semua perhitungan internal boleh memakai float.
+- Output `score_total` untuk persist + UI **wajib** dibulatkan ke **4 decimal**: `score_total_out = round(score_total_raw, 4)`.
+- Ranking **wajib** memakai `score_total_raw` (bukan string), lalu tie-break deterministik:
+  1) `score_total_raw DESC`
+  2) `ticker_id ASC`
+
+Comparator untuk guard (LOCKED):
+- Liquidity: `dv20_idr >= min_dv20_idr` (kalau < → guard fail)
+- Volatility: `atr14_pct <= max_atr14_pct` (kalau > → guard fail)
+- Volume confirmation: `vol_ratio >= min_vol_ratio` (kalau < → guard fail)
+
+Catatan (LOCKED):
+- `atr14_pct` dan `roc20` adalah **pct 0–100**, bukan ratio 0–1.
+- Semua threshold di paramset mengikuti unit di atas.
+
+## Process
+
 ## Process
 ### Step 0 — Build universe
 Universe = semua ticker aktif (master tickers), dikurangi `liquidity.exclude_tickers`.

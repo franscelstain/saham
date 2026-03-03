@@ -11,6 +11,57 @@ Mengunci anti-drift khusus WS (di atas framework global).
 - Fixture dataset WS (EOD+indicators)
 - Sample paramset WS
 
+## LOCKED — Fixture Manifest (wajib dibuat, tanpa ini test hanya “wacana”)
+
+**LOCKED — Fixture Base Path**
+
+Semua referensi `fixture: <nama_file>` di dokumen ini **SECARA DEFAULT** mengacu ke folder:
+
+- `docs/watchlist/policies/weekly_swing/fixtures/`
+
+Saat implementasi test suite dibuat, folder tersebut **di-mirror/copy** menjadi:
+
+- `tests/Fixtures/watchlist/ws/`
+
+Aturan (LOCKED):
+- Selama fase dokumentasi, fixture source-of-truth ada di `docs/.../fixtures/`.
+- Saat fase coding, fixture yang dipakai test adalah copy identik (byte-identical) di `tests/...`.
+- Jika nama file sama, maka dianggap file yang sama (tanpa perlu menulis path di tiap test case).
+
+Daftar file minimal yang **WAJIB ADA** (LOCKED) beserta isinya:
+
+### A) Paramset fixtures
+- `paramset_valid.json` — 1 paramset WS lengkap dan valid (audit-node lengkap).
+- `paramset_missing_required_key.json` — sama seperti valid tapi 1 key required hilang.
+- `paramset_unknown_key.json` — sama seperti valid tapi ada 1 key ekstra yang tidak dikenal.
+- `paramset_type_drift.json` — sama seperti valid tapi 1 value type salah (mis. string vs number).
+- `paramset_missing_audit_field.json` — sama seperti valid tapi audit-node kehilangan 1 field wajib.
+- `paramset_bad_enum.json` — enum invalid (origin/status/mode tidak ada di allowed set).
+- `paramset_bad_eval.json` — eval gate invalid (mis. range/threshold tidak konsisten dengan spec).
+- `paramset_bad_hash_contract.json` — hash contract lock sengaja dilanggar (untuk memicu `CF_HASH_CONTRACT_VIOLATION`).
+
+### B) PLAN fixtures (golden master)
+- `plan_universe_snapshot_sample.json` — snapshot universe EOD minimal (ticker_id, ticker_code, is_active, dll).
+- `plan_items_guard_fail.json` — input EOD+indicators yang memicu guard fail (dv20/atr/vol_ratio) dan expected output reasons.
+- `plan_items_artificial_ties.json` — input yang sengaja membuat `score_total_raw` tie untuk verifikasi tie-break `ticker_id ASC`.
+- `plan_items_no_trade_hide_all.json` — input yang membuat semua candidate ter-filter sehingga output harus deterministik (mis. group `NO_TRADE`/empty sesuai spec).
+- `scored_items_quantile_cutoff.json` — dataset kecil untuk verifikasi rule cutoff/quantile (jika dipakai oleh grouping).
+
+### C) CONFIRM fixtures
+- `confirm_snapshots_two.json` — 2 snapshot intraday untuk verifikasi “confirm overlay terpisah” dan tidak mengubah PLAN.
+- `confirm_payload_with_orderbook_fields.json` — payload yang mengandung field orderbook (bid/ask ladder) dan **harus FAIL** (karena CONFIRM dilarang pakai orderbook).
+
+### D) Backtest governance fixtures
+- `bt_coverage_guard_minimal.json` — coverage matrix minimal: memastikan rule coverage “pass/fail” berjalan.
+- `universe_equivalence_sample.json` — contoh universe backtest vs production untuk verifikasi equivalence.
+- `bt_eval_metrics_minimal.json` — contoh output evaluasi (avg_ret_net_top, win_rate, picks_count, dll) sesuai schema.
+- `bt_oos_proof_minimal.json` — contoh bukti OOS / walk-forward minimal (bukan narasi).
+
+LOCKED — aturan umum fixture:
+- semua file harus **self-contained** (tidak butuh DB) untuk contract test.
+- semua angka mengikuti unit di `08_WS_PLAN_ALGORITHM.md` (pct 0–100 untuk atr/roc).
+- setiap fixture yang menghasilkan FAIL harus menyertakan `expected_cf_code` / `expected_reason_codes` yang jelas.
+
 ## LOCKED — Code Hook Blueprint (belum ada codebase)
 Tujuan: memastikan dokumen ini bisa langsung diterjemahkan jadi test suite tanpa tafsir.
 
@@ -33,13 +84,13 @@ Tujuan: memastikan dokumen ini bisa langsung diterjemahkan jadi test suite tanpa
 - WS_CT_006 — Bad enum origin/status harus FAIL (fixture: `paramset_bad_enum.json`)
 - WS_CT_007 — Hash contract lock harus FAIL bila berubah (fixture: `paramset_bad_hash_contract.json`)
 - WS_CT_008 — Eval gate harus FAIL bila invalid (fixture: `paramset_bad_eval.json`)
-- WS_CT_009 — PLAN determinism harus PASS (fixture: dataset kecil + `paramset_valid.json`)
+- WS_CT_009 — PLAN determinism harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json` + `paramset_valid.json`)
 - WS_CT_010 — Confirm isolation / plan immutability harus PASS (fixture: plan+confirm snapshot)
 - WS_CT_011 — Confirm snapshot selection harus PASS (fixture: `confirm_snapshots_two.json`)
 - WS_CT_012 — Confirm ignores non-contract fields harus PASS (fixture: `confirm_payload_with_orderbook_fields.json`)
 - WS_CT_013 — Group semantics rules harus PASS (fixture: `plan_items_guard_fail.json`, `plan_items_forced_watch_only.json`)
-- WS_CT_014 — Tie-breaker sort_keys harus PASS (fixture: `plan_items_artificial_ties.json`)
-- WS_CT_015 — Qualified pools + quantile cutoff contract harus PASS (fixture: `scored_items_quantile_cutoff.json`)
+- WS_CT_014 — Tie-breaker sort_keys harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json`)
+- WS_CT_015 — Qualified pools + quantile cutoff contract harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json`)
 - WS_CT_016 — BT_COVERAGE_GUARD contract harus PASS (fixture: `bt_coverage_guard_minimal.json`)
 - WS_CT_017 — NO_TRADE gate contract harus PASS (fixture: `plan_items_no_trade_hide_all.json`)
 - WS_CT_018 — Universe equivalence (BT vs PROD) harus PASS (fixture: `universe_equivalence_sample.json`)
@@ -59,8 +110,9 @@ Tujuan: memastikan dokumen ini bisa langsung diterjemahkan jadi test suite tanpa
 - `paramset_bad_eval.json` (buat `eval.min_month_win_rate_min.value = 2`)
 - `confirm_snapshots_two.json` (2 snapshot untuk 1 trade_date, beda captured_at)
 - `confirm_payload_with_orderbook_fields.json` (tambahkan `bid1_price/ask1_price/spread/orderbook_json`)
-- `plan_items_artificial_ties.json` (2–3 ticker skor sama untuk uji sort_keys)
-- `scored_items_quantile_cutoff.json` (dataset kecil untuk uji qualified pools + quantile cutoff)
+- `PLAN_FIXTURE_A_TIES_V1.json` (golden PLAN fixture lengkap: scoring+guard+ties+quantile cutoff+expected output)
+- `plan_items_artificial_ties.json` (opsional bila tidak memakai golden fixture; 2–3 ticker skor sama untuk uji sort_keys)
+- `scored_items_quantile_cutoff.json` (opsional bila tidak memakai golden fixture; dataset kecil untuk uji qualified pools + quantile cutoff)
 - `bt_coverage_guard_minimal.json` (fixture mapping BT params → coverage matrix + contoh cutoff/picks minimal)
 - `plan_items_no_trade_hide_all.json` (plan items yang memicu NO_TRADE dan memastikan seluruh output `HIDE`)
 - `universe_equivalence_sample.json` (sample universe BT vs PROD + expected match/fail + reason canonical)

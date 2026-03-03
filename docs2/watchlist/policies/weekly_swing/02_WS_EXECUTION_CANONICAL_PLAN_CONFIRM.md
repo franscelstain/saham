@@ -7,6 +7,26 @@ Dokumen ini mengunci alur eksekusi Weekly Swing menjadi dua tahap yang tegas:
 
 **LOCKED:** CONFIRM tidak boleh mengubah PLAN.
 
+## LOCKED — Invariant: PLAN Immutability (wajib bisa dites)
+
+Saat CONFIRM dijalankan, **PLAN harus identik** sebelum vs sesudah eksekusi.
+
+Definisi “identik” (LOCKED):
+- `plan_hash_before == plan_hash_after`
+- `plan_items[]` (urutan, `ranking`, `group_semantic`, `score_total`, `reasons[]`) **tidak berubah**
+- Tidak boleh ada UPDATE/DELETE pada storage PLAN untuk `trade_date` yang sama.
+
+Definisi `plan_hash` (LOCKED):
+- `plan_hash = SHA256( canonical_json(plan_items[]) )`
+- `canonical_json` wajib:
+  - sort by `ranking ASC, ticker_id ASC`
+  - hanya field: `ticker_id,ticker_code,ranking,group_semantic,score_total,reasons`
+  - no whitespace, deterministic key order
+
+Scope write yang diizinkan saat CONFIRM (LOCKED):
+- hanya menulis `confirm_result` / `confirm_reasons` / `confirm_meta` (storage terpisah)
+- dilarang menulis ulang PLAN fields, termasuk “reorder ranking” atau “recompute score_total”
+
 ---
 
 ## Prerequisites
