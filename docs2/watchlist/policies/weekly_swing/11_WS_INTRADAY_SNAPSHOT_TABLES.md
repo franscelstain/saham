@@ -150,7 +150,10 @@ DELIMITER ;
 
 ---
 
-## B. Cara Mengambil Data dari Ajaib (LOCKED)
+## B. Manual Intraday Snapshot Input (LOCKED)
+
+> Template operasional 1 halaman (input manual + normalisasi angka + contoh valid/invalid + checklist + query verifikasi):
+> lihat `_refs/WS_GOLDEN_MANUAL_INPUT_TEMPLATE.md`.
 
 ### B1) Sumber field (mapping)
 - `last_price` diambil dari **Close/Last** pada panel Order Book.

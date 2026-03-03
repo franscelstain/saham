@@ -82,6 +82,19 @@ Untuk mencegah writeback tidak sengaja, ruang lingkup operasi DB saat CONFIRM ad
 - `plan_hash_before == plan_hash_after`
 - Test suite **wajib** memiliki audit “DB Write-Scope” (lihat `_refs/WS_CONTRACT_TESTS_SPEC.md` Test 2C). Tanpa audit ini, kontrak dianggap **belum terpenuhi**.
 
+## LOCKED — PLAN Hash Scope (Immutability)
+Definisi `plan_hash` harus **mekanis** agar tidak ada interpretasi berbeda.
+
+**PLAN state yang masuk hash:**
+1) `plan_run` untuk `(policy_code='WS', trade_date=T)`:
+   - `policy_code`, `trade_date`, `param_id`, `data_batch_hash`, `plan_version`
+2) Seluruh `plan_items` untuk trade_date=T:
+   - `ticker_code` (atau `ticker_id`), `rank`, `group_semantic`, `score_total`, `reasons_hash`
+
+**Canonical hashing rules (LOCKED):**
+- Urutkan `plan_items` deterministik: `ticker_code ASC`
+- Serialize ke canonical JSON (field order tetap), lalu hash `SHA-256`.
+
 ---
 
 ## E. Output Canonical (LOCKED)

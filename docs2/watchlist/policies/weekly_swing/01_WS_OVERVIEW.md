@@ -11,9 +11,12 @@ Policy ini menghasilkan:
 - Baca kontrak global paramset di `../_shared/` (dokumen kontrak paramset global).
 
 ### Reference
-- `_refs/WS_GLOSSARY_LOCKED.md`
-- `_refs/WS_WORKED_EXAMPLE_E2E.md`
 - `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`
+- `_refs/WS_GLOSSARY_LOCKED.md`
+- `_refs/WS_GOLDEN_MANUAL_INPUT_TEMPLATE.md`
+- `_refs/WS_WORKED_EXAMPLE_E2E.md`
+- `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`
+- `_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`
 
 ## Governance & Audit (Index)
 - `_refs/WS_PARAMETER_COVERAGE_MATRIX.md` — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator/dok algoritma.

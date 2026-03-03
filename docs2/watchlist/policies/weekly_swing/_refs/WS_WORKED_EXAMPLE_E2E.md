@@ -133,3 +133,41 @@ Hasil:
 - `tp1_price = 1143.93`
 - `label = CONFIRMED`
 - `reasons = []`
+
+---
+
+## Artifacts Produced (GOLDEN, LOCKED)
+Dokumen ini dianggap “golden runnable example”. Minimal artefak yang harus dapat dihasilkan ulang:
+
+### A) PLAN (persisted)
+- `plan_run` untuk `trade_date=T`
+- `plan_items` untuk `trade_date=T` (minimal 1 ticker contoh ini)
+
+### B) CONFIRM snapshot input (persisted, manual)
+- `watchlist_confirm_snapshots` (header) untuk `(policy_code='WS', trade_date=T)`
+- `watchlist_confirm_snapshot_items` (items) untuk `ticker_code=ABCD` dengan field:
+  - `last_price`, `chg_pct`, `volume_shares`, `turnover_idr`, `captured_at`
+
+### C) CONFIRM output (runtime)
+- Output mengikuti schema di `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`.
+- Contoh output referensi ada di `_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`.
+
+Catatan (LOCKED):
+- CONFIRM memakai **intraday aggregate snapshot**, **bukan ladder**.
+
+---
+
+## Replay Checklist (GOLDEN, LOCKED)
+Tujuan: reviewer/operator bisa mengulang hasil dengan data yang sama.
+
+1) Pastikan paramset yang dipakai sama:
+   - `../db/PARAMSET_WS_ACTIVE_EXAMPLE.json`
+2) Jalankan PLAN untuk `trade_date=2026-02-27` (PLAN rekomendasi untuk `plan_trade_date=2026-02-28`).
+3) Input snapshot CONFIRM manual untuk `trade_date=2026-02-27`:
+   - `captured_at` sesuai contoh (snapshot_age_sec <= 900)
+   - Items: `last_price=1028`, `volume_shares=39330000`, `turnover_idr=143960000000`
+4) Jalankan CONFIRM overlay.
+5) Assert hasil sesuai “Final Output Summary” di atas.
+
+Invariant (LOCKED):
+- CONFIRM tidak boleh mengubah PLAN (plan_hash_before == plan_hash_after).

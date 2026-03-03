@@ -30,10 +30,12 @@ Mengunci anti-drift khusus WS (di atas framework global).
 
 ### D) ConfirmIsolationTest (WS)
 - Generate PLAN
+- Ambil `plan_hash_before` sesuai **LOCKED — PLAN Hash Scope** di dok `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`.
 - Run CONFIRM
-- Assert plan tables tidak berubah:
-  - plan_run hash & counts unchanged
-  - plan_items unchanged
+- Ambil `plan_hash_after` dengan scope yang sama.
+- Assert:
+  - `plan_hash_before == plan_hash_after`
+  - Tidak ada `UPDATE/DELETE` pada persistence PLAN (DB write-scope audit)
 
 ### D1) ConfirmSnapshotSelectionTest (WS) (LOCKED)
 - Siapkan 2 snapshot untuk `(policy_code, trade_date)`:
