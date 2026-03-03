@@ -155,6 +155,7 @@ DELIMITER ;
 ### B1) Sumber field (mapping)
 - `last_price` diambil dari **Close/Last** pada panel Order Book.
 - `volume_shares` diambil dari **Volume** pada panel Order Book (format M/B/T).
+- Panel “Order Book” dipakai hanya untuk membaca **angka aggregate di bagian atas**; ladder bid/ask di bawahnya **bukan** input CONFIRM.
 - `turnover_idr` diambil dari **Detail Price → Turnover** (NOMINAL). 
   **DILARANG** memakai `Turnover %` sebagai `turnover_idr`.
 

@@ -100,7 +100,7 @@ Cara enforce (wajib ada di test/contract):
 
 - Snapshot bersifat **append-only** (UPDATE/DELETE dilarang).
 - Jika input ulang snapshot untuk ticker yang sama, buat **snapshot baru** (snapshot_id baru).
-- Snapshot CONFIRM memakai **intraday aggregate** (harga + volume + turnover) yang bersifat stabil untuk input manual. Order book ladder **bukan** input keputusan CONFIRM.
+- Snapshot CONFIRM memakai **intraday aggregate** (last_price/chg_pct/volume_shares/turnover_idr). Order book ladder **bukan** input keputusan CONFIRM.
 
 ---
 

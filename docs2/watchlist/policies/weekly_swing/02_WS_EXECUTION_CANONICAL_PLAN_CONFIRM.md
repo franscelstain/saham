@@ -3,7 +3,7 @@
 Dokumen ini mengunci alur eksekusi Weekly Swing menjadi dua tahap yang tegas:
 
 - **PLAN** dibuat dari data **EOD hari ini** untuk rekomendasi **besok**.
-- **CONFIRM** memakai **intraday snapshot manual** (bukan real-time) untuk mengecek keyakinan pada saat snapshot diambil.
+- **CONFIRM** memakai **intraday snapshot manual** (bukan real-time) berbasis **intraday aggregate** (last/chg/volume/turnover), **bukan** order book ladder.
 
 **LOCKED:** CONFIRM tidak boleh mengubah PLAN.
 

@@ -42,5 +42,6 @@ Total nilai transaksi intraday (IDR) / traded value (Ajaib: “Turnover” nomin
 - **DILARANG** memakai “Turnover %” sebagai `turnover_idr`.
 
 ## Non-Contract Fields (CONFIRM) (LOCKED)
+CONFIRM memakai **intraday aggregate** (last_price/chg_pct/volume_shares/turnover_idr), **bukan** order book ladder.
 Field order book ladder (bid/ask/spread/imbalance/orderbook) **bukan input keputusan CONFIRM**.
 Jika field tersebut muncul di payload/import, engine CONFIRM wajib **mengabaikan** (no-effect).
