@@ -126,6 +126,10 @@ INSERT INTO watchlist_reason_codes (policy_code, reason_code, scope, severity, s
  'Hash PLAN berubah setelah CONFIRM atau setelah proses audit; ini melanggar invariant immutability.',
  'PLAN hash changed after CONFIRM or audit process; this violates the immutability invariant.'),
 
+('WS','WS_PLAN_WRITEBACK_DETECTED','PLAN','BLOCK','plan_writeback',
+ 'Terdeteksi operasi tulis ke persistence PLAN saat proses CONFIRM; ini melanggar DB write-scope contract.',
+ 'Detected write operation to PLAN persistence during CONFIRM; violates DB write-scope contract.'),
+
 ('WS','WS_SNAPSHOT_MISSING','CONFIRM','BLOCK','snap_missing',
  'Snapshot intraday belum diinput; CONFIRM tidak bisa dijalankan.',
  'Intraday snapshot not provided; confirm cannot run.'),

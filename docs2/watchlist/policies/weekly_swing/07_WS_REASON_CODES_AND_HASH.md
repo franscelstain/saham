@@ -58,6 +58,16 @@ CONFIRM memakai intraday snapshot manual. Failure yang harus eksplisit:
 Catatan:
 - Kode lain seperti `WS_SPR_NA`, `WS_SPR_WIDE`, `WS_OUT_BAND` bersifat WARN/INFO (overlay), namun **tidak boleh** mengubah PLAN.
 
+### A3) Reason codes untuk Contract/Test Audit (LOCKED)
+Kode berikut dipakai untuk kegagalan **kontrak** pada test suite/audit, bukan untuk keputusan runtime UI:
+
+- `WS_PLAN_WRITEBACK_DETECTED` (HARD, AUDIT)  
+  Terdeteksi operasi tulis ke persistence PLAN saat proses CONFIRM. Ini melanggar “DB write scope (CONFIRM)” dan wajib membuat test **FAIL**.
+
+Catatan:
+- `WS_PLAN_HASH_MISMATCH` tetap dipakai jika hash PLAN berubah.  
+- `WS_PLAN_WRITEBACK_DETECTED` dipakai jika audit mendeteksi write ke PLAN walau hash kebetulan tidak berubah.
+
 ---
 
 ## B. Data Batch Hash (PLAN) — canonical (LOCKED)

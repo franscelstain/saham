@@ -64,14 +64,23 @@ Aturan:
 ## D. Immutability Contract (LOCKED)
 
 CONFIRM overlay hanya boleh menambah **output CONFIRM terpisah**.
+
 Dilarang:
 - mengubah PLAN record/fields
 - reorder ranking
 - mengubah `score_total`
 - mengubah `group_semantic`
 
+## LOCKED — DB write scope (CONFIRM)
+Untuk mencegah writeback tidak sengaja, ruang lingkup operasi DB saat CONFIRM adalah:
+- **READ-ONLY** terhadap seluruh persistence PLAN (run/header/items/levels/reasons) untuk `trade_date=T`.
+- **WRITE-ONLY** ke persistence CONFIRM (confirm_run + confirm_items + confirm_reasons) sebagai output terpisah.
+- **Dilarang** melakukan `UPDATE`/`DELETE` pada data PLAN dalam proses CONFIRM, termasuk perubahan status, rank, score, group, atau levels.
+- Jika implementasi memakai transaksi DB, maka transaksi CONFIRM tidak boleh mencakup statement yang memodifikasi PLAN.
+
 **Contract test wajib:**
 - `plan_hash_before == plan_hash_after`
+- Test suite **wajib** memiliki audit “DB Write-Scope” (lihat `_refs/WS_CONTRACT_TESTS_SPEC.md` Test 2C). Tanpa audit ini, kontrak dianggap **belum terpenuhi**.
 
 ---
 
