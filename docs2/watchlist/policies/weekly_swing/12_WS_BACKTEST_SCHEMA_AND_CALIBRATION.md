@@ -85,7 +85,8 @@ Bagian ini mengunci cara backtest dihitung agar hasil kalibrasi 2 tahun reproduc
 Untuk menghindari ketergantungan pada fee persen broker, backtest memakai model fee **IDR** dan notional deterministik.
 
 **E1. Notional & qty**
-- Notional per trade (LOCKED): `notional_idr = 10_000_000` (atau nilai lain yang kamu tetapkan).
+- Notional per trade (LOCKED): `notional_idr = 10_000_000`.
+  - Jika notional ingin diubah untuk eksperimen, itu **bukan** bagian dari kontrak LOCKED: wajib dicatat sebagai metadata run (input kalibrasi) dan tidak boleh dibandingkan apple-to-apple dengan run yang notional-nya berbeda.
 - Lot size (LOCKED): `lot_size = 100` saham per lot.
 - Qty saham:
   - `lots = floor(notional_idr / (entry_price * lot_size))`
@@ -100,7 +101,7 @@ Pilih salah satu dan tulis eksplisit (jangan campur).
   - `fee_sell_idr = <nilai tetap>`
 
 - Model 2 (tiered berdasarkan nilai transaksi):
-  - `fee_buy_idr  = f_buy(gross_buy_idr)`  (fungsi piecewise/tabel tier ditulis di dok)
+  - `fee_buy_idr  = f_buy(gross_buy_idr)`
   - `fee_sell_idr = f_sell(gross_sell_idr)`
 
 Catatan: jika fee real di Ajaib tersedia sebagai “biaya transaksi” per order, kamu bisa kalibrasi f_buy/f_sell dari sample statement. Yang penting fungsi/tabelnya LOCKED.
@@ -161,7 +162,7 @@ dan **bukan** kolom wajib pada `watchlist_bt_eval`, kecuali schema `watchlist_bt
 ### J. Determinism & Audit (LOCKED)
 - Semua parameter yang mempengaruhi hasil backtest wajib berasal dari:
   - paramset/backtest grid (wajib tercatat), atau
-  - konstanta LOCKED di dok ini (mis. notional_idr, lot_size, slippage default).
+  - konstanta LOCKED di file ini (mis. notional_idr, lot_size, slippage default).
 - Jika ada perubahan angka/aturan di section ini → dianggap breaking change dan wajib re-run kalibrasi.
 
 ## Process
@@ -222,7 +223,7 @@ Tanpa `watchlist_bt_oos_eval_ws` (OOS proof), kalibrasi tidak boleh dipromote me
 4) Buat param_set baru (DRAFT):
    - parameter terkalibrasi => origin=BT, status=ACTIVE
    - parameter deterministik => origin=DET, status=ACTIVE
-5) Promote param_set BT menjadi ACTIVE (lihat dok 02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md).
+5) Promote param_set BT menjadi ACTIVE (lihat `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`).
 
 ## Evaluation metrics sufficiency (LOCKED)
 Metrik pada `watchlist_bt_eval` wajib memenuhi spesifikasi:
@@ -271,16 +272,16 @@ Jika salah satu field di atas NULL/invalid:
 - ticker tetap dicatat di `watchlist_bt_universe_ws` dengan `required_ok=FALSE`,
 - `missing_fields` wajib diisi,
 - `eligible_ok=FALSE`,
-- `reason_code` mengikuti prioritas canonical reason pada dok 15 (contoh: `WS_DATA_MISSING`).
+- `reason_code` mengikuti prioritas canonical reason pada `15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md` (contoh: `WS_DATA_MISSING`).
 
 ### 4) Field untuk scoring (LOCKED)
-Indikator yang dipakai untuk menghitung `score_total` (contoh: `roc20`, `hh20`, dll) **tidak termasuk** daftar required fields guardrails kecuali policy WS secara eksplisit menetapkannya sebagai requirement eligibility.
+Indikator yang dipakai untuk menghitung `score_total` (contoh: `roc20`, `hh20`) **tidak termasuk** daftar required fields guardrails kecuali policy WS secara eksplisit menetapkannya sebagai requirement eligibility.
 
 Jika indikator scoring missing (LOCKED):
 - ticker tetap boleh eligible selama guardrails terpenuhi,
 - skor komponen yang membutuhkan indikator tersebut = 0,
 - `missing_fields` tetap mencatat indikator yang missing (untuk audit), namun tidak menjatuhkan `required_ok`.
-Aturan ini harus konsisten dengan production PLAN.
+  Aturan ini harus konsisten dengan production PLAN.
 
 Rule (LOCKED):
 `missing_fields` boleh berisi gabungan field guardrails dan field scoring; namun `required_ok` hanya dipengaruhi oleh required fields guardrails (lihat Section 3).
@@ -289,7 +290,7 @@ Rule (LOCKED):
 Untuk audit/re-run **wajib** menyimpan universe harian di `watchlist_bt_universe_ws` (lihat `db/BACKTEST_SCHEMA_DDL.sql`) minimal berisi:
 - `required_ok, missing_fields, guard_ok, eligible_ok, dv20_idr, atr14_pct, vol_ratio, reason_code`
 
-Reason_code memakai dictionary WS_* (contoh: `WS_DATA_MISSING`, `WS_GUARD_LIQUIDITY_FAIL`, dll) sesuai prioritas canonical reason di dok 15.
+Reason_code memakai dictionary WS_* (contoh: `WS_DATA_MISSING`, `WS_GUARD_LIQUIDITY_FAIL`) sesuai prioritas canonical reason di `15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`.
 
 ## Schema: watchlist_bt_universe_ws (AUDIT) (LOCKED)
 
@@ -306,8 +307,10 @@ Kolom (harus match DDL):
 - `guard_ok` — 1 jika lolos semua guardrail, 0 jika tidak
 - `eligible_ok` — 1 jika required_ok=1 dan guard_ok=1
 - `dv20_idr`, `atr14_pct`, `vol_ratio` — metric snapshot untuk debug equivalence
+
 Primary key:
 - `(asof_eod_date, ticker_id)`
+
 Indexes:
 - `idx_bt_univ_ws_req (asof_eod_date, required_ok)`
 - `idx_bt_univ_ws_reason (asof_eod_date, reason_code)`

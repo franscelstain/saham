@@ -24,11 +24,13 @@ Konsekuensi:
 ## North Star (ringkasan kebutuhan)
 Sistem watchlist yang dibangun harus memenuhi poin-poin berikut:
 
-- Setiap parameter (threshold, bobot, batas likuiditas/volatilitas, dll) wajib punya asal-usul yang jelas:
+- Setiap parameter yang memengaruhi output PLAN/CONFIRM wajib eksplisit (tidak boleh ada parameter tersirat). 
+  Ini mencakup: threshold, bobot scoring, batas likuiditas, batas volatilitas, cutoff/kuota selection (Top/Secondary/Watch), aturan risk/position sizing, biaya/fee & slippage, serta aturan blacklist/eligibility.
+  Setiap parameter wajib punya asal-usul yang jelas:
   1) **BT**: kalibrasi backtest 2 tahun yang tervalidasi, dan/atau
   2) **DET**: aturan deterministik berbasis prinsip pasar yang stabil, dan/atau
   3) **MAN**: pengaturan manual yang terdokumentasi.  
-  Setiap parameter wajib punya alasan dipilih serta kapan harus diubah.
+  Setiap parameter wajib punya alasan dipilih serta kriteria kapan harus diubah. Jika parameter dipakai runtime, maka parameter tersebut wajib terdaftar di registry/kontrak policy.
 - Proses pemilihan ticker boleh gabungan beberapa metode (filter kelayakan + scoring + kondisi pasar), asalkan:
   - konsisten dan deterministik,
   - bisa diaudit (jejak keputusan tersimpan),

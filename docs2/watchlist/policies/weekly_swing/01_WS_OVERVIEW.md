@@ -20,7 +20,7 @@ Policy ini menghasilkan:
 - `_refs/WS_OOS_EVIDENCE_GOLDEN.md`
 
 ## Governance & Audit (Index)
-- `_refs/WS_PARAMETER_COVERAGE_MATRIX.md` — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator/dok algoritma.
+- `_refs/WS_PARAMETER_COVERAGE_MATRIX.md` — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator serta algoritma eksekusi WS (`08_WS_PLAN_ALGORITHM.md`, `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`).
 
 ## Inputs
 - EOD OHLCV (asof_eod_date)
@@ -58,8 +58,7 @@ Policy ini menghasilkan:
 
 ## Artefak SQL
 
-- Backtest universe (wajib): `watchlist_bt_universe_ws` dibuat di `db/BACKTEST_SCHEMA_DDL.sql`.
- (bukan dokumen bernomor)
+- Backtest universe (wajib): `watchlist_bt_universe_ws` dibuat di `db/BACKTEST_SCHEMA_DDL.sql` (bukan dokumen bernomor).
 Artefak SQL untuk Weekly Swing berada di folder `db/` dan **bukan** bagian dari urutan dokumen `01_..20_` (MD).
 
 File yang tersedia saat ini:

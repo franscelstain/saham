@@ -6,8 +6,8 @@ Tidak ada interpretasi bebas. Jika hasil berbeda dari spesifikasi ini, implement
 ## 0. Terminologi (LOCKED)
 - PLAN: output watchlist deterministik dari data EOD as-of date tertentu untuk trade_date berikutnya.
 - CONFIRM: overlay runtime berbasis snapshot intraday yang TIDAK BOLEH mengubah PLAN.
-- Paramset: konfigurasi policy WS sesuai contract `03_WS_PARAMSET_JSON_CONTRACT.md`.
-- Plan Hash: hash deterministik PLAN sesuai `07_WS_REASON_CODES_AND_HASH.md`.
+- Paramset: konfigurasi policy WS sesuai contract `../04_WS_PARAMSET_JSON_CONTRACT.md`.
+- Plan Hash: hash deterministik PLAN sesuai `../07_WS_REASON_CODES_AND_HASH.md`.
 
 ## 1) Test: PLAN Determinism (LOCKED)
 ### Tujuan
@@ -54,7 +54,7 @@ CONFIRM tidak boleh mengubah PLAN, termasuk ranking, skor, grouping, dan level h
 
 ## 2B) Test: CONFIRM Rule Contracts (LOCKED)
 ### Tujuan
-CONFIRM harus menghasilkan `label` dan `reason codes` yang tepat untuk kondisi runtime yang sudah didefinisikan di `10_WS_CONFIRM_OVERLAY.md`.
+CONFIRM harus menghasilkan `label` dan `reason codes` yang tepat untuk kondisi runtime yang sudah didefinisikan di `../10_WS_CONFIRM_OVERLAY.md`.
 
 ### Input (fixtures)
 - `plan_output` dari fixture A (minimal 1 item dengan `levels.entry_ref` valid).
@@ -91,7 +91,7 @@ CONFIRM harus menghasilkan `label` dan `reason codes` yang tepat untuk kondisi r
 
 ## 2C) Test: DB Write-Scope Audit (LOCKED)
 ### Tujuan
-Membuktikan CONFIRM **tidak** melakukan writeback ke persistence PLAN (read-only terhadap PLAN, write-only ke CONFIRM), sesuai kontrak `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`.
+Membuktikan CONFIRM **tidak** melakukan writeback ke persistence PLAN (read-only terhadap PLAN, write-only ke CONFIRM), sesuai kontrak `../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`.
 
 ### Precondition
 - PLAN sudah tersedia untuk `trade_date=T` (persistence run/items/levels/reasons ada).
@@ -119,15 +119,19 @@ Membuktikan CONFIRM **tidak** melakukan writeback ke persistence PLAN (read-only
 
 ## 3) Test: Paramset Validator Coverage (LOCKED)
 ### Tujuan
-Semua parameter yang dinyatakan `in_10=Y` di `WS_PARAMETER_COVERAGE_MATRIX.md` harus divalidasi oleh validator spec `06_WS_PARAMSET_VALIDATOR_SPEC.md`.
+Semua parameter yang dinyatakan `in_10=Y` di `WS_PARAMETER_COVERAGE_MATRIX.md` harus divalidasi oleh validator spec `../06_WS_PARAMSET_VALIDATOR_SPEC.md`.
 
 ### Prosedur
 1. Parse tabel `WS_PARAMETER_COVERAGE_MATRIX.md`.
 2. Ambil semua `param_key` dengan `in_10=Y`.
-3. Untuk setiap `param_key`, pastikan ada aturan validasi eksplisit di `06`:
+3. Untuk setiap `param_key`, pastikan ada aturan validasi eksplisit di `../06_WS_PARAMSET_VALIDATOR_SPEC.md`:
    - required/optional status
    - type (int/float/bool/list)
-   - range/domain (mis. 0..1, >0, etc.)
+   - range/domain (bentuk yang diizinkan harus eksplisit), salah satu:
+     - interval numerik: `min..max` (inklusif) atau `min<..<max` (eksklusif bila ditulis eksplisit)
+     - batas satu sisi: `>x`, `>=x`, `<x`, `<=x`
+     - enum set: `{A,B,C}` atau daftar nilai eksplisit
+     - boolean: `{true,false}`
    - relasi antar parameter bila ada (mis. min <= max)
 
 ### Assert
@@ -135,11 +139,11 @@ Semua parameter yang dinyatakan `in_10=Y` di `WS_PARAMETER_COVERAGE_MATRIX.md` h
 
 ## 4) Test: Hash Contract Vectors (LOCKED)
 ### Tujuan
-Implementasi hash canonical harus menghasilkan SHA-256 yang sama persis dengan test vector di `07_WS_REASON_CODES_AND_HASH.md`.
+Implementasi hash canonical harus menghasilkan SHA-256 yang sama persis dengan test vector di `../07_WS_REASON_CODES_AND_HASH.md`.
 
 ### Input
-- Test Vector A (dari dok 07)
-- Test Vector B (dari dok 07)
+- Test Vector A (lihat `../07_WS_REASON_CODES_AND_HASH.md`)
+- Test Vector B (lihat `../07_WS_REASON_CODES_AND_HASH.md`)
 
 ### Assert
 - `sha256(canonical_string_A) == expected_hash_A`
@@ -147,7 +151,7 @@ Implementasi hash canonical harus menghasilkan SHA-256 yang sama persis dengan t
 - aturan canonical:
   - rounding sesuai `hash_contract.scales`
   - NULL handling sesuai `hash_contract.null_handling`
-  - negative zero normalization sesuai dok 07
+  - negative zero normalization sesuai `../07_WS_REASON_CODES_AND_HASH.md`
   - order_by sesuai `hash_contract.order_by`
 
 ## 5) Test: Golden Fixtures E2E (LOCKED)

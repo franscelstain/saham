@@ -149,8 +149,8 @@ Dokumen ini dianggap “golden runnable example”. Minimal artefak yang harus d
   - `last_price`, `chg_pct`, `volume_shares`, `turnover_idr`, `captured_at`
 
 ### C) CONFIRM output (runtime)
-- Output mengikuti schema di `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`.
-- Contoh output referensi ada di `_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`.
+- Output mengikuti schema di `WS_RUNTIME_OUTPUT_SCHEMA.md`.
+- Contoh output referensi ada di `WS_RUNTIME_OUTPUT_EXAMPLES.md`.
 
 Catatan (LOCKED):
 - CONFIRM memakai **intraday aggregate snapshot**, **bukan ladder**.

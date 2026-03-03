@@ -37,7 +37,7 @@ LIMIT 1;
 
 Wajib cek:
 - policy_version match
-- validator WS pass (dok 06_WS_PARAMSET_VALIDATOR_SPEC.md)
+- validator WS pass (lihat `06_WS_PARAMSET_VALIDATOR_SPEC.md`)
 
 ### 2) Lifecycle status (LOCKED)
 - DRAFT: kandidat (boleh dibuat/diupdate), belum boleh dipakai live
@@ -51,7 +51,7 @@ Rule (LOCKED):
 Sebelum promote ke ACTIVE, wajib lolos gate ini:
 
 Checklist gate (LOCKED):
-1) Pastikan OOS proof tersedia untuk hasil kalibrasi terkait (dok 16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md).
+1) Pastikan OOS proof tersedia untuk hasil kalibrasi terkait (lihat `17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`).
 2) Pastikan ada record di watchlist_bt_oos_eval_ws yang relevan untuk param hasil kalibrasi.
 
 Rule (LOCKED): definisi "record OOS yang relevan"
@@ -65,7 +65,7 @@ Record OOS dianggap relevan hanya jika memenuhi:
 Jika tidak bisa melakukan match ini secara deterministik, proses promote wajib menerima `oos_id`
 sebagai input dan memverifikasi semua kondisi di atas terhadap row tersebut.
 
-3) Pastikan metrik OOS memenuhi acceptance criteria (dok 16_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md).
+3) Pastikan metrik OOS memenuhi acceptance criteria (lihat `17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`).
 
 Jika salah satu gagal:
 - proses promote harus abort

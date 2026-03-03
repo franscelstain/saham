@@ -29,7 +29,7 @@ Catatan audit (wajib):
 - watchlist_bt_picks_ws wajib menyimpan bucket_code untuk membuktikan hasil grouping terhadap cutoff score.
 
 Catatan (LOCKED):
-- watchlist_bt_oos_eval_ws wajib ada untuk promote paramset menjadi ACTIVE (lihat dok 17).
+- watchlist_bt_oos_eval_ws wajib ada untuk promote paramset menjadi ACTIVE (lihat `17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`).
 
 ---
 

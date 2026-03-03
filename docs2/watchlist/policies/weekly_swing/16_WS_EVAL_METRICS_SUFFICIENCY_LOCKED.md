@@ -74,6 +74,7 @@ Metrik turunan harus ditulis sebagai “computed at query/report time”.
 ### C) Stability metrics (wajib)
 - `month_win_rate_min` : win_rate minimum per bulan (atau per periode)
 - `month_avg_ret_net_min` : avg return minimum per bulan
+
 Tujuan: param tidak boleh menang hanya karena 1 bulan “meledak”.
 
 Jika belum ada agregasi bulanan:
@@ -94,7 +95,7 @@ Kalibrasi param_id dianggap valid hanya jika:
 Definisi (LOCKED):
 `ws.eval.min_days_covered = ceil(0.70 * total_trading_days_in_window)`
 
-(mencegah param yang cuma aktif di sebagian kecil data)
+Tujuan: mencegah param yang cuma aktif di sebagian kecil data.
 
 3) Robust return
 - avg_ret_net_top > 0

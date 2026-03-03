@@ -64,6 +64,7 @@ Caps / targets ordering:
 
 Plan:
 - plan_levels.entry_band_pct.value > 0
+
 Risk:
 - risk.stop_atr_mult.value > 0
 - risk.min_rr.value > 0

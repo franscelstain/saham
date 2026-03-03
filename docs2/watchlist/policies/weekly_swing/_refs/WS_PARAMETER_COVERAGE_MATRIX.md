@@ -1,14 +1,14 @@
 # WS Parameter Coverage Matrix (LOCKED)
 
-Tujuan: bukti 1 halaman bahwa parameter yang dipakai runtime punya coverage di 
-- `../04_WS_PARAMSET_JSON_CONTRACT.md` kontrak, 
-- `../05_WS_PARAMETER_REGISTRY_COMPLETE.md` registry, 
-- `../06_WS_PARAMSET_VALIDATOR_SPEC.md` validator 
-dan dok eksekusi/algoritma 
-- `../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`,
-- `../08_WS_PLAN_ALGORITHM.md`,
-- `../09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`,
-- `../10_WS_CONFIRM_OVERLAY.md`
+Tujuan: bukti 1 halaman bahwa parameter yang dipakai runtime punya coverage di:
+- kontrak: `../04_WS_PARAMSET_JSON_CONTRACT.md`
+- registry: `../05_WS_PARAMETER_REGISTRY_COMPLETE.md`
+- validator: `../06_WS_PARAMSET_VALIDATOR_SPEC.md`
+- eksekusi & algoritma:
+  - `../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+  - `../08_WS_PLAN_ALGORITHM.md`
+  - `../09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`
+  - `../10_WS_CONFIRM_OVERLAY.md`
 
 Aturan (LOCKED): untuk parameter yang dipakai runtime, kolom 03/09/10/used_in wajib terisi.
 

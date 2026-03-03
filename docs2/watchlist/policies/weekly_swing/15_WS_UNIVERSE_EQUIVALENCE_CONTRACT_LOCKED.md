@@ -77,8 +77,7 @@ Priority order (highest first):
 Backtest dan production wajib memakai prioritas yang sama agar audit konsisten.
 
 ### Mapping rule
-Jika production reason code berbeda nama dari backtest, wajib ada mapping 1:1 di dokumen ini
-(dan test harus memakai mapping tersebut).
+Jika production reason code berbeda nama dari backtest, wajib ada mapping 1:1 di dokumen ini, dan test harus memakai mapping tersebut.
 
 ---
 

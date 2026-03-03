@@ -35,6 +35,7 @@ Untuk setiap ticker:
 - jika data_readiness.outlier_ruleset.value.enabled=true dan abs(ret_1d) > data_readiness.outlier_ruleset.value.max_abs_return_1d_pct => AVOID + reason WS_OUTLIER_RET1D
 - jika data_readiness.outlier_ruleset.value.enabled=true dan (high/low - 1) > data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct => AVOID + reason WS_OUTLIER_RANGE1D
 - outlier check (jika enabled) => AVOID + reason WS_DATA_OUTLIER
+
 Catatan: coverage check run-level dilakukan di execution (lihat `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`).
 
 ### Step 2 — Hard guards (pass_guard)
@@ -90,17 +91,12 @@ Jika pass_guard tapi:
 - rr < min_rr atau invalid => group_semantic=WATCH_ONLY (forced) reason WS_FW_RR_LOW / WS_FW_RR_INV
 
 ### Step 6 — Group semantic default
-Jika pass_guard tapi:
-- breakout extended (close terlalu jauh di atas hh20) => group_semantic=WATCH_ONLY (forced) reason WS_FW_EXT
-- rr < min_rr atau invalid => group_semantic=WATCH_ONLY (forced) reason WS_FW_RR_LOW / WS_FW_RR_INV
-
-### Step 6 — Group semantic default
 Jika pass_guard dan tidak forced:
 - kandidat masuk ranking pool:
-  - group_semantic sementara: TOP_PICKS/SECONDARY/WATCH_ONLY ditentukan oleh selection (dok 09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)
+  - group_semantic sementara: TOP_PICKS/SECONDARY/WATCH_ONLY ditentukan oleh selection (lihat `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`)
 
 **LOCKED — Ranking sort key (PLAN output & selection):**
-Ranking deterministik **wajib** mengikuti `grouping.sort_keys` (dok 09), urutan exact:
+Ranking deterministik **wajib** mengikuti `grouping.sort_keys` (lihat `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`), urutan exact:
 1) `score_total DESC`
 2) `score_breakout DESC`
 3) `score_momentum DESC`
@@ -151,7 +147,7 @@ Catatan rounding & tick-size (LOCKED):
   - `PRICE_SCALE = 6` untuk: `entry_band_low`, `entry_band_high`, `entry_band_mid`, `entry_ref`, `stop_price`, `tp1_price`.
   - `RATIO_SCALE = 6` untuk: `risk_per_share`, `rr`.
   - Normalisasi menggunakan `ROUND_HALF_UP`.
-- `grouping.rounding_mode` **tidak** dipakai untuk rounding harga; itu hanya untuk rounding target dinamis (dok 09).
+- `grouping.rounding_mode` **tidak** dipakai untuk rounding harga; itu hanya untuk rounding target dinamis (lihat `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`).
 
 
 ## Outputs

@@ -36,8 +36,7 @@ Snapshot berasal dari tabel:
 - `effective_captured_at = LEAST(captured_at, inserted_at)`
 
 **Contoh (LOCKED):**
-- `captured_at=09:30`, `inserted_at=10:10` ⇒ `effective_captured_at=09:30`
-  (snapshot bisa **EXPIRED** walau baru diinput jam 10:10)
+- `captured_at=09:30`, `inserted_at=10:10` ⇒ `effective_captured_at=09:30` (snapshot bisa **EXPIRED** walau baru diinput jam 10:10).
 
 ---
 

@@ -65,6 +65,6 @@ Mapping pembuktian kesetaraan terhadap `watchlist_bt_universe_ws`:
 - canonical_fail_reason_code <-> reason_code
 
 Jika backtest memakai reason_code berbeda, wajib definisikan mapping di:
-`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`
+`../15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`
 
 END.

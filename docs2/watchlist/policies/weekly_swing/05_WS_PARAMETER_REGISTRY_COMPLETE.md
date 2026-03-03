@@ -1,7 +1,7 @@
 # 05 — Parameter Registry (Complete) — WS_EOD_PLAN_CONFIRM
 
 ## Purpose
-Daftar parameter WS yang **exhaustive**: semua key yang boleh dipakai runtime oleh code. Jika code butuh parameter, key **wajib** ada di dok ini **dan** ada di `params_json` (paramset).
+Daftar parameter WS yang **exhaustive**: semua key yang boleh dipakai runtime oleh code. Jika code butuh parameter, key **wajib** ada di file ini **dan** ada di `params_json` (paramset).
 
 ## Prerequisites
 ### Weekly Swing
@@ -202,7 +202,7 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 - `liquidity.exclude_tickers` (array<string>) — daftar ticker yang dikecualikan manual.
   - Origin: MAN
-  - Alasan: blacklist operasional (suspend, anomali, corporate action, dll).
+  - Alasan: blacklist operasional (trading suspend/halt, UMA/anomali harga-volume, corporate action yang mengganggu sinyal seperti split/rights/dividen, atau data vendor tidak stabil).
   - Kapan diubah: saat ada case khusus.
   - Cara ubah: update paramset (promote) + catat who/when/why.
 

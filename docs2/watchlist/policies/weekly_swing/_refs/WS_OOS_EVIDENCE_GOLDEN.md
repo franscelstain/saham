@@ -47,8 +47,8 @@ Isi ringkasan ini untuk 1 kandidat promote:
 - Verdict: **PASS / FAIL**
 
 Kriteria PASS harus mengikuti:
-- `16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`
-- `17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`
+- `../16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`
+- `../17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`
 
 ## Evidence Attachment (LOCKED)
 - [ ] Export CSV atau screenshot sudah tersimpan

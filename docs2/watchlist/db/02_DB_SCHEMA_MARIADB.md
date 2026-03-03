@@ -114,7 +114,9 @@ Detail confirm untuk ticker yang dievaluasi.
 - confirm_check_id (FK)
 - ticker_id
 - label (CONFIRMED/NEUTRAL/CAUTION/DELAY)
-- runtime_json (LONGTEXT) — last_price, chg_pct, volume_shares, turnover_idr, drift_pct, snapshot_age_sec, etc.
+- runtime_json (LONGTEXT) — key yang diizinkan (LOCKED):
+  - last_price, chg_pct, volume_shares, turnover_idr, drift_pct, snapshot_age_sec
+  - dilarang menambah key lain tanpa update kontrak output (`../policies/weekly_swing/_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`).
 - reason_codes_json (LONGTEXT)
 - created_at
 
@@ -168,7 +170,7 @@ Detail per ticker untuk snapshot.
 
 Weekly Swing CONFIRM memakai snapshot manual yang disimpan di DB (bukan real-time). Struktur tabel berikut adalah FINAL.
 
-Lihat juga: `watchlist/policies/weekly_swing/11_WS_INTRADAY_SNAPSHOT_TABLES.md`.
+Lihat juga: `../policies/weekly_swing/11_WS_INTRADAY_SNAPSHOT_TABLES.md`.
 
 ### Table: watchlist_confirm_snapshots
 ```sql

@@ -186,8 +186,8 @@ Wajib tersimpan untuk setiap PLAN run:
 - `top_cutoff_today`, `secondary_cutoff_today`
 - `*_target_dynamic`
 - ukuran pool (`eligible_count`, `top_pool_count`, `secondary_pool_count`)
-- `data_batch_hash` (lihat Doc 07)
-Semua diletakkan di `watchlist_plan_runs.run_metrics_json`.
+- `data_batch_hash` (lihat `07_WS_REASON_CODES_AND_HASH.md`)
+- Semua diletakkan di `watchlist_plan_runs.run_metrics_json`.
 
 ## Failure modes & stop condition
 
