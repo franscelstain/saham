@@ -12,14 +12,27 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 
 ## Process
 
-### 1) JSON & identity
+### 1) Failure output (LOCKED)
+- Setiap VALIDATION FAIL **wajib** mengeluarkan `cf_code` (string) yang canonical, referensi: `watchlist/policies/_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`.
+- Pesan error bebas boleh ada sebagai context, tapi **tidak boleh menggantikan** `cf_code`.
+
+LOCKED — CF mapping (validator layer):
+- Missing required key (registry completeness) => `CF_PARAMSET_MISSING_KEY`
+- Unknown key (drift) => `CF_PARAMSET_UNKNOWN_KEY`
+- Type drift (value type != registry) => `CF_PARAMSET_TYPE_DRIFT`
+- Audit-node schema invalid (missing `{ value, origin, status, bt_target, rationale, change_triggers }`) => `CF_PARAMSET_AUDIT_SCHEMA_INVALID`
+- Enum invalid (origin/status/mode keys) => `CF_PARAMSET_ENUM_INVALID`
+- Hash contract lock violated => `CF_HASH_CONTRACT_VIOLATION`
+- Eval gate invalid => `CF_EVAL_GATE_INVALID`
+
+### 2) JSON & identity
 - params_json valid JSON object
 - policy_code='WS'
 - policy_version='WS_EOD_PLAN_CONFIRM'
 - schema_version='PARAMSET_JSON'
 - jika `paramset_code` ada: string non-empty, pattern `^[A-Z0-9_]+$` (audit-friendly, stabil)
 
-### 2) Enum rules
+### 3) Enum rules
 - origin enum: DET, MAN, BT, DET+MAN, MAN+BT, DET+BT
 - status enum: ACTIVE, TEMP, DEPRECATED
 - TEMP => bt_target=true
@@ -27,7 +40,7 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 - LOCKED: setiap leaf parameter **wajib** punya field audit `{ value, origin, status, bt_target, rationale, change_triggers }`
 - `change_triggers` wajib array (boleh kosong)
 
-### 3) Type rules (ringkas)
+### 4) Type rules (ringkas)
 - boolean: data_readiness.reject_if_eod_incomplete, enabled flags, no_trade_hides_all
 - number: thresholds, weights, bounds
 - integer: dv20_idr, counts, dp scales
@@ -35,7 +48,7 @@ Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika
 - array: liquidity.exclude_tickers, grouping.sort_keys
 - object/map: grouping.min_count_overrides, scoring.weights.value, data_contract.required_fields.value (list), data_contract.required_sources.value (list)
 
-### 3B) Registry completeness check (LOCKED)
+### 5) Registry completeness check (LOCKED)
 Validator **wajib** menjadikan registry sebagai sumber kebenaran:
 - Load `05_WS_PARAMETER_REGISTRY_COMPLETE.md`, ambil semua key yang terdefinisi:
   - Expand shorthand `{a,b,c}` menjadi key individual.
@@ -47,7 +60,7 @@ Validator **wajib** menjadikan registry sebagai sumber kebenaran:
   - Node base `X` **wajib ada** dan `X.value` harus **array(list) atau object(map)** yang **non-empty** (memuat minimal 1 item/entry).
 - Jika ada key di `params_json` yang **tidak ada** di registry (kecuali node base yang dibutuhkan oleh wildcard), maka FAIL (drift).
 
-### 4) Numeric sanity
+### 6) Numeric sanity
 Liquidity:
 - liquidity.min_dv20_idr.value > 0
 - liquidity.dv20_strong_idr.value > liquidity.min_dv20_idr.value
@@ -109,7 +122,7 @@ Outlier:
 - data_contract.required_sources.value (required, list non-empty)
 - data_contract.disabled_fields.value (optional, list)
 
-### 5) Locked invariants (must match exact)
+### 7) Locked invariants (must match exact)
 - scoring.combine_mode.value == 'NORM_WEIGHTED_SUM_CLAMP01'
 - grouping.grouping_mode.value == 'QUALIFIED_POOLS_QUANTILE_CUTOFF'
 - grouping.rounding_mode.value == 'FLOOR'
