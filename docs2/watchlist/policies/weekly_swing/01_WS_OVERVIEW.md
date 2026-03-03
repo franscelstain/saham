@@ -17,6 +17,7 @@ Policy ini menghasilkan:
 - `_refs/WS_WORKED_EXAMPLE_E2E.md`
 - `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`
 - `_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`
+- `_refs/WS_OOS_EVIDENCE_GOLDEN.md`
 
 ## Governance & Audit (Index)
 - `_refs/WS_PARAMETER_COVERAGE_MATRIX.md` — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator/dok algoritma.
