@@ -1,0 +1,85 @@
+{
+  "meta": {
+    "policy": "WEEKLY_SWING",
+    "checked_at": "2026-02-14T02:30:00Z",
+    "snapshot_ts": "2026-02-14T02:28:30Z",
+    "snapshot_age_sec": 90,
+    "source": {
+      "vendor": "EXAMPLE_VENDOR",
+      "snapshot_id": "SNAP_20260214_022830Z"
+    }
+  },
+  "items": [
+    {
+      "ticker": "AAA",
+      "label": "CONFIRMED",
+      "reasons": [
+        {
+          "code": "WS_CONFIRM_OK",
+          "severity": "INFO",
+          "message": "Snapshot sehat; momentum & volume konfirmasi OK.",
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "ticker": "BBB",
+      "label": "CAUTION",
+      "reasons": [
+        {
+          "code": "WS_CONFIRM_VOL_WEAK",
+          "severity": "WARN",
+          "message": "Volume intraday di bawah ekspektasi; jangan kejar harga.",
+          "payload": {
+            "vol_ratio_live": 0.72
+          }
+        }
+      ]
+    },
+    {
+      "ticker": "CCC",
+      "label": "NEUTRAL",
+      "reasons": [
+        {
+          "code": "WS_CONFIRM_NEUTRAL",
+          "severity": "INFO",
+          "message": "Tidak ada sinyal tambahan; PLAN tetap berlaku.",
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "ticker": "DDD",
+      "label": "DELAY",
+      "reasons": [
+        {
+          "code": "WS_STALE",
+          "severity": "WARN",
+          "message": "Snapshot terlalu tua / tidak sinkron; ulang capture sebelum eksekusi.",
+          "payload": {
+            "max_age_sec": 120,
+            "actual_age_sec": 90
+          }
+        }
+      ]
+    },
+    {
+      "ticker": "EEE",
+      "label": "DELAY",
+      "reasons": [
+        {
+          "code": "WS_SNAPSHOT_MISSING",
+          "severity": "WARN",
+          "message": "Tidak ada data snapshot untuk ticker ini; jangan eksekusi.",
+          "payload": {}
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "confirmed_count": 1,
+    "neutral_count": 1,
+    "caution_count": 1,
+    "delay_count": 2
+  }
+}

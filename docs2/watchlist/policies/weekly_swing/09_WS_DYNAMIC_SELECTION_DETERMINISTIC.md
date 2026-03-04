@@ -28,7 +28,49 @@ Aturan yang dikunci:
   - eligible tapi tersembunyi karena cutoff/target: `WS_HID_PCT`
   - tersembunyi karena cap: `WS_HID_CAP`
 - Stop condition **NO_TRADE** menghasilkan PLAN kosong pada output API/UI; alasan run-level disimpan sebagai `fail_code`.
+
+## LOCKED — NO_TRADE Gate (non-ambiguous)
+
+NO_TRADE terjadi jika setelah seluruh guard + selection rule tidak ada satupun item yang mendapat `rank`.
+
+Output yang wajib (LOCKED):
+- `meta.fail_code = "NO_TRADE"`
+- `meta.fail_reason_codes` memuat `WS_NO_TRADE_ALL_FILTERED`
+- `items = []` untuk API/UI
+- `plan_hash` dihitung dari canonical payload kosong `[]` (lihat schema runtime)
+
 - Auditability wajib tersimpan di `run_metrics_json`: cutoff hari ini, target dinamis, ukuran pool, dan `data_batch_hash` (lihat `07_WS_REASON_CODES_AND_HASH.md`).
+
+## LOCKED — Group Semantics Mapping (non-ambiguous)
+
+Mapping `group_semantic` untuk setiap ticker **wajib deterministik** dan mengikuti urutan prioritas berikut (higher wins):
+
+1) **AVOID (guard fail / block)**
+   - Jika `pass_guard = false` ⇒ `group_semantic = AVOID`.
+   - Reason code wajib salah satu (sesuai penyebab pertama yang ditemukan, urutan evaluasi sesuai Step 2 di `08_WS_PLAN_ALGORITHM.md`):
+     - `WS_LIQ_FAIL` (dv20_idr < min_dv20_idr)
+     - `WS_ATR_LOW`  (atr14_pct < min_atr14_pct)
+     - `WS_ATR_HIGH` (atr14_pct > max_atr14_pct)
+     - `WS_VOLR_FAIL` (vol_ratio < min_vol_ratio)
+
+2) **WATCH_ONLY (forced)**
+   - Jika `pass_guard = true` tapi kena forced rule (lihat Step 5 di `08_WS_PLAN_ALGORITHM.md`) ⇒ `group_semantic = WATCH_ONLY` (forced).
+   - Reason code wajib:
+     - `WS_FW_EXT` jika breakout extended (close terlalu jauh di atas hh20)
+     - `WS_FW_RR_LOW` jika rr < min_rr
+     - `WS_FW_RR_INV` jika rr invalid / tidak bisa dihitung
+
+3) **Selection result (qualified pools + targets)**
+   - Jika `pass_guard = true` dan tidak forced:
+     - Masuk final picks pool:
+       - `TOP_PICKS` ⇒ reason `WS_SEL_PCT`
+       - `SECONDARY` ⇒ reason `WS_SEL_PCT`
+     - Eligible tapi tidak terpilih karena cutoff/target ⇒ `WATCH_ONLY` dengan reason `WS_HID_PCT`
+     - Eligible tapi tidak terpilih karena cap/run-capped ⇒ `WATCH_ONLY` dengan reason `WS_HID_CAP`
+
+Catatan (LOCKED):
+- Reason codes **tidak boleh membuat code baru**; semua code harus ada di dictionary `watchlist_reason_codes` (lihat `db/REASON_CODES_SEED.sql`).
+- Jika beberapa kondisi berlaku, gunakan prioritas di atas dan **jangan** override `AVOID` atau forced WATCH_ONLY oleh selection.
 
 ## Purpose & invariants (LOCKED)
 

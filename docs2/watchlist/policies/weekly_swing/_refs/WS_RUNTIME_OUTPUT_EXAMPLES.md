@@ -10,6 +10,12 @@ Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tida
 - Contoh **PERSISTENCE RECORD** bukan kontrak UI, dan tidak wajib 1:1 dengan schema API/UI.
 - Kontrak payload API/UI yang wajib diikuti ada di `WS_RUNTIME_OUTPUT_SCHEMA.md`.
 
+## B. API/UI Response Examples (LOCKED)
+
+- PLAN example (schema-valid + plan_hash): `../examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json`
+- CONFIRM example (schema-valid): `../examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json`
+- PLAN+CONFIRM invariant pair (plan_hash unchanged): `../examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json`
+
 ## A. Persistence Examples (Canonical DB Shape)
 
 Catatan:

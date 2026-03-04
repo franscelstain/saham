@@ -17,14 +17,14 @@ Mengunci anti-drift khusus WS (di atas framework global).
 
 Semua referensi `fixture: <nama_file>` di dokumen ini **SECARA DEFAULT** mengacu ke folder:
 
-- `docs/watchlist/policies/weekly_swing/fixtures/`
+- `fixtures/`
 
 Saat implementasi test suite dibuat, folder tersebut **di-mirror/copy** menjadi:
 
 - `tests/Fixtures/watchlist/ws/`
 
 Aturan (LOCKED):
-- Selama fase dokumentasi, fixture source-of-truth ada di `docs/.../fixtures/`.
+- Selama fase dokumentasi, fixture source-of-truth ada di `fixtures/`.
 - Saat fase coding, fixture yang dipakai test adalah copy identik (byte-identical) di `tests/...`.
 - Jika nama file sama, maka dianggap file yang sama (tanpa perlu menulis path di tiap test case).
 
@@ -49,7 +49,10 @@ Daftar file minimal yang **WAJIB ADA** (LOCKED) beserta isinya:
 
 ### C) CONFIRM fixtures
 - `confirm_snapshots_two.json` — 2 snapshot intraday untuk verifikasi “confirm overlay terpisah” dan tidak mengubah PLAN.
-- `confirm_payload_with_orderbook_fields.json` — payload yang mengandung field orderbook (bid/ask ladder) dan **harus FAIL** (karena CONFIRM dilarang pakai orderbook).
+- `confirm_payload_with_orderbook_fields.json` — payload yang mengandung field orderbook (bid/ask ladder) dan **harus PASS + ignore** (field non-contract wajib diabaikan dan tidak boleh mempengaruhi output confirm).
+- `confirm_immutability_pair.json` — pasangan PLAN+CONFIRM untuk uji plan immutability (plan_hash sebelum/sesudah harus sama).
+- `plan_items_guard_fail.json` — dataset kecil yang memicu guard fail (dv20/atr/vol_ratio) + expected reason/group.
+- `plan_items_forced_watch_only.json` — dataset kecil pass_guard tapi forced WATCH_ONLY (WS_FW_EXT / WS_FW_RR_*).
 
 ### D) Backtest governance fixtures
 - `bt_coverage_guard_minimal.json` — coverage matrix minimal: memastikan rule coverage “pass/fail” berjalan.
@@ -70,34 +73,40 @@ Tujuan: memastikan dokumen ini bisa langsung diterjemahkan jadi test suite tanpa
 - Command standar:
   - `php artisan watchlist:contract:ws` (alias yang memanggil phpunit group di atas), atau
   - `vendor/bin/phpunit --group watchlist_ws_contract`
-- Fixture root (LOCKED): `tests/Fixtures/watchlist/ws/`
+- Fixture root (LOCKED): source `fixtures/` (mirror byte-identical ke `tests/Fixtures/watchlist/ws/`).
 - Semua test wajib:
   - deterministic (golden master / fixed input)
   - fail dengan reason code yang jelas (bukan “assert false” doang)
 
 ### B) Test Inventory (LOCKED, bullet list)
-- WS_CT_001 — Paramset valid harus PASS (fixture: `paramset_valid.json`)
-- WS_CT_002 — Missing required key harus FAIL (fixture: `paramset_missing_required_key.json`)
-- WS_CT_003 — Unknown key harus FAIL (fixture: `paramset_unknown_key.json`)
-- WS_CT_004 — Type drift harus FAIL (fixture: `paramset_type_drift.json`)
-- WS_CT_005 — Missing audit field harus FAIL (fixture: `paramset_missing_audit_field.json`)
-- WS_CT_006 — Bad enum origin/status harus FAIL (fixture: `paramset_bad_enum.json`)
-- WS_CT_007 — Hash contract lock harus FAIL bila berubah (fixture: `paramset_bad_hash_contract.json`)
-- WS_CT_008 — Eval gate harus FAIL bila invalid (fixture: `paramset_bad_eval.json`)
-- WS_CT_009 — PLAN determinism harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json` + `paramset_valid.json`)
-- WS_CT_010 — Confirm isolation / plan immutability harus PASS (fixture: plan+confirm snapshot)
-- WS_CT_011 — Confirm snapshot selection harus PASS (fixture: `confirm_snapshots_two.json`)
-- WS_CT_012 — Confirm ignores non-contract fields harus PASS (fixture: `confirm_payload_with_orderbook_fields.json`)
-- WS_CT_013 — Group semantics rules harus PASS (fixture: `plan_items_guard_fail.json`, `plan_items_forced_watch_only.json`)
-- WS_CT_014 — Tie-breaker sort_keys harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json`)
-- WS_CT_015 — Qualified pools + quantile cutoff contract harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json`)
-- WS_CT_016 — BT_COVERAGE_GUARD contract harus PASS (fixture: `bt_coverage_guard_minimal.json`)
-- WS_CT_017 — NO_TRADE gate contract harus PASS (fixture: `plan_items_no_trade_hide_all.json`)
-- WS_CT_018 — Universe equivalence (BT vs PROD) harus PASS (fixture: `universe_equivalence_sample.json`)
-- WS_CT_019 — PLAN universe snapshot export schema harus PASS (fixture: `plan_universe_snapshot_sample.json`)
-- WS_CT_020 — Eval metrics sufficiency guard harus PASS (fixture: `bt_eval_metrics_minimal.json`)
-- WS_CT_021 — OOS proof guard harus PASS (fixture: `bt_oos_proof_minimal.json`)
-- WS_CT_022 — Artifact reference guard harus PASS (fixture: `artifact_reference_guard_minimal.json`)
+
+Definisi status (LOCKED):
+- **PASS** = kontrak terpenuhi (tidak ada pelanggaran).
+- **FAIL** = kontrak dilanggar.
+- **PASS + ignore** = input diterima (PASS), tetapi field di luar contract **wajib diabaikan** dan tidak boleh mempengaruhi output; idealnya output mencatat `ignored_fields[]`.
+
+- [AVAILABLE] WS_CT_001 — Paramset valid harus PASS (fixture: `paramset_valid.json`)
+- [AVAILABLE] WS_CT_002 — Missing required key harus FAIL (fixture: `paramset_missing_required_key.json`)
+- [AVAILABLE] WS_CT_003 — Unknown key harus FAIL (fixture: `paramset_unknown_key.json`)
+- [AVAILABLE] WS_CT_004 — Type drift harus FAIL (fixture: `paramset_type_drift.json`)
+- [AVAILABLE] WS_CT_005 — Missing audit field harus FAIL (fixture: `paramset_missing_audit_field.json`)
+- [AVAILABLE] WS_CT_006 — Bad enum origin/status harus FAIL (fixture: `paramset_bad_enum.json`)
+- [AVAILABLE] WS_CT_007 — Hash contract lock harus FAIL bila berubah (fixture: `paramset_bad_hash_contract.json`)
+- [AVAILABLE] WS_CT_008 — Eval gate harus FAIL bila invalid (fixture: `paramset_bad_eval.json`)
+- [AVAILABLE] WS_CT_009 — PLAN determinism harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json` + `paramset_valid.json`; expected: `expected.plan_output_canonical.plan_hash_sha256` harus match hash dari output PLAN canonical)
+- [AVAILABLE] WS_CT_010 — Confirm isolation / plan immutability harus PASS (fixture: `confirm_immutability_pair.json`)
+- [AVAILABLE] WS_CT_011 — Confirm snapshot selection harus PASS (fixture: `confirm_snapshots_two.json`)
+- [AVAILABLE] WS_CT_012 — Confirm ignores non-contract fields harus PASS (fixture: `confirm_payload_with_orderbook_fields.json`)
+- [AVAILABLE] WS_CT_013 — Group semantics rules harus PASS (fixture: `plan_items_guard_fail.json`, `plan_items_forced_watch_only.json`)
+- [AVAILABLE] WS_CT_014 — Tie-breaker sort_keys harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json`)
+- [AVAILABLE] WS_CT_015 — Qualified pools + quantile cutoff contract harus PASS (fixture: `PLAN_FIXTURE_A_TIES_V1.json`)
+- [AVAILABLE] WS_CT_016 — BT_COVERAGE_GUARD contract harus PASS (fixture: `bt_coverage_guard_minimal.json`)
+- [AVAILABLE] WS_CT_017 — NO_TRADE gate contract harus PASS (fixture: `plan_items_no_trade_hide_all.json`)
+- [AVAILABLE] WS_CT_018 — Universe equivalence (BT vs PROD) harus PASS (fixture: `universe_equivalence_sample.json`)
+- [AVAILABLE] WS_CT_019 — PLAN universe snapshot export schema harus PASS (fixture: `plan_universe_snapshot_sample.json`)
+- [AVAILABLE] WS_CT_020 — Eval metrics sufficiency guard harus PASS (fixture: `bt_eval_metrics_minimal.json`)
+- [AVAILABLE] WS_CT_021 — OOS proof guard harus PASS (fixture: `bt_oos_proof_minimal.json`)
+- [AVAILABLE] WS_CT_022 — Artifact reference guard harus PASS (fixture: `artifact_reference_guard_minimal.json`)
 
 ### C) Fixture Set (LOCKED)
 - `paramset_valid.json` (copy dari `db/PARAMSET_WS_ACTIVE_EXAMPLE.json`)
@@ -183,16 +192,211 @@ LOCKED — Reason code mapping (untuk failure deterministik):
 - Assert hasil CONFIRM **identik** dengan saat field-field itu tidak ada
 - Assert tidak ada reason code yang berasal dari bid/ask/spread/orderbook
 
-### E) GroupSemanticsRulesTest (WS)
-- Guard fail => AVOID + HIDE + reason guard
-- Forced watch-only => WATCH_ONLY (cannot become TOP/SECONDARY)
-- NO_TRADE => output API/UI tidak menampilkan kandidat; persistence audit tetap menyimpan item dan seluruhnya `HIDE` (LOCKED) — WS_CT_017
+### E) GroupSemanticsRulesTest (WS) (LOCKED) — WS_CT_013
+- Referensi aturan normatif: `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` bagian **LOCKED — Group Semantics Mapping**.
+- Jalankan PLAN dengan fixture `plan_items_guard_fail.json`:
+  - Assert setiap item `pass_guard=false` => `group_semantic=AVOID` dan `ranking=null`.
+  - Assert `reason_codes[]` persis sesuai expected fixture (guard reason pertama yang berlaku).
+- Jalankan PLAN dengan fixture `plan_items_forced_watch_only.json`:
+  - Assert `pass_guard=true` dan `forced_watch_only=true` => `group_semantic=WATCH_ONLY`.
+  - Assert `reason_codes[]` memuat `WS_FW_EXT` (atau sesuai expected fixture).
+  - Assert item forced WATCH_ONLY **tidak boleh** menjadi TOP_PICKS/SECONDARY walau skor tinggi.
+- Priority invariant (LOCKED): `AVOID` dan forced `WATCH_ONLY` **tidak boleh** dioverride oleh selection/pooling.
 
 ## Outputs
 - Test checklist yang wajib ada sebelum deploy.
 
 ## Reference
 - `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`
+
+### WS_CT_016 — BT_COVERAGE_GUARD contract (LOCKED)
+Fixture: `bt_coverage_guard_minimal.json`
+
+Tujuan:
+- memastikan parameter origin=BT **tidak bisa** dipromosikan/dianggap valid tanpa bukti artefak yang dipersist (grid/cutoffs/picks) sesuai `14_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
+
+Assertions (wajib deterministik):
+
+Case `PASS_MINIMAL` (wajib PASS):
+- Semua `bt_params_in_registry[]` **wajib** ada di Coverage Matrix (14) dan fixture `coverage_matrix_rows[]`.
+- Untuk setiap row matrix:
+  - kolom `grid_column` **wajib** ada di `artifacts.watchlist_bt_param_grid.columns_present[]`.
+  - untuk setiap `(param_id, asof_eod_date)` pada picks, **wajib** ada row cutoff di `watchlist_bt_cutoffs_ws`.
+  - untuk setiap pick:
+    - jika `bucket_code == 'TOP_PICKS'` maka `score_total >= top_cutoff_score`.
+    - jika `bucket_code == 'SECONDARY'` maka `score_total >= secondary_cutoff_score`.
+
+Case `FAIL_PICK_VIOLATION` (wajib FAIL):
+- Jika ada pick dengan `bucket_code='TOP_PICKS'` dan `score_total < top_cutoff_score`, maka test wajib FAIL dengan:
+  - `fail_code = 'BT_COVERAGE_GUARD_FAIL'`
+  - `fail_reason_codes` memuat `WS_BT_COV_PICK_VIOLATION`.
+
+Catatan (LOCKED):
+- Reason code BT coverage guard wajib memakai namespace `WS_BT_COV_*` (lihat `07_WS_REASON_CODES_AND_HASH.md` A3) dan seed `db/REASON_CODES_SEED.sql`.
+- Jika implementasi memilih untuk mem-breakdown fail lebih detail (grid missing/cutoffs missing), gunakan:
+  - `WS_BT_COV_GRID_MISSING`, `WS_BT_COV_CUTOFFS_MISSING`, `WS_BT_COV_MATRIX_MISSING`.
+
+### WS_CT_017 — NO_TRADE gate contract (LOCKED)
+Fixture: `plan_items_no_trade_hide_all.json`
+
+Assertions (wajib PASS):
+- Output PLAN API/UI memiliki `meta.fail_code = "NO_TRADE"`.
+- `meta.fail_reason_codes` memuat `WS_NO_TRADE_ALL_FILTERED`.
+- `items` pada output API/UI **wajib kosong** (`[]`).
+- `meta.plan_hash` harus sama dengan hash canonical payload kosong `[]` sesuai `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`.
+
+## WS_CT_020 — Eval metrics sufficiency guard (LOCKED)
+
+Tujuan: memastikan metrik di `watchlist_bt_eval` cukup dan lolos gating rules sebelum param_id boleh dipilih menjadi BEST/ACTIVE.
+
+Fixture:
+- `bt_eval_metrics_minimal.json`
+
+Rule (LOCKED):
+- `cf_code` saat gagal **wajib**: `CF_EVAL_METRICS_INSUFFICIENT`
+- Metrik wajib mengikuti `16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`
+
+Assertion minimal (LOCKED):
+1) Untuk tiap `case.row`:
+   - jika metrik wajib hilang → FAIL dan wajib mengandung reason `WS_BT_EVAL_METRICS_MISSING`
+2) Jika metrik lengkap:
+   - `picks_count >= ws.eval.min_trades`
+   - `days_covered >= ws.eval.min_days_covered`
+   - `avg_ret_net_top > 0`
+   - `median_ret_net_top > 0` (atau minimal tidak negatif jika strategi defensif; untuk WS dikunci > 0)
+   - downside bound:
+     - `p25_ret_net_top >= downside.p25_min` **atau** (fallback) `min_ret_net_top >= downside.min_min`
+   - stability:
+     - `month_win_rate_min >= stability.month_win_rate_min`
+     - `month_avg_ret_net_min >= stability.month_avg_ret_net_min`
+3) Jika salah satu rule pada (2) gagal → FAIL dan reason codes harus mencerminkan kategori kegagalan:
+   - trades/days → `WS_BT_EVAL_MIN_TRADES_FAIL` / `WS_BT_EVAL_MIN_DAYS_FAIL`
+   - robust return → `WS_BT_EVAL_ROBUST_RETURN_FAIL`
+   - downside → `WS_BT_EVAL_DOWNSIDE_FAIL`
+   - stability → `WS_BT_EVAL_STABILITY_FAIL`
+
+Catatan:
+- Reason code boleh lebih dari satu (contoh: downside + stability).
+- PASS case tidak boleh mengandung reason `WS_BT_EVAL_*`.
+
+
+## WS_CT_021 — OOS proof guard (LOCKED)
+
+Tujuan: memastikan promosi paramset/policy berbasis backtest memiliki bukti *out-of-sample* (OOS) yang memadai.
+
+Fixture: `bt_oos_proof_minimal.json` (wajib berisi `cases[]`).
+
+Assertion (LOCKED):
+- Untuk `case_id=PASS_MINIMAL`:
+  - harus PASS (`expected.should_pass=true`)
+  - `expected.cf_code` harus `null`
+  - `expected.reason_codes` harus kosong
+- Untuk `case_id=FAIL_TEST_METRICS`:
+  - harus FAIL
+  - `cf_code = CF_OOS_PROOF_FAILED`
+  - reason memuat `WS_BT_OOS_METRICS_FAIL`
+- Untuk `case_id=FAIL_WINDOW_INSUFFICIENT`:
+  - harus FAIL
+  - `cf_code = CF_OOS_PROOF_FAILED`
+  - reason memuat `WS_BT_OOS_WINDOW_INSUFFICIENT`
+- Untuk `case_id=FAIL_MISSING_PROOF`:
+  - harus FAIL
+  - `cf_code = CF_OOS_PROOF_FAILED`
+  - reason memuat `WS_BT_OOS_PROOF_MISSING`
+
+Catatan (LOCKED):
+- OOS proof guard bersifat **BLOCK**: jika FAIL, paramset origin=BT tidak boleh dipromosikan menjadi ACTIVE/BEST.
+
+
+## WS_CT_022 — Artifact reference guard (LOCKED)
+
+Tujuan: memastikan semua artefak backtest yang direferensikan (grid/eval/dataset/coverage/OOS) **benar-benar ada**, berada di allowlist, dan konsisten (mis. `param_id` match). Ini mencegah “referensi pajangan” yang tidak bisa diaudit.
+
+Fixture: `artifact_reference_guard_minimal.json` (wajib berisi `cases[]`).
+
+Assertion (LOCKED):
+- Untuk `case_id=PASS_MINIMAL`:
+  - harus PASS
+  - `expected.cf_code` harus `null`
+  - `expected.reason_codes` harus kosong
+- Untuk `case_id=FAIL_MISSING_REQUIRED_ARTIFACT`:
+  - harus FAIL
+  - `cf_code = CF_ARTIFACT_REFERENCE_VIOLATION`
+  - reason memuat `WS_BT_ARTIFACT_MISSING`
+- Untuk `case_id=FAIL_NOT_ALLOWED_ARTIFACT`:
+  - harus FAIL
+  - `cf_code = CF_ARTIFACT_REFERENCE_VIOLATION`
+  - reason memuat `WS_BT_ARTIFACT_NOT_ALLOWED`
+- Untuk `case_id=FAIL_PARAM_ID_MISMATCH`:
+  - harus FAIL
+  - `cf_code = CF_ARTIFACT_REFERENCE_VIOLATION`
+  - reason memuat `WS_BT_ARTIFACT_PARAM_ID_MISMATCH`
+
+Catatan (LOCKED):
+- Artifact reference guard bersifat **BLOCK**: jika FAIL, paramset origin=BT tidak boleh dipromosikan.
+
+
+## LOCKED — Single Command Checklist (Execution Order & Severity)
+
+Tujuan: 1 perintah (kelak) harus bisa menjalankan seluruh contract test WS tanpa tafsir. Bagian ini mengunci **urutan eksekusi**, **kriteria lulus/gagal**, dan **severity**.
+
+### A) Execution order (LOCKED)
+
+1) **Paramset validation (blocking)**
+   - WS_CT_001 .. WS_CT_008
+
+2) **PLAN determinism & hash (blocking)**
+   - WS_CT_009
+   - WS_CT_014
+   - WS_CT_015
+
+3) **CONFIRM isolation & snapshot rules (blocking)**
+   - WS_CT_010
+   - WS_CT_011
+   - WS_CT_012
+
+4) **Group semantics & NO_TRADE gate (blocking)**
+   - WS_CT_013
+   - WS_CT_017
+
+5) **Backtest governance guards (blocking)**
+   - WS_CT_016
+   - WS_CT_018
+   - WS_CT_020
+   - WS_CT_021
+   - WS_CT_022
+
+6) **PLAN universe export schema (non-blocking, tetapi wajib dipenuhi sebelum rilis)**
+   - WS_CT_019
+
+### B) Pass/Fail policy (LOCKED)
+
+- **PASS**: seluruh assertion test terpenuhi.
+- **FAIL**: ada minimal 1 assertion yang gagal.
+- **BLOCK**: test bertipe BLOCK; jika FAIL maka **status keseluruhan suite harus FAIL** (exit code non‑zero).
+- **NON-BLOCK**: test bertipe NON-BLOCK; jika FAIL maka suite boleh tetap exit zero **hanya** pada fase dokumentasi/eksperimen, tetapi **wajib** dianggap FAIL untuk rilis/production.
+
+Klasifikasi (LOCKED):
+- **BLOCK**: WS_CT_001..WS_CT_018, WS_CT_020..WS_CT_022
+- **NON-BLOCK**: WS_CT_019
+
+### C) “Single command” shape (LOCKED blueprint)
+
+Implementasi boleh berbeda bahasa/framework, tetapi wajib menyediakan satu entrypoint dengan perilaku berikut:
+
+- Input:
+  - `--policy=WS`
+  - `--fixtures=watchlist/policies/weekly_swing/fixtures` (atau mirror tests)
+- Output:
+  - Ringkasan per test case: `test_id`, `status(PASS|FAIL)`, `cf_code(if any)`, `reason_codes[]`
+  - Ringkasan suite: `total`, `passed`, `failed`, `blocked_failed`, `nonblocked_failed`
+- Exit code (LOCKED):
+  - `0` jika **tidak ada** BLOCK test yang FAIL
+  - `1` jika **ada** minimal 1 BLOCK test yang FAIL
+
+Catatan (LOCKED):
+- Untuk test yang berbasis fixture `cases[]`, runner wajib menjalankan **semua** `case_id` di fixture tersebut.
+- Semua perbandingan angka yang dikunci oleh schema (mis. rounding 4 decimal) wajib dipakai sebelum assert.
 
 ## Next
 ### Weekly Swing

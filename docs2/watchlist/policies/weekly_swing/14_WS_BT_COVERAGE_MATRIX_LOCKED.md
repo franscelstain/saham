@@ -50,6 +50,15 @@ Sebuah parameter boleh origin=BT hanya jika:
 - [COV-4] cutoff score yang dipakai tersimpan (`watchlist_bt_cutoffs_ws`)
 - [COV-5] picks menyimpan bucket_code sehingga bisa diverifikasi terhadap cutoff
 
+### Failure reasons (LOCKED)
+
+Jika salah satu rule COV-1..COV-5 gagal, maka BT coverage dianggap **FAIL** dan harus menghasilkan reason code (scope `BT`, severity `BLOCK`) yang deterministik:
+
+- `WS_BT_COV_MATRIX_MISSING` — parameter BT tidak ada di matrix ini.
+- `WS_BT_COV_GRID_MISSING` — kolom grid yang dipetakan tidak ada di artefak `watchlist_bt_param_grid`.
+- `WS_BT_COV_CUTOFFS_MISSING` — row cutoff untuk `(param_id, asof_eod_date)` tidak tersedia.
+- `WS_BT_COV_PICK_VIOLATION` — picks melanggar cutoff yang dipersist.
+
 ---
 
 ## Coverage Matrix (LOCKED)

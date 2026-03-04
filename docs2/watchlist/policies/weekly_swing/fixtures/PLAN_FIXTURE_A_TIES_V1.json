@@ -56,11 +56,31 @@
       }
     },
     "universe": [
-      { "ticker_id": 101, "ticker_code": "AAA", "is_active": "Yes" },
-      { "ticker_id": 102, "ticker_code": "BBB", "is_active": "Yes" },
-      { "ticker_id": 103, "ticker_code": "CCC", "is_active": "Yes" },
-      { "ticker_id": 104, "ticker_code": "DDD", "is_active": "Yes" },
-      { "ticker_id": 105, "ticker_code": "EEE", "is_active": "Yes" }
+      {
+        "ticker_id": 101,
+        "ticker_code": "AAA",
+        "is_active": "Yes"
+      },
+      {
+        "ticker_id": 102,
+        "ticker_code": "BBB",
+        "is_active": "Yes"
+      },
+      {
+        "ticker_id": 103,
+        "ticker_code": "CCC",
+        "is_active": "Yes"
+      },
+      {
+        "ticker_id": 104,
+        "ticker_code": "DDD",
+        "is_active": "Yes"
+      },
+      {
+        "ticker_id": 105,
+        "ticker_code": "EEE",
+        "is_active": "Yes"
+      }
     ],
     "rows": [
       {
@@ -178,14 +198,19 @@
     },
     "hashing": {
       "canonical_payload": "101,100.0000,100.0000,10.000000,3.0000,3000000000\n102,100.0000,100.0000,10.000000,3.0000,3000000000\n103,100.0000,101.0000,8.000000,4.6000,4000000000\n104,100.0000,102.0000,4.000000,1.3000,3000000000\n105,50.0000,55.0000,15.000000,3.5000,500000000",
-      "data_batch_hash_sha256": "57a36134a8b78a1f2a45bda2b622813a53aa68681536c1b8d9ff7466c9029b23"
+      "data_batch_hash_sha256": "57a36134a8b78a1fede428b9c4c86b74b5357f380e5556e336c797490ab1ed16"
     },
     "items": [
       {
         "ticker_id": 101,
         "ticker_code": "AAA",
         "asof_close": 100.0,
-        "indicators": { "dv20_idr": 3000000000, "atr14_pct": 3.0, "roc20": 10.0, "hh20": 100.0 },
+        "indicators": {
+          "dv20_idr": 3000000000,
+          "atr14_pct": 3.0,
+          "roc20": 10.0,
+          "hh20": 100.0
+        },
         "pass_guard": true,
         "scores": {
           "score_momentum": 0.5,
@@ -195,7 +220,9 @@
           "score_total_raw": 0.75,
           "score_total": 0.75
         },
-        "reason_codes": [ "WS_SEL_PCT" ],
+        "reason_codes": [
+          "WS_SEL_PCT"
+        ],
         "levels": {
           "entry_band_low": 99.0,
           "entry_band_high": 101.0,
@@ -214,7 +241,12 @@
         "ticker_id": 102,
         "ticker_code": "BBB",
         "asof_close": 100.0,
-        "indicators": { "dv20_idr": 3000000000, "atr14_pct": 3.0, "roc20": 10.0, "hh20": 100.0 },
+        "indicators": {
+          "dv20_idr": 3000000000,
+          "atr14_pct": 3.0,
+          "roc20": 10.0,
+          "hh20": 100.0
+        },
         "pass_guard": true,
         "scores": {
           "score_momentum": 0.5,
@@ -224,7 +256,9 @@
           "score_total_raw": 0.75,
           "score_total": 0.75
         },
-        "reason_codes": [ "WS_SEL_PCT" ],
+        "reason_codes": [
+          "WS_SEL_PCT"
+        ],
         "levels": {
           "entry_band_low": 99.0,
           "entry_band_high": 101.0,
@@ -243,7 +277,12 @@
         "ticker_id": 103,
         "ticker_code": "CCC",
         "asof_close": 100.0,
-        "indicators": { "dv20_idr": 4000000000, "atr14_pct": 4.6, "roc20": 8.0, "hh20": 101.0 },
+        "indicators": {
+          "dv20_idr": 4000000000,
+          "atr14_pct": 4.6,
+          "roc20": 8.0,
+          "hh20": 101.0
+        },
         "pass_guard": true,
         "scores": {
           "score_momentum": 0.4,
@@ -253,7 +292,9 @@
           "score_total_raw": 0.7,
           "score_total": 0.7
         },
-        "reason_codes": [ "WS_SEL_PCT" ],
+        "reason_codes": [
+          "WS_SEL_PCT"
+        ],
         "levels": {
           "entry_band_low": 99.0,
           "entry_band_high": 101.0,
@@ -272,7 +313,12 @@
         "ticker_id": 104,
         "ticker_code": "DDD",
         "asof_close": 100.0,
-        "indicators": { "dv20_idr": 3000000000, "atr14_pct": 1.3, "roc20": 4.0, "hh20": 102.0 },
+        "indicators": {
+          "dv20_idr": 3000000000,
+          "atr14_pct": 1.3,
+          "roc20": 4.0,
+          "hh20": 102.0
+        },
         "pass_guard": true,
         "scores": {
           "score_momentum": 0.2,
@@ -282,7 +328,9 @@
           "score_total_raw": 0.4,
           "score_total": 0.4
         },
-        "reason_codes": [ "WS_HID_PCT" ],
+        "reason_codes": [
+          "WS_HID_PCT"
+        ],
         "levels": {
           "entry_band_low": 99.0,
           "entry_band_high": 101.0,
@@ -301,7 +349,12 @@
         "ticker_id": 105,
         "ticker_code": "EEE",
         "asof_close": 50.0,
-        "indicators": { "dv20_idr": 500000000, "atr14_pct": 3.5, "roc20": 15.0, "hh20": 55.0 },
+        "indicators": {
+          "dv20_idr": 500000000,
+          "atr14_pct": 3.5,
+          "roc20": 15.0,
+          "hh20": 55.0
+        },
         "pass_guard": false,
         "scores": {
           "score_momentum": 0.0,
@@ -311,11 +364,112 @@
           "score_total_raw": 0.0,
           "score_total": 0.0
         },
-        "reason_codes": [ "WS_LIQ_FAIL" ],
+        "reason_codes": [
+          "WS_LIQ_FAIL"
+        ],
         "levels": null,
         "group_semantic": "AVOID",
         "ranking": null
       }
-    ]
+    ],
+    "plan_output_canonical": {
+      "items": [
+        {
+          "ticker": "AAA",
+          "rank": 1,
+          "group_semantic": "TOP_PICKS",
+          "score_total": 0.75,
+          "levels": {
+            "entry_ref": 100.0,
+            "entry_band_low": 99.0,
+            "entry_band_high": 101.0,
+            "stop_price": 94.0,
+            "tp1_price": 112.0
+          },
+          "flags": {
+            "eligible": true,
+            "hidden": false
+          },
+          "reasons": [
+            {
+              "code": "WS_SEL_PCT",
+              "severity": "INFO"
+            }
+          ]
+        },
+        {
+          "ticker": "BBB",
+          "rank": 2,
+          "group_semantic": "TOP_PICKS",
+          "score_total": 0.75,
+          "levels": {
+            "entry_ref": 100.0,
+            "entry_band_low": 99.0,
+            "entry_band_high": 101.0,
+            "stop_price": 94.0,
+            "tp1_price": 112.0
+          },
+          "flags": {
+            "eligible": true,
+            "hidden": false
+          },
+          "reasons": [
+            {
+              "code": "WS_SEL_PCT",
+              "severity": "INFO"
+            }
+          ]
+        },
+        {
+          "ticker": "CCC",
+          "rank": 3,
+          "group_semantic": "SECONDARY",
+          "score_total": 0.7,
+          "levels": {
+            "entry_ref": 100.0,
+            "entry_band_low": 99.0,
+            "entry_band_high": 101.0,
+            "stop_price": 90.8,
+            "tp1_price": 118.4
+          },
+          "flags": {
+            "eligible": true,
+            "hidden": false
+          },
+          "reasons": [
+            {
+              "code": "WS_SEL_PCT",
+              "severity": "INFO"
+            }
+          ]
+        },
+        {
+          "ticker": "DDD",
+          "rank": 4,
+          "group_semantic": "WATCH_ONLY",
+          "score_total": 0.4,
+          "levels": {
+            "entry_ref": 100.0,
+            "entry_band_low": 99.0,
+            "entry_band_high": 101.0,
+            "stop_price": 97.4,
+            "tp1_price": 105.2
+          },
+          "flags": {
+            "eligible": true,
+            "hidden": true
+          },
+          "reasons": [
+            {
+              "code": "WS_HID_PCT",
+              "severity": "INFO"
+            }
+          ]
+        }
+      ],
+      "plan_hash_payload_json": "[{\"flags\":{\"eligible\":true,\"hidden\":false},\"group_semantic\":\"TOP_PICKS\",\"levels\":{\"entry_band_high\":101.0,\"entry_band_low\":99.0,\"entry_ref\":100.0,\"stop_price\":94.0,\"tp1_price\":112.0},\"rank\":1,\"reasons\":[{\"code\":\"WS_SEL_PCT\",\"severity\":\"INFO\"}],\"score_total\":0.75,\"ticker\":\"AAA\"},{\"flags\":{\"eligible\":true,\"hidden\":false},\"group_semantic\":\"TOP_PICKS\",\"levels\":{\"entry_band_high\":101.0,\"entry_band_low\":99.0,\"entry_ref\":100.0,\"stop_price\":94.0,\"tp1_price\":112.0},\"rank\":2,\"reasons\":[{\"code\":\"WS_SEL_PCT\",\"severity\":\"INFO\"}],\"score_total\":0.75,\"ticker\":\"BBB\"},{\"flags\":{\"eligible\":true,\"hidden\":false},\"group_semantic\":\"SECONDARY\",\"levels\":{\"entry_band_high\":101.0,\"entry_band_low\":99.0,\"entry_ref\":100.0,\"stop_price\":90.8,\"tp1_price\":118.4},\"rank\":3,\"reasons\":[{\"code\":\"WS_SEL_PCT\",\"severity\":\"INFO\"}],\"score_total\":0.7,\"ticker\":\"CCC\"},{\"flags\":{\"eligible\":true,\"hidden\":true},\"group_semantic\":\"WATCH_ONLY\",\"levels\":{\"entry_band_high\":101.0,\"entry_band_low\":99.0,\"entry_ref\":100.0,\"stop_price\":97.4,\"tp1_price\":105.2},\"rank\":4,\"reasons\":[{\"code\":\"WS_HID_PCT\",\"severity\":\"INFO\"}],\"score_total\":0.4,\"ticker\":\"DDD\"}]",
+      "plan_hash_sha256": "339af6a779509121a4871a0da0ac454c7a233d28b2f67348cbc2e9d90ee83294",
+      "notes": "plan_hash dihitung dari JSON canonical items[] sesuai WS_RUNTIME_OUTPUT_SCHEMA.md (sort_keys=true, separators=(',',':'), UTF-8, SHA256 hex lowercase). Hanya item yang memiliki rank (ranking != null) yang masuk payload."
+    }
   }
 }

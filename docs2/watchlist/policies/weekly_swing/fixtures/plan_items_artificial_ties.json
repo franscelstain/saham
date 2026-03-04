@@ -1,0 +1,38 @@
+{
+  "fixture_id": "WS_PLAN_ARTIFICIAL_TIES_V1",
+  "policy_code": "WS",
+  "asof_eod_date": "2026-02-13",
+  "params_ref": "paramset_valid.json",
+  "rows": [
+    {
+      "ticker_id": 501,
+      "ticker_code": "TIE1",
+      "score_total_raw": 0.75
+    },
+    {
+      "ticker_id": 502,
+      "ticker_code": "TIE2",
+      "score_total_raw": 0.75
+    }
+  ],
+  "expected": {
+    "order_by": [
+      "score_total_raw DESC",
+      "ticker_id ASC"
+    ],
+    "ranking": [
+      {
+        "ticker_code": "TIE1",
+        "ranking": 1
+      },
+      {
+        "ticker_code": "TIE2",
+        "ranking": 2
+      }
+    ]
+  },
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "Minimal tie-break test independent from full scoring."
+  }
+}

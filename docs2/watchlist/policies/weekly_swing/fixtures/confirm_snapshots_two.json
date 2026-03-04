@@ -1,0 +1,37 @@
+{
+  "fixture_id": "WS_CONFIRM_SNAPSHOTS_TWO_V1",
+  "policy_code": "WS",
+  "trade_date": "2026-02-14",
+  "snapshots": [
+    {
+      "captured_at": "2026-02-14 09:05:00",
+      "source": "MANUAL",
+      "items": [
+        {
+          "ticker_code": "AAA",
+          "last": 101.0,
+          "chg_pct": 1.0,
+          "volume": 1200000,
+          "turnover_idr": 1200000000
+        }
+      ]
+    },
+    {
+      "captured_at": "2026-02-14 10:30:00",
+      "source": "MANUAL",
+      "items": [
+        {
+          "ticker_code": "AAA",
+          "last": 100.5,
+          "chg_pct": 0.5,
+          "volume": 1800000,
+          "turnover_idr": 1800000000
+        }
+      ]
+    }
+  ],
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "Used to test snapshot selection (latest captured_at) deterministically."
+  }
+}

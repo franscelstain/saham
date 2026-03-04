@@ -1,0 +1,227 @@
+{
+  "fixture_id": "WS_CONFIRM_IMMUTABILITY_PAIR_V2",
+  "policy_code": "WS",
+  "note": "LOCKED: CT_010. CONFIRM hanya menghasilkan confirm_result terpisah. PLAN output tidak boleh berubah (hash identik) sebelum vs sesudah.",
+  "plan_output": {
+    "meta": {
+      "policy": "WEEKLY_SWING",
+      "asof_eod_date": "2026-02-13",
+      "trade_date": "2026-02-14",
+      "paramset_hash": "5d8c7315a540cadc4e9a890a1e2a7cc2641d37dde63ee10805eff4dcfaa910ff",
+      "plan_hash": "3a4b4299b5a2008cb2f99f4088155e3769421d295045104d89e33e8871b8e7ca"
+    },
+    "items": [
+      {
+        "ticker": "AAA",
+        "rank": 1,
+        "group_semantic": "TOP_PICKS",
+        "score_total": 0.75,
+        "scores": {
+          "score_momentum": 0.5,
+          "score_breakout": 1.0,
+          "score_volume": 0.5,
+          "score_risk": 1.0
+        },
+        "levels": {
+          "entry_ref": 100.0,
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "stop_price": 94.0,
+          "tp1_price": 112.0
+        },
+        "flags": {
+          "eligible": true,
+          "hidden": false
+        },
+        "reasons": [
+          {
+            "code": "WS_SEL_PCT",
+            "severity": "INFO",
+            "message": "Dipilih sebagai kandidat utama (Top Picks) berdasarkan skor total dan memenuhi guard.",
+            "payload": {
+              "policy": "WS"
+            }
+          }
+        ]
+      },
+      {
+        "ticker": "BBB",
+        "rank": 2,
+        "group_semantic": "TOP_PICKS",
+        "score_total": 0.75,
+        "scores": {
+          "score_momentum": 0.5,
+          "score_breakout": 1.0,
+          "score_volume": 0.5,
+          "score_risk": 1.0
+        },
+        "levels": {
+          "entry_ref": 100.0,
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "stop_price": 94.0,
+          "tp1_price": 112.0
+        },
+        "flags": {
+          "eligible": true,
+          "hidden": false
+        },
+        "reasons": [
+          {
+            "code": "WS_SEL_PCT",
+            "severity": "INFO",
+            "message": "Dipilih sebagai kandidat utama (Top Picks) berdasarkan skor total dan memenuhi guard.",
+            "payload": {
+              "policy": "WS"
+            }
+          }
+        ]
+      },
+      {
+        "ticker": "CCC",
+        "rank": 3,
+        "group_semantic": "SECONDARY",
+        "score_total": 0.7,
+        "scores": {
+          "score_momentum": 0.4,
+          "score_breakout": 0.8,
+          "score_volume": 0.75,
+          "score_risk": 0.85
+        },
+        "levels": {
+          "entry_ref": 100.0,
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "stop_price": 90.8,
+          "tp1_price": 118.4
+        },
+        "flags": {
+          "eligible": true,
+          "hidden": false
+        },
+        "reasons": [
+          {
+            "code": "WS_SEL_PCT",
+            "severity": "INFO",
+            "message": "Masuk pool Secondary: memenuhi guard namun berada di bawah cutoff Top Picks.",
+            "payload": {
+              "policy": "WS"
+            }
+          }
+        ]
+      },
+      {
+        "ticker": "DDD",
+        "rank": 4,
+        "group_semantic": "WATCH_ONLY",
+        "score_total": 0.4,
+        "scores": {
+          "score_momentum": 0.2,
+          "score_breakout": 0.6,
+          "score_volume": 0.5,
+          "score_risk": 0.3
+        },
+        "levels": {
+          "entry_ref": 100.0,
+          "entry_band_low": 99.0,
+          "entry_band_high": 101.0,
+          "stop_price": 97.4,
+          "tp1_price": 105.2
+        },
+        "flags": {
+          "eligible": true,
+          "hidden": false
+        },
+        "reasons": [
+          {
+            "code": "WS_HID_PCT",
+            "severity": "INFO",
+            "message": "Skor di bawah cutoff eksekusi; ditampilkan untuk monitoring saja.",
+            "payload": {
+              "policy": "WS"
+            }
+          }
+        ]
+      },
+      {
+        "ticker": "EEE",
+        "rank": 5,
+        "group_semantic": "AVOID",
+        "score_total": 0.0,
+        "scores": {
+          "score_momentum": 0.0,
+          "score_breakout": 0.0,
+          "score_volume": 0.0,
+          "score_risk": 0.0
+        },
+        "levels": {
+          "entry_ref": 0.0,
+          "entry_band_low": 0.0,
+          "entry_band_high": 0.0,
+          "stop_price": 0.0,
+          "tp1_price": 0.0
+        },
+        "flags": {
+          "eligible": false,
+          "hidden": false
+        },
+        "reasons": [
+          {
+            "code": "WS_LIQ_FAIL",
+            "severity": "WARN",
+            "message": "Gagal guard likuiditas (DV20 di bawah minimum).",
+            "payload": {
+              "min_dv20_idr": 1000000000
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "confirm_input": {
+    "fixture_ref": "confirm_payload_with_orderbook_fields.json",
+    "rule": "PASS + ignore non-contract fields. Field orderbook tidak boleh mempengaruhi output.",
+    "select_snapshot_rule": "LATEST_CAPTURED_AT"
+  },
+  "expected": {
+    "plan_hash_before": "3a4b4299b5a2008cb2f99f4088155e3769421d295045104d89e33e8871b8e7ca",
+    "plan_hash_after": "3a4b4299b5a2008cb2f99f4088155e3769421d295045104d89e33e8871b8e7ca",
+    "plan_hash_unchanged": true,
+    "plan_items_unchanged": true,
+    "confirm_output": {
+      "meta": {
+        "checked_at": "2026-02-14T02:00:00Z",
+        "snapshot_ts": "2026-02-14T01:59:00Z",
+        "snapshot_age_sec": 60
+      },
+      "items": [
+        {
+          "ticker": "AAA",
+          "label": "OK",
+          "reasons": [
+            {
+              "code": "WS_CONFIRM_OK",
+              "severity": "INFO"
+            }
+          ]
+        },
+        {
+          "ticker": "BBB",
+          "label": "OK",
+          "reasons": [
+            {
+              "code": "WS_CONFIRM_OK",
+              "severity": "INFO"
+            }
+          ]
+        }
+      ],
+      "ignored_fields": [
+        "orderbook_json",
+        "bid1_price",
+        "ask1_price",
+        "spread"
+      ]
+    }
+  }
+}

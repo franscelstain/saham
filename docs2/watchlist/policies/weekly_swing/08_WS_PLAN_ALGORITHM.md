@@ -64,6 +64,7 @@ Jika salah satu gagal => AVOID:
 - dv20_idr < liquidity.min_dv20_idr => WS_LIQ_FAIL
 - atr14_pct < risk.min_atr14_pct => WS_ATR_LOW
 - atr14_pct > risk.max_atr14_pct => WS_ATR_HIGH
+- vol_ratio < volume.min_vol_ratio => WS_VOLR_FAIL
 
 ### Step 3 — Compute component scores (0..1)
 WS memakai 4 komponen. Semua komponen **wajib** deterministik dengan rumus berikut.

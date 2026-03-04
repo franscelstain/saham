@@ -1,0 +1,124 @@
+{
+  "fixture_id": "WS_ARTIFACT_REFERENCE_GUARD_MINIMAL_V2",
+  "policy_code": "WS",
+  "base_path_locked": "watchlist/policies/weekly_swing/fixtures/",
+  "rules_locked": [
+    "Setiap referensi artifact wajib ada sebagai file/record di allowlist.",
+    "Artifact name wajib sesuai allowlist dan scope policy.",
+    "Jika artifact mengandung param_id, maka param_id wajib match dengan paramset/fixture yang mengklaimnya.",
+    "Violation adalah BLOCK: promosi paramset origin=BT harus ditolak."
+  ],
+  "allowlist": [
+    "watchlist_bt_param_grid",
+    "watchlist_bt_eval",
+    "watchlist_bt_dataset_ws",
+    "coverage_matrix_export.json",
+    "bt_eval_metrics_minimal.json",
+    "bt_oos_proof_minimal.json"
+  ],
+  "cases": [
+    {
+      "case_id": "PASS_MINIMAL",
+      "references": [
+        {
+          "name": "watchlist_bt_param_grid",
+          "param_id": 1
+        },
+        {
+          "name": "watchlist_bt_eval",
+          "param_id": 1
+        },
+        {
+          "name": "watchlist_bt_dataset_ws",
+          "asof_eod_date": "2026-02-13"
+        },
+        {
+          "name": "coverage_matrix_export.json"
+        },
+        {
+          "name": "bt_eval_metrics_minimal.json",
+          "case_id": "PASS_MINIMAL"
+        },
+        {
+          "name": "bt_oos_proof_minimal.json",
+          "case_id": "PASS_MINIMAL"
+        }
+      ],
+      "expected": {
+        "should_pass": true,
+        "cf_code": null,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "FAIL_MISSING_REQUIRED_ARTIFACT",
+      "references": [
+        {
+          "name": "watchlist_bt_param_grid",
+          "param_id": 1
+        },
+        {
+          "name": "watchlist_bt_eval",
+          "param_id": 1
+        }
+      ],
+      "expected": {
+        "should_pass": false,
+        "cf_code": "CF_ARTIFACT_REFERENCE_VIOLATION",
+        "reason_codes": [
+          "WS_BT_ARTIFACT_MISSING"
+        ]
+      }
+    },
+    {
+      "case_id": "FAIL_NOT_ALLOWED_ARTIFACT",
+      "references": [
+        {
+          "name": "watchlist_bt_param_grid",
+          "param_id": 1
+        },
+        {
+          "name": "watchlist_bt_eval",
+          "param_id": 1
+        },
+        {
+          "name": "some_random_file.csv"
+        }
+      ],
+      "expected": {
+        "should_pass": false,
+        "cf_code": "CF_ARTIFACT_REFERENCE_VIOLATION",
+        "reason_codes": [
+          "WS_BT_ARTIFACT_NOT_ALLOWED"
+        ]
+      }
+    },
+    {
+      "case_id": "FAIL_PARAM_ID_MISMATCH",
+      "references": [
+        {
+          "name": "watchlist_bt_param_grid",
+          "param_id": 999
+        },
+        {
+          "name": "watchlist_bt_eval",
+          "param_id": 999
+        },
+        {
+          "name": "coverage_matrix_export.json"
+        }
+      ],
+      "expected": {
+        "should_pass": false,
+        "cf_code": "CF_ARTIFACT_REFERENCE_VIOLATION",
+        "reason_codes": [
+          "WS_BT_ARTIFACT_PARAM_ID_MISMATCH"
+        ]
+      }
+    }
+  ],
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "V2: cases[] + reason_codes + cf_code. Semua artifact names harus ada di allowlist."
+  }
+}

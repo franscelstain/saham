@@ -1,0 +1,198 @@
+{
+  "meta": {
+    "policy": "WEEKLY_SWING",
+    "asof_eod_date": "2026-02-13",
+    "trade_date": "2026-02-14",
+    "paramset_id": "WS_ACTIVE_EXAMPLE",
+    "paramset_hash": "5d8c7315a540cadc4e9a890a1e2a7cc2641d37dde63ee10805eff4dcfaa910ff",
+    "plan_hash": "3a4b4299b5a2008cb2f99f4088155e3769421d295045104d89e33e8871b8e7ca",
+    "data_batch_hash": "c0949d4c5248ddf77e90dad82993e26f06c934de2744cb91e5962bc3f892c312",
+    "generated_at": "2026-03-04T00:00:00Z",
+    "source": {
+      "vendor": "INTERNAL_SAMPLE",
+      "dataset_id": "WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A",
+      "coverage_ratio": 1.0
+    },
+    "fail_code": null,
+    "fail_reason_codes": []
+  },
+  "items": [
+    {
+      "ticker": "AAA",
+      "rank": 1,
+      "group_semantic": "TOP_PICKS",
+      "score_total": 0.75,
+      "scores": {
+        "score_momentum": 0.5,
+        "score_breakout": 1.0,
+        "score_volume": 0.5,
+        "score_risk": 1.0
+      },
+      "levels": {
+        "entry_ref": 100.0,
+        "entry_band_low": 99.0,
+        "entry_band_high": 101.0,
+        "stop_price": 94.0,
+        "tp1_price": 112.0
+      },
+      "flags": {
+        "eligible": true,
+        "hidden": false
+      },
+      "reasons": [
+        {
+          "code": "WS_SEL_PCT",
+          "severity": "INFO",
+          "message": "Dipilih sebagai kandidat utama (Top Picks) berdasarkan skor total dan memenuhi guard.",
+          "payload": {
+            "policy": "WS"
+          }
+        }
+      ]
+    },
+    {
+      "ticker": "BBB",
+      "rank": 2,
+      "group_semantic": "TOP_PICKS",
+      "score_total": 0.75,
+      "scores": {
+        "score_momentum": 0.5,
+        "score_breakout": 1.0,
+        "score_volume": 0.5,
+        "score_risk": 1.0
+      },
+      "levels": {
+        "entry_ref": 100.0,
+        "entry_band_low": 99.0,
+        "entry_band_high": 101.0,
+        "stop_price": 94.0,
+        "tp1_price": 112.0
+      },
+      "flags": {
+        "eligible": true,
+        "hidden": false
+      },
+      "reasons": [
+        {
+          "code": "WS_SEL_PCT",
+          "severity": "INFO",
+          "message": "Dipilih sebagai kandidat utama (Top Picks) berdasarkan skor total dan memenuhi guard.",
+          "payload": {
+            "policy": "WS"
+          }
+        }
+      ]
+    },
+    {
+      "ticker": "CCC",
+      "rank": 3,
+      "group_semantic": "SECONDARY",
+      "score_total": 0.7,
+      "scores": {
+        "score_momentum": 0.4,
+        "score_breakout": 0.8,
+        "score_volume": 0.75,
+        "score_risk": 0.85
+      },
+      "levels": {
+        "entry_ref": 100.0,
+        "entry_band_low": 99.0,
+        "entry_band_high": 101.0,
+        "stop_price": 90.8,
+        "tp1_price": 118.4
+      },
+      "flags": {
+        "eligible": true,
+        "hidden": false
+      },
+      "reasons": [
+        {
+          "code": "WS_SEL_PCT",
+          "severity": "INFO",
+          "message": "Masuk pool Secondary: memenuhi guard namun berada di bawah cutoff Top Picks.",
+          "payload": {
+            "policy": "WS"
+          }
+        }
+      ]
+    },
+    {
+      "ticker": "DDD",
+      "rank": 4,
+      "group_semantic": "WATCH_ONLY",
+      "score_total": 0.4,
+      "scores": {
+        "score_momentum": 0.2,
+        "score_breakout": 0.6,
+        "score_volume": 0.5,
+        "score_risk": 0.3
+      },
+      "levels": {
+        "entry_ref": 100.0,
+        "entry_band_low": 99.0,
+        "entry_band_high": 101.0,
+        "stop_price": 97.4,
+        "tp1_price": 105.2
+      },
+      "flags": {
+        "eligible": true,
+        "hidden": false
+      },
+      "reasons": [
+        {
+          "code": "WS_HID_PCT",
+          "severity": "INFO",
+          "message": "Skor di bawah cutoff eksekusi; ditampilkan untuk monitoring saja.",
+          "payload": {
+            "policy": "WS"
+          }
+        }
+      ]
+    },
+    {
+      "ticker": "EEE",
+      "rank": 5,
+      "group_semantic": "AVOID",
+      "score_total": 0.0,
+      "scores": {
+        "score_momentum": 0.0,
+        "score_breakout": 0.0,
+        "score_volume": 0.0,
+        "score_risk": 0.0
+      },
+      "levels": {
+        "entry_ref": 0.0,
+        "entry_band_low": 0.0,
+        "entry_band_high": 0.0,
+        "stop_price": 0.0,
+        "tp1_price": 0.0
+      },
+      "flags": {
+        "eligible": false,
+        "hidden": false
+      },
+      "reasons": [
+        {
+          "code": "WS_LIQ_FAIL",
+          "severity": "WARN",
+          "message": "Gagal guard likuiditas (DV20 di bawah minimum).",
+          "payload": {
+            "min_dv20_idr": 1000000000
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "eligible_count": 4,
+    "top_picks_count": 2,
+    "secondary_count": 1,
+    "watch_only_count": 1,
+    "avoid_count": 1,
+    "no_trade": false,
+    "no_trade_reason": {
+      "code": "",
+      "message": ""
+    }
+  }
+}

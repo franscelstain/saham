@@ -7,6 +7,8 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 > Field `meta` dan `items[]` adalah **view model** yang boleh berasal dari agregasi beberapa tabel/record (mis. plan_run/plan_item + metrics + confirm overlay).
 > Prinsip utama: **CONFIRM tidak boleh mengubah PLAN**. Output CONFIRM harus terpisah.
 
+**Contoh pasangan (LOCKED):** lihat `../examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json` (PLAN hash sebelum/sesudah harus identik).
+
 ---
 
 ## 1) PLAN Output (LOCKED)
@@ -22,6 +24,8 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     "paramset_hash": "sha256-hex",
     "plan_hash": "sha256-hex",
     "data_batch_hash": "sha256-hex",
+    "fail_code": null,
+    "fail_reason_codes": [],
     "generated_at": "YYYY-MM-DDTHH:MM:SSZ",
     "source": {
       "vendor": "string",
@@ -76,6 +80,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
   }
 }
 ```
+**Contoh file (LOCKED):** lihat `../examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk payload PLAN yang valid terhadap schema ini (termasuk `meta.plan_hash`).
 
 ### Field semantics (LOCKED)
 - `meta.policy`: selalu `"WEEKLY_SWING"`.
@@ -147,6 +152,8 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 }
 ```
 
+**Contoh file (LOCKED):** lihat `../examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk payload CONFIRM yang valid terhadap schema ini.
+
 ### Field semantics (LOCKED)
 - `meta.policy`: selalu `"WEEKLY_SWING"`.
 - `meta.checked_at`: waktu sistem menghasilkan confirm result.
@@ -161,6 +168,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
     - `DELAY`
   - `reasons[]`: alasan deterministic (code, severity, message, payload).
   - Untuk CONFIRM, field output item yang sah hanya `ticker`, `label`, dan `reasons[]`; alias seperti `confirm_label`, `confirm_reasons`, atau `reason_codes` tidak boleh dipakai di output final.
+- `ignored_fields` (optional): list nama field non-contract yang ditemukan pada payload input dan **diabaikan** (PASS + ignore).
 
 ---
 
@@ -173,38 +181,43 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 - Timestamp wajib ISO-8601 (`YYYY-MM-DDTHH:MM:SSZ`) atau format canonical yang dikunci di dokumen eksekusi.
 
 ### 3.2 PLAN rules
-- `items[].ticker` wajib unik.
-- `rank` mulai dari 1 dan kontigu (1..N).
-- `score_total` harus dalam range 0..1 (setelah clamp).
-- `scores.*` harus dalam range 0..1.
-- `levels.*` selalu numeric.
-- Jika level tidak valid (mis. `stop_price >= entry_ref` atau `tp1_price <= entry_ref`), item tidak boleh berada di `TOP_PICKS`; minimal `WATCH_ONLY`/`AVOID` dan wajib ada reason yang menjelaskan.
-- `reasons[]` wajib deterministic:
-  - urutan reasons harus stabil (canonical order) dan konsisten dengan kontrak hash.
-  - `payload` hanya memuat field yang dibutuhkan untuk audit (tidak random, tidak berubah-ubah).
 
-### 3.3 CONFIRM rules
-- CONFIRM tidak boleh mengubah PLAN:
-  - Tidak boleh mengubah `plan_hash`.
-  - Tidak boleh mengubah `items[].rank`, `group_semantic`, `score_total`, `levels.*`, `reasons[]` pada PLAN.
-- `label` ditentukan oleh severity tertinggi di reasons:
-  - ada `BLOCK` → `DELAY`
-  - else ada `WARN` → `CAUTION`
-  - else ada `INFO` → `NEUTRAL`
-  - else (tidak ada reasons) → `CONFIRMED`
-- CONFIRM tidak memakai reason code khusus label seperti `WS_LBL_OK`, `WS_LBL_NEU`, atau `WS_LBL_WARN`.
-- `label` adalah hasil interpretasi akhir dari reason CONFIRM, bukan reason tambahan.
-- Jika snapshot stale melebihi `confirm_overlay.snapshot_max_age_sec`, label harus `DELAY`.
+#### 3.2.1 Precision & Rounding (LOCKED)
+- `score_total` dan semua `scores.*` **dibulatkan 4 decimal** pada output UI/API.
+- Semua harga pada `levels.*` **dibulatkan 4 decimal**.
+- `meta.coverage_ratio` dibulatkan 4 decimal.
+- Dilarang mengubah precision ini per lingkungan (dev/prod).
 
-### 3.4 Summary rules
-- `summary.*_count` harus konsisten dengan agregasi `items[]` pada output masing-masing.
-- Jika `summary.no_trade=true`, maka:
-  - `summary.top_picks_count = 0`
-  - `summary.secondary_count = 0`
-  - `summary.no_trade_reason` boleh ditampilkan untuk kebutuhan UI.
-  - `summary.no_trade_reason` adalah view-model turunan dari `fail_code` + dictionary, bukan source of truth persistence terpisah.
+#### 3.2.2 Canonicalization for `meta.plan_hash` (LOCKED)
+`meta.plan_hash` dihitung dari **PLAN output** (bukan dari input indikator) dengan aturan mekanis berikut:
 
----
+1) Bentuk data yang di-hash adalah array `items[]` setelah **ranking final**.
+2) Item yang diikutkan dalam hash:
+   - semua item yang muncul di `items[]` (termasuk `WATCH_ONLY` / `AVOID` bila tetap ditampilkan).
+   - Jika `meta.fail_code = "NO_TRADE"`, maka `items[]` **wajib** `[]` (lihat kontrak NO_TRADE). Dengan demikian canonical payload untuk `plan_hash` adalah payload kosong.
+3) Untuk setiap item, field yang diikutkan **hanya**:
+   - `ticker`
+   - `rank`
+   - `group_semantic`
+   - `score_total`
+   - `levels.entry_ref`, `levels.entry_band_low`, `levels.entry_band_high`, `levels.stop_price`, `levels.tp1_price`
+   - `reasons[]` → untuk setiap reason hanya: `code`, `severity` (tanpa `message` dan tanpa `payload`)
+   - `flags.eligible`, `flags.hidden`
+4) Urutan item **wajib**: `rank ASC, ticker ASC`.
+5) Urutan `reasons[]` per item **wajib**: severity desc (`BLOCK`> `WARN`> `INFO`) lalu `code ASC`.
+6) Angka wajib memakai string format fixed:
+   - `score_total` 4 decimal
+   - `levels.*` 4 decimal
+7) Representasi canonical payload (LOCKED):
+   - payload adalah string JSON hasil serialisasi dari array item canonical (hasil langkah 1–6) dengan aturan:
+     - key order deterministik: JSON object keys diurutkan alfabetis (`sort_keys=true`).
+     - tanpa whitespace: gunakan separators `(',', ':')`.
+     - encoding UTF-8.
+   - Dengan kata lain, implementasi referensi adalah setara dengan `json.dumps(items, separators=(',',':'), sort_keys=True, ensure_ascii=False)`. 
+8) Hash dihitung sebagai `SHA256(utf8_bytes(payload))` dan hasilnya ditulis sebagai hex lowercase.
+
+Catatan (LOCKED):
+- Jika implementasi tidak memakai JSON, hasil hash dianggap **INVALID** kecuali canonical payload string-nya persis sama.
 
 ## 4. Reason Model by Layer (LOCKED)
 
@@ -240,4 +253,30 @@ Agar kontrak PLAN ↔ CONFIRM konsisten, model reason dibedakan tegas per layer:
 ## 5) Backward/Forward compatibility (LOCKED)
 - Jika schema berubah, harus bump **policy schema version** dan dokumentasi harus menyatakan breaking change.
 - Tidak boleh “diam-diam” menambah field yang mengubah interpretasi UI/audit.
+## LOCKED — NO_TRADE Gate Output
+
+NO_TRADE adalah kondisi ketika **tidak ada** item yang berhasil lolos hingga tahap ranking final (mis. seluruh candidate gagal guard, tersaring selection, atau ter-hide semuanya).
+
+### 1) Output API / UI (LOCKED)
+Jika NO_TRADE terjadi, output PLAN API/UI **wajib** memenuhi:
+- `meta.fail_code = "NO_TRADE"`
+- `meta.fail_reason_codes` **wajib** memuat `WS_NO_TRADE_ALL_FILTERED`
+- `items` **wajib** `[]` (kosong). Tidak boleh mengirim item `HIDE`/`WATCH_ONLY`/`AVOID` sebagai “pengganti”.
+- `meta.plan_hash` dihitung dari canonical payload kosong `[]` sesuai aturan `3.2.2 Canonicalization for meta.plan_hash`.
+
+### 2) Canonical payload kosong untuk `meta.plan_hash` (LOCKED)
+Karena `items = []`, canonical payload untuk hash adalah string JSON persis:
+- payload: `[]` (tanpa whitespace)
+
+Implementasi referensi:
+- `payload = "[]"`
+- `meta.plan_hash = SHA256(utf8_bytes(payload))` (hex lowercase)
+
+Nilai referensi (LOCKED) untuk payload `[]`:
+- `SHA256("[]") = 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945`
+
+### 3) Konsistensi dengan rule PLAN hashing (LOCKED)
+Aturan ini **mengikat** kalimat di `3.2.2`:
+- “Jika meta.fail_code = NO_TRADE maka items wajib []”
+- sehingga tidak ada mode/variant lain untuk NO_TRADE.
 

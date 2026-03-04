@@ -1,0 +1,35 @@
+{
+  "fixture_id": "WS_PLAN_FORCED_WATCH_ONLY_V1",
+  "policy_code": "WS",
+  "asof_eod_date": "2026-02-13",
+  "params_ref": "paramset_valid.json",
+  "rows": [
+    {
+      "ticker_id": 301,
+      "ticker_code": "EXTD",
+      "asof_close": 112.0,
+      "hh20": 100.0,
+      "roc20": 12.0,
+      "atr14_pct": 3.0,
+      "dv20_idr": 3000000000,
+      "vol_ratio": 1.3
+    }
+  ],
+  "expected": {
+    "items": [
+      {
+        "ticker_code": "EXTD",
+        "pass_guard": true,
+        "forced_watch_only": true,
+        "reason_codes": [
+          "WS_FW_EXT"
+        ],
+        "group_semantic": "WATCH_ONLY"
+      }
+    ]
+  },
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "Pass guard but breakout extended triggers forced WATCH_ONLY."
+  }
+}

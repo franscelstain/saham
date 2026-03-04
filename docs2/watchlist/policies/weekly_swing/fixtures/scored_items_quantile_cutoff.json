@@ -1,0 +1,39 @@
+{
+  "fixture_id": "WS_SCORED_ITEMS_QUANTILE_CUTOFF_V1",
+  "policy_code": "WS",
+  "scores": [
+    {
+      "ticker_id": 601,
+      "ticker_code": "Q1",
+      "score_total": 0.4
+    },
+    {
+      "ticker_id": 602,
+      "ticker_code": "Q2",
+      "score_total": 0.7
+    },
+    {
+      "ticker_id": 603,
+      "ticker_code": "Q3",
+      "score_total": 0.75
+    },
+    {
+      "ticker_id": 604,
+      "ticker_code": "Q4",
+      "score_total": 0.9
+    }
+  ],
+  "params": {
+    "top_min_score_q": 0.75,
+    "secondary_min_score_q": 0.5
+  },
+  "expected": {
+    "top_cutoff": 0.75,
+    "secondary_cutoff": 0.7,
+    "quantile_disc": "k=ceil(q*N) on ASC order"
+  },
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "Quantile cutoff deterministic definition."
+  }
+}

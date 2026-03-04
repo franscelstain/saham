@@ -1,0 +1,37 @@
+{
+  "fixture_id": "WS_UNIVERSE_EQUIVALENCE_SAMPLE_V1",
+  "policy_code": "WS",
+  "asof_eod_date": "2026-02-13",
+  "prod_snapshot": [
+    {
+      "ticker_code": "AAA",
+      "eligible_plan": true,
+      "fail_reason": null
+    },
+    {
+      "ticker_code": "ILLQ",
+      "eligible_plan": false,
+      "fail_reason": "WS_LIQ_FAIL"
+    }
+  ],
+  "bt_snapshot": [
+    {
+      "ticker_code": "AAA",
+      "eligible_plan": true,
+      "fail_reason": null
+    },
+    {
+      "ticker_code": "ILLQ",
+      "eligible_plan": false,
+      "fail_reason": "WS_LIQ_FAIL"
+    }
+  ],
+  "expected": {
+    "should_pass": true,
+    "cf_code_if_fail": "CF_UNIVERSE_EQUIVALENCE_MISMATCH"
+  },
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "Prod vs BT guardrails equivalence sample."
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "fixture_id": "WS_BT_OOS_PROOF_MINIMAL_V2",
+  "policy_code": "WS",
+  "cases": [
+    {
+      "case_id": "PASS_MINIMAL",
+      "oos": {
+        "method": "holdout",
+        "train_pct": 0.7,
+        "test_pct": 0.3,
+        "walk_forward": false
+      },
+      "train_metrics": {
+        "avg_ret_net_top": 0.035,
+        "win_rate_top": 0.6,
+        "picks_count": 140,
+        "max_drawdown": -0.1
+      },
+      "test_metrics": {
+        "avg_ret_net_top": 0.02,
+        "win_rate_top": 0.54,
+        "picks_count": 60,
+        "max_drawdown": -0.12
+      },
+      "acceptance": {
+        "min_test_win_rate": 0.52,
+        "min_test_picks": 40,
+        "min_test_avg_ret": 0.015,
+        "max_test_drawdown": -0.2
+      },
+      "expected": {
+        "should_pass": true,
+        "cf_code": null,
+        "reason_codes": []
+      }
+    },
+    {
+      "case_id": "FAIL_TEST_METRICS",
+      "oos": {
+        "method": "holdout",
+        "train_pct": 0.7,
+        "test_pct": 0.3,
+        "walk_forward": false
+      },
+      "train_metrics": {
+        "avg_ret_net_top": 0.04,
+        "win_rate_top": 0.62,
+        "picks_count": 150,
+        "max_drawdown": -0.09
+      },
+      "test_metrics": {
+        "avg_ret_net_top": 0.008,
+        "win_rate_top": 0.47,
+        "picks_count": 60,
+        "max_drawdown": -0.14
+      },
+      "acceptance": {
+        "min_test_win_rate": 0.52,
+        "min_test_picks": 40,
+        "min_test_avg_ret": 0.015,
+        "max_test_drawdown": -0.2
+      },
+      "expected": {
+        "should_pass": false,
+        "cf_code": "CF_OOS_PROOF_FAILED",
+        "reason_codes": [
+          "WS_BT_OOS_METRICS_FAIL"
+        ]
+      }
+    },
+    {
+      "case_id": "FAIL_WINDOW_INSUFFICIENT",
+      "oos": {
+        "method": "holdout",
+        "train_pct": 0.9,
+        "test_pct": 0.1,
+        "walk_forward": false
+      },
+      "train_metrics": {
+        "avg_ret_net_top": 0.03,
+        "win_rate_top": 0.58,
+        "picks_count": 180,
+        "max_drawdown": -0.11
+      },
+      "test_metrics": {
+        "avg_ret_net_top": 0.018,
+        "win_rate_top": 0.53,
+        "picks_count": 15,
+        "max_drawdown": -0.1
+      },
+      "acceptance": {
+        "min_test_win_rate": 0.52,
+        "min_test_picks": 40,
+        "min_test_avg_ret": 0.015,
+        "max_test_drawdown": -0.2
+      },
+      "expected": {
+        "should_pass": false,
+        "cf_code": "CF_OOS_PROOF_FAILED",
+        "reason_codes": [
+          "WS_BT_OOS_WINDOW_INSUFFICIENT"
+        ]
+      }
+    },
+    {
+      "case_id": "FAIL_MISSING_PROOF",
+      "oos": null,
+      "train_metrics": null,
+      "test_metrics": null,
+      "acceptance": {
+        "min_test_win_rate": 0.52,
+        "min_test_picks": 40,
+        "min_test_avg_ret": 0.015,
+        "max_test_drawdown": -0.2
+      },
+      "expected": {
+        "should_pass": false,
+        "cf_code": "CF_OOS_PROOF_FAILED",
+        "reason_codes": [
+          "WS_BT_OOS_PROOF_MISSING"
+        ]
+      }
+    }
+  ]
+}

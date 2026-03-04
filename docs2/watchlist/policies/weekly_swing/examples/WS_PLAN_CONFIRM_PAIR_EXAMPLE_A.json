@@ -1,0 +1,10 @@
+{
+  "note": "LOCKED: CONFIRM output terpisah dan tidak mengubah PLAN. plan_hash harus identik.",
+  "plan_output_file": "WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json",
+  "confirm_output_file": "WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json",
+  "invariant": {
+    "plan_hash_before": "3a4b4299b5a2008cb2f99f4088155e3769421d295045104d89e33e8871b8e7ca",
+    "plan_hash_after": "3a4b4299b5a2008cb2f99f4088155e3769421d295045104d89e33e8871b8e7ca",
+    "plan_hash_unchanged": true
+  }
+}

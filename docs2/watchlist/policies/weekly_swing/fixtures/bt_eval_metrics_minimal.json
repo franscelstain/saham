@@ -1,0 +1,86 @@
+{
+  "fixture_id": "WS_BT_EVAL_METRICS_SUFFICIENCY_V2",
+  "policy_code": "WS",
+  "doc_ref": "16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md",
+  "thresholds": {
+    "ws.eval.min_trades": 120,
+    "ws.eval.min_days_covered": 350,
+    "downside.p25_min": -0.03,
+    "downside.min_min": -0.07,
+    "stability.month_win_rate_min": 0.45,
+    "stability.month_avg_ret_net_min": -0.01
+  },
+  "cases": [
+    {
+      "case_id": "PASS_MINIMAL",
+      "row": {
+        "param_id": 1,
+        "picks_count": 200,
+        "days_covered": 420,
+        "avg_ret_net_top": 0.032,
+        "win_rate_top": 0.58,
+        "median_ret_net_top": 0.018,
+        "p25_ret_net_top": -0.015,
+        "p75_ret_net_top": 0.041,
+        "min_ret_net_top": -0.055,
+        "max_ret_net_top": 0.12,
+        "month_win_rate_min": 0.47,
+        "month_avg_ret_net_min": -0.006,
+        "periods_count": 24,
+        "period_fail_count": 0
+      },
+      "expected": {
+        "should_pass": true,
+        "cf_code_if_fail": "CF_EVAL_METRICS_INSUFFICIENT",
+        "fail_reason_codes": []
+      }
+    },
+    {
+      "case_id": "FAIL_DOWNSIDE_AND_STABILITY",
+      "row": {
+        "param_id": 2,
+        "picks_count": 180,
+        "days_covered": 410,
+        "avg_ret_net_top": 0.021,
+        "win_rate_top": 0.52,
+        "median_ret_net_top": 0.009,
+        "p25_ret_net_top": -0.045,
+        "p75_ret_net_top": 0.033,
+        "min_ret_net_top": -0.09,
+        "max_ret_net_top": 0.11,
+        "month_win_rate_min": 0.38,
+        "month_avg_ret_net_min": -0.02,
+        "periods_count": 24,
+        "period_fail_count": 6
+      },
+      "expected": {
+        "should_pass": false,
+        "cf_code_if_fail": "CF_EVAL_METRICS_INSUFFICIENT",
+        "fail_reason_codes": [
+          "WS_BT_EVAL_DOWNSIDE_FAIL",
+          "WS_BT_EVAL_STABILITY_FAIL"
+        ]
+      }
+    },
+    {
+      "case_id": "FAIL_MISSING_METRICS",
+      "row": {
+        "param_id": 3,
+        "picks_count": 200,
+        "days_covered": 420,
+        "avg_ret_net_top": 0.03,
+        "win_rate_top": 0.55
+      },
+      "expected": {
+        "should_pass": false,
+        "cf_code_if_fail": "CF_EVAL_METRICS_INSUFFICIENT",
+        "fail_reason_codes": [
+          "WS_BT_EVAL_METRICS_MISSING"
+        ]
+      }
+    }
+  ],
+  "_fixture_expected": {
+    "notes": "Fixture self-contained untuk WS_CT_020. PASS case memenuhi gating rules; FAIL case melanggar downside+stability; FAIL_MISSING_METRICS memastikan guard menolak row tanpa metrik wajib."
+  }
+}

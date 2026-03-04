@@ -30,6 +30,7 @@ WS wajib memiliki blok berikut:
 - data_contract (required_sources, required_fields, disabled_fields)
 - data_readiness (min_history_days, max_missing_bar_days_60d, reject_if_eod_incomplete, outlier_ruleset, min_coverage_ratio)
 - liquidity (min_dv20_idr, dv20_strong_idr, exclude_tickers)
+- volume (min_vol_ratio)
 - risk (min/max atr14_pct, ideal band, stop_mode, stop_atr_mult, min_rr)
 - setup (roc bounds, bo trigger, near/ext bounds)
 - scoring (combine_mode, weights)

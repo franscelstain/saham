@@ -1,0 +1,70 @@
+{
+  "fixture_id": "WS_PLAN_GUARD_FAIL_V1",
+  "policy_code": "WS",
+  "asof_eod_date": "2026-02-13",
+  "params_ref": "paramset_valid.json",
+  "rows": [
+    {
+      "ticker_id": 201,
+      "ticker_code": "ILLQ",
+      "asof_close": 100.0,
+      "hh20": 100.0,
+      "roc20": 5.0,
+      "atr14_pct": 3.0,
+      "dv20_idr": 100000000,
+      "vol_ratio": 1.2
+    },
+    {
+      "ticker_id": 202,
+      "ticker_code": "WILD",
+      "asof_close": 100.0,
+      "hh20": 100.0,
+      "roc20": 6.0,
+      "atr14_pct": 20.0,
+      "dv20_idr": 3000000000,
+      "vol_ratio": 1.2
+    },
+    {
+      "ticker_id": 203,
+      "ticker_code": "DRY",
+      "asof_close": 100.0,
+      "hh20": 100.0,
+      "roc20": 7.0,
+      "atr14_pct": 3.0,
+      "dv20_idr": 3000000000,
+      "vol_ratio": 0.5
+    }
+  ],
+  "expected": {
+    "items": [
+      {
+        "ticker_code": "ILLQ",
+        "pass_guard": false,
+        "reason_codes": [
+          "WS_LIQ_FAIL"
+        ],
+        "group_semantic": "AVOID"
+      },
+      {
+        "ticker_code": "WILD",
+        "pass_guard": false,
+        "reason_codes": [
+          "WS_ATR_HIGH"
+        ],
+        "group_semantic": "AVOID"
+      },
+      {
+        "ticker_code": "DRY",
+        "pass_guard": false,
+        "reason_codes": [
+          "WS_VOLR_FAIL"
+        ],
+        "group_semantic": "AVOID"
+      }
+    ]
+  },
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "Used for group semantics + guard reasons mapping."
+  }
+}

@@ -13,15 +13,16 @@ Saat CONFIRM dijalankan, **PLAN harus identik** sebelum vs sesudah eksekusi.
 
 Definisi “identik” (LOCKED):
 - `plan_hash_before == plan_hash_after`
-- `plan_items[]` (urutan, `ranking`, `group_semantic`, `score_total`, `reasons[]`) **tidak berubah**
+- `items[]` (urutan, `rank`, `group_semantic`, `score_total`, `levels.*`, `flags.*`, `reasons[]`) **tidak berubah**
 - Tidak boleh ada UPDATE/DELETE pada storage PLAN untuk `trade_date` yang sama.
 
 Definisi `plan_hash` (LOCKED):
-- `plan_hash = SHA256( canonical_json(plan_items[]) )`
-- `canonical_json` wajib:
-  - sort by `ranking ASC, ticker_id ASC`
-  - hanya field: `ticker_id,ticker_code,ranking,group_semantic,score_total,reasons`
-  - no whitespace, deterministic key order
+- `plan_hash = SHA256( canonical_plan_payload(items[]) )`
+- Aturan canonical payload **wajib** mengikuti: `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md` bagian **3.2.2 Canonicalization for `meta.plan_hash`**.
+- Ringkasannya (LOCKED):
+  - urutan item: `rank ASC, ticker ASC`
+  - field yang diikutkan: `ticker,rank,group_semantic,score_total,levels(entry_ref/entry_band_low/entry_band_high/stop_price/tp1_price),flags(eligible/hidden),reasons(code,severity)`
+  - `message` dan `payload` **dilarang** masuk hash
 
 Scope write yang diizinkan saat CONFIRM (LOCKED):
 - hanya menulis `confirm_result` / `confirm_reasons` / `confirm_meta` (storage terpisah)

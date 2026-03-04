@@ -96,6 +96,9 @@ Liquidity:
 - liquidity.min_dv20_idr.value > 0
 - liquidity.dv20_strong_idr.value > liquidity.min_dv20_idr.value
 
+Volume:
+- volume.min_vol_ratio.value >= 0
+
 ATR:
 - risk.min_atr14_pct.value > 0
 - risk.max_atr14_pct.value > risk.min_atr14_pct.value

@@ -1,0 +1,588 @@
+{
+  "policy_code": "WS",
+  "policy_version": "WS_EOD_PLAN_CONFIRM",
+  "schema_version": "PARAMSET_JSON",
+  "paramset_code": "WS_FIXTURE_PARAMSET_VALID_V1",
+  "data_contract": {
+    "required_sources": {
+      "value": [
+        "ohlcv_daily",
+        "indicators_daily"
+      ],
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Sumber minimum yang wajib tersedia untuk membentuk PLAN.",
+      "change_triggers": []
+    },
+    "required_fields": {
+      "value": [
+        "ticker_id",
+        "trade_date",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "dv20_idr",
+        "atr14_pct",
+        "roc20",
+        "hh20"
+      ],
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Field minimum yang dipakai oleh guards, scoring, dan plan levels.",
+      "change_triggers": [
+        "Perubahan schema indikator",
+        "Perubahan pipeline data"
+      ]
+    },
+    "disabled_fields": {
+      "value": [],
+      "origin": "DET+MAN",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Tidak ada field yang dinonaktifkan saat ini.",
+      "change_triggers": [
+        "Perubahan schema"
+      ]
+    }
+  },
+  "data_readiness": {
+    "min_coverage_ratio": {
+      "value": 0.95,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Run dibatalkan jika coverage EOD di bawah batas ini.",
+      "change_triggers": [
+        "Perubahan kualitas feed",
+        "Perubahan cakupan universe"
+      ]
+    },
+    "min_history_days": {
+      "value": 60,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Minimum history agar indikator harian dan rolling metrics stabil.",
+      "change_triggers": [
+        "Perubahan indikator yang dipakai"
+      ]
+    },
+    "max_missing_bar_days_60d": {
+      "value": 3,
+      "origin": "MAN",
+      "status": "TEMP",
+      "bt_target": true,
+      "rationale": "Masih trial; belum dijadikan gate utama runtime canonical.",
+      "change_triggers": [
+        "Recalibrate BT 2y",
+        "Audit data quality"
+      ]
+    },
+    "reject_if_eod_incomplete": {
+      "value": true,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Jika batch EOD tidak lengkap, PLAN harus abort.",
+      "change_triggers": []
+    },
+    "outlier_ruleset": {
+      "value": {
+        "enabled": true,
+        "max_abs_return_1d_pct": 0.25,
+        "max_high_low_range_1d_pct": 0.3
+      },
+      "origin": "DET+MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Filter outlier untuk mencegah data korup/aneh masuk ke PLAN.",
+      "change_triggers": [
+        "Audit false positive/false negative outlier",
+        "Recalibrate BT 2y"
+      ]
+    }
+  },
+  "liquidity": {
+    "min_dv20_idr": {
+      "value": 1000000000,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "change_triggers": [
+        "Likuiditas pasar berubah",
+        "Recalibrate BT 2y"
+      ]
+    },
+    "dv20_strong_idr": {
+      "value": 5000000000,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Ambang DV20 untuk score_volume = 1.0.",
+      "change_triggers": [
+        "Likuiditas pasar berubah",
+        "Recalibrate BT 2y"
+      ]
+    },
+    "exclude_tickers": {
+      "value": [],
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Blacklist manual untuk ticker yang ingin dikecualikan dari universe.",
+      "change_triggers": [
+        "Corporate action",
+        "Suspensi",
+        "Masalah likuiditas khusus"
+      ]
+    }
+  },
+  "risk": {
+    "min_atr14_pct": {
+      "value": 1.0,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Hindari ticker yang terlalu mati untuk target swing mingguan.",
+      "change_triggers": [
+        "Recalibrate BT 2y",
+        "Regime volatilitas berubah"
+      ]
+    },
+    "max_atr14_pct": {
+      "value": 8.0,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Batasi ticker yang terlalu liar dan rawan spike/gap.",
+      "change_triggers": [
+        "Recalibrate BT 2y",
+        "Regime volatilitas berubah"
+      ]
+    },
+    "atr_ideal_low": {
+      "value": 2.0,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Batas bawah zona ATR ideal untuk score_risk optimum.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "atr_ideal_high": {
+      "value": 4.0,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Batas atas zona ATR ideal untuk score_risk optimum.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "stop_mode": {
+      "value": "ATR",
+      "origin": "DET+MAN",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Mode stop canonical untuk PLAN WS.",
+      "change_triggers": []
+    },
+    "stop_atr_mult": {
+      "value": 1.5,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Jarak stop dari entry_ref dalam satuan ATR.",
+      "change_triggers": [
+        "Recalibrate BT 2y",
+        "Perubahan profil risiko"
+      ]
+    },
+    "min_rr": {
+      "value": 1.5,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Minimum risk-reward untuk setup yang layak tampil.",
+      "change_triggers": [
+        "Recalibrate BT 2y",
+        "Perubahan filosofi exit"
+      ]
+    }
+  },
+  "setup": {
+    "roc_lo": {
+      "value": 0.0,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Batas bawah normalisasi ROC20 untuk score_momentum.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "roc_hi": {
+      "value": 20.0,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Batas atas normalisasi ROC20 untuk score_momentum.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "mom_roc20_soft_min": {
+      "value": 2.0,
+      "origin": "MAN",
+      "status": "TEMP",
+      "bt_target": true,
+      "rationale": "Masih trial; belum jadi cutoff runtime utama.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "bo_trigger_mode": {
+      "value": "CLOSE_GT_HH20",
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Trigger breakout canonical untuk Weekly Swing.",
+      "change_triggers": []
+    },
+    "bo_near_below_pct": {
+      "value": 0.02,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Jarak maksimum di bawah HH20 agar masih dianggap near breakout.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "bo_max_ext_pct": {
+      "value": 0.05,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Batas maksimum extension di atas HH20 sebelum forced WATCH_ONLY.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    }
+  },
+  "scoring": {
+    "combine_mode": {
+      "value": "NORM_WEIGHTED_SUM_CLAMP01",
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Mode gabung score canonical yang dikunci validator.",
+      "change_triggers": []
+    },
+    "weights": {
+      "value": {
+        "momentum": 0.3,
+        "breakout": 0.3,
+        "volume": 0.2,
+        "risk": 0.2
+      },
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Bobot komponen score_total runtime canonical.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    }
+  },
+  "grouping": {
+    "secondary_target": {
+      "value": 10,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Base target untuk SECONDARY sebelum diturunkan dinamis per-run.",
+      "change_triggers": [
+        "Perubahan kebutuhan coverage",
+        "Recalibrate BT 2y"
+      ]
+    },
+    "top_picks_target": {
+      "value": 5,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Base target untuk TOP_PICKS sebelum diturunkan dinamis per-run.",
+      "change_triggers": [
+        "Perubahan kapasitas eksekusi",
+        "Recalibrate BT 2y"
+      ]
+    },
+    "secondary_min_score_q": {
+      "value": 0.65,
+      "origin": "BT",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Quantile cutoff untuk membentuk SECONDARY dari distribusi score_total eligible hari itu.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "top_min_score_q": {
+      "value": 0.8,
+      "origin": "BT",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Quantile cutoff untuk membentuk TOP_PICKS dari distribusi score_total eligible hari itu.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    },
+    "grouping_mode": {
+      "value": "QUALIFIED_POOLS_QUANTILE_CUTOFF",
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Mode grouping canonical untuk policy WS.",
+      "change_triggers": []
+    },
+    "sort_keys": {
+      "value": [
+        "score_total_desc",
+        "score_breakout_desc",
+        "score_momentum_desc",
+        "dv20_idr_desc",
+        "atr14_pct_asc",
+        "ticker_id_asc"
+      ],
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Urutan ranking dan tie-break canonical yang dikunci validator.",
+      "change_triggers": []
+    },
+    "rounding_mode": {
+      "value": "FLOOR",
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Mode rounding canonical untuk target/display derivation.",
+      "change_triggers": []
+    },
+    "min_count_overrides": {
+      "value": {},
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Saat ini tidak ada override minimum count; object disediakan agar kontrak lengkap.",
+      "change_triggers": [
+        "Perubahan aturan dynamic target"
+      ]
+    },
+    "display_caps": {
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Batas tampilan untuk menjaga UI tetap fokus tanpa mengubah audit persistence.",
+      "change_triggers": [
+        "Perubahan kebutuhan UI/output"
+      ]
+    }
+  },
+  "plan_levels": {
+    "entry_mode": {
+      "value": "BREAKOUT",
+      "origin": "DET+MAN",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Mode entry canonical untuk PLAN Weekly Swing.",
+      "change_triggers": []
+    },
+    "entry_band_pct": {
+      "value": 0.01,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Lebar entry band dari asof_close untuk membentuk entry_ref/entry_band.",
+      "change_triggers": [
+        "Recalibrate BT 2y"
+      ]
+    }
+  },
+  "no_trade": {
+    "min_eligible_count": {
+      "value": 30,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Jika eligible terlalu sedikit, run ditandai NO_TRADE agar kualitas tetap terjaga.",
+      "change_triggers": [
+        "Universe berubah signifikan",
+        "Recalibrate BT 2y"
+      ]
+    },
+    "no_trade_hides_all": {
+      "value": true,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Saat NO_TRADE, hasil display harus kosong dan tidak menyesatkan.",
+      "change_triggers": []
+    }
+  },
+  "confirm_overlay": {
+    "snapshot_max_age_sec": {
+      "value": 900,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "LOCKED: TTL canonical untuk validitas snapshot CONFIRM.",
+      "change_triggers": [
+        "Breaking change: redefinisi 'fresh snapshot' untuk WS (update docs + validator + contract tests)"
+      ]
+    },
+    "max_drift_from_entry_pct": {
+      "value": 0.03,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Jika harga runtime terlalu jauh dari entry_ref, confirm harus memberi caution/delay.",
+      "change_triggers": [
+        "Regime volatilitas berubah",
+        "Audit hasil eksekusi"
+      ]
+    }
+  },
+  "eval": {
+    "min_trades_oos": {
+      "value": 0,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Gate OOS minimal trades untuk menghindari bias sample kecil.",
+      "change_triggers": [
+        "Perubahan window OOS",
+        "Perubahan definisi trade"
+      ]
+    },
+    "min_trades": {
+      "value": 0,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Gate in-sample minimal trades untuk menghindari bias sample kecil.",
+      "change_triggers": [
+        "Perubahan window backtest",
+        "Perubahan definisi trade"
+      ]
+    },
+    "min_days_covered": {
+      "value": 0,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Minimum hari tercakup agar evaluasi tidak bias karena coverage parsial.",
+      "change_triggers": [
+        "Perubahan definisi days_covered",
+        "Perubahan window backtest"
+      ]
+    },
+    "min_p25_ret_net_top": {
+      "value": -0.03,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Downside bound sederhana untuk TOP bucket.",
+      "change_triggers": [
+        "Regime volatilitas berubah",
+        "Strategi dibuat lebih defensif/agresif"
+      ]
+    },
+    "min_month_win_rate_min": {
+      "value": 0.45,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Stability gate: win_rate bulanan terendah.",
+      "change_triggers": [
+        "Definisi period berubah",
+        "Window evaluasi berubah"
+      ]
+    },
+    "min_month_avg_ret_net_min": {
+      "value": -0.01,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Stability gate: avg return net bulanan terendah.",
+      "change_triggers": [
+        "Definisi period berubah",
+        "Strategi dibuat lebih defensif/agresif"
+      ]
+    }
+  },
+  "hash_contract": {
+    "version": {
+      "value": 1,
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Versi kontrak hash canonical untuk reproducibility PLAN.",
+      "change_triggers": [
+        "Perubahan payload hash canonical"
+      ]
+    },
+    "order_by": {
+      "value": "ticker_id_asc",
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Urutan canonical ticker untuk hashing.",
+      "change_triggers": []
+    },
+    "scales": {
+      "value": {
+        "close_price_dp": 4,
+        "hh20_dp": 4,
+        "roc20_dp": 6,
+        "atr14_pct_dp": 4,
+        "dv20_idr_dp": 0
+      },
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Presisi fixed untuk canonical hash payload.",
+      "change_triggers": []
+    },
+    "null_handling": {
+      "value": "EXCLUDE_FROM_HASH_PAYLOAD",
+      "origin": "DET",
+      "status": "ACTIVE",
+      "bt_target": false,
+      "rationale": "Aturan null handling canonical untuk payload hash.",
+      "change_triggers": []
+    }
+  },
+  "_fixture_expected": {
+    "should_pass": false,
+    "cf_code": "CF_PARAMSET_AUDIT_SCHEMA_INVALID",
+    "notes": "Removed rationale from liquidity.min_dv20_idr audit node."
+  },
+  "volume": {
+    "min_vol_ratio": {
+      "value": 1.0,
+      "origin": "MAN",
+      "status": "ACTIVE",
+      "bt_target": true,
+      "rationale": "Konfirmasi volume minimal (vol_ratio) untuk memastikan pergerakan didukung volume.",
+      "change_triggers": [
+        "Recalibrate BT 2y",
+        "Perubahan karakter volume pasar"
+      ]
+    }
+  }
+}

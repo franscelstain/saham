@@ -1,0 +1,42 @@
+{
+  "fixture_id": "WS_CONFIRM_PAYLOAD_WITH_ORDERBOOK_FIELDS_V1",
+  "policy_code": "WS",
+  "trade_date": "2026-02-14",
+  "captured_at": "2026-02-14 10:30:00",
+  "items": [
+    {
+      "ticker_code": "AAA",
+      "last": 100.5,
+      "chg_pct": 0.5,
+      "volume": 1800000,
+      "turnover_idr": 1800000000,
+      "bid1_price": 100.4,
+      "ask1_price": 100.6,
+      "spread": 0.2,
+      "orderbook_json": {
+        "bids": [
+          [
+            100.4,
+            1000
+          ]
+        ],
+        "asks": [
+          [
+            100.6,
+            1200
+          ]
+        ]
+      }
+    }
+  ],
+  "_fixture_expected": {
+    "should_pass": true,
+    "expected_ignored_fields": [
+      "bid1_price",
+      "ask1_price",
+      "spread",
+      "orderbook_json"
+    ],
+    "notes": "Confirm must ignore non-contract orderbook fields (no influence on confirm decision)."
+  }
+}

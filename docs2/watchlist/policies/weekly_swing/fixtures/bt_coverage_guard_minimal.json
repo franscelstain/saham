@@ -1,0 +1,134 @@
+{
+  "fixture_id": "WS_BT_COVERAGE_GUARD_MINIMAL_V2",
+  "policy_code": "WS",
+  "bt_window": {
+    "from": "2024-01-01",
+    "to": "2025-12-31"
+  },
+  "notes": "Fixture untuk WS_CT_016: membuktikan gating rules COV-1..COV-5 (14_WS_BT_COVERAGE_MATRIX_LOCKED.md) terhadap artefak backtest (grid/cutoffs/picks).",
+
+  "cases": [
+    {
+      "case_id": "PASS_MINIMAL",
+      "bt_params_in_registry": [
+        "grouping.top_min_score_q",
+        "grouping.secondary_min_score_q"
+      ],
+      "coverage_matrix_rows": [
+        {
+          "registry_key": "grouping.top_min_score_q",
+          "grid_column": "top_min_score_q",
+          "used_in_step": "PICK/GROUPING",
+          "audit": {
+            "cutoff_field": "top_cutoff_score",
+            "bucket_code": "TOP_PICKS"
+          }
+        },
+        {
+          "registry_key": "grouping.secondary_min_score_q",
+          "grid_column": "secondary_min_score_q",
+          "used_in_step": "PICK/GROUPING",
+          "audit": {
+            "cutoff_field": "secondary_cutoff_score",
+            "bucket_code": "SECONDARY"
+          }
+        }
+      ],
+      "artifacts": {
+        "watchlist_bt_param_grid": {
+          "param_id": 7,
+          "columns_present": [
+            "top_min_score_q",
+            "secondary_min_score_q"
+          ],
+          "values": {
+            "top_min_score_q": 0.75,
+            "secondary_min_score_q": 0.5
+          }
+        },
+        "watchlist_bt_cutoffs_ws": [
+          {
+            "asof_eod_date": "2026-02-13",
+            "param_id": 7,
+            "top_cutoff_score": 0.75,
+            "secondary_cutoff_score": 0.7
+          }
+        ],
+        "watchlist_bt_picks_ws": [
+          {
+            "asof_eod_date": "2026-02-13",
+            "param_id": 7,
+            "ticker_code": "AAA",
+            "bucket_code": "TOP_PICKS",
+            "score_total": 0.75
+          },
+          {
+            "asof_eod_date": "2026-02-13",
+            "param_id": 7,
+            "ticker_code": "CCC",
+            "bucket_code": "SECONDARY",
+            "score_total": 0.7
+          }
+        ]
+      },
+      "expected": {
+        "should_pass": true,
+        "fail_code_if_fail": "BT_COVERAGE_GUARD_FAIL",
+        "fail_reason_codes_if_fail": []
+      }
+    },
+    {
+      "case_id": "FAIL_PICK_VIOLATION",
+      "bt_params_in_registry": [
+        "grouping.top_min_score_q",
+        "grouping.secondary_min_score_q"
+      ],
+      "coverage_matrix_rows": [
+        {
+          "registry_key": "grouping.top_min_score_q",
+          "grid_column": "top_min_score_q",
+          "used_in_step": "PICK/GROUPING",
+          "audit": {
+            "cutoff_field": "top_cutoff_score",
+            "bucket_code": "TOP_PICKS"
+          }
+        }
+      ],
+      "artifacts": {
+        "watchlist_bt_param_grid": {
+          "param_id": 9,
+          "columns_present": [
+            "top_min_score_q"
+          ],
+          "values": {
+            "top_min_score_q": 0.75
+          }
+        },
+        "watchlist_bt_cutoffs_ws": [
+          {
+            "asof_eod_date": "2026-02-13",
+            "param_id": 9,
+            "top_cutoff_score": 0.75,
+            "secondary_cutoff_score": 0.7
+          }
+        ],
+        "watchlist_bt_picks_ws": [
+          {
+            "asof_eod_date": "2026-02-13",
+            "param_id": 9,
+            "ticker_code": "AAA",
+            "bucket_code": "TOP_PICKS",
+            "score_total": 0.74
+          }
+        ]
+      },
+      "expected": {
+        "should_pass": false,
+        "fail_code": "BT_COVERAGE_GUARD_FAIL",
+        "fail_reason_codes": [
+          "WS_BT_COV_PICK_VIOLATION"
+        ]
+      }
+    }
+  ]
+}

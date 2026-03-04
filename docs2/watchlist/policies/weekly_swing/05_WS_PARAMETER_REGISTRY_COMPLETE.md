@@ -34,6 +34,9 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - `liquidity.dv20_strong_idr` (MAN/ACTIVE, bt_target=true)
 - `liquidity.exclude_tickers` (MAN/ACTIVE)
 
+### C1. Volume confirmation
+- `volume.min_vol_ratio` (MAN/ACTIVE, bt_target=true)
+
 ### D. Risk & stops
 - `risk.min_atr14_pct` (MAN/ACTIVE, bt_target=true)
 - `risk.max_atr14_pct` (MAN/ACTIVE, bt_target=true)
@@ -223,6 +226,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Alasan: blacklist operasional (trading suspend/halt, UMA/anomali harga-volume, corporate action yang mengganggu sinyal seperti split/rights/dividen, atau data vendor tidak stabil).
   - Kapan diubah: saat ada case khusus.
   - Cara ubah: update paramset (promote) + catat who/when/why.
+
+### C1. Volume confirmation
+- `volume.min_vol_ratio` (number >= 0) — batas minimum `vol_ratio` untuk lolos guard volume.
+  - Origin: MAN/ACTIVE, bt_target=true
+  - Rationale: konfirmasi bahwa pergerakan harga didukung volume; mencegah sinyal lemah pada volume kering.
+  - Change triggers: recalibrate BT 2y; perubahan karakter volume pasar.
 
 ### D. Risk & stops
 
