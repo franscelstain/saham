@@ -18,7 +18,7 @@ Definisi “identik” (LOCKED):
 
 Definisi `plan_hash` (LOCKED):
 - `plan_hash = SHA256( canonical_plan_payload(items[]) )`
-- Aturan canonical payload **wajib** mengikuti: `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md` bagian **3.2.2 Canonicalization for `meta.plan_hash`**.
+- Aturan canonical payload **wajib** mengikuti: [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md) bagian **3.2.2 Canonicalization for `meta.plan_hash`**.
 - Ringkasannya (LOCKED):
   - urutan item: `rank ASC, ticker ASC`
   - field yang diikutkan: `ticker,rank,group_semantic,score_total,levels(entry_ref/entry_band_low/entry_band_high/stop_price/tp1_price),flags(eligible/hidden),reasons(code,severity)`
@@ -45,7 +45,7 @@ Scope write yang diizinkan saat CONFIRM (LOCKED):
 
 PLAN:
 - input: data EOD, indikator, scoring, risk guard, universe
-- output: `plan_items[]` dengan `ranking`, `group_semantic`, `score_total`, `reasons[]`
+- output: `plan_items[]` dengan `rank`, `group_semantic`, `score_total`, `reasons[]`
 
 PLAN adalah **referensi utama**. PLAN tidak boleh berubah ketika CONFIRM jalan.
 
@@ -101,20 +101,24 @@ Untuk mencegah writeback tidak sengaja, ruang lingkup operasi DB saat CONFIRM ad
 
 **Contract test wajib:**
 - `plan_hash_before == plan_hash_after`
-- Test suite **wajib** memiliki audit “DB Write-Scope” (lihat `_refs/WS_CONTRACT_TESTS_SPEC.md` Test 2C). Tanpa audit ini, kontrak dianggap **belum terpenuhi**.
+- Test suite **wajib** memiliki audit “DB Write-Scope” (lihat [`_refs/WS_CONTRACT_TESTS_SPEC.md`](_refs/WS_CONTRACT_TESTS_SPEC.md) Test 2C). Tanpa audit ini, kontrak dianggap **belum terpenuhi**.
 
 ## LOCKED — PLAN Hash Scope (Immutability)
-Definisi `plan_hash` harus **mekanis** agar tidak ada interpretasi berbeda.
+Definisi `meta.plan_hash` harus **mekanis** dan hanya memiliki **satu** sumber kebenaran.
 
-**PLAN state yang masuk hash:**
-1) `plan_run` untuk `(policy_code='WS', trade_date=T)`:
-   - `policy_code`, `trade_date`, `param_id`, `data_batch_hash`, `plan_version`
-2) Seluruh `plan_items` untuk trade_date=T:
-   - `ticker_code` (atau `ticker_id`), `rank`, `group_semantic`, `score_total`, `reasons_hash`
+**Sumber kebenaran tunggal (LOCKED):**
+- `meta.plan_hash = SHA256(canonical_plan_payload(items[]))`
+- Canonical payload dan aturan serialisasi **wajib** mengikuti [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md) bagian **3.2.2 Canonicalization for `meta.plan_hash`**.
+- Urutan item canonical **wajib**: `rank ASC, ticker ASC`.
+- `message` dan `payload` pada `reasons[]` **dilarang** masuk ke `meta.plan_hash`.
 
-**Canonical hashing rules (LOCKED):**
-- Urutkan `plan_items` deterministik: `ticker_code ASC`
-- Serialize ke canonical JSON (field order tetap), lalu hash `SHA-256`.
+**Larangan interpretasi lain (LOCKED):**
+- `meta.plan_hash` **tidak boleh** memasukkan field header/run-level seperti `policy_code`, `trade_date`, `param_id`, `data_batch_hash`, atau `plan_version`.
+- `meta.plan_hash` **tidak boleh** memakai urutan `ticker_code ASC` sebagai pengganti urutan canonical resmi.
+
+**Jika implementasi membutuhkan hash persistence/run-level terpisah:**
+- boleh membuat hash lain dengan nama berbeda (contoh: `plan_state_hash`),
+- tetapi hash tersebut **bukan** `meta.plan_hash` dan **tidak boleh** dipakai untuk menguji invariant immutability pada dokumen ini.
 
 ---
 

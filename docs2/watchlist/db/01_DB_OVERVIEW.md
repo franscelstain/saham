@@ -37,4 +37,4 @@ Menetapkan prinsip database Watchlist yang **global** (lintas policy), sehingga 
 ## Next
 02_DB_SCHEMA_MARIADB.md
 
-Jika schema sudah terbuat dari versi lama, gunakan artefak: `05_DB_DDL_MARIADB.sql`.
+Jika schema sudah terbuat dari versi lama, gunakan artefak: [`05_DB_DDL_MARIADB.sql`](05_DB_DDL_MARIADB.sql).

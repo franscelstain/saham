@@ -3,12 +3,21 @@
 ## Purpose
 Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tidak berbeda-beda.
 
+## Scope
+Dipakai saat membaca bentuk payload PLAN/CONFIRM dan contoh persistence.
+
+## Inputs
+- Schema resmi runtime output dan contoh payload terkait.
+
+## Outputs
+- Contoh payload runtime yang konsisten dengan schema utama.
+
 ## Notes
 - **LOCKED:** File ini berisi dua jenis contoh:
-  - **API/UI RESPONSE**: contoh payload yang harus sesuai `WS_RUNTIME_OUTPUT_SCHEMA.md`.
+  - **API/UI RESPONSE**: contoh payload yang harus sesuai [`WS_RUNTIME_OUTPUT_SCHEMA.md`](WS_RUNTIME_OUTPUT_SCHEMA.md).
   - **PERSISTENCE RECORD**: contoh bentuk record `plan_run` / `plan_item` untuk audit/debug.
 - Contoh **PERSISTENCE RECORD** bukan kontrak UI, dan tidak wajib 1:1 dengan schema API/UI.
-- Kontrak payload API/UI yang wajib diikuti ada di `WS_RUNTIME_OUTPUT_SCHEMA.md`.
+- Kontrak payload API/UI yang wajib diikuti ada di [`WS_RUNTIME_OUTPUT_SCHEMA.md`](WS_RUNTIME_OUTPUT_SCHEMA.md).
 
 ## B. API/UI Response Examples (LOCKED)
 
@@ -27,7 +36,7 @@ Catatan:
 {
   "plan_run_id": 1001,
   "policy_code": "WS",
-  "policy_version": "1.0.0",
+  "policy_version": "WS_EOD_PLAN_CONFIRM",
   "plan_trade_date": "2026-02-28",
   "asof_eod_date": "2026-02-27",
   "param_set_id": 55,
@@ -74,8 +83,8 @@ Catatan:
   },
   "plan_levels_json": {
     "entry_ref": 1020.0000,
-    "entry_min": 1009.8000,
-    "entry_max": 1030.2000,
+    "entry_band_low": 1009.8000,
+    "entry_band_high": 1030.2000,
     "stop_price": 937.3800,
     "tp1_price": 1143.9300,
     "rr": 1.500000
@@ -113,8 +122,8 @@ Catatan:
   },
   "plan_levels_json": {
     "entry_ref": 1540.0000,
-    "entry_min": 1524.6000,
-    "entry_max": 1555.4000,
+    "entry_band_low": 1524.6000,
+    "entry_band_high": 1555.4000,
     "stop_price": 1462.0000,
     "tp1_price": 1657.0000,
     "rr": 1.500000
@@ -143,7 +152,9 @@ Catatan:
     "turnover_idr": 143960000000,
     "volume_shares": 39330000
   },
-  "reason_codes_json": [],
+  "reason_codes_json": [
+    "WS_CONFIRM_OK"
+  ],
   "created_at": "2026-02-28T09:15:01+07:00"
 }
 ```
@@ -153,7 +164,7 @@ Catatan:
 {
   "plan_run_id": 1002,
   "policy_code": "WS",
-  "policy_version": "1.0.0",
+  "policy_version": "WS_EOD_PLAN_CONFIRM",
   "plan_trade_date": "2026-02-28",
   "asof_eod_date": "2026-02-27",
   "param_set_id": 55,
@@ -163,7 +174,7 @@ Catatan:
   "processed_count": 900,
   "eligible_count": 12,
   "run_status": "NO_TRADE",
-  "fail_code": "WS_NO_TRADE_MIN_ELIGIBLE",
+  "fail_code": "NO_TRADE",
   "run_metrics_json": {
     "top_picks_count": 0,
     "secondary_count": 0,
@@ -180,7 +191,7 @@ Catatan:
 {
   "plan_run_id": 1003,
   "policy_code": "WS",
-  "policy_version": "1.0.0",
+  "policy_version": "WS_EOD_PLAN_CONFIRM",
   "plan_trade_date": "2026-02-28",
   "asof_eod_date": "2026-02-27",
   "param_set_id": 55,
@@ -208,23 +219,33 @@ Catatan:
 ### Example A — confirm_item
 ```json
 {
-  "run_id": 1001,
   "ticker": "ABCD",
   "label": "CONFIRMED",
-  "reasons": []
+  "reasons": [
+    {
+      "code": "WS_CONFIRM_OK",
+      "severity": "INFO",
+      "message": "Snapshot valid dan sehat; tidak ada sinyal negatif.",
+      "payload": {}
+    }
+  ]
 }
 ```
 
 ### Example B — confirm_item (CAUTION)
 ```json
 {
-  "run_id": 1001,
   "ticker": "IJKL",
   "label": "CAUTION",
   "reasons": [
     {
+      "code": "WS_DRIFT_FAR",
       "severity": "WARN",
-      "message": "Spread runtime melebihi batas maksimum.",
+      "message": "Harga runtime terlalu jauh dari entry band.",
+      "payload": {
+        "max_drift_from_entry_pct": 0.02,
+        "actual_drift_pct": 0.0315
+      }
     }
   ]
 }

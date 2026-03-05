@@ -1,5 +1,17 @@
 # WS Glossary (LOCKED)
 
+## Purpose
+Glosarium istilah resmi Weekly Swing.
+
+## Scope
+Mengunci arti istilah penting agar istilah tidak dipakai dengan makna berbeda.
+
+## Inputs
+- Semua pembaca dokumen Weekly Swing.
+
+## Outputs
+- Definisi istilah LOCKED yang harus konsisten di seluruh dokumen dan implementasi.
+
 Istilah di dokumen Weekly Swing yang **wajib** dipahami sama oleh semua implementasi.
 
 ## PLAN

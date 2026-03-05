@@ -1,90 +1,114 @@
-# 14 - WS Backtest Coverage Matrix (LOCKED)
+# 14 — WS BT Coverage Matrix (LOCKED)
 
-## Purpose (LOCKED)
-Dokumen ini adalah bukti formal bahwa parameter ber-origin **BT**:
-1) benar-benar tersimpan pada artefak backtest yang resmi,
-2) benar-benar dipakai dalam langkah pemilihan (grouping/pick),
-3) memiliki audit-proof yang dapat diverifikasi ulang.
+## Purpose
+Mengunci definisi coverage minimum untuk parameter Weekly Swing yang berasal dari backtest (`origin = BT`) agar setiap parameter BT yang dipakai runtime punya bukti artefak kalibrasi yang nyata, dapat diaudit, dan dapat dilacak ke grid / cutoffs / picks.
 
-Jika parameter origin=BT tidak punya mapping lengkap di matrix ini,
-maka origin BT dianggap **tidak valid** (harus downgrade ke MAN/DET sampai coverage valid).
+## Scope
+Dokumen ini hanya mengatur **coverage proof** untuk parameter BT.
+Dokumen ini tidak mengganti algorithm scoring, validator, atau sufficiency gate lain.
+
+## Inputs
+- registry parameter Weekly Swing,
+- hasil calibration/backtest,
+- tabel artefak resmi yang ada di manifest WS.
+
+## Outputs
+- coverage matrix minimum,
+- aturan keterkaitan parameter BT dengan artefak backtest,
+- acceptance rule untuk promosi paramset BT.
 
 ## Prerequisites
-### Weekly Swing
-- 13_WS_CONTRACT_TEST_CHECKLIST.md
+- [`12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md`](12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md)
+- [`13_WS_CONTRACT_TEST_CHECKLIST.md`](13_WS_CONTRACT_TEST_CHECKLIST.md)
+- [`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`](18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md)
 
----
+## 1) Rule of Coverage (LOCKED)
+Setiap parameter dengan `origin = BT` yang dipakai runtime wajib memiliki bukti minimal berikut:
+1. parameter itu muncul pada grid / evaluasi yang resmi,
+2. artefak hasilnya dapat ditelusuri ke cutoffs/picks/eval yang sah,
+3. dan coverage-nya cukup untuk membuktikan bahwa parameter tersebut bukan angka liar.
 
-## BT parameters in registry (LOCKED)
-Berdasarkan `05_WS_PARAMETER_REGISTRY_COMPLETE.md`, parameter origin=BT untuk WS adalah:
-- `grouping.top_min_score_q`
-- `grouping.secondary_min_score_q`
+Jika salah satu bukti di atas tidak ada, parameter BT tersebut tidak boleh dipakai untuk promote ACTIVE.
 
-Matrix ini dilarang memuat BT parameter lain di luar dua key tersebut
-kecuali registry diupdate.
+## 2) Official Coverage Artifacts (LOCKED)
+Artefak resmi yang dipakai untuk coverage BT Weekly Swing adalah:
+- `watchlist_bt_param_grid`
+- `watchlist_bt_eval`
+- `watchlist_bt_picks_ws`
+- `watchlist_bt_cutoffs_ws`
+- `watchlist_bt_oos_eval_ws`
 
----
+Catatan:
+- detail authoritative daftar artefak ada di [`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`](18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md),
+- dokumen ini hanya menjelaskan relasi coverage-nya.
 
-## Required artifacts (LOCKED)
-Agar BT dapat dibuktikan (coverage + audit), backtest WS wajib memiliki artefak berikut:
+## 3) Coverage Matrix Minimum (LOCKED)
+Setiap parameter BT yang memengaruhi runtime harus punya row coverage matrix dengan kolom minimal berikut:
+- `param_key`
+- `origin`
+- `grid_column`
+- `cutoff_dependency`
+- `pick_dependency`
+- `eval_dependency`
+- `notes`
 
-1) `watchlist_bt_param_grid`
-   - menyimpan nilai parameter yang di-grid-search (termasuk quantile cutoff)
+Aturan:
+- `origin` untuk dokumen ini harus `BT`,
+- `grid_column` harus menunjuk ke kolom resmi pada `watchlist_bt_param_grid`,
+- dependency lain harus menunjuk artefak resmi yang benar-benar ada.
 
-2) `watchlist_bt_cutoffs_ws` (per tanggal, per param_id)
-   - menyimpan cutoff score yang benar-benar dipakai hari itu
-   - diperlukan agar audit tidak bergantung pada “recompute” yang rawan drift
+## 4) Required Coverage Semantics
 
-3) `watchlist_bt_picks_ws`
-   - menyimpan hasil picks + bucket_code + score_total
+### A) Grid presence
+Jika sebuah parameter BT diklaim aktif di runtime, maka:
+- parameter itu wajib punya representasi eksplisit pada `watchlist_bt_param_grid`,
+- dan nama/semantics-nya tidak boleh ambigu.
 
-Jika artefak (2) dan/atau kolom bucket_code belum ada, BT coverage belum bisa dianggap proven.
+### B) Cutoff dependency
+Jika bucket selection dipengaruhi cutoff score, maka bukti cutoff wajib ada pada:
+- `watchlist_bt_cutoffs_ws`
 
----
+### C) Pick dependency
+Jika evidence hasil kalibrasi memakai pick list, maka pick terkait wajib ada pada:
+- `watchlist_bt_picks_ws`
 
-## Gating rules for BT origin (LOCKED)
-Sebuah parameter boleh origin=BT hanya jika:
-- [COV-1] key ada di registry dan origin=BT
-- [COV-2] nilai param tersebut tersimpan di artefak resmi grid (`watchlist_bt_param_grid`)
-- [COV-3] param dipakai langsung pada step PICK/GROUPING
-- [COV-4] cutoff score yang dipakai tersimpan (`watchlist_bt_cutoffs_ws`)
-- [COV-5] picks menyimpan bucket_code sehingga bisa diverifikasi terhadap cutoff
+### D) Eval dependency
+Jika parameter dipromosikan karena performa, maka bukti metrik evaluasi wajib ada pada:
+- `watchlist_bt_eval`
+- dan untuk promote ACTIVE juga wajib lolos bukti OOS dari `watchlist_bt_oos_eval_ws`
 
-### Failure reasons (LOCKED)
+## 5) Pick-to-Cutoff Integrity Rule (LOCKED)
+Untuk setiap row pick yang mengklaim bucket tertentu:
+- jika `bucket_code = 'TOP_PICKS'`, maka `score_total >= top_cutoff_score`
+- jika `bucket_code = 'SECONDARY'`, maka `score_total >= secondary_cutoff_score`
 
-Jika salah satu rule COV-1..COV-5 gagal, maka BT coverage dianggap **FAIL** dan harus menghasilkan reason code (scope `BT`, severity `BLOCK`) yang deterministik:
+Jika aturan ini gagal, maka coverage proof gagal.
 
-- `WS_BT_COV_MATRIX_MISSING` — parameter BT tidak ada di matrix ini.
-- `WS_BT_COV_GRID_MISSING` — kolom grid yang dipetakan tidak ada di artefak `watchlist_bt_param_grid`.
-- `WS_BT_COV_CUTOFFS_MISSING` — row cutoff untuk `(param_id, asof_eod_date)` tidak tersedia.
-- `WS_BT_COV_PICK_VIOLATION` — picks melanggar cutoff yang dipersist.
+## 6) Missing Coverage Classes
+Coverage dianggap gagal jika terjadi salah satu kondisi berikut:
+- row coverage matrix tidak ada,
+- `grid_column` tidak ada pada param grid resmi,
+- cutoff yang dibutuhkan tidak ada,
+- picks yang dibutuhkan tidak ada,
+- mapping param BT ke artefak resmi tidak bisa dibuktikan,
+- atau hasil pick melanggar cutoff integrity.
 
----
+Reason code WS yang relevan boleh memakai namespace:
+- `WS_BT_COV_MATRIX_MISSING`
+- `WS_BT_COV_GRID_MISSING`
+- `WS_BT_COV_CUTOFFS_MISSING`
+- `WS_BT_COV_PICK_VIOLATION`
 
-## Coverage Matrix (LOCKED)
+## 7) Acceptance Rule (LOCKED)
+Paramset Weekly Swing yang mengandung parameter `origin = BT` hanya boleh dipromosikan jika:
+- semua parameter BT punya row coverage matrix,
+- row matrix menunjuk artefak resmi yang ada,
+- integrity picks-vs-cutoffs lolos,
+- dan bukti evaluasi/OOS yang diwajibkan juga lolos.
 
-| registry_key | grid_column | used_in_step | rule_ref | audit_proof |
-|---|---|---|---|---|
-| `grouping.top_min_score_q` | `top_min_score_q` | PICK/GROUPING | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` (Quantile grouping TOP) | 1) `watchlist_bt_param_grid.top_min_score_q` (nilai q) 2) `watchlist_bt_cutoffs_ws.top_cutoff_score` (nilai cutoff) 3) `watchlist_bt_picks_ws.bucket_code='TOP_PICKS'` memastikan `score_total >= top_cutoff_score` |
-| `grouping.secondary_min_score_q` | `secondary_min_score_q` | PICK/GROUPING | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` (Quantile grouping SECONDARY) | 1) `watchlist_bt_param_grid.secondary_min_score_q` (nilai q) 2) `watchlist_bt_cutoffs_ws.secondary_cutoff_score` (nilai cutoff) 3) `watchlist_bt_picks_ws.bucket_code='SECONDARY'` memastikan `score_total >= secondary_cutoff_score` (dan < TOP cutoff bila mode eksklusif) |
-
----
-
-## Verification queries (LOCKED)
-
-### V1. Ensure BT params exist in grid
-Untuk setiap BT param di registry:
-- wajib ada kolom grid_column di `watchlist_bt_param_grid`.
-
-### V2. Ensure cutoff scores are persisted
-Untuk setiap `(param_id, asof_eod_date)` yang menghasilkan picks:
-- wajib ada 1 row di `watchlist_bt_cutoffs_ws`.
-
-### V3. Ensure picks satisfy cutoffs
-Untuk setiap pick:
-- jika bucket TOP_PICKS: `score_total >= top_cutoff_score`
-- jika bucket SECONDARY: `score_total >= secondary_cutoff_score`
+## 8) Test Anchor
+Dokumen ini harus dibuktikan minimal oleh test:
+- `WS_CT_016` dengan fixture [`fixtures/bt_coverage_guard_minimal.json`](fixtures/bt_coverage_guard_minimal.json)
 
 ## Next
-### Weekly Swing
-- 15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md
+- [`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`](15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md)

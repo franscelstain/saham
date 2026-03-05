@@ -17,7 +17,7 @@
         {
           "code": "WS_CONFIRM_OK",
           "severity": "INFO",
-          "message": "Snapshot sehat; momentum & volume konfirmasi OK.",
+          "message": "Snapshot valid dan sehat; tidak ada sinyal negatif.",
           "payload": {}
         }
       ]
@@ -43,7 +43,7 @@
         {
           "code": "WS_CONFIRM_NEUTRAL",
           "severity": "INFO",
-          "message": "Tidak ada sinyal tambahan; PLAN tetap berlaku.",
+          "message": "Snapshot valid tetapi tidak memberi sinyal tambahan kuat.",
           "payload": {}
         }
       ]
@@ -53,13 +53,10 @@
       "label": "DELAY",
       "reasons": [
         {
-          "code": "WS_STALE",
-          "severity": "WARN",
-          "message": "Snapshot terlalu tua / tidak sinkron; ulang capture sebelum eksekusi.",
-          "payload": {
-            "max_age_sec": 120,
-            "actual_age_sec": 90
-          }
+          "code": "WS_NO_PRICE",
+          "severity": "BLOCK",
+          "message": "Harga runtime tidak tersedia; jangan eksekusi.",
+          "payload": {}
         }
       ]
     },
@@ -68,10 +65,14 @@
       "label": "DELAY",
       "reasons": [
         {
-          "code": "WS_SNAPSHOT_MISSING",
-          "severity": "WARN",
-          "message": "Tidak ada data snapshot untuk ticker ini; jangan eksekusi.",
-          "payload": {}
+          "code": "WS_INPUT_INCOMPLETE",
+          "severity": "BLOCK",
+          "message": "Field intraday aggregate wajib belum lengkap; jangan eksekusi.",
+          "payload": {
+            "missing_fields": [
+              "turnover_idr"
+            ]
+          }
         }
       ]
     }

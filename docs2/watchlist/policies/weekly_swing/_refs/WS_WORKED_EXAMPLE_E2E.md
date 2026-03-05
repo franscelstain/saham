@@ -3,6 +3,12 @@
 ## Purpose
 Contoh 1 ticker dari input EOD sampai hasil PLAN dan CONFIRM agar implementasi tidak menebak.
 
+## Scope
+Dipakai untuk membantu pembaca mengikuti alur PLAN dan CONFIRM langkah demi langkah.
+
+## Outputs
+- Narasi E2E yang membantu implementasi dan audit.
+
 ## Inputs
 - ticker_id: ABCD
 - trade_date: 2026-02-27
@@ -87,8 +93,8 @@ Hasil:
 ## Step 5 — PLAN Levels
 - `plan_levels.entry_band_pct = 0.01`
 - `entry_ref = close = 1020`
-- `entry_min = 1020 * (1 - 0.01) = 1009.80`
-- `entry_max = 1020 * (1 + 0.01) = 1030.20`
+- `entry_band_low = 1020 * (1 - 0.01) = 1009.80`
+- `entry_band_high = 1020 * (1 + 0.01) = 1030.20`
 
 Stop:
 - `risk.stop_mode = ATR`
@@ -127,8 +133,8 @@ Hasil:
 - `score_total = 0.788846`
 - `group_semantic = SECONDARY`
 - `entry_ref = 1020`
-- `entry_min = 1009.80`
-- `entry_max = 1030.20`
+- `entry_band_low = 1009.80`
+- `entry_band_high = 1030.20`
 - `stop_price = 937.38`
 - `tp1_price = 1143.93`
 - `label = CONFIRMED`
@@ -149,8 +155,8 @@ Dokumen ini dianggap “golden runnable example”. Minimal artefak yang harus d
   - `last_price`, `chg_pct`, `volume_shares`, `turnover_idr`, `captured_at`
 
 ### C) CONFIRM output (runtime)
-- Output mengikuti schema di `WS_RUNTIME_OUTPUT_SCHEMA.md`.
-- Contoh output referensi ada di `WS_RUNTIME_OUTPUT_EXAMPLES.md`.
+- Output mengikuti schema di [`WS_RUNTIME_OUTPUT_SCHEMA.md`](WS_RUNTIME_OUTPUT_SCHEMA.md).
+- Contoh output referensi ada di [`WS_RUNTIME_OUTPUT_EXAMPLES.md`](WS_RUNTIME_OUTPUT_EXAMPLES.md).
 
 Catatan (LOCKED):
 - CONFIRM memakai **intraday aggregate snapshot**, **bukan ladder**.

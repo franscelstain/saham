@@ -1,5 +1,17 @@
 # WS Runtime Output Schema (LOCKED)
 
+## Purpose
+Schema referensi output runtime Weekly Swing.
+
+## Scope
+Mengunci bentuk payload output PLAN/CONFIRM yang dibaca API/UI/audit.
+
+## Inputs
+- Engineer serializer/API/UI, reviewer, dan auditor.
+
+## Outputs
+- Kontrak schema output runtime Weekly Swing.
+
 Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 
 > **Scope (LOCKED):** Dokumen ini mendefinisikan **schema output API/UI** (response payload) untuk ditampilkan ke user.
@@ -159,6 +171,7 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 - `meta.checked_at`: waktu sistem menghasilkan confirm result.
 - `meta.snapshot_ts`: timestamp snapshot input.
 - `meta.snapshot_age_sec`: `checked_at - snapshot_ts` (detik).
+- Jika `meta.snapshot_age_sec > snapshot_max_age_sec (LOCKED: 900)`, maka kondisi stale bersifat snapshot-level dan seluruh `items[]` yang dikembalikan wajib berlabel `DELAY` dengan reason `WS_STALE`.
 - `items[]`:
   - `ticker`: kode ticker yang ada di PLAN.
   - `label`: salah satu:
@@ -260,7 +273,9 @@ NO_TRADE adalah kondisi ketika **tidak ada** item yang berhasil lolos hingga tah
 ### 1) Output API / UI (LOCKED)
 Jika NO_TRADE terjadi, output PLAN API/UI **wajib** memenuhi:
 - `meta.fail_code = "NO_TRADE"`
-- `meta.fail_reason_codes` **wajib** memuat `WS_NO_TRADE_ALL_FILTERED`
+- `meta.fail_reason_codes` **wajib** berisi **tepat satu** reason NO_TRADE:
+  - `["WS_NO_TRADE_MIN_ELIGIBLE"]` jika `eligible_total < ws.filters.min_eligible_count`
+  - `["WS_NO_TRADE_ALL_FILTERED"]` jika `eligible_total >= ws.filters.min_eligible_count` namun tidak ada item yang lolos untuk ditampilkan
 - `items` **wajib** `[]` (kosong). Tidak boleh mengirim item `HIDE`/`WATCH_ONLY`/`AVOID` sebagai “pengganti”.
 - `meta.plan_hash` dihitung dari canonical payload kosong `[]` sesuai aturan `3.2.2 Canonicalization for meta.plan_hash`.
 
@@ -279,4 +294,3 @@ Nilai referensi (LOCKED) untuk payload `[]`:
 Aturan ini **mengikat** kalimat di `3.2.2`:
 - “Jika meta.fail_code = NO_TRADE maka items wajib []”
 - sehingga tidak ada mode/variant lain untuk NO_TRADE.
-

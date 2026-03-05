@@ -1,5 +1,17 @@
 # WS Contract Tests Spec (LOCKED)
 
+## Purpose
+Spesifikasi contract tests referensi yang harus dipenuhi implementasi Weekly Swing.
+
+## Scope
+Menjabarkan tujuan, input, prosedur, dan assert minimum per test kontrak.
+
+## Inputs
+- Engineer test suite, reviewer release, dan auditor kualitas implementasi.
+
+## Outputs
+- Daftar referensi contract tests yang harus diterjemahkan menjadi test nyata.
+
 Dokumen ini mendefinisikan contract tests yang WAJIB dipenuhi oleh implementasi policy WEEKLY_SWING (WS).
 Tidak ada interpretasi bebas. Jika hasil berbeda dari spesifikasi ini, implementasi dianggap salah.
 
@@ -7,15 +19,15 @@ Tidak ada interpretasi bebas. Jika hasil berbeda dari spesifikasi ini, implement
 - PLAN: output watchlist deterministik dari data EOD as-of date tertentu untuk trade_date berikutnya.
 - CONFIRM: overlay runtime berbasis snapshot intraday yang TIDAK BOLEH mengubah PLAN.
 - Paramset: konfigurasi policy WS sesuai contract `../04_WS_PARAMSET_JSON_CONTRACT.md`.
-- Plan Hash: hash deterministik PLAN sesuai `../07_WS_REASON_CODES_AND_HASH.md`.
+- Plan Hash: hash deterministik PLAN sesuai [`WS_RUNTIME_OUTPUT_SCHEMA.md`](WS_RUNTIME_OUTPUT_SCHEMA.md) bagian `3.2.2 Canonicalization for meta.plan_hash`.
 
 ## 1) Test: PLAN Determinism (LOCKED)
 ### Tujuan
 PLAN yang sama (input EOD sama + paramset sama) harus menghasilkan output identik byte-to-byte (atau identik secara canonical JSON).
 
 ### Input
-- EOD dataset as-of date D (fixture A).
-- Paramset WS (fixture A paramset).
+- EOD dataset as-of date D dari fixture `../fixtures/PLAN_FIXTURE_A_TIES_V1.json`.
+- Paramset WS dari fixture `../fixtures/paramset_valid.json`.
 
 ### Prosedur
 1. Jalankan PLAN (run 1) → simpan `plan_output_1` dan `plan_hash_1`.
@@ -39,8 +51,8 @@ PLAN yang sama (input EOD sama + paramset sama) harus menghasilkan output identi
 CONFIRM tidak boleh mengubah PLAN, termasuk ranking, skor, grouping, dan level harga.
 
 ### Input
-- `plan_output` dari fixture A.
-- snapshot runtime (fixture A confirm snapshot).
+- `plan_output` dari fixture `../fixtures/confirm_immutability_pair.json`.
+- snapshot runtime dari fixture yang sama (`confirm_input`).
 
 ### Prosedur
 1. Ambil `plan_hash_before` dari `plan_output`.
@@ -57,8 +69,8 @@ CONFIRM tidak boleh mengubah PLAN, termasuk ranking, skor, grouping, dan level h
 CONFIRM harus menghasilkan `label` dan `reason codes` yang tepat untuk kondisi runtime yang sudah didefinisikan di `../10_WS_CONFIRM_OVERLAY.md`.
 
 ### Input (fixtures)
-- `plan_output` dari fixture A (minimal 1 item dengan `levels.entry_ref` valid).
-- Snapshot fixture yang dapat diatur: `captured_at`, `last_price`.
+- `plan_output` dari fixture `../fixtures/confirm_immutability_pair.json` (minimal 1 item dengan `levels.entry_ref` valid).
+- Snapshot fixture yang dapat diatur dari `../fixtures/confirm_snapshots_two.json` atau `../fixtures/confirm_payload_with_orderbook_fields.json`.
 
 ### Cases & Assert (semua wajib, per-case)
 1) **Snapshot stale**
@@ -119,10 +131,10 @@ Membuktikan CONFIRM **tidak** melakukan writeback ke persistence PLAN (read-only
 
 ## 3) Test: Paramset Validator Coverage (LOCKED)
 ### Tujuan
-Semua parameter yang dinyatakan `in_10=Y` di `WS_PARAMETER_COVERAGE_MATRIX.md` harus divalidasi oleh validator spec `../06_WS_PARAMSET_VALIDATOR_SPEC.md`.
+Semua parameter yang dinyatakan `in_10=Y` di [`WS_PARAMETER_COVERAGE_MATRIX.md`](WS_PARAMETER_COVERAGE_MATRIX.md) harus divalidasi oleh validator spec `../06_WS_PARAMSET_VALIDATOR_SPEC.md`.
 
 ### Prosedur
-1. Parse tabel `WS_PARAMETER_COVERAGE_MATRIX.md`.
+1. Parse tabel [`WS_PARAMETER_COVERAGE_MATRIX.md`](WS_PARAMETER_COVERAGE_MATRIX.md).
 2. Ambil semua `param_key` dengan `in_10=Y`.
 3. Untuk setiap `param_key`, pastikan ada aturan validasi eksplisit di `../06_WS_PARAMSET_VALIDATOR_SPEC.md`:
    - required/optional status
@@ -155,5 +167,5 @@ Implementasi hash canonical harus menghasilkan SHA-256 yang sama persis dengan t
   - order_by sesuai `hash_contract.order_by`
 
 ## 5) Test: Golden Fixtures E2E (LOCKED)
-Lihat `WS_GOLDEN_FIXTURES.md` untuk definisi fixture A/B/C dan expected outputs.
-Assert: output PLAN dan CONFIRM harus match expected.
+Lihat [`WS_GOLDEN_FIXTURES.md`](WS_GOLDEN_FIXTURES.md) untuk inventory fixture resmi dan tujuan masing-masing.
+Assert: output PLAN dan CONFIRM harus match expected pada fixture yang relevan.

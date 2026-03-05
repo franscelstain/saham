@@ -3,6 +3,15 @@
 ## Purpose
 Mengunci perilaku sistem saat kondisi invalid, stale, atau kualitas data buruk agar implementasi, output, dan UI tidak berbeda-beda.
 
+## Scope
+Pembaca memakai matrix ini saat memetakan detection -> status -> output/UI -> reason code.
+
+## Inputs
+- Condition/failure states dari dokumen utama dan runtime status yang relevan.
+
+## Outputs
+- Matriks perilaku sistem yang tidak boleh drift.
+
 ## Matrix
 
 | Condition | Detection Source | Severity | System Behavior | Runtime Status | UI / Output | Reason Code |

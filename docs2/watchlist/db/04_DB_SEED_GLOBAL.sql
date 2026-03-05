@@ -19,14 +19,4 @@ INSERT INTO watchlist_fail_codes (fail_code, scope, severity, description_id) VA
 ('CONFIRM_ABORT_DB_WRITE_FAILED','CONFIRM','ERROR','Gagal menulis hasil CONFIRM ke database.');
 
 -- B) REASON CODES (global; per policy_code)
-CREATE TABLE IF NOT EXISTS watchlist_reason_codes (
-  policy_code VARCHAR(16) NOT NULL,
-  reason_code VARCHAR(64) NOT NULL,
-  scope ENUM('PLAN','CONFIRM') NOT NULL,
-  severity ENUM('INFO','WARN','BLOCK') NOT NULL,
-  short_id VARCHAR(32) NOT NULL,
-  description_id TEXT NOT NULL,
-  description_en TEXT NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (policy_code, reason_code)
-) ENGINE=InnoDB;
+-- NOTE: Struktur tabel dibuat di 05_DB_DDL_MARIADB.sql (LOCKED). File seed hanya INSERT.

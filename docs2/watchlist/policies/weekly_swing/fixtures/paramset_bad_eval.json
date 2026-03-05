@@ -143,7 +143,7 @@
   },
   "risk": {
     "min_atr14_pct": {
-      "value": 1.0,
+      "value": 0.02,
       "origin": "MAN",
       "status": "ACTIVE",
       "bt_target": true,
@@ -154,7 +154,7 @@
       ]
     },
     "max_atr14_pct": {
-      "value": 8.0,
+      "value": 0.12,
       "origin": "MAN",
       "status": "ACTIVE",
       "bt_target": true,
@@ -165,7 +165,7 @@
       ]
     },
     "atr_ideal_low": {
-      "value": 2.0,
+      "value": 0.035,
       "origin": "MAN",
       "status": "ACTIVE",
       "bt_target": true,
@@ -175,7 +175,7 @@
       ]
     },
     "atr_ideal_high": {
-      "value": 4.0,
+      "value": 0.075,
       "origin": "MAN",
       "status": "ACTIVE",
       "bt_target": true,

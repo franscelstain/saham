@@ -1,21 +1,45 @@
 # _shared — Index
 
+> **Status:** LOCKED (Normative)
+> **Doc Role:** Shared policy contracts index
+
+
+## Purpose
+Entry point kontrak global yang berlaku lintas policy watchlist.
+
+## Scope
+Harus dibaca sebelum masuk ke policy spesifik agar aturan global tidak drift.
+
+## Inputs
+- Engineer, reviewer, AI, dan auditor lintas policy.
+
+## Outputs
+- Daftar kontrak global yang wajib dipatuhi semua policy.
+
 ## Policy yang tersedia
-- `weekly_swing/`
+- [`../weekly_swing/`](../weekly_swing/README.md)
 
-## Urutan baca global (_shared/01..05)
-Baca berurutan dari 01 sampai 06:
+## Urutan baca global (_shared/01..07)
+Baca berurutan dari 01 sampai 07:
 
-- `01_POLICY_FRAMEWORK_OVERVIEW.md` — Gambaran kontrak global policy watchlist dan cara membaca dokumen.
-- `02_PARAMSET_CONTRACT_GLOBAL.md` — Kontrak global paramset: field wajib, provenance BT/DET/MAN, hash_contract.
-- `03_VALIDATOR_SPEC_GLOBAL.md` — Aturan validator global: konsistensi kontrak, anti-placeholder, anti-drift.
-- `04_CONTRACT_TESTS_GLOBAL.md` — Daftar test global: anti-drift schema, dictionary codes, hash reproducibility.
-- `05_EXECUTION_CANONICAL_GLOBAL.md` — Aturan eksekusi global: PLAN snapshot EOD vs CONFIRM overlay runtime.
-- `06_SCHEMA_PARITY_RULES.md` — Kontrak anti-drift: schema doc ↔ DDL ↔ repository columns.
+- [`01_POLICY_FRAMEWORK_OVERVIEW.md`](01_POLICY_FRAMEWORK_OVERVIEW.md) — gambaran kontrak global policy watchlist dan cara membaca dokumen.
+- [`02_PARAMSET_CONTRACT_GLOBAL.md`](02_PARAMSET_CONTRACT_GLOBAL.md) — kontrak global paramset: field wajib, provenance BT/DET/MAN, hash_contract.
+- [`03_VALIDATOR_SPEC_GLOBAL.md`](03_VALIDATOR_SPEC_GLOBAL.md) — aturan validator global: konsistensi kontrak, anti-drift, dan minimum failure classes.
+- [`04_CONTRACT_TESTS_GLOBAL.md`](04_CONTRACT_TESTS_GLOBAL.md) — test global minimum + checklist artefak wajib per policy.
+- [`05_EXECUTION_CANONICAL_GLOBAL.md`](05_EXECUTION_CANONICAL_GLOBAL.md) — aturan eksekusi global: PLAN snapshot EOD vs CONFIRM overlay runtime.
+- [`06_SCHEMA_PARITY_RULES.md`](06_SCHEMA_PARITY_RULES.md) — kontrak anti-drift: schema doc ↔ DDL ↔ repository columns.
+- [`07_CONTRACT_FAILURE_CODES_LOCKED.md`](07_CONTRACT_FAILURE_CODES_LOCKED.md) — kamus code kegagalan deterministik untuk validator/test layer.
+
+## Start here
+Kalau baru masuk ke repo ini:
+1. baca `../README.md`
+2. baca `../../policy.md`
+3. baru masuk ke `_shared/01...07`
+4. setelah itu masuk ke policy spesifik
 
 ## Aturan referensi dokumen (LOCKED)
 - Referensi dokumen **wajib** memakai **nama file real** yang **benar-benar ada** di repo.
-- **Dilarang** memakai placeholder atau token contoh, termasuk tetapi tidak terbatas pada: `01_...`, `NN_*`, token contoh berbentuk "<...>", `docs/.../01_...`, atau variasinya.
+- **Dilarang** memakai placeholder atau token contoh, termasuk tetapi tidak terbatas pada: `01_…`, `NN_*`, token contoh berbentuk tiga titik/penanda dummy, `docs … 01 …`, atau variasinya.
 - Jika dokumen yang dirujuk belum ada: **hapus referensi** atau **buat file-nya dulu**. Jangan meninggalkan referensi “contoh”.
 
 ## Definisi status dokumen & perubahan

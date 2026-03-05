@@ -6,9 +6,7 @@
   "items": [
     {
       "ticker_code": "AAA",
-      "last": 100.5,
       "chg_pct": 0.5,
-      "volume": 1800000,
       "turnover_idr": 1800000000,
       "bid1_price": 100.4,
       "ask1_price": 100.6,
@@ -26,7 +24,9 @@
             1200
           ]
         ]
-      }
+      },
+      "last_price": 100.5,
+      "volume_shares": 1800000
     }
   ],
   "_fixture_expected": {

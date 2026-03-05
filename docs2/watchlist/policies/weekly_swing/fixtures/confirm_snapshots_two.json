@@ -9,10 +9,10 @@
       "items": [
         {
           "ticker_code": "AAA",
-          "last": 101.0,
           "chg_pct": 1.0,
-          "volume": 1200000,
-          "turnover_idr": 1200000000
+          "turnover_idr": 1200000000,
+          "last_price": 101.0,
+          "volume_shares": 1200000
         }
       ]
     },
@@ -22,10 +22,10 @@
       "items": [
         {
           "ticker_code": "AAA",
-          "last": 100.5,
           "chg_pct": 0.5,
-          "volume": 1800000,
-          "turnover_idr": 1800000000
+          "turnover_idr": 1800000000,
+          "last_price": 100.5,
+          "volume_shares": 1800000
         }
       ]
     }

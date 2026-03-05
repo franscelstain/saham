@@ -38,7 +38,7 @@ WS wajib memiliki blok berikut:
 - plan_levels (entry_mode, entry_band_pct)
 - no_trade (min_eligible_count, no_trade_hides_all)
 - confirm_overlay (snapshot_max_age_sec, max_drift_from_entry_pct)
-- eval (min_trades_oos, min_trades, min_days_covered, min_p25_ret_net_top, min_month_win_rate_min, min_month_avg_ret_net_min)  <-- NEW
+- eval (min_trades_oos, min_trades, min_days_covered, min_p25_ret_net_top, min_month_win_rate_min, min_month_avg_ret_net_min)
 - hash_contract (order_by, scales, null_handling)
 
 ### 3) Tambahan wajib deterministik (anti drift)

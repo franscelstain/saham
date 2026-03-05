@@ -54,3 +54,12 @@ Kriteria PASS harus mengikuti:
 - [ ] Export CSV atau screenshot sudah tersimpan
 - [ ] SQL query yang dipakai dicantumkan
 - [ ] Paramset yang dipromote direferensikan (`param_id`)
+
+## Scope
+Dipakai untuk guard promote dan audit kualitas riset.
+
+## Inputs
+- Evidence OOS yang dikumpulkan dari proses riset/backtest.
+
+## Outputs
+- Patokan evidence OOS yang dianggap memadai.

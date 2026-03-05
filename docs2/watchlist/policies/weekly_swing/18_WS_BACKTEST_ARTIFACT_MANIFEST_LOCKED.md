@@ -1,51 +1,101 @@
-# WS Backtest Artifact Manifest (LOCKED)
+# 18 — WS Backtest Artifact Manifest (LOCKED)
 
-## Purpose (LOCKED)
-Dokumen ini adalah daftar resmi artefak (tabel/file) yang dianggap EXIST dan DIPAKAI
-oleh backtest & calibration.
+## Purpose
+Menjadi allowlist resmi untuk artefak backtest, calibration, dan proof yang dianggap **exist**, **valid**, dan **boleh dirujuk** oleh dokumen Weekly Swing.
 
-Jika sebuah dokumen lain menyebut artefak yang tidak ada di manifest ini,
-maka salah satu wajib terjadi:
-- artefak itu ditambahkan ke manifest + schema, atau
-- penyebutan itu dipindahkan ke Deprecation Ledger (non-scope) dan dinyatakan tidak dipakai.
+Dokumen ini mencegah drift akibat penyebutan tabel/file/artefak yang tidak resmi atau tidak lagi dipakai.
 
-Dokumen ini mencegah drift akibat referensi artefak “hantu”.
+## Scope
+Dokumen ini berlaku untuk:
+- artefak tabel backtest resmi,
+- artefak proof produksi resmi,
+- dan dokumen pengendali yang sah untuk artefak tersebut.
+
+Dokumen ini tidak memasukkan fixture test sebagai artefak produksi.
+Dokumen ini juga tidak memutihkan artefak lama yang belum masuk allowlist.
+
+## Inputs
+- desain backtest WS,
+- kebutuhan calibration/evidence/promote,
+- dan dokumen proof lintas sistem.
+
+## Outputs
+- daftar artefak resmi yang boleh dirujuk,
+- klasifikasi artefak,
+- aturan referensi silang,
+- aturan penanganan artefak non-scope.
 
 ## Prerequisites
-### Weekly Swing
-17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
+- [`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`](17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md)
+- [`19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md`](19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md)
 
----
+## 1) Official WS Backtest Tables (LOCKED)
+Tabel berikut adalah artefak backtest resmi Weekly Swing:
+1. `watchlist_bt_param_grid`
+2. `watchlist_bt_eval`
+3. `watchlist_bt_picks_ws`
+4. `watchlist_bt_universe_ws`
+5. `watchlist_bt_cutoffs_ws`
+6. `watchlist_bt_oos_eval_ws`
 
-## A) Official WS backtest tables (LOCKED)
-1) watchlist_bt_param_grid
-2) watchlist_bt_eval
-3) watchlist_bt_picks_ws
-4) watchlist_bt_universe_ws
-5) watchlist_bt_cutoffs_ws
-6) watchlist_bt_oos_eval_ws
+Aturan:
+- nama tabel harus dipakai persis seperti di atas,
+- penyebutan alias/deskripsi boleh, tapi nama artefak resminya tidak boleh berubah,
+- dan artefak lain tidak boleh dianggap resmi hanya karena “mirip” fungsinya.
 
-Catatan audit (wajib):
-- watchlist_bt_picks_ws wajib menyimpan bucket_code untuk membuktikan hasil grouping terhadap cutoff score.
+## 2) Official Production Proof Artifact (LOCKED)
+Artefak proof produksi resmi yang dibutuhkan untuk equivalence adalah:
+1. export PLAN universe snapshot dengan shape mengikuti:
+   - [`db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`](db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md)
 
-Catatan (LOCKED):
-- watchlist_bt_oos_eval_ws wajib ada untuk promote paramset menjadi ACTIVE (lihat `17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`).
+Catatan:
+- ini adalah **shape/contract artefak proof**, bukan nama tabel fisik baku,
+- implementasi boleh mengekspor ke file JSON/CSV atau bentuk lain selama shape-nya identik terhadap kontrak schema export resmi.
 
----
+## 3) Official Supporting Governance Docs (LOCKED)
+Dokumen resmi yang mengendalikan artefak di atas adalah:
+- [`12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md`](12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md)
+- [`14_WS_BT_COVERAGE_MATRIX_LOCKED.md`](14_WS_BT_COVERAGE_MATRIX_LOCKED.md)
+- [`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`](15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md)
+- [`16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`](16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md)
+- [`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`](17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md)
+- [`_refs/WS_OOS_EVIDENCE_GOLDEN.md`](_refs/WS_OOS_EVIDENCE_GOLDEN.md)
+- [`db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`](db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md)
 
-## B) Official production/PLAN artifacts required for proof (LOCKED)
-1) PLAN universe snapshot export (format: db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md)
+## 4) Explicit Non-members (LOCKED)
+Artefak berikut **bukan** anggota manifest ini kecuali kelak ditambahkan secara eksplisit:
+- fixtures pada folder [`fixtures/`](fixtures/README.md)
+- examples pada folder [`examples/`](examples/README.md)
+- ledger/history notes
+- export ad-hoc yang tidak punya kontrak resmi
+- tabel/folder/file yang hanya pernah muncul di diskusi lama
 
----
+## 5) Reference Rule (LOCKED)
+Jika dokumen Weekly Swing menyebut artefak sebagai:
+- wajib,
+- resmi,
+- dipakai promote,
+- dipakai proof,
+- atau dipakai calibration,
 
-## C) Official docs that govern these artifacts (LOCKED)
-- 12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md
-- 14_WS_BT_COVERAGE_MATRIX_LOCKED.md
-- 15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md
-- 16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md
-- 17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
-- _refs/WS_OOS_EVIDENCE_GOLDEN.md
+maka artefak itu wajib memenuhi salah satu dari dua kondisi berikut:
+1. tercantum pada bagian `Official WS Backtest Tables`, atau
+2. tercantum pada bagian `Official Production Proof Artifact`.
+
+Jika tidak, maka dokumen tersebut melakukan **artifact reference violation**.
+
+## 6) Relationship with Deprecation Ledger
+Jika sebuah artefak pernah disebut tetapi tidak ada di manifest ini, maka default status-nya adalah:
+- non-scope / deprecated
+
+dan artefak tersebut harus dicatat pada:
+- [`19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md`](19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md)
+
+## 7) Acceptance Rule (LOCKED)
+Sebuah patch Weekly Swing hanya dianggap bersih secara artefak jika:
+- semua artefak wajib berada di manifest ini,
+- tidak ada artefak “hantu” yang disebut sebagai resmi,
+- dan semua artefak non-scope tercatat pada ledger.
 
 ## Next
-### Weekly Swing
-- 19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md
+- [`19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md`](19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md)

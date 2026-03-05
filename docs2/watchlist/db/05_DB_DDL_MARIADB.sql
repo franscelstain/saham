@@ -1,6 +1,31 @@
 -- 05_DB_DDL_MARIADB.sql
 -- DDL lengkap tabel global Watchlist (MariaDB 10.4)
--- Catatan: ALTER yang pernah dibahas sudah diinkorporasi langsung ke CREATE TABLE ini.
+-- Prinsip:
+-- - Dictionary tables dibuat lebih dulu agar FK fail_code valid.
+-- - PLAN items append-only.
+-- - PLAN headers immutable kecuali deaktivasi supersede satu arah pada is_active.
+
+-- 0) Dictionary tables
+CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
+  fail_code VARCHAR(64) NOT NULL,
+  scope ENUM('PLAN','CONFIRM','BOTH') NOT NULL,
+  severity ENUM('INFO','WARN','ERROR') NOT NULL,
+  description_id TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (fail_code)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS watchlist_reason_codes (
+  policy_code VARCHAR(16) NOT NULL,
+  reason_code VARCHAR(64) NOT NULL,
+  scope ENUM('PLAN','CONFIRM') NOT NULL,
+  severity ENUM('INFO','WARN','BLOCK') NOT NULL,
+  short_id VARCHAR(32) NOT NULL,
+  description_id TEXT NOT NULL,
+  description_en TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (policy_code, reason_code)
+) ENGINE=InnoDB;
 
 -- 1) watchlist_param_sets
 CREATE TABLE IF NOT EXISTS watchlist_param_sets (
@@ -37,7 +62,8 @@ CREATE TABLE IF NOT EXISTS watchlist_plan_runs (
   PRIMARY KEY (plan_run_id),
   KEY IDX_plan_active (policy_code, plan_trade_date, is_active),
   KEY IDX_plan_asof (policy_code, asof_eod_date),
-  CONSTRAINT FK_plan_paramset FOREIGN KEY (param_set_id) REFERENCES watchlist_param_sets(param_set_id)
+  CONSTRAINT FK_plan_paramset FOREIGN KEY (param_set_id) REFERENCES watchlist_param_sets(param_set_id),
+  CONSTRAINT FK_plan_fail_code FOREIGN KEY (fail_code) REFERENCES watchlist_fail_codes(fail_code)
 ) ENGINE=InnoDB;
 
 -- 3) watchlist_plan_items
@@ -77,7 +103,8 @@ CREATE TABLE IF NOT EXISTS watchlist_confirm_checks (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (confirm_check_id),
   KEY IDX_confirm_plan_run (plan_run_id, checked_at),
-  CONSTRAINT FK_confirm_planrun FOREIGN KEY (plan_run_id) REFERENCES watchlist_plan_runs(plan_run_id)
+  CONSTRAINT FK_confirm_planrun FOREIGN KEY (plan_run_id) REFERENCES watchlist_plan_runs(plan_run_id),
+  CONSTRAINT FK_confirm_fail_code FOREIGN KEY (fail_code) REFERENCES watchlist_fail_codes(fail_code)
 ) ENGINE=InnoDB;
 
 -- 5) watchlist_confirm_items
@@ -93,7 +120,6 @@ CREATE TABLE IF NOT EXISTS watchlist_confirm_items (
   KEY IDX_confirm_items_check_ticker (confirm_check_id, ticker_id),
   CONSTRAINT FK_confirm_items_check FOREIGN KEY (confirm_check_id) REFERENCES watchlist_confirm_checks(confirm_check_id)
 ) ENGINE=InnoDB;
-
 
 -- 6) watchlist_confirm_snapshots (manual intraday snapshot source for CONFIRM)
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
@@ -113,25 +139,20 @@ CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshots (
 
 -- 7) watchlist_confirm_snapshot_items (manual intraday snapshot items)
 CREATE TABLE IF NOT EXISTS watchlist_confirm_snapshot_items (
-  snapshot_item_id  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  snapshot_id       BIGINT UNSIGNED NOT NULL,
-
-  ticker_code       VARCHAR(16) NOT NULL,
-  ticker_id         BIGINT UNSIGNED NULL,
-
-  last_price        INT UNSIGNED NOT NULL,
-  chg_pct           DECIMAL(8,4) NOT NULL,
-  volume_shares     BIGINT UNSIGNED NOT NULL,
-  turnover_idr      BIGINT UNSIGNED NOT NULL,
-
-  item_hash         CHAR(64) NULL,
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
+  snapshot_item_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  snapshot_id BIGINT UNSIGNED NOT NULL,
+  ticker_code VARCHAR(16) NOT NULL,
+  ticker_id BIGINT UNSIGNED NULL,
+  last_price INT UNSIGNED NOT NULL,
+  chg_pct DECIMAL(8,4) NOT NULL,
+  volume_shares BIGINT UNSIGNED NOT NULL,
+  turnover_idr BIGINT UNSIGNED NOT NULL,
+  item_hash CHAR(64) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (snapshot_item_id),
   UNIQUE KEY uq_snap_ticker (snapshot_id, ticker_code),
   KEY idx_item_snap (snapshot_id),
   KEY idx_item_ticker (ticker_code),
-
   CONSTRAINT fk_wcs_items_snapshot
     FOREIGN KEY (snapshot_id)
     REFERENCES watchlist_confirm_snapshots(snapshot_id)
@@ -169,25 +190,81 @@ BEGIN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_snapshots is append-only (DELETE blocked)';
 END//
 
+-- PLAN headers: only one-way deactivation for supersede is allowed.
+CREATE TRIGGER trg_wpr_guard_update
+BEFORE UPDATE ON watchlist_plan_runs
+FOR EACH ROW
+BEGIN
+  IF NOT (
+    OLD.is_active = 'Yes' AND
+    NEW.is_active = 'No' AND
+    OLD.policy_code = NEW.policy_code AND
+    OLD.policy_version = NEW.policy_version AND
+    OLD.asof_eod_date = NEW.asof_eod_date AND
+    OLD.plan_trade_date = NEW.plan_trade_date AND
+    OLD.param_set_id = NEW.param_set_id AND
+    OLD.run_status = NEW.run_status AND
+    OLD.data_batch_hash = NEW.data_batch_hash AND
+    OLD.hash_count = NEW.hash_count AND
+    OLD.missing_required_count = NEW.missing_required_count AND
+    OLD.processed_count = NEW.processed_count AND
+    OLD.eligible_count = NEW.eligible_count AND
+    ((OLD.supersedes_plan_run_id <=> NEW.supersedes_plan_run_id)) AND
+    ((OLD.fail_code <=> NEW.fail_code)) AND
+    OLD.run_metrics_json = NEW.run_metrics_json AND
+    OLD.created_at = NEW.created_at
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_plan_runs only allows controlled is_active Yes->No supersede update';
+  END IF;
+END//
+
+CREATE TRIGGER trg_wpr_no_delete
+BEFORE DELETE ON watchlist_plan_runs
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_plan_runs is immutable-history (DELETE blocked)';
+END//
+
+CREATE TRIGGER trg_wpi_no_update
+BEFORE UPDATE ON watchlist_plan_items
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_plan_items is append-only (UPDATE blocked)';
+END//
+
+CREATE TRIGGER trg_wpi_no_delete
+BEFORE DELETE ON watchlist_plan_items
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_plan_items is append-only (DELETE blocked)';
+END//
+
+CREATE TRIGGER trg_wcc_no_update
+BEFORE UPDATE ON watchlist_confirm_checks
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_checks is append-only (UPDATE blocked)';
+END//
+
+CREATE TRIGGER trg_wcc_no_delete
+BEFORE DELETE ON watchlist_confirm_checks
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_checks is append-only (DELETE blocked)';
+END//
+
+CREATE TRIGGER trg_wci_no_update
+BEFORE UPDATE ON watchlist_confirm_items
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_items is append-only (UPDATE blocked)';
+END//
+
+CREATE TRIGGER trg_wci_no_delete
+BEFORE DELETE ON watchlist_confirm_items
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'watchlist_confirm_items is append-only (DELETE blocked)';
+END//
+
 DELIMITER ;
-
-CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
-  fail_code VARCHAR(64) NOT NULL,
-  scope ENUM('PLAN','CONFIRM','BOTH') NOT NULL,
-  severity ENUM('INFO','WARN','ERROR') NOT NULL,
-  description_id TEXT NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (fail_code)
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS watchlist_reason_codes (
-  policy_code VARCHAR(16) NOT NULL,
-  reason_code VARCHAR(64) NOT NULL,
-  scope ENUM('PLAN','CONFIRM') NOT NULL,
-  severity ENUM('INFO','WARN','BLOCK') NOT NULL,
-  short_id VARCHAR(32) NOT NULL,
-  description_id TEXT NOT NULL,
-  description_en TEXT NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (policy_code, reason_code)
-) ENGINE=InnoDB;

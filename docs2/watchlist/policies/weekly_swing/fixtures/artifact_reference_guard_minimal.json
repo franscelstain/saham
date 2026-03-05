@@ -1,20 +1,27 @@
 {
-  "fixture_id": "WS_ARTIFACT_REFERENCE_GUARD_MINIMAL_V2",
+  "fixture_id": "WS_ARTIFACT_REFERENCE_GUARD_MINIMAL_V3",
   "policy_code": "WS",
   "base_path_locked": "watchlist/policies/weekly_swing/fixtures/",
   "rules_locked": [
-    "Setiap referensi artifact wajib ada sebagai file/record di allowlist.",
+    "Referensi artifact produksi wajib ada pada manifest resmi WS atau pada daftar fixture evidence yang eksplisit di file ini.",
     "Artifact name wajib sesuai allowlist dan scope policy.",
-    "Jika artifact mengandung param_id, maka param_id wajib match dengan paramset/fixture yang mengklaimnya.",
+    "Jika artifact mengandung param_id, maka param_id wajib match dengan paramset/evidence yang mengklaimnya.",
     "Violation adalah BLOCK: promosi paramset origin=BT harus ditolak."
   ],
-  "allowlist": [
+  "allowlist_production_artifacts": [
     "watchlist_bt_param_grid",
     "watchlist_bt_eval",
-    "watchlist_bt_dataset_ws",
-    "coverage_matrix_export.json",
+    "watchlist_bt_picks_ws",
+    "watchlist_bt_universe_ws",
+    "watchlist_bt_cutoffs_ws",
+    "watchlist_bt_oos_eval_ws",
+    "PLAN_UNIVERSE_SNAPSHOT_EXPORT"
+  ],
+  "allowlist_fixture_evidence_files": [
+    "bt_coverage_guard_minimal.json",
     "bt_eval_metrics_minimal.json",
-    "bt_oos_proof_minimal.json"
+    "bt_oos_proof_minimal.json",
+    "universe_equivalence_sample.json"
   ],
   "cases": [
     {
@@ -29,11 +36,12 @@
           "param_id": 1
         },
         {
-          "name": "watchlist_bt_dataset_ws",
-          "asof_eod_date": "2026-02-13"
+          "name": "watchlist_bt_oos_eval_ws",
+          "param_id": 1
         },
         {
-          "name": "coverage_matrix_export.json"
+          "name": "PLAN_UNIVERSE_SNAPSHOT_EXPORT",
+          "asof_eod_date": "2026-02-13"
         },
         {
           "name": "bt_eval_metrics_minimal.json",
@@ -82,7 +90,7 @@
           "param_id": 1
         },
         {
-          "name": "some_random_file.csv"
+          "name": "watchlist_bt_dataset_ws"
         }
       ],
       "expected": {
@@ -105,7 +113,7 @@
           "param_id": 999
         },
         {
-          "name": "coverage_matrix_export.json"
+          "name": "bt_coverage_guard_minimal.json"
         }
       ],
       "expected": {
@@ -119,6 +127,6 @@
   ],
   "_fixture_expected": {
     "should_pass": true,
-    "notes": "V2: cases[] + reason_codes + cf_code. Semua artifact names harus ada di allowlist."
+    "notes": "V3: memisahkan artefak produksi resmi vs file fixture evidence agar tidak drift dengan manifest LOCKED."
   }
 }

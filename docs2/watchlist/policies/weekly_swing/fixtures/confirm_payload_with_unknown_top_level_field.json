@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "fixture_name": "confirm_payload_with_unknown_top_level_field.json",
+    "purpose": "Top-level unknown field must FAIL (INVALID_SCHEMA_DRIFT) per CONFIRM contract strictness.",
+    "expected": "FAIL",
+    "expected_reason_code": "INVALID_SCHEMA_DRIFT"
+  },
+  "snapshot_at": "2026-03-05T09:15:00+07:00",
+  "ticker": "BBCA",
+  "last_price": 9500,
+  "volume": 123456,
+  "unknown_top_level": "SHOULD_TRIGGER_FAILURE"
+}

@@ -31,15 +31,29 @@ Aturan yang dikunci:
 
 ## LOCKED — NO_TRADE Gate (non-ambiguous)
 
-NO_TRADE terjadi jika setelah seluruh guard + selection rule tidak ada satupun item yang mendapat `rank`.
+NO_TRADE adalah run PLAN yang **tidak menghasilkan daftar ticker untuk ditampilkan** di API/UI (`items = []`).
+Ada **dua** penyebab yang dibedakan oleh `meta.fail_reason_codes`:
 
-Output yang wajib (LOCKED):
-- `meta.fail_code = "NO_TRADE"`
-- `meta.fail_reason_codes` memuat `WS_NO_TRADE_ALL_FILTERED`
-- `items = []` untuk API/UI
-- `plan_hash` dihitung dari canonical payload kosong `[]` (lihat schema runtime)
+1) **MIN_ELIGIBLE**
+- Kondisi: `eligible_total < ws.filters.min_eligible_count`
+- Output wajib:
+  - `meta.fail_code = "NO_TRADE"`
+  - `meta.fail_reason_codes = ["WS_NO_TRADE_MIN_ELIGIBLE"]`
+  - `items = []`
 
-- Auditability wajib tersimpan di `run_metrics_json`: cutoff hari ini, target dinamis, ukuran pool, dan `data_batch_hash` (lihat `07_WS_REASON_CODES_AND_HASH.md`).
+2) **ALL_FILTERED**
+- Kondisi: `eligible_total >= ws.filters.min_eligible_count` namun setelah guard + selection + display rules tidak ada satupun item yang lolos untuk ditampilkan (mis. seluruh candidate ter-hide/terfilter).
+- Output wajib:
+  - `meta.fail_code = "NO_TRADE"`
+  - `meta.fail_reason_codes = ["WS_NO_TRADE_ALL_FILTERED"]`
+  - `items = []`
+
+Tambahan wajib (LOCKED):
+- `meta.plan_hash` dihitung dari canonical payload kosong `[]` (lihat schema runtime).
+
+Auditability wajib tersimpan di `run_metrics_json`: cutoff hari ini, target dinamis, ukuran pool, dan `data_batch_hash` (lihat [`07_WS_REASON_CODES_AND_HASH.md`](07_WS_REASON_CODES_AND_HASH.md)).
+
+
 
 ## LOCKED — Group Semantics Mapping (non-ambiguous)
 
@@ -47,14 +61,14 @@ Mapping `group_semantic` untuk setiap ticker **wajib deterministik** dan mengiku
 
 1) **AVOID (guard fail / block)**
    - Jika `pass_guard = false` ⇒ `group_semantic = AVOID`.
-   - Reason code wajib salah satu (sesuai penyebab pertama yang ditemukan, urutan evaluasi sesuai Step 2 di `08_WS_PLAN_ALGORITHM.md`):
+   - Reason code wajib salah satu (sesuai penyebab pertama yang ditemukan, urutan evaluasi sesuai Step 2 di [`08_WS_PLAN_ALGORITHM.md`](08_WS_PLAN_ALGORITHM.md)):
      - `WS_LIQ_FAIL` (dv20_idr < min_dv20_idr)
      - `WS_ATR_LOW`  (atr14_pct < min_atr14_pct)
      - `WS_ATR_HIGH` (atr14_pct > max_atr14_pct)
      - `WS_VOLR_FAIL` (vol_ratio < min_vol_ratio)
 
 2) **WATCH_ONLY (forced)**
-   - Jika `pass_guard = true` tapi kena forced rule (lihat Step 5 di `08_WS_PLAN_ALGORITHM.md`) ⇒ `group_semantic = WATCH_ONLY` (forced).
+   - Jika `pass_guard = true` tapi kena forced rule (lihat Step 5 di [`08_WS_PLAN_ALGORITHM.md`](08_WS_PLAN_ALGORITHM.md)) ⇒ `group_semantic = WATCH_ONLY` (forced).
    - Reason code wajib:
      - `WS_FW_EXT` jika breakout extended (close terlalu jauh di atas hh20)
      - `WS_FW_RR_LOW` jika rr < min_rr
@@ -69,7 +83,7 @@ Mapping `group_semantic` untuk setiap ticker **wajib deterministik** dan mengiku
      - Eligible tapi tidak terpilih karena cap/run-capped ⇒ `WATCH_ONLY` dengan reason `WS_HID_CAP`
 
 Catatan (LOCKED):
-- Reason codes **tidak boleh membuat code baru**; semua code harus ada di dictionary `watchlist_reason_codes` (lihat `db/REASON_CODES_SEED.sql`).
+- Reason codes **tidak boleh membuat code baru**; semua code harus ada di dictionary `watchlist_reason_codes` (lihat [`db/REASON_CODES_SEED.sql`](db/REASON_CODES_SEED.sql)).
 - Jika beberapa kondisi berlaku, gunakan prioritas di atas dan **jangan** override `AVOID` atau forced WATCH_ONLY oleh selection.
 
 ## Purpose & invariants (LOCKED)
@@ -228,7 +242,7 @@ Wajib tersimpan untuk setiap PLAN run:
 - `top_cutoff_today`, `secondary_cutoff_today`
 - `*_target_dynamic`
 - ukuran pool (`eligible_count`, `top_pool_count`, `secondary_pool_count`)
-- `data_batch_hash` (lihat `07_WS_REASON_CODES_AND_HASH.md`)
+- `data_batch_hash` (lihat [`07_WS_REASON_CODES_AND_HASH.md`](07_WS_REASON_CODES_AND_HASH.md))
 - Semua diletakkan di `watchlist_plan_runs.run_metrics_json`.
 
 ## Failure modes & stop condition
@@ -258,10 +272,10 @@ Jika NO_TRADE aktif:
 ### Weekly Swing
 - 10_WS_CONFIRM_OVERLAY.md
 ### Reference
-- `03_WS_DATA_MODEL_MARIADB.md` untuk schema persistence / output table mapping,
-- `05_WS_PARAMETER_REGISTRY_COMPLETE.md` untuk registry,
-- `06_WS_PARAMSET_VALIDATOR_SPEC.md` untuk validator,
-- `07_WS_REASON_CODES_AND_HASH.md` untuk data_batch_hash canonical,
-- `13_WS_CONTRACT_TEST_CHECKLIST.md` untuk checklist.
-- `_refs/WS_WORKED_EXAMPLE_E2E.md`
-- `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`
+- [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md) untuk schema persistence / output table mapping,
+- [`05_WS_PARAMETER_REGISTRY_COMPLETE.md`](05_WS_PARAMETER_REGISTRY_COMPLETE.md) untuk registry,
+- [`06_WS_PARAMSET_VALIDATOR_SPEC.md`](06_WS_PARAMSET_VALIDATOR_SPEC.md) untuk validator,
+- [`07_WS_REASON_CODES_AND_HASH.md`](07_WS_REASON_CODES_AND_HASH.md) untuk data_batch_hash canonical,
+- [`13_WS_CONTRACT_TEST_CHECKLIST.md`](13_WS_CONTRACT_TEST_CHECKLIST.md) untuk checklist.
+- [`_refs/WS_WORKED_EXAMPLE_E2E.md`](_refs/WS_WORKED_EXAMPLE_E2E.md)
+- [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)

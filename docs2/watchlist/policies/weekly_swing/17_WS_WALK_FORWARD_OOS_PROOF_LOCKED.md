@@ -32,12 +32,12 @@ Split harus berbasis urutan waktu (time series), bukan random split.
 ### Step 1: Calibrate on IS
 - Jalankan backtest grid pada IS window.
 - Pilih `param_id_best_is` dengan ranking policy + gating rules dari:
-  `16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`
+  [`16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`](16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md)
 
 ### Step 2: Evaluate on OOS
 - Jalankan evaluasi pada OOS window menggunakan `param_id_best_is` TANPA re-tuning.
 - Simpan hasilnya sebagai bukti OOS.
-- Evidence wajib diringkas dalam `_refs/WS_OOS_EVIDENCE_GOLDEN.md` (GOLDEN).
+- Evidence wajib diringkas dalam [`_refs/WS_OOS_EVIDENCE_GOLDEN.md`](_refs/WS_OOS_EVIDENCE_GOLDEN.md) (GOLDEN).
 
 ### Step 3: Optional rolling walk-forward (recommended)
 Jika ingin lebih kuat, lakukan rolling window:
@@ -81,11 +81,20 @@ Output OOS wajib menyimpan:
 `eval_model` wajib merepresentasikan komponen perhitungan return secara eksplisit agar tidak menjadi label kosong.
 
 Format minimum (LOCKED):
-`ENTRY=<...>;EXIT=<...>;HOLD=<N>;FEE=<...>;SLIP=<...>`
+`ENTRY=ENTRY_RULE;EXIT=EXIT_RULE;HOLD=INT_DAYS;FEE=FEE_MODEL;SLIP=DECIMAL_PCT`
 
-Contoh:
+Enum minimum yang diizinkan:
+- `ENTRY_RULE`: `NEXT_OPEN`
+- `EXIT_RULE`: `STOP_TP_OR_TIME`, `TIME_ONLY`
+- `FEE_MODEL`: `IDR_FIXED`, `IDR_TIERED`
+- `SLIP`: angka desimal non-negatif dalam format string ringkas (contoh `0`, `0.001`)
+
+Contoh valid:
 - `ENTRY=NEXT_OPEN;EXIT=STOP_TP_OR_TIME;HOLD=5;FEE=IDR_FIXED;SLIP=0`
 - `ENTRY=NEXT_OPEN;EXIT=TIME_ONLY;HOLD=5;FEE=IDR_TIERED;SLIP=0.001`
+
+Catatan implementasi:
+- Panjang `eval_model` harus cukup untuk menyimpan string canonical ini utuh; DDL backtest mengunci kolom sebagai `VARCHAR(96)`.
 
 ## Next
 ### Weekly Swing

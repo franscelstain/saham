@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS watchlist_bt_oos_eval_ws (
   oos_id BIGINT NOT NULL AUTO_INCREMENT,
   policy_code VARCHAR(16) NOT NULL,
   policy_version VARCHAR(32) NOT NULL,
-  eval_model VARCHAR(32) NOT NULL,
+  eval_model VARCHAR(96) NOT NULL,
   param_id_best_is INT NOT NULL,
 
   -- in-sample window (where it was selected)

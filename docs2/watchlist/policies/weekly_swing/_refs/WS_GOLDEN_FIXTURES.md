@@ -1,64 +1,111 @@
 # WS Golden Fixtures (LOCKED)
 
-Fixture dipakai untuk memastikan E2E behavior stabil. Semua output harus deterministic.
+## Purpose
+Mencatat inventori fixture resmi Weekly Swing yang dipakai untuk membuktikan kontrak validator, PLAN, CONFIRM, hash, dan governance backtest.
 
-## Format file fixture (LOCKED)
-- fixtures/ws/fixture_A_input.json
-- fixtures/ws/fixture_A_paramset.json
-- fixtures/ws/fixture_A_expected_plan.json
-- fixtures/ws/fixture_A_snapshot_confirm.json
-- fixtures/ws/fixture_A_expected_confirm.json
+## Scope
+Dokumen ini hanya menginventaris fixture source-of-truth dan tujuan pengujiannya.
+Dokumen ini tidak mendefinisikan kontrak baru di luar dokumen normatif.
 
-Catatan: folder `fixtures/` adalah **artifact testing** dan berada di luar paket `docs.zip`. Dokumen ini hanya mendefinisikan kontrak struktur fixture-nya.
+## Inputs
+- file fixture resmi pada folder [`../fixtures/`](../fixtures/README.md)
+- kontrak normatif Weekly Swing
 
-Catatan: aturan yang sama berlaku untuk fixture B dan C.
+## Outputs
+- daftar fixture resmi,
+- relative path resmi,
+- mapping fixture ke tujuan test.
 
-## Common input schema (LOCKED)
-*_input.json harus menyediakan minimal:
-- `asof_eod_date`: YYYY-MM-DD
-- `trade_date`: YYYY-MM-DD
-- `tickers[]`:
-  - `ticker`
-  - `close`
-  - `high`
-  - `low`
-  - `volume`
-  - indikator yang dipakai WS (minimum required untuk fixture): `roc20`, `atr14_pct`, `hh20`, `dv20_idr` (lihat `../08_WS_PLAN_ALGORITHM.md` dan `../09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`). 
-  - Jika fixture menambahkan indikator lain, indikator tersebut wajib disebut eksplisit (nama kolom + definisi singkat) di fixture ini.
-  - flag data readiness bila diperlukan (mis. `required_ok`, `coverage_flags`)
+## Official Fixture Root (LOCKED)
+Source of truth fixture Weekly Swing berada di:
+- [`../fixtures/`](../fixtures/README.md)
 
-*_snapshot_confirm.json minimal:
-- `checked_at`: timestamp
-- `snapshot_ts`: timestamp
-- `tickers[]`:
-  - `ticker`
-  - `bid`
-  - `ask`
-  - `last` (optional)
-  - `entry_ref_runtime` bila digunakan (kalau tidak, omit)
+Jika test suite memirror file ke lokasi lain, mirror tersebut harus byte-identical.
+Namun dokumen ini selalu menyebut fixture dengan **relative path eksplisit** dari folder `_refs/` ini.
 
-## Fixture A: Normal Day (LOCKED)
-Tujuan: menghasilkan TOP/SECONDARY/WATCH sesuai scoring dan cutoff.
-- Data lengkap, coverage >= min_coverage_ratio
-- Tidak ada outlier yang trigger block
+## Official Fixture Inventory (LOCKED)
 
-**Expected:**
-- expected_plan.json berisi minimal 1 top pick dan 1 secondary (atau sesuai target/cutoff paramset)
-- expected_confirm.json berisi label CONFIRMED/NEUTRAL/CAUTION sesuai rule confirm
+### A) Paramset validator fixtures
+- `../fixtures/paramset_valid.json`
+- `../fixtures/paramset_unknown_key.json`
+- `../fixtures/paramset_missing_required_key.json`
+- `../fixtures/paramset_type_drift.json`
+- `../fixtures/paramset_missing_audit_field.json`
+- `../fixtures/paramset_bad_enum.json`
+- `../fixtures/paramset_bad_hash_contract.json`
+- `../fixtures/paramset_bad_eval.json`
 
-## Fixture B: EOD Incomplete (LOCKED)
-Tujuan: memaksa FAILED sesuai rule data readiness.
-- coverage < min_coverage_ratio
+### B) PLAN / grouping fixtures
+- `../fixtures/PLAN_FIXTURE_A_TIES_V1.json`
+- `../fixtures/plan_items_artificial_ties.json`
+- `../fixtures/plan_items_guard_fail.json`
+- `../fixtures/plan_items_forced_watch_only.json`
+- `../fixtures/plan_items_no_trade_hide_all.json`
+- `../fixtures/plan_items_no_trade_min_eligible.json`
+- `../fixtures/scored_items_quantile_cutoff.json`
 
-**Expected:**
-- PLAN tidak menghasilkan picks dan menghasilkan status FAILED sesuai `02` canonical
-- Fail code harus mencantumkan data readiness failure
+### C) CONFIRM / immutability fixtures
+- `../fixtures/confirm_immutability_pair.json`
+- `../fixtures/confirm_snapshots_two.json`
+- `../fixtures/confirm_payload_with_orderbook_fields.json`
+- `../fixtures/confirm_payload_with_unknown_top_level_field.json`
 
-## Fixture C: Outlier Day (LOCKED)
-Tujuan: memastikan outlier_ruleset bekerja.
-- minimal 1 ticker memiliki return/range yang melebihi threshold outlier_ruleset
+### D) Backtest governance fixtures
+- `../fixtures/bt_coverage_guard_minimal.json`
+- `../fixtures/bt_eval_metrics_minimal.json`
+- `../fixtures/bt_oos_proof_minimal.json`
+- `../fixtures/artifact_reference_guard_minimal.json`
+- `../fixtures/universe_equivalence_sample.json`
+- `../fixtures/plan_universe_snapshot_sample.json`
 
-**Expected:**
-- ticker outlier tidak boleh masuk eligible set
-- reason code outlier harus muncul pada ticker tersebut (BLOCK)
-- sistem tidak crash dan tetap deterministic
+### E) Hash vector fixture
+- `../fixtures/hash_contract_vectors.json`
+
+## Schema Expectations by Fixture Family (LOCKED)
+
+### PLAN / grouping fixtures
+Minimal harus memuat:
+- `fixture_id`
+- `policy_code`
+- `asof_eod_date`
+- input rows yang cukup untuk menghitung guard/scoring/grouping
+- `expected` canonical
+
+### CONFIRM fixtures
+Minimal harus memuat:
+- `trade_date`
+- `captured_at` dan/atau `checked_at`
+- item runtime dengan field contract seperti `ticker`, `last`/`last_price`, `volume_shares`, `turnover_idr`
+- jika ada field non-contract seperti bid/ask/spread/orderbook, field tersebut wajib di-ignore
+
+### Hash vector fixture
+Minimal harus memuat:
+- `rules_locked`
+- `vectors[]`
+- `canonical_string`
+- `expected_sha256`
+
+## Fixture → Test Purpose Mapping (LOCKED)
+- `../fixtures/PLAN_FIXTURE_A_TIES_V1.json` -> PLAN determinism + tie handling
+- `../fixtures/plan_items_artificial_ties.json` -> exact sort / tie-break
+- `../fixtures/plan_items_guard_fail.json` -> guard fail grouping
+- `../fixtures/plan_items_forced_watch_only.json` -> forced WATCH_ONLY contract
+- `../fixtures/plan_items_no_trade_hide_all.json` -> NO_TRADE hide-all contract
+- `../fixtures/plan_items_no_trade_min_eligible.json` -> NO_TRADE minimum eligible contract
+- `../fixtures/scored_items_quantile_cutoff.json` -> quantile cutoff / qualified pools
+- `../fixtures/confirm_immutability_pair.json` -> PLAN immutability under CONFIRM
+- `../fixtures/confirm_snapshots_two.json` -> snapshot selection contract
+- `../fixtures/confirm_payload_with_orderbook_fields.json` -> ignore non-contract orderbook fields
+- `../fixtures/confirm_payload_with_unknown_top_level_field.json` -> top-level drift must FAIL (INVALID_SCHEMA_DRIFT)
+- `../fixtures/bt_coverage_guard_minimal.json` -> BT coverage guard
+- `../fixtures/bt_eval_metrics_minimal.json` -> eval sufficiency guard
+- `../fixtures/bt_oos_proof_minimal.json` -> OOS proof guard
+- `../fixtures/artifact_reference_guard_minimal.json` -> artifact allowlist / path guard
+- `../fixtures/universe_equivalence_sample.json` -> universe equivalence audit
+- `../fixtures/plan_universe_snapshot_sample.json` -> production snapshot export schema
+- `../fixtures/hash_contract_vectors.json` -> data_batch_hash canonical vectors
+
+## Anti-Drift Rule (LOCKED)
+- Jika kontrak menyebut fixture baru, file fisiknya wajib ada pada [`../fixtures/`](../fixtures/README.md).
+- Jika file fixture dihapus, rename, atau dipindah, semua referensi dokumen wajib diperbarui pada commit yang sama.
+- Tidak boleh ada placeholder fixture name di dokumen ini.

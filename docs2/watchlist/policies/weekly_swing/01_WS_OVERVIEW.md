@@ -13,19 +13,19 @@ Policy ini menghasilkan:
 
 ## Prerequisites
 ### Shared Global
-- Baca kontrak global paramset di `../_shared/` (dokumen kontrak paramset global).
+- Baca kontrak global paramset di [`../_shared/`](../_shared/README.md) (dokumen kontrak paramset global).
 
 ### Reference
-- `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`
-- `_refs/WS_GLOSSARY_LOCKED.md`
-- `_refs/WS_GOLDEN_MANUAL_INPUT_TEMPLATE.md`
-- `_refs/WS_WORKED_EXAMPLE_E2E.md`
-- `_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`
-- `_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`
-- `_refs/WS_OOS_EVIDENCE_GOLDEN.md`
+- [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)
+- [`_refs/WS_GLOSSARY_LOCKED.md`](_refs/WS_GLOSSARY_LOCKED.md)
+- [`_refs/WS_GOLDEN_MANUAL_INPUT_TEMPLATE.md`](_refs/WS_GOLDEN_MANUAL_INPUT_TEMPLATE.md)
+- [`_refs/WS_WORKED_EXAMPLE_E2E.md`](_refs/WS_WORKED_EXAMPLE_E2E.md)
+- [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md)
+- [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md)
+- [`_refs/WS_OOS_EVIDENCE_GOLDEN.md`](_refs/WS_OOS_EVIDENCE_GOLDEN.md)
 
 ## Governance & Audit (Index)
-- `_refs/WS_PARAMETER_COVERAGE_MATRIX.md` — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator serta algoritma eksekusi WS (`08_WS_PLAN_ALGORITHM.md`, `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`).
+- [`_refs/WS_PARAMETER_COVERAGE_MATRIX.md`](_refs/WS_PARAMETER_COVERAGE_MATRIX.md) — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator serta algoritma eksekusi WS ([`08_WS_PLAN_ALGORITHM.md`](08_WS_PLAN_ALGORITHM.md), [`09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)).
 
 ## Inputs
 - EOD OHLCV (asof_eod_date)
@@ -59,18 +59,18 @@ Policy ini menghasilkan:
 - 18: Backtest Artifact Manifest (LOCKED)
 - 19: Deprecated / Non-scope Artifacts Ledger
 - 20: Canonical procedures WS (paramset promotion & active pick)
-- Catatan: artefak SQL (seed/promote/backtest DDL) berada di folder `db/` pada level Weekly Swing.
+- Catatan: artefak SQL (seed/promote/backtest DDL) berada di folder [`db/`](db/README.md) pada level Weekly Swing.
 
 ## Artefak SQL
 
-- Backtest universe (wajib): `watchlist_bt_universe_ws` dibuat di `db/BACKTEST_SCHEMA_DDL.sql` (bukan dokumen bernomor).
-Artefak SQL untuk Weekly Swing berada di folder `db/` dan **bukan** bagian dari urutan dokumen `01_..20_` (MD).
+- Backtest universe (wajib): `watchlist_bt_universe_ws` dibuat di [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql) (bukan dokumen bernomor).
+Artefak SQL untuk Weekly Swing berada di folder [`db/`](db/README.md) dan **bukan** bagian dari urutan dokumen `01_..20_` (MD).
 
 File yang tersedia saat ini:
-- `db/BACKTEST_SCHEMA_DDL.sql`
-- `db/PROMOTE_PARAMSET.sql`
-- `db/REASON_CODES_SEED.sql`
-- `db/PARAMSET_WS_ACTIVE_EXAMPLE.json`
+- [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql)
+- [`db/PROMOTE_PARAMSET.sql`](db/PROMOTE_PARAMSET.sql)
+- [`db/REASON_CODES_SEED.sql`](db/REASON_CODES_SEED.sql)
+- [`db/PARAMSET_WS_ACTIVE_EXAMPLE.json`](db/PARAMSET_WS_ACTIVE_EXAMPLE.json)
 
 ## Next
 ### Weekly Swing

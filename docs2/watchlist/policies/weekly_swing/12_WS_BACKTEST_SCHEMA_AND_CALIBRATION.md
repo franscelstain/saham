@@ -8,10 +8,10 @@ Dokumen ini juga menetapkan syarat validasi: BT coverage, universe equivalence, 
 
 ## Scope lock (yang dikerjakan)
 Backtest Weekly Swing mengikuti artefak resmi yang didefinisikan pada:
-`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`.
+[`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`](18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md).
 
 **Schema backtest (LOCKED)**
-Schema tabel backtest mengikuti: `db/BACKTEST_SCHEMA_DDL.sql`.
+Schema tabel backtest mengikuti: [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql).
 
 Dokumen ini tidak menduplikasi daftar tabel; semua daftar artefak wajib merujuk ke Manifest.
 
@@ -24,7 +24,7 @@ Menetapkan mekanisme kalibrasi parameter WS dari backtest 2 tahun:
 
 ## Proof of BT coverage (LOCKED)
 Semua parameter dengan origin=BT wajib tercakup di:
-`14_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
+[`14_WS_BT_COVERAGE_MATRIX_LOCKED.md`](14_WS_BT_COVERAGE_MATRIX_LOCKED.md).
 
 Kalibrasi backtest dianggap tidak valid jika ada parameter origin=BT yang:
 - tidak punya mapping ke kolom `watchlist_bt_param_grid`, atau
@@ -34,10 +34,10 @@ Kalibrasi backtest dianggap tidak valid jika ada parameter origin=BT yang:
 ## Universe equivalence (LOCKED)
 Backtest universe (`watchlist_bt_universe_ws`) wajib setara dengan production PLAN universe
 untuk tanggal EOD yang sama sesuai:
-`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`.
+[`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`](15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md).
 
 Bukti equivalence WAJIB menggunakan snapshot dari production PLAN yang mengikuti schema resmi:
-`db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`.
+[`db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`](db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md).
 
 Kalibrasi dianggap tidak valid jika tidak ada bukti equivalence (pass/fail + canonical reason).
 
@@ -94,17 +94,24 @@ Untuk menghindari ketergantungan pada fee persen broker, backtest memakai model 
   - `qty = lots * lot_size`
 
 **E2. Fee model (LOCKED)**
-Pilih salah satu dan tulis eksplisit (jangan campur).
+Pilih **satu** model dan tulis eksplisit di metadata evaluasi; model tidak boleh campur dalam satu seri evaluasi.
 
-- Model 1 (fixed fee per side):
-  - `fee_buy_idr  = <nilai tetap>`
-  - `fee_sell_idr = <nilai tetap>`
+- Model 1 (fixed fee per side, canonical default):
+  - `fee_model = IDR_FIXED`
+  - `fee_buy_idr  = 2500`
+  - `fee_sell_idr = 2500`
 
 - Model 2 (tiered berdasarkan nilai transaksi):
+  - `fee_model = IDR_TIERED`
   - `fee_buy_idr  = f_buy(gross_buy_idr)`
   - `fee_sell_idr = f_sell(gross_sell_idr)`
+  - fungsi `f_buy/f_sell` wajib dikunci di code/table terpisah dan versioned.
 
-Catatan: jika fee real di Ajaib tersedia sebagai “biaya transaksi” per order, kamu bisa kalibrasi f_buy/f_sell dari sample statement. Yang penting fungsi/tabelnya LOCKED.
+Rule (LOCKED):
+- Jika tidak ada model fee real yang sudah dibakukan, default kontrak adalah `IDR_FIXED` dengan `2500/2500` per sisi agar semua evaluasi tetap reproduksibel.
+- Bila nanti berpindah ke `IDR_TIERED`, hasil run lama tidak boleh dibandingkan apple-to-apple tanpa label `eval_model` yang berbeda.
+
+Catatan: jika fee real di Ajaib tersedia sebagai biaya transaksi per order, fungsi/tabel tiered boleh dikalibrasi dari sample statement, tetapi begitu dipakai harus LOCKED.
 
 **E3. Slippage (LOCKED)**
 - Default: `slippage_entry_pct = 0` dan `slippage_exit_pct = 0` (ditulis eksplisit).
@@ -223,17 +230,17 @@ Tanpa `watchlist_bt_oos_eval_ws` (OOS proof), kalibrasi tidak boleh dipromote me
 4) Buat param_set baru (DRAFT):
    - parameter terkalibrasi => origin=BT, status=ACTIVE
    - parameter deterministik => origin=DET, status=ACTIVE
-5) Promote param_set BT menjadi ACTIVE (lihat `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`).
+5) Promote param_set BT menjadi ACTIVE (lihat [`02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)).
 
 ## Evaluation metrics sufficiency (LOCKED)
 Metrik pada `watchlist_bt_eval` wajib memenuhi spesifikasi:
-`16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`.
+[`16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`](16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md).
 
 Kalibrasi param_id dianggap tidak valid jika metrik minimum tidak tersedia atau gagal gating rules.
 
 ## Walk-forward / OOS proof (LOCKED)
 Kalibrasi WS wajib memiliki bukti out-of-sample sesuai:
-`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`.
+[`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`](17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md).
 
 Ringkasan OOS wajib tersimpan di:
 `watchlist_bt_oos_eval_ws`.
@@ -245,7 +252,7 @@ Ringkasan OOS wajib tersimpan di:
 - Backtest dataset tidak konsisten => tidak boleh promote.
 
 ## DDL
-Schema backtest (DDL) disimpan sebagai artefak di: `db/BACKTEST_SCHEMA_DDL.sql`.
+Schema backtest (DDL) disimpan sebagai artefak di: [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql).
 
 ## Universe rule (DET) (LOCKED)
 
@@ -272,7 +279,7 @@ Jika salah satu field di atas NULL/invalid:
 - ticker tetap dicatat di `watchlist_bt_universe_ws` dengan `required_ok=FALSE`,
 - `missing_fields` wajib diisi,
 - `eligible_ok=FALSE`,
-- `reason_code` mengikuti prioritas canonical reason pada `15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md` (contoh: `WS_DATA_MISSING`).
+- `reason_code` mengikuti prioritas canonical reason pada [`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`](15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md) (contoh: `WS_DATA_MISSING`).
 
 ### 4) Field untuk scoring (LOCKED)
 Indikator yang dipakai untuk menghitung `score_total` (contoh: `roc20`, `hh20`) **tidak termasuk** daftar required fields guardrails kecuali policy WS secara eksplisit menetapkannya sebagai requirement eligibility.
@@ -287,16 +294,16 @@ Rule (LOCKED):
 `missing_fields` boleh berisi gabungan field guardrails dan field scoring; namun `required_ok` hanya dipengaruhi oleh required fields guardrails (lihat Section 3).
 
 ### 5) Audit storage (LOCKED)
-Untuk audit/re-run **wajib** menyimpan universe harian di `watchlist_bt_universe_ws` (lihat `db/BACKTEST_SCHEMA_DDL.sql`) minimal berisi:
+Untuk audit/re-run **wajib** menyimpan universe harian di `watchlist_bt_universe_ws` (lihat [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql)) minimal berisi:
 - `required_ok, missing_fields, guard_ok, eligible_ok, dv20_idr, atr14_pct, vol_ratio, reason_code`
 
-Reason_code memakai dictionary WS_* (contoh: `WS_DATA_MISSING`, `WS_GUARD_LIQUIDITY_FAIL`) sesuai prioritas canonical reason di `15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`.
+Reason_code memakai dictionary WS_* yang **resmi di-seed** (contoh: `WS_DATA_MISSING`, `WS_LIQ_FAIL`) sesuai prioritas canonical reason di [`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`](15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md). Alias nama lain tidak boleh dipakai.
 
 ## Schema: watchlist_bt_universe_ws (AUDIT) (LOCKED)
 
 Tabel ini **wajib** ada untuk membuat backtest reproducible dan audit-friendly.
 
-Lokasi DDL: `db/BACKTEST_SCHEMA_DDL.sql`
+Lokasi DDL: [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql)
 
 Kolom (harus match DDL):
 - `asof_eod_date` (DATE, NOT NULL) — tanggal EOD universe

@@ -1,5 +1,17 @@
 # WS Parameter Coverage Matrix (LOCKED)
 
+## Purpose
+Matriks cakupan parameter terhadap sumber pembuktian Weekly Swing.
+
+## Scope
+Membantu audit apakah setiap parameter punya dasar BT/DET/MAN yang benar.
+
+## Inputs
+- Engineer riset, reviewer paramset, dan auditor.
+
+## Outputs
+- Peta pembuktian parameter terhadap coverage dokumen.
+
 Tujuan: bukti 1 halaman bahwa parameter yang dipakai runtime punya coverage di:
 - kontrak: `../04_WS_PARAMSET_JSON_CONTRACT.md`
 - registry: `../05_WS_PARAMETER_REGISTRY_COMPLETE.md`
@@ -60,4 +72,3 @@ last_updated=2026-02-22
 | `setup.roc_lo` | Y | Y | Y | 06,08 | see 09 | see 03 |
 | `grouping.top_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |
 | `grouping.top_picks_target` | Y | Y | Y | 06,09 | see 09 | see 03 |
-

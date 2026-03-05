@@ -1,0 +1,49 @@
+{
+  "fixture_id": "WS_PLAN_NO_TRADE_MIN_ELIGIBLE_V1",
+  "policy_code": "WS",
+  "asof_eod_date": "2026-02-13",
+  "params_ref": "paramset_valid.json",
+  "rows": [
+    {
+      "ticker_id": 501,
+      "ticker_code": "Y1",
+      "asof_close": 100.0,
+      "hh20": 120.0,
+      "roc20": 3.0,
+      "atr14_pct": 5.0,
+      "dv20_idr": 300000000,
+      "vol_ratio": 1.2
+    },
+    {
+      "ticker_id": 502,
+      "ticker_code": "Y2",
+      "asof_close": 80.0,
+      "hh20": 90.0,
+      "roc20": 2.0,
+      "atr14_pct": 6.0,
+      "dv20_idr": 250000000,
+      "vol_ratio": 1.1
+    }
+  ],
+  "expected": {
+    "run_decision": "NO_TRADE",
+    "items_hidden": true,
+    "reason_codes": [
+      "WS_NO_TRADE_MIN_ELIGIBLE"
+    ],
+    "plan_output_api": {
+      "meta": {
+        "fail_code": "NO_TRADE",
+        "fail_reason_codes": [
+          "WS_NO_TRADE_MIN_ELIGIBLE"
+        ],
+        "plan_hash_sha256_of_items": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "items": []
+    }
+  },
+  "_fixture_expected": {
+    "should_pass": true,
+    "notes": "Eligible tickers exist but eligible_total < ws.filters.min_eligible_count -> NO_TRADE (min eligible) and API/UI items are empty."
+  }
+}

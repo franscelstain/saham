@@ -1,5 +1,17 @@
 # 21 — Golden Manual Input Template (CONFIRM, Non-Ladder) — Weekly Swing
 
+## Purpose
+Template input manual resmi untuk CONFIRM Weekly Swing.
+
+## Scope
+Menjelaskan format input manual agar snapshot CONFIRM tidak salah tafsir.
+
+## Inputs
+- Operator/manual checker, engineer import, reviewer, dan auditor.
+
+## Outputs
+- Pedoman input manual CONFIRM yang sah.
+
 Dokumen 1 halaman ini adalah **template operasional** untuk input manual CONFIRM dari aplikasi (contoh: Ajaib).
 Tujuannya: **operator tidak salah input**, data **deterministik**, dan status CONFIRM **tidak bisa diperdebatkan**.
 

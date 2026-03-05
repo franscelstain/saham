@@ -5,7 +5,7 @@ Daftar parameter WS yang **exhaustive**: semua key yang boleh dipakai runtime ol
 
 ## Prerequisites
 ### Weekly Swing
-- `04_WS_PARAMSET_JSON_CONTRACT.md`
+- [`04_WS_PARAMSET_JSON_CONTRACT.md`](04_WS_PARAMSET_JSON_CONTRACT.md)
 
 ## Inputs
 - params_json WS
@@ -16,7 +16,6 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 ### A. Meta & data contract
 - `data_contract.required_sources` (DET/ACTIVE)
 - `data_contract.required_fields` (DET/ACTIVE)
-- `data_contract.required_fields.*` (DET/ACTIVE)
 - `data_contract.disabled_fields` (DET+MAN/ACTIVE)
 
 ### B. Data readiness & outlier
@@ -59,7 +58,10 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 ### F. Scoring
 - `scoring.combine_mode` (DET/ACTIVE)
 - `scoring.weights` (MAN/ACTIVE, bt_target=true)
-- `scoring.weights.value.{momentum,breakout,volume,risk}` (MAN/ACTIVE, bt_target=true)
+- `scoring.weights.value.momentum` (MAN/ACTIVE, bt_target=true)
+- `scoring.weights.value.breakout` (MAN/ACTIVE, bt_target=true)
+- `scoring.weights.value.volume` (MAN/ACTIVE, bt_target=true)
+- `scoring.weights.value.risk` (MAN/ACTIVE, bt_target=true)
 
 ### G. Grouping (dynamic selection)
 - `grouping.secondary_target` (MAN/ACTIVE)
@@ -87,7 +89,11 @@ Gunakan registry ini sebagai sumber kebenaran definisi per key.
 - `hash_contract.version` (DET/ACTIVE, locked)
 - `hash_contract.order_by` (DET/ACTIVE, locked)
 - `hash_contract.scales` (DET/ACTIVE, locked)
-- `hash_contract.scales.value.{close_price_dp,hh20_dp,roc20_dp,atr14_pct_dp,dv20_idr_dp}` (DET/ACTIVE, locked)
+- `hash_contract.scales.value.close_price_dp` (DET/ACTIVE, locked)
+- `hash_contract.scales.value.hh20_dp` (DET/ACTIVE, locked)
+- `hash_contract.scales.value.roc20_dp` (DET/ACTIVE, locked)
+- `hash_contract.scales.value.atr14_pct_dp` (DET/ACTIVE, locked)
+- `hash_contract.scales.value.dv20_idr_dp` (DET/ACTIVE, locked)
 - `hash_contract.null_handling` (DET/ACTIVE, locked)
 
 ## Outputs
@@ -119,7 +125,7 @@ Parameter **tidak** diubah karena “feeling”. Ubah hanya jika ada sinyal obje
 - Origin **MAN**: perubahan boleh manual, tapi wajib tercatat (who/when/why) dan menghasilkan paramset baru.
 
 ### Rule (LOCKED): BT origin must be proven
-Parameter boleh origin=BT hanya jika tercakup pada `14_WS_BT_COVERAGE_MATRIX_LOCKED.md`.
+Parameter boleh origin=BT hanya jika tercakup pada [`14_WS_BT_COVERAGE_MATRIX_LOCKED.md`](14_WS_BT_COVERAGE_MATRIX_LOCKED.md).
 Jika tidak, origin wajib MAN/DET sampai coverage valid.
 
 ## Namespace rules (LOCKED)
@@ -128,6 +134,13 @@ Catatan (LOCKED): di dokumen, a.b.c adalah notasi referensi; JSON paramset tetap
 Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code wajib membaca key canonical saja:
 - Alias (key alternatif) dilarang di runtime.
 - Key lama di dokumen legacy dianggap salah dan harus dinormalisasi.
+
+## Registry normalization rules (LOCKED)
+- Registry ini hanya boleh mendaftarkan **key canonical yang benar-benar ada** pada struktur JSON paramset.
+- Shorthand seperti BAD EXAMPLE (NOT A KEY): a.<b,c> atau wildcard semu seperti `a.*` **dilarang** di registry utama karena bukan key JSON nyata.
+- Jika sebuah node adalah audit object, registry wajib mendaftarkan node base-nya dan, bila perlu, child key canonical satu per satu.
+- Jika sebuah field adalah array scalar, registry hanya boleh mendaftarkan node array-nya sendiri; elemen array bukan key terpisah.
+- Setiap penambahan key baru wajib dilakukan serentak di: contract JSON, registry ini, validator spec, contoh paramset, dan contract tests.
 
 ## Per-Parameter Definitions (LOCKED)
 
@@ -145,10 +158,10 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: hanya jika struktur required_fields berubah (breaking).
   - Cara ubah: update paramset + update contract tests.
 
-- `data_contract.required_fields.*` (array<string> atau map) — daftar field wajib per source.
+- `data_contract.required_fields.value` (array<string>) — daftar field minimum yang wajib ada pada dataset WS.
   - Origin: DET
-  - Alasan: memastikan indikator/score tidak dihitung dari field kosong/0.
-  - Kapan diubah: bila formula indikator berubah atau field baru jadi wajib.
+  - Alasan: memastikan guards, scoring, dan plan levels tidak dihitung dari field kosong/hilang.
+  - Kapan diubah: bila formula indikator berubah atau field baru menjadi wajib secara resmi.
   - Cara ubah: ubah di paramset + jalankan contract tests.
 
 - `data_contract.disabled_fields` (array<string>) — field yang sengaja diabaikan walau ada.
@@ -237,24 +250,32 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 - `risk.min_atr14_pct` (0..1) — batas bawah ATR14% untuk eligible.
   - Origin: MAN/BT
+  - Unit: fraction (0..1); contoh 0.02 = 2% dari harga.
+  - Forbidden: input percent-point (contoh 1.0 = 1%) — ini dianggap salah unit dan harus FAIL di validator.
   - Alasan: hindari ticker “mati” yang sulit capai target swing.
   - Kapan diubah: saat volatilitas market turun / win-rate turun karena move kecil.
   - Cara ubah: update paramset (BT/MAN).
 
 - `risk.max_atr14_pct` (0..1) — batas atas ATR14% untuk eligible.
   - Origin: MAN/BT
+  - Unit: fraction (0..1); contoh 0.02 = 2% dari harga.
+  - Forbidden: input percent-point (contoh 1.0 = 1%) — ini dianggap salah unit dan harus FAIL di validator.
   - Alasan: hindari ticker terlalu liar (gap/spike).
   - Kapan diubah: saat terlalu banyak false reject atau drawdown naik.
   - Cara ubah: update paramset (BT/MAN).
 
 - `risk.atr_ideal_low` (0..1) — batas bawah “ideal ATR band”.
   - Origin: MAN/BT
+  - Unit: fraction (0..1); contoh 0.02 = 2% dari harga.
+  - Forbidden: input percent-point (contoh 1.0 = 1%) — ini dianggap salah unit dan harus FAIL di validator.
   - Alasan: scoring/ranking bisa menganggap ATR mendekati band ini lebih sehat.
   - Kapan diubah: saat regime ATR bergeser.
   - Cara ubah: update paramset (BT/MAN).
 
 - `risk.atr_ideal_high` (0..1) — batas atas “ideal ATR band”.
   - Origin: MAN/BT
+  - Unit: fraction (0..1); contoh 0.02 = 2% dari harga.
+  - Forbidden: input percent-point (contoh 1.0 = 1%) — ini dianggap salah unit dan harus FAIL di validator.
   - Alasan: komplementer `atr_ideal_low`.
   - Kapan diubah: sama seperti `risk.atr_ideal_low`.
   - Cara ubah: update paramset (BT/MAN).
@@ -414,11 +435,11 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 - `plan_levels.entry_mode` (LOCKED enum: `BREAKOUT`) — mode pembentukan entry band.
   - Origin: DET
-  - Alasan: Weekly Swing menggunakan entry band breakout yang diturunkan menjadi `entry_ref`, `entry_min`, dan `entry_max`.
+  - Alasan: Weekly Swing menggunakan entry band breakout yang diturunkan menjadi `entry_ref`, `entry_band_low`, dan `entry_band_high`.
   - Kapan diubah: hanya jika desain PLAN berubah secara breaking.
   - Cara ubah: ubah registry + validator + active paramset + algorithm docs secara serempak.
 
-- `plan_levels.entry_band_pct` (0..1) — lebar band entry ±% dari `entry_ref` jika `entry_mode=BAND`.
+- `plan_levels.entry_band_pct` (0..1) — lebar band entry ±% dari `entry_ref` pada mode `BREAKOUT`.
   - Origin: MAN/BT
   - Alasan: memberi toleransi entry (weekly swing tidak harus presisi 1 tick).
   - Kapan diubah: jika terlalu sering drift/delay atau terlalu longgar.
@@ -426,7 +447,7 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 ### I. No-trade
 
-- `no_trade.min_eligible_count` (integer >= 0) — minimum jumlah eligible ticker agar run dianggap valid.
+- `no_trade.min_eligible_count` (integer >= 1) — minimum jumlah eligible ticker agar run dianggap valid.
   - Origin: MAN/BT
   - Alasan: jika universe terlalu kecil, output jadi noise dan menipu.
   - Kapan diubah: bila universe berubah besar atau data readiness sering reject.
@@ -462,11 +483,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: hanya jika payload canonical hash berubah (breaking change).
   - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
 
-- `hash_contract.order_by` (array<string>, LOCKED) — urutan field untuk canonical hashing.
+- `hash_contract.order_by` (enum/string, LOCKED) — strategi urutan canonical untuk hashing.
   - Origin: DET
   - Alasan: memastikan hash stabil lintas runtime/DB ordering.
   - Kapan diubah: jika schema output/hash input berubah (breaking change).
   - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
+  - Nilai ACTIVE yang diizinkan saat ini: `ticker_id_asc`.
 
 - `hash_contract.scales` (map<string,number>, LOCKED) — skala/rounding angka sebelum hashing.
   - Origin: DET
@@ -504,11 +526,12 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
   - Kapan diubah: jika precision dv20_idr di output berubah (breaking).
   - Cara ubah: sama seperti close_price_dp.
 
-- `hash_contract.null_handling` (enum: `AS_NULL` | `AS_ZERO` | `DROP_FIELD`, LOCKED) — aturan null sebelum hashing.
+- `hash_contract.null_handling` (enum: `EXCLUDE_FROM_HASH_PAYLOAD`, LOCKED) — aturan null canonical sebelum hashing.
   - Origin: DET
   - Alasan: determinisme hash saat ada null.
   - Kapan diubah: bila policy null berubah (breaking change).
   - Cara ubah: update dok LOCKED + update validator + update contract tests + promote paramset baru.
+  - Nilai ACTIVE yang diizinkan saat ini: `EXCLUDE_FROM_HASH_PAYLOAD`.
 
 ### L. Evaluation (backtest & OOS)
 
@@ -554,4 +577,4 @@ Untuk Weekly Swing, namespace parameter bersifat tunggal dan canonical. Code waj
 
 ## Next
 ### Weekly Swing
-- `06_WS_PARAMSET_VALIDATOR_SPEC.md`
+- [`06_WS_PARAMSET_VALIDATOR_SPEC.md`](06_WS_PARAMSET_VALIDATOR_SPEC.md)

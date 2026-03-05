@@ -1,5 +1,9 @@
 # 10 — CONFIRM Overlay (Intraday Snapshot) — Weekly Swing
 
+> **Status:** LOCKED (Normative)
+> **Doc Role:** WS CONFIRM overlay contract
+
+
 ## Purpose
 Menetapkan CONFIRM sebagai **pengecekan keyakinan** berbasis **intraday snapshot manual** yang:
 
@@ -7,6 +11,29 @@ Menetapkan CONFIRM sebagai **pengecekan keyakinan** berbasis **intraday snapshot
 - **tidak mengklaim real-time** (snapshot = sumber kebenaran CONFIRM),
 - otomatis **tidak sah** (EXPIRED) jika snapshot melewati TTL,
 - memaksa output yang **tidak bisa diperdebatkan**: benar/salahnya CONFIRM hanya ditentukan oleh **snapshot yang diinput** dan **usia snapshot**.
+
+
+## Contract Strictness — LOCKED
+
+CONFIRM menerima payload snapshot intraday sebagai **input deterministik**. Untuk mencegah drift, aturan ketat berikut berlaku:
+
+### 1) Unknown/extra fields
+- **Top-level unknown fields** (di luar kontrak) ⇒ **FAIL (INVALID_SCHEMA_DRIFT)**.
+- **Item-level unknown fields** (di dalam `items[]`) ⇒ **IGNORE** *tanpa efek ke keputusan*, tetapi **wajib dicatat** dalam output `confirm_meta.ignored_fields_by_item[]`.
+
+> Alasan: top-level drift berisiko mengubah arti payload secara global; sedangkan item-level “noise” seperti orderbook boleh lewat agar integrasi tidak rapuh, selama benar-benar tidak mempengaruhi keputusan.
+
+### 2) Non-contract “orderbook fields”
+Field seperti `bid1_price`, `ask1_price`, `spread`, `orderbook_json` **selalu dianggap non-contract** dan **harus diabaikan** (tidak boleh masuk perhitungan apapun).
+Fixture referensi: `fixtures/confirm_payload_with_orderbook_fields.json`.
+
+### 3) Logging minimum
+Output CONFIRM **wajib** memuat:
+- `confirm_meta.snapshot_captured_at`
+- `confirm_meta.snapshot_age_seconds`
+- `confirm_meta.ttl_seconds`
+- `confirm_meta.is_expired`
+- `confirm_meta.ignored_fields_by_item[]` (jika ada)
 
 ## Prerequisites
 - 09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md
@@ -52,6 +79,7 @@ Aturan:
 - Jika `snapshot_age_sec > snapshot_max_age_sec` (LOCKED: 900 detik) → snapshot **EXPIRED** → output CONFIRM **wajib**:
   - `label = DELAY`
   - reason code wajib: `WS_STALE`
+  - karena ini kondisi snapshot-level, seluruh item hasil CONFIRM pada run tersebut wajib berlabel `DELAY`
 - Jika tidak ada snapshot → `label = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
 - LOCKED: `NO_TRADE` bukan label CONFIRM. `NO_TRADE` hanya berlaku untuk status run PLAN/global selection, sedangkan label CONFIRM hanya boleh `CONFIRMED`, `NEUTRAL`, `CAUTION`, atau `DELAY`.
 
@@ -61,21 +89,32 @@ Aturan:
 
 ## Output Model (LOCKED)
 
-CONFIRM menghasilkan output terpisah, minimal:
-- `confirm_run_id`
-- `checked_at`
-- `snapshot_id` (yang dipakai)
-- `snapshot_age_sec`
+CONFIRM menghasilkan output **terpisah** dari PLAN dan output final API/UI **wajib** mengikuti [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md).
+
+Bentuk minimum output final:
+- `meta`:
+  - `policy`
+  - `checked_at`
+  - `snapshot_ts`
+  - `snapshot_age_sec`
+  - `source.snapshot_id`
 - `items[]`:
-  - `ticker_code`
-  - `plan_group_semantic` (dari PLAN, immutable)
-  - `plan_score_total` (dari PLAN, immutable)
+  - `ticker`
   - `label` (`CONFIRMED` / `NEUTRAL` / `CAUTION` / `DELAY`)
   - `reasons[]`:
     - `code`
     - `severity`
     - `message`
     - `payload`
+- `summary`:
+  - `confirmed_count`
+  - `neutral_count`
+  - `caution_count`
+  - `delay_count`
+
+Catatan (LOCKED):
+- Field PLAN seperti `group_semantic`, `score_total`, `entry_ref`, atau ranking boleh dipakai **sebagai input evaluasi**, tetapi **tidak boleh** ditambahkan ke item output final CONFIRM kecuali schema runtime resmi diubah.
+- Nama field final yang sah hanya `ticker`, `label`, dan `reasons[]` pada level item.
 
 ---
 
@@ -119,8 +158,10 @@ Cara enforce (wajib ada di test/contract):
 8) Mapping label:
    - ada `BLOCK` → `DELAY`
    - else ada `WARN` → `CAUTION`
-   - else ada `INFO` saja → `NEUTRAL`
+   - else jika ada reason code `WS_CONFIRM_OK` → `CONFIRMED`
+   - else jika ada `INFO` lain (mis. `WS_CONFIRM_NEUTRAL`) → `NEUTRAL`
    - else → `CONFIRMED`
+   - LOCKED: `WS_CONFIRM_OK` adalah positive confirmation code; `WS_CONFIRM_NEUTRAL` adalah informational-neutral code.
    - LOCKED: CONFIRM tidak boleh menambahkan reason code yang hanya mengulang label akhir.
   `CONFIRMED`, `NEUTRAL`, `CAUTION`, dan `DELAY` adalah label hasil evaluasi, bukan reason code tersendiri.
 9) Output CONFIRM **tidak mengubah PLAN** (invariant harus lolos)

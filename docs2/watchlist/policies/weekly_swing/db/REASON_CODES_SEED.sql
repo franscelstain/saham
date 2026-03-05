@@ -2,7 +2,7 @@
 -- Policy: WS_EOD_PLAN_CONFIRM
 -- Table: watchlist_reason_codes(reason_code PK, scope, severity, short_id, description_id, description_en)
 
--- Tabel global watchlist_reason_codes dibuat oleh: ../../db/04_DB_SEED_GLOBAL.sql
+-- Tabel global watchlist_reason_codes dibuat oleh: ../../../db/04_DB_SEED_GLOBAL.sql
 INSERT INTO watchlist_reason_codes (policy_code, reason_code, scope, severity, short_id, description_id, description_en) VALUES
 ('WS','WS_DATA_MISSING','PLAN','BLOCK','data_missing',
  'Data wajib tidak lengkap untuk ticker ini (field input minimal tidak tersedia).',
@@ -146,11 +146,11 @@ INSERT INTO watchlist_reason_codes (policy_code, reason_code, scope, severity, s
  'Harga runtime tidak tersedia, tidak bisa menghitung drift.',
  'Runtime price missing; cannot compute drift.'),
 ('WS','WS_CONFIRM_OK','CONFIRM','INFO','confirm_ok',
- 'Tidak ada sinyal negatif dari snapshot; CONFIRM netral/OK.',
- 'No negative signal from snapshot; confirm neutral/OK.'),
+ 'Snapshot valid dan cukup sehat; hasil CONFIRM boleh diberi label CONFIRMED.',
+ 'Snapshot is valid and healthy enough; CONFIRM may be labeled CONFIRMED.'),
 ('WS','WS_CONFIRM_NEUTRAL','CONFIRM','INFO','confirm_neutral',
- 'Snapshot tidak memberi sinyal kuat (bukan bagus, bukan jelek).',
- 'Snapshot provides no strong signal (neither good nor bad).'),
+ 'Snapshot valid tetapi tidak memberi sinyal kuat tambahan; hasil CONFIRM diberi label NEUTRAL.',
+ 'Snapshot is valid but provides no additional strong signal; CONFIRM is labeled NEUTRAL.'),
 ('WS','WS_CONFIRM_VOL_WEAK','CONFIRM','WARN','confirm_vol_weak',
  'Volume runtime relatif lemah; validasi breakout/momentum berkurang.',
  'Runtime volume relatively weak; breakout/momentum validation reduced.'),

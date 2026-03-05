@@ -66,18 +66,27 @@ Jika ada guardrail baru di production, dokumen ini wajib diupdate bersama backte
 ## Reason code equivalence (LOCKED)
 
 ### Rule: canonical fail reason
-Jika satu ticker gagal lebih dari satu guardrail, reason utama dipilih berdasarkan prioritas:
+Jika satu ticker gagal lebih dari satu guardrail, reason utama dipilih berdasarkan prioritas berikut dan **harus memakai kode WS_* yang sama** di backtest maupun production.
 
 Priority order (highest first):
-1) MISSING_DATA (data-quality)
-2) LIQUIDITY_FAIL
-3) VOLATILITY_FAIL
-4) VOLUME_RATIO_FAIL
+1) `WS_DATA_MISSING` — data-quality / required fields tidak lengkap atau invalid
+2) `WS_LIQ_FAIL` — liquidity guard gagal (`dv20_idr < min_dv20_idr`)
+3) `WS_ATR_HIGH` — volatility upper guard gagal (`atr14_pct > max_atr14_pct`)
+4) `WS_VOLR_FAIL` — volume participation guard gagal (`vol_ratio < min_vol_ratio`)
 
 Backtest dan production wajib memakai prioritas yang sama agar audit konsisten.
 
-### Mapping rule
-Jika production reason code berbeda nama dari backtest, wajib ada mapping 1:1 di dokumen ini, dan test harus memakai mapping tersebut.
+### Mapping rule (LOCKED)
+Untuk guardrails yang dicakup dokumen ini, **tidak ada alias nama**. Mapping 1:1 canonical adalah:
+
+- `MISSING_DATA`          => `WS_DATA_MISSING`
+- `LIQUIDITY_FAIL`        => `WS_LIQ_FAIL`
+- `VOLATILITY_FAIL`       => `WS_ATR_HIGH`
+- `VOLUME_RATIO_FAIL`     => `WS_VOLR_FAIL`
+
+Aturan tambahan (LOCKED):
+- Code alias seperti `WS_GUARD_LIQUIDITY_FAIL` **tidak boleh** dipakai.
+- Jika di masa depan production/backtest menambah guardrail baru, dokumen ini **wajib** diperbarui dengan mapping WS_* yang eksplisit sebelum artefak dianggap setara.
 
 ---
 
@@ -95,7 +104,7 @@ Contoh (sesuaikan dengan scoring WS yang aktif):
 - vol_ratio
 
 ### Handling rule
-- Jika field yang wajib = NULL atau invalid → fail dengan reason `MISSING_DATA`.
+- Jika field yang wajib = NULL atau invalid → fail dengan reason `WS_DATA_MISSING`.
 - Tidak boleh “diam-diam default 0” di backtest tapi “fail” di production (atau sebaliknya).
 - Jika production menggunakan fallback tertentu, fallback itu harus ditulis eksplisit di sini.
 
@@ -133,7 +142,7 @@ Production side:
   - metrics snapshot (dv20_idr, atr14_pct, vol_ratio, missing_fields)
 
 - Format snapshot WAJIB mengikuti schema resmi:
-  `db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`
+  [`db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`](db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md)
 
 ### Canonical audit queries (LOCKED)
 Tujuan: membuktikan equivalence dan memudahkan root-cause saat mismatch.

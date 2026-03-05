@@ -38,7 +38,7 @@ Top-level (LOCKED):
 - `errors` (array) — wajib ada; empty array jika `success=true`.
 
 Error item schema (LOCKED):
-- `cf_code` (string) — wajib; harus salah satu `CF_*` di `07_CONTRACT_FAILURE_CODES_LOCKED.md`.
+- `cf_code` (string) — wajib; harus salah satu `CF_*` di `../_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`.
 - `severity` (enum) — `ERROR` | `WARN` (default: `ERROR`).
 - `path` (string) — dotted JSON path yang menunjuk lokasi masalah (contoh `risk.max_atr14_pct.value`).
 - `message` (string) — ringkas; boleh, tapi tidak menggantikan `cf_code`.
@@ -77,11 +77,12 @@ Examples (non-normative):
 - integer: dv20_idr, counts, dp scales
 - string: *mode keys
 - array: liquidity.exclude_tickers, grouping.sort_keys
-- object/map: grouping.min_count_overrides, scoring.weights.value, data_contract.required_fields.value (list), data_contract.required_sources.value (list)
+- object/map: grouping.min_count_overrides, scoring.weights.value
+- array/list: data_contract.required_fields.value, data_contract.required_sources.value
 
 ### 6) Registry completeness check (LOCKED)
 Validator **wajib** menjadikan registry sebagai sumber kebenaran:
-- Load `05_WS_PARAMETER_REGISTRY_COMPLETE.md`, ambil semua key yang terdefinisi:
+- Load [`05_WS_PARAMETER_REGISTRY_COMPLETE.md`](05_WS_PARAMETER_REGISTRY_COMPLETE.md), ambil semua key yang terdefinisi:
   - Expand shorthand `{a,b,c}` menjadi key individual.
   - Untuk wildcard `.*`, treat sebagai “pattern” (bukan key tunggal).
 - Untuk setiap key non-wildcard:
@@ -100,8 +101,11 @@ Volume:
 - volume.min_vol_ratio.value >= 0
 
 ATR:
-- risk.min_atr14_pct.value > 0
+- 0 < risk.min_atr14_pct.value <= 1   (unit: fraction; 0.02 = 2%)
+- 0 < risk.max_atr14_pct.value <= 1
 - risk.max_atr14_pct.value > risk.min_atr14_pct.value
+- 0 < risk.atr_ideal_low.value <= 1
+- 0 < risk.atr_ideal_high.value <= 1
 - risk.atr_ideal_low.value >= risk.min_atr14_pct.value
 - risk.atr_ideal_high.value <= risk.max_atr14_pct.value
 - risk.atr_ideal_low.value <= risk.atr_ideal_high.value
@@ -121,7 +125,7 @@ Weights:
 - scoring.weights.value.breakout >= 0
 - scoring.weights.value.volume >= 0
 - scoring.weights.value.risk >= 0
-- sum(scoring.weights.value.{momentum,breakout,volume,risk}) > 0
+- sum(scoring.weights.value.momentum + scoring.weights.value.breakout + scoring.weights.value.volume + scoring.weights.value.risk) > 0
 
 Caps / targets ordering:
 - grouping.top_picks_target.value >= 0
@@ -151,7 +155,7 @@ Eval (backtest & OOS gates):
 - eval.min_month_avg_ret_net_min.value is number
 
 Outlier:
-- if enabled: max_abs_return_1d_pct.value > 0, max_high_low_range_1d_pct.value > 0
+- if enabled: data_readiness.outlier_ruleset.value.max_abs_return_1d_pct > 0, data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct > 0
 - data_contract.required_fields.value (required, list non-empty)
 - data_contract.required_sources.value (required, list non-empty)
 - data_contract.disabled_fields.value (optional, list)
@@ -183,7 +187,7 @@ hash_contract lock:
 - hash_contract.scales.value.atr14_pct_dp == 4
 - hash_contract.scales.value.dv20_idr_dp == 0
 
-Catatan LOCKED: nilai dp ini **harus identik** dengan definisi di `07_WS_REASON_CODES_AND_HASH.md` dan test vector hash di sana.
+Catatan LOCKED: nilai dp ini **harus identik** dengan definisi di [`07_WS_REASON_CODES_AND_HASH.md`](07_WS_REASON_CODES_AND_HASH.md) dan fixture [`fixtures/hash_contract_vectors.json`](fixtures/hash_contract_vectors.json).
 
 ## Outputs
 - PASS/FAIL + daftar error.
@@ -244,7 +248,7 @@ Catatan:
 - Check ini bukan validasi paramset; ini **contract test/invariant** untuk pipeline eksekusi.
 
 ## Reference
-- `_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`
+- [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)
 
 ## Next
 ### Weekly Swing

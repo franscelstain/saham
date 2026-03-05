@@ -197,7 +197,7 @@
       "items": [
         {
           "ticker": "AAA",
-          "label": "OK",
+          "label": "CONFIRMED",
           "reasons": [
             {
               "code": "WS_CONFIRM_OK",
@@ -207,7 +207,7 @@
         },
         {
           "ticker": "BBB",
-          "label": "OK",
+          "label": "CONFIRMED",
           "reasons": [
             {
               "code": "WS_CONFIRM_OK",

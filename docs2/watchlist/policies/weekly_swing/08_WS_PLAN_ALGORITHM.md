@@ -16,8 +16,8 @@ Menetapkan algoritma PLAN WS dari EOD snapshot sampai menghasilkan plan_items de
 ## LOCKED — Units & Scales for Indicator Inputs
 Agar implementasi tidak drift (mis. persen vs desimal), unit/scale berikut **wajib**:
 - `dv20_idr` = nilai transaksi harian rata-rata 20 hari dalam **IDR** (contoh: `15_000_000_000`).
-- `atr14_pct` = **persentase** ATR14 terhadap harga (contoh: `3.25` berarti 3.25%, **bukan** `0.0325`).
-- `roc20` = **persentase** return 20 hari (contoh: `12.5` berarti 12.5%, **bukan** `0.125`).
+- `atr14_pct` = **decimal-percent / ratio** ATR14 terhadap harga (contoh: `0.0325` berarti 3.25%).
+- `roc20` = **decimal-percent / ratio** return 20 hari (contoh: `0.125` berarti 12.5%).
 - `hh20` = harga **price-level** (bukan persen), high tertinggi 20 hari.
 - `close`/`asof_close` = harga **price-level** pada `asof_eod_date`.
 
@@ -39,12 +39,12 @@ Comparator untuk guard (LOCKED):
 - Volume confirmation: `vol_ratio >= min_vol_ratio` (kalau < → guard fail)
 
 Catatan (LOCKED):
-- `atr14_pct` dan `roc20` adalah **pct 0–100**, bukan ratio 0–1.
-- Semua threshold di paramset mengikuti unit di atas.
+- `atr14_pct` dan `roc20` disimpan sebagai **decimal-percent (ratio 0–1)**.
+  - Contoh: 0.065 berarti 6.5%.
+- Semua threshold di paramset mengikuti unit ini (0–1).
 
 ## Process
 
-## Process
 ### Step 0 — Build universe
 Universe = semua ticker aktif (master tickers), dikurangi `liquidity.exclude_tickers`.
 
@@ -57,7 +57,7 @@ Untuk setiap ticker:
 - jika data_readiness.outlier_ruleset.value.enabled=true dan (high/low - 1) > data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct => AVOID + reason WS_OUTLIER_RANGE1D
 - outlier check (jika enabled) => AVOID + reason WS_DATA_OUTLIER
 
-Catatan: coverage check run-level dilakukan di execution (lihat `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`).
+Catatan: coverage check run-level dilakukan di execution (lihat [`02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)).
 
 ### Step 2 — Hard guards (pass_guard)
 Jika salah satu gagal => AVOID:
@@ -115,10 +115,10 @@ Jika pass_guard tapi:
 ### Step 6 — Group semantic default
 Jika pass_guard dan tidak forced:
 - kandidat masuk ranking pool:
-  - group_semantic sementara: TOP_PICKS/SECONDARY/WATCH_ONLY ditentukan oleh selection (lihat `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`)
+  - group_semantic sementara: TOP_PICKS/SECONDARY/WATCH_ONLY ditentukan oleh selection (lihat [`09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md))
 
 **LOCKED — Ranking sort key (PLAN output & selection):**
-Ranking deterministik **wajib** mengikuti `grouping.sort_keys` (lihat `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`), urutan exact:
+Ranking deterministik **wajib** mengikuti `grouping.sort_keys` (lihat [`09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)), urutan exact:
 1) `score_total DESC`
 2) `score_breakout DESC`
 3) `score_momentum DESC`
@@ -169,7 +169,7 @@ Catatan rounding & tick-size (LOCKED):
   - `PRICE_SCALE = 6` untuk: `entry_band_low`, `entry_band_high`, `entry_band_mid`, `entry_ref`, `stop_price`, `tp1_price`.
   - `RATIO_SCALE = 6` untuk: `risk_per_share`, `rr`.
   - Normalisasi menggunakan `ROUND_HALF_UP`.
-- `grouping.rounding_mode` **tidak** dipakai untuk rounding harga; itu hanya untuk rounding target dinamis (lihat `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`).
+- `grouping.rounding_mode` **tidak** dipakai untuk rounding harga; itu hanya untuk rounding target dinamis (lihat [`09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)).
 
 
 ## Outputs
@@ -179,7 +179,7 @@ Catatan rounding & tick-size (LOCKED):
 - division by zero (roc_hi==roc_lo) => validator harus mencegah.
 
 ## Reference
-- `_refs/WS_WORKED_EXAMPLE_E2E.md`
+- [`_refs/WS_WORKED_EXAMPLE_E2E.md`](_refs/WS_WORKED_EXAMPLE_E2E.md)
 
 ## Next
 ### Weekly Swing
