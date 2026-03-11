@@ -1,7 +1,7 @@
-# Indicator Registry — Weekly Swing Baseline (Upstream)
+# Indicator Registry — Baseline (LOCKED)
 
-This registry defines only the upstream baseline indicator set that downstream weekly-swing style consumers may expect.
-It does **not** define downstream scoring/grouping logic.
+This registry defines only the upstream baseline indicator set that downstream consumers may expect.
+It does **not** define downstream screening, scoring, grouping, ranking, or portfolio logic.
 
 ## Mandatory baseline indicators
 - `dv20_idr` using 20-day inclusive turnover average

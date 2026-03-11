@@ -1,9 +1,9 @@
-# Commands and Runbook (Market Data Platform)
+# Commands and Runbook (Market Data Platform, LOCKED)
 
 ## Tujuan
 Dokumen ini mengunci command minimum agar platform dapat memproduksi data pasar upstream yang canonical, tervalidasi, deterministik, auditable, dan siap dikonsumsi downstream.
 
-Dokumen ini **tidak** membahas scoring, grouping, ranking, atau logika kebijakan downstream.
+Dokumen ini **tidak** membahas screening, scoring, grouping, ranking, atau logika kebijakan downstream.
 
 ## Command minimum (WAJIB)
 ### 1) `market-data:eod-bars:ingest`
@@ -47,9 +47,14 @@ Ambil snapshot intraday best-effort untuk D tanpa memodifikasi artifact EOD.
 ### 10) `market-data:intraday:purge`
 Purge intraday berdasarkan TTL.
 
-## Operator flow harian
+## Operator flow harian (LOCKED)
 1) jalankan `market-data:daily --latest`
 2) verifikasi `eod_runs` final
 3) verifikasi hash non-null
 4) verifikasi `sealed_at` non-null
 5) bila `HELD/FAILED`, downstream wajib fallback ke prior sealed effective date
+
+## Locking and ownership rule (LOCKED)
+- satu requested date hanya boleh punya satu writer aktif untuk pipeline harian
+- finalize/hash/seal harus dieksekusi dalam kepemilikan run yang sama
+- command pelengkap tidak boleh mengubah sealed dataset tanpa controlled correction flow

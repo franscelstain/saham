@@ -41,6 +41,10 @@ Recursive form afterward:
 `ATR14(D) = ((ATR14(D[-1]) * 13) + TR(D)) / 14`
 Requires trading-day continuity per ticker.
 
+Warmup implication:
+- because `TR(D)` itself requires `close(D[-1])`, the first computable `ATR14_seed` date is the trade date that has 15 canonical bars available for the ticker
+- before that point, `ATR14` and `atr14_pct` are NULL
+
 ### 5) `atr14_pct`
 `atr14_pct(D) = (ATR14(D) / close(D)) * 100`
 If `close(D) <= 0` the source bar is invalid and the indicator must not be computed.

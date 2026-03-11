@@ -1,4 +1,4 @@
-# Intraday Snapshot Contract
+# Intraday Snapshot Contract (LOCKED)
 
 ## Scope
 Intraday snapshot is an optional, best-effort upstream artifact for downstream consumers that need a same-day overlay.
@@ -11,7 +11,7 @@ It is not streaming data and it must not mutate EOD canonical datasets.
 
 ## Scope rule (LOCKED)
 Default scope is the eligibility set for the effective trade date D unless a narrower upstream-approved scope contract exists.
-Default behavior must never assume downstream picks/rankings.
+Default behavior must never assume downstream picks, rankings, or portfolio subsets.
 
 ## Minimum fields
 - `trade_date`
@@ -30,3 +30,4 @@ Default behavior must never assume downstream picks/rankings.
 - `trade_date` must equal `trade_date_effective`
 - failure or absence of an intraday snapshot must never block EOD finalization or sealing
 - retention and slot tolerance are governed by locked intraday defaults
+- intraday rows are not inputs to EOD bar canonicalization or EOD indicator recomputation for the same date

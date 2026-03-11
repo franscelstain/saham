@@ -29,8 +29,8 @@
 - Dataset_Seal_and_Freeze_Contract_LOCKED.md
 - Audit_Hash_and_Reproducibility_Contract_LOCKED.md
 - Hash_Number_Formatting_LOCKED.md
-- Watchlist_Consumer_Read_Model_Contract_LOCKED.md
-- Watchlist_Data_Readiness_Guarantee_LOCKED.md
+- Downstream_Consumer_Read_Model_Contract_LOCKED.md
+- Downstream_Data_Readiness_Guarantee_LOCKED.md
 
 ## Supporting datasets
 - Market_Daily_Metrics_Contract.md

@@ -8,15 +8,16 @@ This module covers:
 - computing EOD indicators from canonical bars using trading-day windows
 - declaring run status, quality gates, effective trade date, audit hashes, and seal state
 - publishing daily eligibility snapshot for downstream consumers
-- publishing optional intraday snapshots as best-effort overlays
+- publishing optional intraday snapshots as best-effort overlays aligned to the effective trade date
+- supporting deterministic replay of historical dates using versioned dependencies
 
 This module does **not** cover:
-- downstream scoring/grouping/ranking
+- downstream scoring, grouping, ranking, or screening policy
 - trade recommendation policy
 - order routing / execution
 - portfolio or risk allocation logic
 - streaming market data
-- maintenance of ticker master or market calendar beyond consuming them as dependencies
+- maintenance of ticker master or market calendar beyond consuming them as versioned dependencies
 
 ## Key terms
 - **Trading Day**: exchange trading date from the market calendar, not a calendar day inferred from timestamps.
@@ -26,7 +27,7 @@ This module does **not** cover:
 - **Invalid Provider Bar**: provider row that failed canonical bar validation and is stored only for audit in `eod_invalid_bars`.
 - **Indicator Window**: ordered trading-day sequence using market calendar continuity.
 - **Eligibility Snapshot**: one row per ticker in the coverage universe for D with `eligible=1/0` and reason code.
-- **Seal**: readiness marker proving dataset for D is finalized, hashed, and frozen.
+- **Seal**: readiness marker proving dataset for D is finalized, hashed, and frozen for consumers.
 - **Controlled Correction**: explicit rerun for an already sealed date, producing a new `run_id`, new hashes, and a new seal record while preserving auditability.
 
 ## Design principles (LOCKED)

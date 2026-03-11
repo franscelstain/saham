@@ -11,6 +11,7 @@ Define the minimum automated contract tests required to keep Market Data Platfor
 
 ### 2) Indicator correctness
 - ATR14 Wilder seed and recursion
+- ATR14 warmup starts only when 14 TR values exist, which implies 15 canonical bars
 - `roc20` uses `D[-20]`
 - `vol_ratio` uses prior-20 average excluding D
 - `hh20` uses inclusive 20-day real-high window
@@ -33,6 +34,7 @@ Define the minimum automated contract tests required to keep Market Data Platfor
 ### 6) Hash determinism
 - fixed ordering and formatting yield stable hashes across reruns
 - locale and trailing-zero behavior do not change hashes
+- only rows for the effective date being sealed are hashed
 
 ### 7) Controlled correction
 - reseal after correction creates new run/hash trail

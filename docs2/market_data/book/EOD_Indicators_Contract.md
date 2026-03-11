@@ -21,10 +21,10 @@ Minimum baseline columns:
 - Windows use **trading-day order**, never calendar-day differences.
 - All output-affecting semantics come from the effective config registry and selected defaults in this documentation set.
 - `ATR` / `TR` always use real OHLC and previous real close, never adjusted price.
-- Price-series indicators use `P(T)`, where `P(T) = adj_close` when `PRICE_BASIS_DEFAULT=ADJ_CLOSE` and `adj_close` is available, otherwise `close`.
+- Price-series indicators use `P(D)`, where `P(D) = adj_close` when `PRICE_BASIS_DEFAULT=ADJ_CLOSE` and `adj_close` is available, otherwise `close`.
 - `D[-20]` means the 20th prior trading day relative to D, excluding D itself.
 - Insufficient history for any mandatory baseline indicator yields `NULL` for that indicator and `is_valid=0` with reason code `IND_INSUFFICIENT_HISTORY`.
-- Any semantic change requires a new `indicator_set_version` and recomputation.
+- Any semantic change to formulas, defaults, hash-affecting formatting, or included baseline columns requires a new `indicator_set_version` and recomputation.
 
 ## Validity policy (LOCKED)
 `is_valid=1` iff:

@@ -1,4 +1,4 @@
-# Platform Configuration Registry
+# Platform Configuration Registry (LOCKED)
 
 Defines output-affecting configuration that must be versioned and effective-dated.
 
@@ -16,6 +16,7 @@ Defines output-affecting configuration that must be versioned and effective-date
 - `CUT_OFF_GRACE_MINUTES`
 - `PLATFORM_EOD_CUTOFF_TIME`
 - `SEAL_REQUIRED_FOR_CONSUMERS` (default `true`)
+- `PLATFORM_TIMEZONE`
 
 ### Indicator windows
 - `DV_WINDOW_DAYS` = 20
@@ -23,6 +24,11 @@ Defines output-affecting configuration that must be versioned and effective-date
 - `VOL_RATIO_LOOKBACK_DAYS` = 20 (prior days, excluding D)
 - `ROC_LOOKBACK_DAYS` = 20
 - `HH_WINDOW_DAYS` = 20
+
+### Hash / serialization
+- `HASH_ALGORITHM` = `SHA-256`
+- `HASH_DELIMITER` = `|`
+- `HASH_LINE_SEPARATOR` = `\n`
 
 ### Provider/runtime
 - `API_RETRY_MAX`

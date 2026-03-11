@@ -1,4 +1,4 @@
-# Failure Playbook
+# Failure Playbook (LOCKED)
 
 ## Goal
 Define operator actions for common failures without weakening downstream safety.
@@ -28,3 +28,9 @@ Define operator actions for common failures without weakening downstream safety.
 ### Hash or seal step fails
 - requested date is not consumable even if prior stages succeeded
 - final outcome must be `FAILED` or remain `HELD`; never expose unsealed SUCCESS to consumers
+
+### Controlled correction for sealed historical date
+- create a new `run_id`
+- recompute affected upstream artifacts deterministically
+- generate new hashes and reseal
+- preserve prior sealed run as auditable history

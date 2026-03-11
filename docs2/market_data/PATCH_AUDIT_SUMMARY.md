@@ -1,18 +1,26 @@
-# Patch Audit Summary — Market Data Platform (EOD)
+# Patch Audit Summary
 
-## What was fixed
-1) Re-centered the documentation on upstream market-data responsibilities only.
-2) Tightened core contracts for canonical bars, indicators, effective date, hashes, and sealing.
-3) Filled mandatory but previously empty specs for contract tests and historical replay.
-4) Removed schema/contract ambiguity around invalid bars by separating `eod_invalid_bars` from canonical `eod_bars`.
-5) Added required schema support for seal metadata and structured run-event logging.
-6) Reduced downstream-policy leakage by rewriting watchlist references as example consumer dependencies only.
+## What was corrected
+- removed consumer-specific naming from contracts that should be generic downstream contracts
+- tightened LOCKED status for commands/runbook, failure playbook, intraday snapshot contract, indicator registry, and config registry
+- clarified ATR14 Wilder warmup semantics so the first seed requires 15 canonical bars
+- tightened hash scope to the effective date only
+- expanded config registry to include timezone and hash/serialization keys
+- tightened schema contract wording around controlled correction and sealed audit trail
 
-## Key gaps closed
-- contract tests spec
-- historical replay / data-quality backtest spec
-- seal metadata in schema
-- logging schema
-- invalid-bar audit storage model
-- exact indicator semantics for `D[-20]`, trading-day windows, null policy, and price-basis fallback
-- hash serialization / formatting details
+## Boundary check
+This documentation set now stays within market-data upstream scope:
+- canonical bars
+- indicators
+- eligibility
+- effective date
+- seal/freeze
+- intraday snapshot as optional upstream artifact
+- locking/logging/runbook/replay/tests
+
+Explicitly excluded:
+- downstream screening
+- scoring
+- grouping
+- ranking
+- portfolio/execution logic
