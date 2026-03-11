@@ -89,6 +89,21 @@ Must support:
 - severity/classification
 - active/inactive state
 
+## Required uniqueness and integrity constraints (LOCKED)
+
+### Required uniqueness
+- `eod_bars`: exactly one row per `(trade_date, ticker_id)`
+- `eod_indicators`: exactly one row per `(trade_date, ticker_id)`
+- `eod_eligibility`: exactly one row per `(trade_date, ticker_id)`
+- replay reason-code count: one row per `(replay_id, trade_date, reason_code)`
+- correction request identity: unique correction primary key and deterministic run linkage
+
+### Required integrity semantics
+- one coherent run context must back one sealed readable publication
+- corrected publication must explicitly supersede prior publication
+- superseded publication must remain queryable
+- consumer-readable publication resolution must not depend on timestamp guessing
+
 ## Required schema support for effective-date publication
 The schema must support a consumer-readable publication model where:
 - one effective dataset publication is readable for one date D
@@ -134,11 +149,23 @@ Replay result storage must be able to represent:
 - effective trade date
 - terminal status
 - comparison result
+- comparison note
 - seal state
 - expected-vs-actual mismatch summary
 - reason-code counts
+- config identity
+- publication version if replay is correction-aware
 
 If replay storage is split across multiple tables, the overall semantics must still remain queryable without guessing.
+
+## Application-enforced integrity where MariaDB cannot express partial uniqueness
+Some invariants may require application transaction discipline or locked stored-procedure flow, for example:
+- exactly one current publication per trade date
+- no ambiguous publication switch
+- no dual-current corrected publication state
+- no mixed old/new publication exposure during switch
+
+If MariaDB cannot express the invariant directly as a partial unique index, the implementation must still enforce it deterministically.
 
 ## Severity model distinction
 Two different severity layers may exist:
@@ -167,6 +194,7 @@ Examples of optional but supported tables include:
 - `md_replay_reason_code_counts`
 - per-ticker optional fetch-failure table
 - correction request / publication history tables if correction lifecycle is implemented separately from `eod_runs`
+- explicit `eod_publications` table if publication semantics are separated from `eod_runs`
 
 ## Anti-ambiguity rule (LOCKED)
 The schema must be rich enough that:

@@ -1,35 +1,114 @@
-# EOD Indicators Contract
+# EOD Indicators Contract (LOCKED)
 
-## Output table
-`eod_indicators` with PK `(trade_date, ticker_id)`
+## Purpose
+Define the authoritative upstream indicator artifact for one trade date D.
 
-Meta columns:
-- `is_valid` (1/0)
+This contract governs:
+- indicator row identity
+- minimum fields
+- validity semantics
+- dependency semantics
+- null/invalid behavior
+- deterministic interpretation
+
+This document complements:
+- `indicators/EOD_Indicators_Formula_Spec.md`
+- indicator test fixtures
+- eligibility contracts
+
+## Output identity
+For each `(trade_date, ticker_id)` there must be at most one indicator row.
+
+Minimum row identity:
+- `trade_date`
+- `ticker_id`
+
+## Minimum fields
+Required minimum fields:
+- `trade_date`
+- `ticker_id`
+- `is_valid`
 - `invalid_reason_code`
 - `indicator_set_version`
-- `computed_at`
-- `run_id`
-
-Minimum baseline columns:
 - `dv20_idr`
 - `atr14_pct`
 - `vol_ratio`
 - `roc20`
 - `hh20`
 
-## Locked semantics
-- Windows use **trading-day order**, never calendar-day differences.
-- All output-affecting semantics come from the effective config registry and selected defaults in this documentation set.
-- `ATR` / `TR` always use real OHLC and previous real close, never adjusted price.
-- Price-series indicators use `P(D)`, where `P(D) = adj_close` when `PRICE_BASIS_DEFAULT=ADJ_CLOSE` and `adj_close` is available, otherwise `close`.
-- `D[-20]` means the 20th prior trading day relative to D, excluding D itself.
-- Insufficient history for any mandatory baseline indicator yields `NULL` for that indicator and `is_valid=0` with reason code `IND_INSUFFICIENT_HISTORY`.
-- Any semantic change to formulas, defaults, hash-affecting formatting, or included baseline columns requires a new `indicator_set_version` and recomputation.
+Equivalent naming is allowed only if semantics remain identical.
 
-## Validity policy (LOCKED)
-`is_valid=1` iff:
-- required input bars exist for all needed trading-day positions
-- formulas complete without compute error
-- no mandatory baseline indicator is NULL
+## Upstream-only rule (LOCKED)
+These indicators are upstream derived data.
+They are not:
+- signals
+- rankings
+- watchlist groups
+- portfolio actions
+- execution instructions
 
-Otherwise `is_valid=0` with one of the registered indicator reason codes.
+## Validity semantics
+- `is_valid = 1` means all mandatory indicator fields required by the active upstream contract are valid for that row
+- `is_valid = 0` means the row exists, but one or more mandatory readiness conditions failed
+
+When invalid:
+- `invalid_reason_code` must be populated
+- blocked downstream readiness must be explainable without guessing
+
+## One-row rule (LOCKED)
+The indicator artifact must emit at most one row per `(trade_date, ticker_id)`.
+Duplicate indicator rows for the same key are forbidden.
+
+## Dependency summary table (LOCKED)
+
+| Indicator | Input dependency | Window traversal | Warmup rule | Null rule | Blocking invalid reason |
+|---|---|---|---|---|---|
+| `dv20_idr` | `basis_close(X)`, `volume(X)` for `D[-19] ... D` | trading-day | 20 valid bars including D | `NULL` if required history missing | `IND_INSUFFICIENT_HISTORY`, `IND_MISSING_DEPENDENCY_BAR`, `IND_INVALID_BAR_INPUT` |
+| `atr14_pct` | `high(X)`, `low(X)`, `basis_close(prev(X))`, `basis_close(D)` | trading-day | 15 bars for first ATR14 output | `NULL` if seed or dependency chain invalid | `IND_INSUFFICIENT_HISTORY`, `IND_MISSING_DEPENDENCY_BAR`, `IND_INVALID_BAR_INPUT` |
+| `vol_ratio` | `volume(D)` and `volume(D[-20] ... D[-1])` | trading-day | 21 bars total | `NULL` if prior-20 unavailable | `IND_INSUFFICIENT_HISTORY`, `IND_MISSING_DEPENDENCY_BAR`, `IND_INVALID_BAR_INPUT` |
+| `roc20` | `basis_close(D)`, `basis_close(D[-20])` | trading-day | 21 bars total | `NULL` if `D[-20]` unavailable | `IND_INSUFFICIENT_HISTORY`, `IND_MISSING_DEPENDENCY_BAR`, `IND_INVALID_BAR_INPUT` |
+| `hh20` | `high(X)` for `D[-19] ... D` | trading-day | 20 valid bars including D | `NULL` if required dependency unavailable | `IND_INSUFFICIENT_HISTORY`, `IND_MISSING_DEPENDENCY_BAR`, `IND_INVALID_BAR_INPUT` |
+
+## Price basis rule (LOCKED)
+Where closing-price basis is required, use per-date fallback:
+- `adj_close`
+- otherwise `close`
+
+This must be applied separately on each dependency date.
+
+## Trading-day rule (LOCKED)
+Lookbacks and windows must be evaluated on ordered trading-day sequence.
+Calendar subtraction is forbidden.
+
+## Invalid reason semantics
+Preferred meanings:
+- `IND_INSUFFICIENT_HISTORY`:
+  history not yet long enough for the indicator’s locked warmup
+- `IND_MISSING_DEPENDENCY_BAR`:
+  a required trading-day dependency row should exist but is missing
+- `IND_INVALID_BAR_INPUT`:
+  required bar input exists but is invalid for computation
+- `IND_COMPUTE_ERROR`:
+  compute logic/runtime failed unexpectedly
+
+## Row existence rule (LOCKED)
+If implementation chooses to materialize indicator rows even when invalid:
+- the row must remain uniquely keyed
+- `is_valid = 0`
+- `invalid_reason_code` must explain why
+
+Implementation must not silently omit rows if downstream contracts expect explicit invalid-state rows.
+
+## Determinism rule (LOCKED)
+Given identical canonical bars, calendar ordering, config semantics, and indicator-set version, the indicator row for `(trade_date, ticker_id)` must be identical across reruns.
+
+## Eligibility interaction
+Eligibility consumers must use this indicator artifact as published.
+They must not recompute indicators ad hoc from bars at read time.
+
+## Anti-ambiguity rule (LOCKED)
+The following are forbidden:
+- multiple indicator rows for the same `(trade_date, ticker_id)`
+- invalid row with empty invalid reason
+- non-`NULL` output produced through guessed or missing dependencies
+- downstream read logic inferring validity from field non-nullness alone while ignoring `is_valid` and `invalid_reason_code`
