@@ -1,17 +1,40 @@
 CREATE TABLE IF NOT EXISTS md_replay_daily_metrics (
   replay_id BIGINT UNSIGNED NOT NULL,
   trade_date DATE NOT NULL,
+  trade_date_effective DATE NULL,
   source VARCHAR(32) NOT NULL,
   status ENUM('SUCCESS','HELD','FAILED') NOT NULL,
+  comparison_result ENUM('MATCH','MISMATCH','EXPECTED_DEGRADE','UNEXPECTED') NOT NULL,
   coverage_ratio DECIMAL(6,4) NULL,
   bars_rows_written INT NULL,
   indicators_rows_written INT NULL,
+  eligibility_rows_written INT NULL,
   eligible_count INT NULL,
   invalid_bar_count INT NULL,
   invalid_indicator_count INT NULL,
+  warning_count INT NULL,
+  hard_reject_count INT NULL,
   bars_batch_hash VARCHAR(64) NULL,
   indicators_batch_hash VARCHAR(64) NULL,
   eligibility_batch_hash VARCHAR(64) NULL,
+  seal_state ENUM('SEALED','UNSEALED') NOT NULL,
+  sealed_at DATETIME NULL,
+  expected_status ENUM('SUCCESS','HELD','FAILED') NULL,
+  expected_trade_date_effective DATE NULL,
+  expected_seal_state ENUM('SEALED','UNSEALED') NULL,
+  mismatch_summary VARCHAR(255) NULL,
   created_at DATETIME NOT NULL,
-  PRIMARY KEY (replay_id, trade_date)
+  PRIMARY KEY (replay_id, trade_date),
+  KEY idx_replay_daily_status (replay_id, status),
+  KEY idx_replay_daily_effective (replay_id, trade_date_effective),
+  KEY idx_replay_daily_compare (replay_id, comparison_result)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS md_replay_reason_code_counts (
+  replay_id BIGINT UNSIGNED NOT NULL,
+  trade_date DATE NOT NULL,
+  reason_code VARCHAR(64) NOT NULL,
+  reason_count INT NOT NULL,
+  PRIMARY KEY (replay_id, trade_date, reason_code),
+  KEY idx_replay_reason_code (replay_id, reason_code)
 ) ENGINE=InnoDB;

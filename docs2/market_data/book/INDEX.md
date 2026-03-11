@@ -7,9 +7,9 @@
 - Coverage_Universe_Definition_LOCKED.md
 - Symbol_Lifecycle_and_Mapping_Contract.md
 
-## Provider and canonical data
-- Provider_Data_Acquisition_Contract_API.md
-- Provider_Mapping_Contract_Yahoo_API.md
+## Source acquisition and canonical data
+- Source_Data_Acquisition_Contract_LOCKED.md
+- Source_Mapping_Contract_LOCKED.md
 - Canonicalization_Contract_EOD_Bars.md
 - EOD_Bars_Contract.md
 - Invalid_Bar_Storage_Policy_LOCKED.md
@@ -35,3 +35,9 @@
 
 ## Supporting datasets
 - Market_Daily_Metrics_Contract.md
+
+## How to use this book
+1) Read `Terminology_and_Scope.md` first.
+2) Lock identity/calendar/coverage before implementing ingest.
+3) Implement bars -> indicators -> eligibility -> hash -> seal -> finalize in that exact order.
+4) Treat the `ops/`, `tests/`, `registry/`, and `backtest/` folders as normative companions to this book, not optional notes.

@@ -27,7 +27,7 @@ Otherwise `eligible=0` with a registered reason code.
 - `ELIG_INVALID_BAR`
 - `ELIG_INVALID_INDICATORS`
 - `ELIG_INSUFFICIENT_HISTORY`
-- `ELIG_PROVIDER_ERROR`
+- `ELIG_SOURCE_ERROR`
 
 ## Determinism rule (LOCKED)
 Eligibility must be built from upstream canonical artifacts only. No downstream policy filter may participate in this table.

@@ -8,7 +8,7 @@ Canonical EOD OHLCV is stored in:
 - `eod_bars(trade_date, ticker_id, open, high, low, close, volume, adj_close, source, ingested_at, run_id)`
 
 Rejected provider rows are stored only for audit in:
-- `eod_invalid_bars(trade_date, ticker_id, source, provider_payload_ref, invalid_reason_code, observed_open, observed_high, observed_low, observed_close, observed_volume, observed_adj_close, run_id, recorded_at)`
+- `eod_invalid_bars(trade_date, ticker_id, source, source_row_ref, invalid_reason_code, observed_open, observed_high, observed_low, observed_close, observed_volume, observed_adj_close, run_id, recorded_at)`
 
 Consumers must treat `eod_bars` as the only allowed canonical OHLCV source.
 Consumers must never read `eod_invalid_bars` as market data input.
@@ -27,7 +27,7 @@ Consumers must never read `eod_invalid_bars` as market data input.
 If the provider delivers multiple candidate rows for the same `(trade_date, ticker_id)` within one run, the pipeline must choose exactly one canonical candidate before validation using a deterministic precedence chain:
 1) latest provider payload timestamp if the provider exposes it
 2) otherwise latest acquisition timestamp recorded by the platform
-3) if still tied, lexical maximum of `provider_payload_ref`
+3) if still tied, lexical maximum of `source_row_ref`
 
 All non-selected duplicates must be recorded as non-canonical audit rows with a reason code such as `BAR_DUPLICATE_SUPERSEDED` and must never reach `eod_bars`.
 

@@ -14,13 +14,17 @@ A run may evaluate gates before seal, but it must not be recorded as finalized `
 ## Locked rules
 - A run for requested date T must not be finalized `SUCCESS` before `cutoff_time(T)`.
 - `HELD` or `FAILED` may be recorded before cutoff if an unrecoverable failure is already known.
-- Finalized `SUCCESS` requires all of the following for the same `run_id` and the same consumer-visible date D:
+- A run becomes success-eligible only if all of the following hold for the same `run_id` and the same consumer-visible date D:
   - canonical bars published
   - indicators computed
   - eligibility built
   - quality gates passed
   - hashes computed
-  - seal written
+- Seal is written only after the run is success-eligible and before final `SUCCESS` is committed.
+- Finalized `SUCCESS` requires:
+  - success-eligible state achieved
+  - seal written for the same effective date D
+  - final status committed on the same run context
 - `trade_date_effective = D` becomes consumer-usable only together with finalized `SUCCESS` plus seal.
 
 ## Anti-ambiguity rule (LOCKED)

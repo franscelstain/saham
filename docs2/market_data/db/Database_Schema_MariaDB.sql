@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS eod_runs (
   indicators_batch_hash VARCHAR(64) NULL,
   eligibility_batch_hash VARCHAR(64) NULL,
 
+  config_version VARCHAR(64) NULL,
+  config_hash VARCHAR(64) NULL,
+  config_snapshot_ref VARCHAR(255) NULL,
+
   sealed_at DATETIME NULL,
   sealed_by VARCHAR(64) NULL,
   seal_note VARCHAR(255) NULL,
@@ -66,7 +70,7 @@ CREATE TABLE IF NOT EXISTS eod_invalid_bars (
   trade_date DATE NOT NULL,
   ticker_id INT NULL,
   source VARCHAR(32) NOT NULL,
-  provider_payload_ref VARCHAR(128) NULL,
+  source_row_ref VARCHAR(128) NULL,
   invalid_reason_code VARCHAR(64) NOT NULL,
   observed_open DECIMAL(18,4) NULL,
   observed_high DECIMAL(18,4) NULL,
@@ -148,7 +152,7 @@ CREATE TABLE IF NOT EXISTS eod_run_events (
   CONSTRAINT fk_run_events_run FOREIGN KEY (run_id) REFERENCES eod_runs(run_id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS intraday_snapshots (
+CREATE TABLE IF NOT EXISTS session_snapshots (
   trade_date DATE NOT NULL,
   snapshot_slot VARCHAR(32) NOT NULL,
   ticker_id INT NOT NULL,

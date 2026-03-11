@@ -1,2 +1,42 @@
--- (Optional) Seed reason codes into eod_reason_codes.
--- Use ON DUPLICATE KEY UPDATE.
+-- Seed canonical reason codes into eod_reason_codes.
+-- Safe to rerun: uses ON DUPLICATE KEY UPDATE for description/severity/category/is_active.
+
+INSERT INTO eod_reason_codes (`code`, `category`, `description`, `severity`, `is_active`) VALUES
+('RUN_COVERAGE_LOW', 'RUN', 'Coverage ratio for requested date is below locked minimum threshold.', 'HARD', 1),
+('RUN_INDICATORS_MISSING', 'RUN', 'Mandatory indicator artifact or row set is missing for requested date.', 'HARD', 1),
+('RUN_ELIGIBILITY_MISSING', 'RUN', 'Eligibility snapshot missing for requested date.', 'HARD', 1),
+('RUN_HASH_MISSING', 'RUN', 'One or more mandatory content hashes are absent at finalize time.', 'HARD', 1),
+('RUN_HASH_FAILED', 'RUN', 'Hash computation failed or produced unusable output.', 'HARD', 1),
+('RUN_SEAL_PRECONDITION_FAILED', 'RUN', 'Seal attempted before all locked preconditions were satisfied.', 'HARD', 1),
+('RUN_SEAL_WRITE_FAILED', 'RUN', 'Seal metadata could not be written successfully.', 'HARD', 1),
+('RUN_FINALIZE_BEFORE_CUTOFF', 'RUN', 'Final success attempted before cutoff policy allowed it.', 'HARD', 1),
+('RUN_LOCK_CONFLICT', 'RUN', 'Hash/seal/finalize ownership conflict or duplicate writer detected.', 'HARD', 1),
+('RUN_SOURCE_TIMEOUT', 'RUN', 'Source timeout occurred and retry policy was invoked or exhausted.', 'WARN', 1),
+('RUN_SOURCE_RATE_LIMIT', 'RUN', 'Source rate limiting occurred and affected acquisition progress.', 'WARN', 1),
+('RUN_SOURCE_AUTH_ERROR', 'RUN', 'Source authentication or credential/config failure blocked acquisition.', 'HARD', 1),
+('RUN_SOURCE_RESPONSE_CHANGED', 'RUN', 'Source schema/response contract drift detected.', 'HARD', 1),
+('RUN_SOURCE_PARTIAL_COVERAGE', 'RUN', 'Source returned incomplete symbol coverage for requested date.', 'WARN', 1),
+('RUN_SOURCE_MALFORMED_PAYLOAD', 'RUN', 'Source payload could not be normalized safely.', 'HARD', 1),
+('BAR_DUPLICATE_SOURCE_ROW', 'BAR', 'Multiple source rows mapped to the same (trade_date, ticker_id) and required deterministic winner selection.', 'WARN', 1),
+('BAR_INVALID_OHLC_ORDER', 'BAR', 'Observed OHLC violates canonical ordering rules.', 'HARD', 1),
+('BAR_NON_POSITIVE_PRICE', 'BAR', 'Observed price field is zero or negative where positive value is required.', 'HARD', 1),
+('BAR_NEGATIVE_VOLUME', 'BAR', 'Observed volume is negative.', 'HARD', 1),
+('BAR_MISSING_REQUIRED_FIELD', 'BAR', 'One or more mandatory source fields were missing.', 'HARD', 1),
+('IND_INSUFFICIENT_HISTORY', 'INDICATOR', 'Required trading-day history window not available for deterministic compute.', 'WARN', 1),
+('IND_MISSING_DEPENDENCY_BAR', 'INDICATOR', 'Required canonical dependency bar is missing in the trading-day chain.', 'HARD', 1),
+('IND_INVALID_BAR_INPUT', 'INDICATOR', 'Indicator compute input derived from canonical bars is invalid.', 'HARD', 1),
+('IND_COMPUTE_ERROR', 'INDICATOR', 'Indicator computation failed because of logic/runtime error.', 'HARD', 1),
+('ELIG_MISSING_BAR', 'ELIGIBILITY', 'Coverage-universe ticker has no canonical valid bar for requested date.', 'WARN', 1),
+('ELIG_MISSING_INDICATORS', 'ELIGIBILITY', 'Eligibility cannot be determined because mandatory indicators are absent.', 'HARD', 1),
+('ELIG_INVALID_INDICATORS', 'ELIGIBILITY', 'Indicator row exists but is marked invalid for mandatory fields.', 'WARN', 1),
+('ELIG_INSUFFICIENT_HISTORY', 'ELIGIBILITY', 'Eligibility denied because mandatory history-dependent indicators are not yet available.', 'WARN', 1),
+('ELIG_UNIVERSE_DEPENDENCY_MISSING', 'ELIGIBILITY', 'Upstream dependency required to build universe membership was unavailable.', 'HARD', 1),
+('SNAP_SOURCE_TIMEOUT', 'INTRADAY', 'Session snapshot source timeout occurred.', 'WARN', 1),
+('SNAP_SOURCE_RATE_LIMIT', 'INTRADAY', 'Session snapshot source rate limit occurred.', 'WARN', 1),
+('SNAP_PARTIAL_SCOPE', 'INTRADAY', 'Session snapshot captured only part of the intended scope.', 'WARN', 1),
+('SNAP_SOURCE_ERROR', 'INTRADAY', 'Session snapshot source failed for non-blocking operational reasons.', 'WARN', 1)
+ON DUPLICATE KEY UPDATE
+  `category` = VALUES(`category`),
+  `description` = VALUES(`description`),
+  `severity` = VALUES(`severity`),
+  `is_active` = VALUES(`is_active`);

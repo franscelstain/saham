@@ -22,24 +22,39 @@ Define the minimum automated contract tests required to keep Market Data Platfor
 ### 3) Null and warmup policy
 - insufficient history produces NULL mandatory indicator + invalid reason
 - no forward-fill or zero-fill
+- missing required prior date in trading-day chain invalidates the dependent indicator row
 
 ### 4) Effective date and readiness
 - unsealed `SUCCESS` does not become consumable effective date
 - `HELD` / `FAILED` requested date falls back to prior sealed SUCCESS date
 - if no prior sealed SUCCESS date exists, `trade_date_effective` stays NULL
 - consumer read model never uses `MAX(trade_date)` behavior
+- final `SUCCESS` is impossible before seal is written
 
 ### 5) Eligibility determinism
 - one row per coverage-universe ticker/date
 - missing canonical bar => `ELIG_MISSING_BAR`
 - invalid indicators => `ELIG_INVALID_INDICATORS`
+- insufficient mandatory history => `ELIG_INSUFFICIENT_HISTORY`
 
 ### 6) Hash determinism
 - fixed ordering and formatting yield stable hashes across reruns
 - locale and trailing-zero behavior do not change hashes
 - only rows for the effective date being sealed are hashed
 - field order in serialized payload exactly matches the locked hash contract
+- changing `run_id` alone does not change content hash
+- changing canonical content does change the relevant content hash
 
-### 7) Controlled correction
+### 7) Seal/finalize sequencing
+- seal cannot be written before all hash preconditions exist
+- finalize cannot commit `SUCCESS` before seal exists
+- one sealed effective date must map to one coherent run context
+
+### 8) Controlled correction
 - reseal after correction creates new run/hash trail
 - prior run remains auditable
+- historical correction cannot silently overwrite prior sealed content without new run context
+
+## Minimum evidence format
+Each test group must have:
+- expected hash result when applicable

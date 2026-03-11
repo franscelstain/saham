@@ -10,7 +10,7 @@
 - `eod_run_events`
 
 ## Optional tables
-- `intraday_snapshots`
+- `session_snapshots`
 - `eod_fetch_failures`
 - `md_replay_daily_metrics`
 
