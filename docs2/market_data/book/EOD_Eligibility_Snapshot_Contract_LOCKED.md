@@ -1,33 +1,101 @@
 # EOD Eligibility Snapshot Contract (LOCKED)
 
-## Output table
-`eod_eligibility` with PK `(trade_date, ticker_id)` where `trade_date` is the effective date D.
+## Purpose
+Define the authoritative eligibility snapshot produced by Market Data Platform for one trade date D.
 
-Columns:
-- `eligible` (1/0)
-- `reason_code` (required if `eligible=0`; NULL if `eligible=1`)
-- `asof_run_id`
-- `created_at`
+This snapshot is an upstream readiness artifact for consumers.
+It does not encode ranking, scoring, picks, or trading decisions.
 
-## Coverage rule (LOCKED)
-There must be exactly one eligibility row per ticker in the coverage universe for D.
-Consumers must not infer absence as ineligibility.
+## Output definition
+For each trade date D, the platform must produce exactly one eligibility row per coverage-universe ticker for D.
 
-## Minimum eligibility rule (LOCKED)
-`eligible=1` iff all conditions hold:
-- canonical bar exists in `eod_bars(D, ticker)`
-- indicator row exists in `eod_indicators(D, ticker)`
-- indicator row has `is_valid=1`
+Minimum fields:
+- `trade_date`
+- `ticker_id`
+- `eligible`
+- `reason_code`
 
-Otherwise `eligible=0` with a registered reason code.
+## Row cardinality rule (LOCKED)
+For one trade date D:
+- every ticker in coverage universe for D must have exactly one eligibility row
+- tickers outside coverage universe for D must not appear in the eligibility snapshot for D
 
-## Minimum reason codes
+## Eligibility meaning
+- `eligible = 1` means the ticker is readable for downstream consumers under upstream readiness rules
+- `eligible = 0` means the ticker is not readable for downstream use on D and must carry a blocking `reason_code`
+
+## Upstream-only rule (LOCKED)
+Eligibility here means upstream dataset readiness only.
+It must not be interpreted as:
+- a buy/sell signal
+- a ranking result
+- a watchlist group
+- a strategy approval
+
+## Minimum blocking reasons (LOCKED)
+Use only reason codes that exist in the official reason-code registry.
+
+Minimum standard blocking reasons:
 - `ELIG_MISSING_BAR`
 - `ELIG_MISSING_INDICATORS`
-- `ELIG_INVALID_BAR`
 - `ELIG_INVALID_INDICATORS`
 - `ELIG_INSUFFICIENT_HISTORY`
-- `ELIG_SOURCE_ERROR`
+- `ELIG_UNIVERSE_DEPENDENCY_MISSING`
+- `ELIG_FETCH_FAILURE` when optional per-ticker fetch-failure tracking is implemented and the ticker could not be built safely from source acquisition failure
+
+## Validity rules
+A ticker may be `eligible = 1` only if all required upstream conditions hold for D:
+- ticker is in coverage universe for D
+- canonical valid bar exists for D
+- mandatory indicators exist for D
+- mandatory indicators are valid
+- no blocking fetch-failure condition applies
+- no locked rule denies readiness for that ticker/date
+
+## Missing-bar rule
+If a coverage-universe ticker has no canonical valid bar for D:
+- `eligible = 0`
+- `reason_code = ELIG_MISSING_BAR`
+
+## Missing-indicators rule
+If mandatory indicators for D do not exist:
+- `eligible = 0`
+- `reason_code = ELIG_MISSING_INDICATORS`
+
+## Invalid-indicators rule
+If indicator row exists but mandatory indicator readiness is invalid:
+- `eligible = 0`
+- `reason_code = ELIG_INVALID_INDICATORS`
+
+## Insufficient-history rule
+If the blocking cause is insufficient required history for mandatory indicators:
+- `eligible = 0`
+- `reason_code = ELIG_INSUFFICIENT_HISTORY`
+
+## Universe-dependency rule
+If eligibility cannot be built safely because required universe dependency is unavailable:
+- `eligible = 0`
+- `reason_code = ELIG_UNIVERSE_DEPENDENCY_MISSING`
+
+## Optional fetch-failure rule
+If optional per-ticker fetch-failure tracking is implemented and a ticker could not be safely produced because source acquisition failed after retries/exhaustion:
+- `eligible = 0`
+- `reason_code = ELIG_FETCH_FAILURE`
+
+This code must be used only if it exists in the official registry and is supported by the implementation.
+
+## One-blocking-reason rule (LOCKED)
+Each eligibility row stores one blocking `reason_code` only.
+
+If multiple blocking conditions exist, the implementation must select the most specific dominant blocking reason according to locked precedence documented elsewhere.
+
+## Consumer rule (LOCKED)
+Consumers must use the eligibility snapshot as published for D.
+Consumers must not:
+- recompute eligibility ad hoc from raw tables
+- ignore `reason_code`
+- infer eligibility from bars alone
+- infer eligibility from indicators alone
 
 ## Determinism rule (LOCKED)
-Eligibility must be built from upstream canonical artifacts only. No downstream policy filter may participate in this table.
+Given identical upstream inputs and identical locked contracts, eligibility output for D must be identical across reruns.

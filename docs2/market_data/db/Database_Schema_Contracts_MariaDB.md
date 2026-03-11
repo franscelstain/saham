@@ -1,29 +1,101 @@
 # Database Schema Contracts (MariaDB)
 
-## Required tables
-- `eod_runs`
+## Purpose
+Define the minimum MariaDB schema semantics required to implement Market Data Platform contracts safely and deterministically.
+
+This document describes schema intent and required semantics.
+It complements the concrete DDL in `Database_Schema_MariaDB.sql`.
+
+## Core schema goals
+The schema must support:
+- canonical EOD bars
+- deterministic indicator storage
+- explicit eligibility snapshot
+- run-level terminal status
+- append-only event trail
+- hash and seal evidence
+- effective-date publication semantics
+- historical correction trail
+- replay/result evidence
+- auditable registry linkage
+
+## Required core tables
+Minimum required schema support must exist for concepts equivalent to:
 - `eod_bars`
 - `eod_invalid_bars`
 - `eod_indicators`
 - `eod_eligibility`
-- `eod_reason_codes`
+- `eod_runs`
 - `eod_run_events`
+- reason-code registry table
 
-## Optional tables
-- `session_snapshots`
-- `eod_fetch_failures`
-- `md_replay_daily_metrics`
+Equivalent naming is allowed if semantics remain identical.
 
-## Required schema capabilities (LOCKED)
-- canonical bars and invalid bars are stored separately
-- run record stores hashes and seal metadata
-- run-event logging supports auditable stage/event trail
-- eligibility stores one row per coverage-universe ticker/date
-- schema supports deterministic replay and downstream read safety
-- schema supports controlled correction by preserving run-level audit history instead of silently mutating sealed output semantics
+## Required table semantics
+
+### 1. Canonical bars
+Must support:
+- one canonical row per `(trade_date, ticker_id)`
+- deterministic storage of canonical OHLCV fields
+- source identity for canonical winner row
+- prevention of ambiguous duplicates
+
+### 2. Invalid bars
+Must support:
+- rejected row evidence
+- invalid reason code
+- source row reference or equivalent traceability
+- association to relevant run/date
+
+### 3. Indicators
+Must support:
+- one indicator row per `(trade_date, ticker_id)`
+- explicit validity state
+- invalid reason code when invalid
+- indicator-set version identity
+
+### 4. Eligibility
+Must support:
+- one row per coverage-universe ticker/date
+- explicit `eligible` state
+- explicit blocking `reason_code`
+- deterministic downstream-readable readiness artifact
+
+### 5. Runs
+Must support:
+- requested trade date
+- effective trade date
+- terminal status
+- stage identity
+- counts and gate-related telemetry
+- hash fields
+- seal metadata
+- config identity linkage
+- current publication semantics for corrected history if implemented in run table
+
+### 6. Run events
+Must support:
+- append-only event trail
+- stage/event traceability
+- event severity
+- optional reason-code linkage
+- run association
+
+### 7. Reason-code registry
+Must support:
+- stable code identity
+- category
+- description
+- severity/classification
+- active/inactive state
+
+## Required schema support for effective-date publication
+The schema must support a consumer-readable publication model where:
+- one effective dataset publication is readable for one date D
+- consumers can resolve the current readable publication safely
+- consumers do not need to guess using latest timestamps or max dates
 
 ## Required schema support for historical correction integrity (LOCKED)
-
 The schema must support all semantics required by:
 - `Historical_Correction_and_Reseal_Contract_LOCKED.md`
 - `Dataset_Seal_and_Freeze_Contract_LOCKED.md`
@@ -48,8 +120,15 @@ Allowed implementation patterns:
 
 The contract does not force one exact schema pattern, but all semantics above are mandatory.
 
-## Required replay-proof schema support (LOCKED)
+## Required schema support for determinism and reproducibility
+The schema must preserve enough data to prove:
+- which artifact set was hashed
+- which run produced the publication
+- which config identity was used
+- which seal was current
+- which historical publication was superseded by correction
 
+## Required replay-proof schema support (LOCKED)
 Replay result storage must be able to represent:
 - requested trade date
 - effective trade date
@@ -61,8 +140,37 @@ Replay result storage must be able to represent:
 
 If replay storage is split across multiple tables, the overall semantics must still remain queryable without guessing.
 
+## Severity model distinction
+Two different severity layers may exist:
+
+### Reason-code severity
+Registry-level classification such as:
+- `INFO`
+- `WARN`
+- `HARD`
+
+This classifies the semantic seriousness of the code itself.
+
+### Event severity
+Run-event log severity such as:
+- `INFO`
+- `WARN`
+- `ERROR`
+
+This classifies the event/log occurrence in run execution.
+
+These two layers do not need identical enums, but the distinction must remain documented and intentional.
+
 ## Optional tables
 Examples of optional but supported tables include:
 - `md_replay_daily_metrics`
 - `md_replay_reason_code_counts`
+- per-ticker optional fetch-failure table
 - correction request / publication history tables if correction lifecycle is implemented separately from `eod_runs`
+
+## Anti-ambiguity rule (LOCKED)
+The schema must be rich enough that:
+- consumer-readable state can be resolved deterministically
+- correction history can be audited without guessing
+- replay results can be interpreted without hidden assumptions
+- reason-code usage remains consistent with the official registry
