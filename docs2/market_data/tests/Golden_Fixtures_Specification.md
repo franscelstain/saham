@@ -1,58 +1,107 @@
-# Golden Fixtures Spec
+# Golden Fixtures Specification (LOCKED)
 
-Defines immutable fixtures for deterministic contract tests and replay tests.
+## Purpose
+Define how golden fixtures must be structured so contract tests and replay proofs can be implemented without guessing.
 
-## Required fixture sets
-- valid canonical bars
-- invalid provider bars
-- minimal market calendar sample
-- ticker identity mapping sample
-- indicator vectors with expected outputs
-- expected eligibility snapshot
-- expected serialized hash inputs and hash outputs
-- requested-date fallback scenarios
-- seal/finalize sequencing scenarios
-- controlled correction scenarios
+Golden fixtures are immutable proof inputs and expected outputs.
+They are not ad-hoc sample files.
 
-## Fixture rules
-- fixtures are immutable once published
-- changes require new fixture version and explicit note
-- fixture filenames should encode semantic version, not ad-hoc timestamps
-- one fixture family should test one contract focus; do not mix unrelated assertions in one opaque file
+## Fixture design rules (LOCKED)
+1. A fixture must test a clear contract focus.
+2. A fixture family may include multiple files, but they must belong to one semantic scenario.
+3. Changing semantic meaning requires a new fixture version.
+4. Expected outputs are part of the fixture family, not optional commentary.
+5. A fixture that lacks expected outputs does not satisfy this specification.
 
-## Minimum fixture catalog (LOCKED)
-### `fixture_calendar_v1`
-- at least 25 ordered trading days
-- includes one non-trading gap so `D[-N]` walk is provable by calendar, not date subtraction
+## Minimum fixture package structure
+Each fixture family should include, as applicable:
+- input source rows
+- normalized/canonical expected rows
+- expected invalid rows
+- expected indicators
+- expected eligibility
+- expected run summary outcome
+- expected hash payload lines
+- expected hash values
+- expected publication/correction outcome
 
-### `fixture_bars_valid_minimal_v1`
-- at least 21 canonical bars for one ticker
-- sufficient to prove `dv20_idr`, `vol_ratio`, `roc20`, and `hh20`
+## Required fixture families
+The required families are listed in:
+- `Golden_Fixture_Catalog_LOCKED.md`
 
-### `fixture_bars_atr_seed_v1`
-- at least 15 canonical bars for one ticker
-- expected TR series and first ATR14 seed date explicitly listed
+This file defines how those fixture families must be shaped.
 
-### `fixture_bars_adj_close_fallback_v1`
-- mixed window where some days have `adj_close` and some days fall back to `close`
-- expected `roc20` proves per-date fallback
+## Minimum contents by fixture type
 
-### `fixture_invalid_provider_rows_v1`
-- negative/zero-invalid price cases
-- high-low ordering violation
-- duplicate provider rows for one `(trade_date, ticker_id)`
+### A. Bar-validation fixtures
+Must include:
+- source input rows
+- expected canonical output rows
+- expected invalid row outputs
+- expected invalid reason codes
 
-### `fixture_effective_date_fallback_v1`
-- requested date blocked by `HELD`
-- prior date sealed `SUCCESS`
-- expected `trade_date_effective` resolves to prior date
+### B. Indicator fixtures
+Must include:
+- canonical bar inputs
+- relevant calendar ordering inputs if needed
+- expected indicator outputs
+- expected invalid reason codes where applicable
 
-### `fixture_hash_payload_v1`
-- explicit serialized lines for bars/indicators/eligibility
-- expected SHA-256 outputs
-- same content with different `run_id` must keep identical hash
+### C. Eligibility fixtures
+Must include:
+- coverage-universe inputs
+- canonical bar or indicator dependencies
+- expected eligibility outputs
+- expected row counts
 
-### `fixture_controlled_correction_v1`
-- original sealed dataset for D
-- corrected rerun for the same D with one intentional content change
-- expected new hash + preserved audit trail
+### D. Hash fixtures
+Must include:
+- explicit serialized line payloads
+- explicit expected SHA-256 outputs
+- cases with different `run_id` and identical content
+
+### E. Effective-date fixtures
+Must include:
+- requested date
+- prior readable or non-readable states
+- expected `trade_date_effective`
+- expected terminal outcome
+
+### F. Correction fixtures
+Must include:
+- prior current published state
+- correction request metadata
+- approval metadata where applicable
+- correction execution outputs
+- old hash set
+- new hash set
+- expected publication switch or non-switch result
+
+### G. Replay fixtures
+Must include:
+- source snapshot/extract reference
+- config/registry snapshot reference
+- calendar/mapping snapshot reference
+- expected comparison result
+- expected run-level outputs
+
+## Expected-output discipline (LOCKED)
+Every fixture family must carry enough expected outputs to support:
+- row-level assertions
+- run-level assertions
+- hash-level assertions where applicable
+- publication/correction assertions where applicable
+
+## Fixture naming rule
+Fixture family names must be stable semantic identifiers, for example:
+- `fixture_bars_atr_seed_v1`
+- `fixture_controlled_correction_v1`
+
+Do not use ad-hoc names based only on timestamps or local developer shorthand.
+
+## Anti-drift rule (LOCKED)
+When a contract meaning changes intentionally:
+- create new fixture version
+- keep prior fixture version preserved for historical comparison where needed
+
+Do not silently edit old fixture semantics and pretend nothing changed.

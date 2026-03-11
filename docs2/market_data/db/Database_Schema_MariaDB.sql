@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS eod_runs (
   config_hash VARCHAR(64) NULL,
   config_snapshot_ref VARCHAR(255) NULL,
 
+  supersedes_run_id BIGINT UNSIGNED NULL,
+  publication_version INT UNSIGNED NULL,
+  is_current_publication TINYINT(1) NOT NULL DEFAULT 0,
+
   sealed_at DATETIME NULL,
   sealed_by VARCHAR(64) NULL,
   seal_note VARCHAR(255) NULL,
@@ -41,7 +45,9 @@ CREATE TABLE IF NOT EXISTS eod_runs (
   PRIMARY KEY (run_id),
   KEY idx_runs_requested_status_stage (trade_date_requested, status, stage),
   KEY idx_runs_effective (trade_date_effective),
-  KEY idx_runs_effective_status_sealed (trade_date_effective, status, sealed_at)
+  KEY idx_runs_effective_status_sealed (trade_date_effective, status, sealed_at),
+  KEY idx_runs_trade_date_current_pub (trade_date_effective, is_current_publication),
+  KEY idx_runs_supersedes (supersedes_run_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS eod_bars (
@@ -150,6 +156,27 @@ CREATE TABLE IF NOT EXISTS eod_run_events (
   KEY idx_run_events_run_time (run_id, event_time),
   KEY idx_run_events_date_stage (trade_date_requested, stage),
   CONSTRAINT fk_run_events_run FOREIGN KEY (run_id) REFERENCES eod_runs(run_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS eod_dataset_corrections (
+  correction_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  trade_date DATE NOT NULL,
+  prior_run_id BIGINT UNSIGNED NULL,
+  new_run_id BIGINT UNSIGNED NULL,
+  correction_reason_code VARCHAR(64) NOT NULL,
+  correction_reason_note TEXT NULL,
+  status ENUM('REQUESTED','APPROVED','EXECUTING','RESEALED','PUBLISHED','REJECTED','CANCELLED') NOT NULL,
+  requested_by VARCHAR(64) NOT NULL,
+  requested_at DATETIME NOT NULL,
+  approved_by VARCHAR(64) NULL,
+  approved_at DATETIME NULL,
+  published_at DATETIME NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (correction_id),
+  KEY idx_corr_trade_date_status (trade_date, status),
+  KEY idx_corr_prior_run (prior_run_id),
+  KEY idx_corr_new_run (new_run_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS session_snapshots (
