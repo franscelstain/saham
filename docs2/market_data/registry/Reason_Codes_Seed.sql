@@ -1,0 +1,2 @@
+-- (Optional) Seed reason codes into eod_reason_codes.
+-- Use ON DUPLICATE KEY UPDATE.

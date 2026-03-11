@@ -1,0 +1,26 @@
+# Book Index — Market Data Platform (EOD)
+
+- Terminology_and_Scope.md
+- Provider_Data_Acquisition_Contract_API.md
+- Provider_Mapping_Contract_Yahoo_API.md
+- Canonicalization_Contract_EOD_Bars.md
+- EOD_Bars_Contract.md
+- EOD_Indicators_Contract.md
+- Run_Status_and_Quality_Gates_LOCKED.md
+- Effective_Trade_Date_Contract_LOCKED.md
+- EOD_Eligibility_Snapshot_Contract_LOCKED.md
+- Eligibility_Partial_Data_Behavior_LOCKED.md
+- Audit_Hash_and_Reproducibility_Contract_LOCKED.md
+- Hash_Number_Formatting_LOCKED.md
+- Coverage_Universe_Definition_LOCKED.md
+- Invalid_Bar_Storage_Policy_LOCKED.md
+- Market_Calendar_Requirements_Contract.md
+- EOD_Cutoff_and_Finalization_Contract_LOCKED.md
+- EOD_Data_Retention_and_History_Rewrite_Policy_LOCKED.md
+- Corporate_Action_and_Adjustment_Policy.md
+- Corporate_Action_and_Adjustment_Policy_Selected_Defaults_LOCKED.md
+- Dataset_Seal_and_Freeze_Contract_LOCKED.md
+- Watchlist_Consumer_Read_Model_Contract_LOCKED.md
+- Market_Daily_Metrics_Contract.md
+- Corporate_Action_Impact_Flags_Contract.md
+- Symbol_Lifecycle_and_Mapping_Contract.md
