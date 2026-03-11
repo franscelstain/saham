@@ -202,3 +202,10 @@ The schema must be rich enough that:
 - correction history can be audited without guessing
 - replay results can be interpreted without hidden assumptions
 - reason-code usage remains consistent with the official registry
+
+## See also
+- `Database_Schema_MariaDB.sql`
+- `Indices_and_Constraints_Contract_LOCKED.md`
+- `EOD_Publications_Table.sql`
+- `../book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+- `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`

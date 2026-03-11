@@ -7,47 +7,52 @@ This runbook complements:
 - `Historical_Correction_and_Reseal_Contract_LOCKED.md`
 - `Dataset_Seal_and_Freeze_Contract_LOCKED.md`
 - `Commands_and_Runbook.md`
-- `Historical_Replay_and_Data_Quality_Backtest.md`
+- replay and publication contracts
 
 ## Operator goals
 When correcting trade date D, the operator must ensure:
-- the prior published sealed state remains preserved
-- the corrected state is produced through a fresh run context
+- prior current publication remains preserved
+- corrected state is produced through a fresh run context
 - corrected content is hashed and resealed
-- the new publication becomes current only after validation
-- consumers never read mixed old/new artifacts
+- new publication becomes current only after validation
+- consumers never read mixed old/new publication state
 
 ## When this runbook must be used
 Use this runbook when:
 - a sealed historical date D contains incorrect canonical bars
-- indicators for D were computed from invalid dependencies
+- indicators for D were computed from incorrect dependencies
 - eligibility for D was wrong because upstream data or config was wrong
-- symbol/ticker mapping or market calendar issues altered consumer-visible artifacts for D
+- symbol mapping, calendar logic, or config semantics changed consumer-visible output for D
 - a prior publication for D must be replaced with a corrected publication
 
-Do not use this runbook merely to add notes, logs, or non-consumer-visible audit metadata.
+Do not use this runbook merely to:
+- add notes
+- append logs
+- add non-consumer-visible audit references
+- rerun a date that produces identical content and identical hashes
 
 ## Required preconditions
 Before correction starts, the following must exist:
-- identified target trade date `D`
+- identified target trade date D
 - identified current publication for D
 - correction reason documented
 - approval recorded
-- planned source of truth for corrected input documented
+- planned corrected source-of-truth path documented
 - operator confirmed this is a content correction, not just an audit rerun
 
 ## High-level flow (LOCKED)
 1. create correction request
-2. review and approve correction
-3. identify current publication for D
-4. execute correction run for D
+2. approve correction
+3. record current publication baseline
+4. execute correction run
 5. rebuild bars -> indicators -> eligibility
 6. recompute hashes
-7. validate outputs versus expectation
-8. reseal corrected dataset
-9. mark corrected publication current
-10. mark prior publication superseded
-11. archive audit evidence
+7. validate candidate output
+8. reseal candidate publication
+9. switch publication only if safe
+10. preserve evidence pack
+
+---
 
 ## Step-by-step operator flow
 
@@ -55,7 +60,7 @@ Before correction starts, the following must exist:
 Record at minimum:
 - correction ID
 - target trade date D
-- reason
+- reason code / reason note
 - scope of expected change
 - requester
 - request timestamp
@@ -65,18 +70,19 @@ Approval must record:
 - approver identity
 - approval timestamp
 - approval note
-- whether downstream communication or maintenance note is required
+- whether downstream communication is needed
 
 No correction publication may proceed without approval.
 
-### Step 3 — Identify current state
-Before execution, identify and record:
-- current published run for D
-- current hashes for D
-- current seal timestamp for D
-- current publication version for D if applicable
+### Step 3 — Record baseline current publication
+Before execution, record:
+- current publication identity for D
+- current publication version
+- current run reference
+- current hash set
+- current seal timestamp
 
-This snapshot is the baseline for comparison after correction.
+This baseline is mandatory comparison evidence.
 
 ### Step 4 — Execute correction run
 Run the normal upstream pipeline for D under a new run context:
@@ -86,49 +92,86 @@ Run the normal upstream pipeline for D under a new run context:
 - compute hashes
 - validate gates
 
-The operator must not mutate the old published state in place.
+Never mutate the old publication in place.
 
-### Step 5 — Compare old vs new outputs
-Minimum comparison:
+### Step 5 — Compare old vs new candidate
+Minimum comparison must cover:
 - row counts
-- reason-code counts
-- hash set
-- dominant changed rows/artifacts
-- expected vs actual scope of change
+- changed artifact scope
+- old/new hash sets
+- expected vs actual correction scope
+- whether content is actually different
 
-If outputs are byte-identical and hashes are identical, treat as audit rerun, not a correction publication.
+If outputs are byte-identical and hashes are identical:
+- treat as audit rerun
+- do not create a new publication
+- do not increment publication version
 
-### Step 6 — Validate correction outcome
-The operator must verify:
+### Step 6 — Validate correction candidate
+Verify:
 - required artifacts exist
 - gates pass
 - hashes exist
-- new seal preconditions pass
-- changed output is consistent with correction intent
+- seal preconditions pass
+- changed output matches correction intent
+- candidate publication is internally coherent
 
-### Step 7 — Reseal corrected output
-Only after successful validation:
+### Step 7 — Reseal corrected candidate
+Only after validation:
 - write new seal metadata
-- link seal to correction execution run
-- preserve prior seal trail
+- link new seal to the correction execution run
+- preserve prior seal and publication trail
 
 ### Step 8 — Publish corrected state
-Mark corrected publication as current for D.
-Mark prior current publication as superseded.
+Switch current publication only if:
+- new candidate is sealed
+- publication switch can be performed without ambiguity
+- prior publication will remain preserved and non-current
 
-This publication switch must be atomic at the logical level: consumer reads must resolve to exactly one current publication.
-
-### Step 9 — Archive evidence
-Store or reference:
+### Step 9 — Preserve correction evidence pack
+Store or reconstruct:
 - correction request
 - approval
-- old hashes
-- new hashes
-- old publication reference
-- new publication reference
-- comparison result
-- run summary
-- seal evidence
+- baseline publication
+- old/new hash sets
+- comparison summary
+- publication switch result
+- final current publication resolution
+
+---
+
+## Pre-publication switch checklist (LOCKED)
+Before switching current publication, verify all below are true:
+- correction request is approved
+- candidate run completed required artifacts
+- candidate hashes exist
+- candidate seal exists
+- candidate output differs materially from prior current publication
+- prior current publication baseline is recorded
+- publication switch can produce exactly one current publication
+- prior publication will remain preserved
+
+If any item above is false:
+- do not switch publication
+
+## Post-publication switch checklist (LOCKED)
+After switching current publication, verify:
+- exactly one publication is current for D
+- new publication is current
+- prior publication is preserved and non-current
+- publication version is correct
+- correction evidence pack is complete
+- downstream read model resolves the new current publication for D
+
+## Failed correction recovery checklist (LOCKED)
+If correction fails before safe publication:
+- confirm prior current publication remains current
+- confirm candidate correction is non-current
+- confirm no ambiguous publication state exists
+- preserve failure evidence
+- decide whether to retry, reject, or cancel the correction request
+
+---
 
 ## Decision outcomes
 
@@ -138,10 +181,11 @@ Use when:
 - all gates pass
 - hashes exist
 - reseal succeeded
+- publication switch succeeded safely
 
 Effect:
 - new publication becomes current for D
-- prior publication becomes superseded
+- prior publication becomes superseded and audit-only
 
 ### Outcome B — Approved execution but unchanged content
 Use when:
@@ -152,51 +196,56 @@ Use when:
 Effect:
 - keep current publication unchanged
 - record audit rerun only
+- do not increase publication version
 
 ### Outcome C — Correction rejected
 Use when:
 - reason invalid
-- proposed change unsupported
 - evidence insufficient
-- correction would violate upstream contracts
+- proposed change unsupported
+- correction would violate locked upstream contracts
 
 Effect:
 - no new correction run becomes current
 
-### Outcome D — Correction failed during execution
+### Outcome D — Correction failed during execution or reseal
 Use when:
-- run failed
+- candidate run failed
 - hashes missing
 - reseal failed
 - outputs inconsistent with expected correction scope
+- publication switch could not be made safely
 
 Effect:
-- keep prior current publication
-- record failure trail
-- do not partially publish
+- prior current publication remains current
+- correction candidate remains non-current
+- failure trail remains auditable
+
+---
 
 ## Forbidden operator shortcuts (LOCKED)
 Operators must not:
-- directly edit sealed canonical rows in place
+- directly edit current sealed publication rows in place
 - overwrite historical hashes
-- manually flip current publication without new seal evidence
-- skip comparison and publish based on guess
-- merge rows from old publication and new run
-- publish correction because of timestamp recency alone
+- switch current publication based only on recency timestamp
+- skip comparison and publish by assumption
+- merge rows from old publication and new candidate
+- publish correction without new seal evidence
+- increment publication version for unchanged-content rerun
 
 ## Minimum evidence checklist
-For every completed historical correction flow, ensure evidence exists for:
+For every completed correction flow, preserve at minimum:
 - correction request ID
 - approval metadata
 - target trade date D
-- old current publication reference
+- prior publication identity
 - new execution run ID
 - old hash set
 - new hash set
 - comparison result
 - new seal evidence
-- supersession relation
-- final publication status
+- publication switch result
+- final current publication resolution
 
 ## Rollback rule (LOCKED)
 If corrected publication switch cannot be completed safely:
@@ -209,12 +258,23 @@ If corrected publication switch cannot be completed safely:
 Before final publication switch, verify:
 - corrected state is sealed
 - corrected state is internally coherent
-- only one publication will resolve as current for D
+- exactly one current publication will resolve for D
 - fallback behavior for other dates remains unaffected
 
 ## Replay proof requirement
-Every correction flow should be replay-verifiable later through:
-- old publication state
+Every correction flow should later be replay-verifiable through:
+- baseline publication state
 - corrected publication state
-- supersession metadata
 - old/new hash comparison
+- publication switch evidence
+- preserved prior trail
+
+## Anti-ambiguity rule (LOCKED)
+If the correction flow cannot explain exactly which publication is current, which one was superseded, and why the switch was safe, then the correction is not complete.
+
+## See also
+- `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
+- `Failure_Playbook.md`
+- `Run_Ownership_and_Recovery_LOCKED.md`
+- `Run_Artifacts_Format.md`
+- `Audit_Evidence_Pack_Contract_LOCKED.md`

@@ -66,3 +66,30 @@ For one readable effective trade date `D`, the upstream dataset consists only of
 Batch hashes prove content identity of the published dataset for `D`.
 They must hash canonical content fields only, using locked ordering and formatting.
 Per-run provenance such as `run_id`, `asof_run_id`, timestamps of ingestion, and operator identity remain mandatory audit metadata, but they must not change the content hash for an otherwise identical dataset.
+
+## Final locked contracts
+- book/Terminology_and_Scope.md
+- book/Downstream_Consumer_Read_Model_Contract_LOCKED.md
+- book/Downstream_Data_Readiness_Guarantee_LOCKED.md
+- book/Determinism_Invariants_LOCKED.md
+- book/Audit_Hash_and_Reproducibility_Contract_LOCKED.md
+- book/Historical_Correction_and_Reseal_Contract_LOCKED.md
+
+## Implementation-critical schema and operations
+- db/Database_Schema_MariaDB.sql
+- db/Database_Schema_Contracts_MariaDB.md
+- db/Indices_and_Constraints_Contract_LOCKED.md
+- db/EOD_Publications_Table.sql
+- ops/Commands_and_Runbook.md
+- ops/Failure_Playbook.md
+- ops/Run_Ownership_and_Recovery_LOCKED.md
+- ops/Run_Artifacts_Format.md
+- ops/Audit_Evidence_Pack_Contract_LOCKED.md
+
+## Testing, fixtures, and replay proof
+- tests/Contract_Test_Matrix_LOCKED.md
+- tests/Golden_Fixture_Catalog_LOCKED.md
+- tests/Golden_Fixture_Examples_LOCKED.md
+- tests/Test_Implementation_Guidance_LOCKED.md
+- backtest/Historical_Replay_and_Data_Quality_Backtest.md
+- backtest/Replay_Results_Schema_MariaDB.sql
