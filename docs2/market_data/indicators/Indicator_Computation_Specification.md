@@ -19,6 +19,7 @@ Notation:
 - `adj_close`, when `PRICE_BASIS_DEFAULT=ADJ_CLOSE` and `adj_close IS NOT NULL`
 - otherwise `close`
 
+This fallback is applied independently per date in the required lookback window.
 `ATR` and `TR` always use real `high`, `low`, and previous real `close`.
 
 ## Baseline formulas (LOCKED)
@@ -57,6 +58,7 @@ Requires 21 canonical bars total: D plus D[-1]..D[-20].
 ### 7) `roc20`
 `roc20(D) = (P(D) / P(D[-20])) - 1`
 Requires both `P(D)` and `P(D[-20])`.
+This is a pure ratio, not a percentage-multiplied-by-100 field.
 
 ### 8) `hh20`
 `hh20(D) = MAX(high(x))` over `window(D, 20)`.

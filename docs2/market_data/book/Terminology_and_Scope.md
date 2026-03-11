@@ -27,7 +27,8 @@ This module does **not** cover:
 - **Invalid Provider Bar**: provider row that failed canonical bar validation and is stored only for audit in `eod_invalid_bars`.
 - **Indicator Window**: ordered trading-day sequence using market calendar continuity.
 - **Eligibility Snapshot**: one row per ticker in the coverage universe for D with `eligible=1/0` and reason code.
-- **Seal**: readiness marker proving dataset for D is finalized, hashed, and frozen for consumers.
+- **Seal**: readiness marker proving dataset for D is hashed, frozen, and explicitly marked consumable for consumers.
+- **Finalized SUCCESS Run**: run state recorded only after required artifacts for D are complete, hashes are present, and seal metadata is written.
 - **Controlled Correction**: explicit rerun for an already sealed date, producing a new `run_id`, new hashes, and a new seal record while preserving auditability.
 
 ## Design principles (LOCKED)

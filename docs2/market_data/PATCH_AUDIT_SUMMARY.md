@@ -1,26 +1,20 @@
 # Patch Audit Summary
 
-## What was corrected
-- removed consumer-specific naming from contracts that should be generic downstream contracts
-- tightened LOCKED status for commands/runbook, failure playbook, intraday snapshot contract, indicator registry, and config registry
-- clarified ATR14 Wilder warmup semantics so the first seed requires 15 canonical bars
-- tightened hash scope to the effective date only
-- expanded config registry to include timezone and hash/serialization keys
-- tightened schema contract wording around controlled correction and sealed audit trail
+## Scope of this patch
+This patch keeps the documentation set strictly inside the Market Data Platform (EOD) upstream domain and removes duplicate/example documents that were specific to watchlist naming.
 
-## Boundary check
-This documentation set now stays within market-data upstream scope:
-- canonical bars
-- indicators
-- eligibility
-- effective date
-- seal/freeze
-- intraday snapshot as optional upstream artifact
-- locking/logging/runbook/replay/tests
+## Updated / corrected
+- removed watchlist-specific duplicate consumer docs so the source of truth stays generic and upstream-only
+- cleaned `Audit_Hash_and_Reproducibility_Contract_LOCKED.md` so it contains only hash/reproducibility semantics and no accidental appended run-status content
+- locked exact hash field order per artifact to eliminate serialization ambiguity
+- locked explicit `trade_date_effective = NULL` behavior when no prior sealed `SUCCESS` date exists
+- locked deterministic duplicate-provider-row resolution before canonical publish
+- clarified `roc20` as ratio-scaled and clarified per-date `adj_close -> close` fallback semantics
+- expanded contract tests to cover the corrected locked semantics above
 
-Explicitly excluded:
-- downstream screening
-- scoring
-- grouping
-- ranking
-- portfolio/execution logic
+## Removed duplicate files
+- `docs/market_data/book/Watchlist_Consumer_Read_Model_Contract_LOCKED.md`
+- `docs/market_data/book/Watchlist_Data_Readiness_Guarantee_LOCKED.md`
+
+## Result
+The remaining documentation set is narrower, less ambiguous, and aligned to a single upstream source of truth for canonical market data, readiness, seals, and deterministic consumption.

@@ -6,10 +6,11 @@ Ensure daily runs produce a frozen upstream dataset that downstream consumers ca
 ## Daily order (LOCKED)
 1) acquire and publish canonical EOD bars for requested date T
 2) compute indicators for T using locked semantics and version
-3) build eligibility for effective date D
-4) finalize run status and resolve effective date
-5) compute audit hashes
-6) write seal metadata for D
+3) build eligibility for requested date T
+4) compute audit hashes for the candidate consumer-visible date
+5) write seal metadata for that date only if all seal preconditions pass
+6) finalize run status and resolve `trade_date_effective`
+7) generate run artifacts after final status is committed
 
 ## Readiness rule (LOCKED)
 Downstream consumers may only use:

@@ -1,5 +1,8 @@
 # Audit Hash and Reproducibility Contract (LOCKED)
 
+## Purpose
+Define the exact hash contract for sealed upstream artifacts so reruns with identical controlled inputs produce identical batch hashes.
+
 ## Hashed artifacts
 For effective date D, compute and persist:
 - `bars_batch_hash`
@@ -10,17 +13,53 @@ For effective date D, compute and persist:
 - SHA-256
 - lowercase hex output
 
-## Ordering (LOCKED)
-Rows must be sorted by the full deterministic key of the artifact:
+## Artifact row ordering (LOCKED)
+Rows must be sorted by the full deterministic key of the artifact.
+For the current schema:
 - bars: `ticker_id ASC`
 - indicators: `ticker_id ASC`
 - eligibility: `ticker_id ASC`
 
 If a future artifact uses a wider key, all key columns must be sorted ascending in schema key order.
 
+## Artifact field order (LOCKED)
+Within one serialized line, fields must appear exactly in the following order.
+
+### Bars payload field order
+1) `trade_date`
+2) `ticker_id`
+3) `open`
+4) `high`
+5) `low`
+6) `close`
+7) `volume`
+8) `adj_close`
+9) `source`
+10) `run_id`
+
+### Indicators payload field order
+1) `trade_date`
+2) `ticker_id`
+3) `is_valid`
+4) `invalid_reason_code`
+5) `indicator_set_version`
+6) `dv20_idr`
+7) `atr14_pct`
+8) `vol_ratio`
+9) `roc20`
+10) `hh20`
+11) `run_id`
+
+### Eligibility payload field order
+1) `trade_date`
+2) `ticker_id`
+3) `eligible`
+4) `reason_code`
+5) `asof_run_id`
+
 ## Serialization (LOCKED)
 - one logical row becomes one serialized line
-- fields are serialized in fixed column order defined by the contract/schema
+- fields are serialized in the fixed field order defined above
 - delimiter is pipe character `|`
 - line separator is newline `\n`
 - NULL serializes as empty string
@@ -28,48 +67,13 @@ If a future artifact uses a wider key, all key columns must be sorted ascending 
 - final payload is the exact joined line sequence with no trailing newline
 - rows included in the payload must belong only to the effective date D being sealed
 
+## Number and timestamp formatting (LOCKED)
+Formatting is governed by `Hash_Number_Formatting_LOCKED.md` and is part of the hash contract.
+Locale, thousands separators, scientific notation, and trimmed trailing zeros are forbidden.
+
+## Run inclusion rule (LOCKED)
+Hashing is performed over the canonical rows that are consumer-visible for effective date D and tied to the sealing run.
+A correction run for the same date must recompute the full artifact hash set from the corrected canonical rows and publish a new seal trail.
+
 ## Reproducibility rule (LOCKED)
 For identical canonical inputs, same config registry version, same ticker mapping, same market calendar, same indicator set version, and same serialization/formatting rules, the hashes must be identical across reruns.
-
-===== docs/market_data/book/Run_Status_and_Quality_Gates_LOCKED.md =====
-# Run Status and Quality Gates (LOCKED)
-
-## Purpose
-Run telemetry and finalization rules so consumers never consume half-ready data.
-
-## `eod_runs` conceptual fields
-- requested/effective dates
-- status
-- current/final stage
-- coverage ratio
-- row counts
-- invalid counts
-- warning/hard reject counts
-- hashes
-- seal metadata
-- notes and timestamps
-
-## Final statuses (LOCKED)
-- `SUCCESS`: all required stages completed, gates passed, hashes present, dataset sealed.
-- `HELD`: technical pipeline may have completed, but output is not safe to consume for requested date T.
-- `FAILED`: required stage failed or mandatory artifact is missing.
-
-## Minimum gates (LOCKED)
-1) canonical bar publish completed
-2) indicator compute completed
-3) eligibility snapshot built
-4) `coverage_ratio >= COVERAGE_MIN`
-5) no mandatory artifact missing for requested date T
-6) hashes present before seal
-7) finalization occurs only after cutoff contract permits it
-8) seal is written before requested date T can become consumer-visible effective output
-
-## Minimum status mapping (LOCKED)
-- bars missing or coverage below threshold => `HELD`
-- indicators missing => `FAILED`
-- eligibility missing => `FAILED`
-- hashes missing at finalization time => `FAILED`
-- unsealed dataset => not ready; requested date must not become effective
-
-## Consumer rule
-Consumers must use `trade_date_effective`, not `trade_date_requested`.

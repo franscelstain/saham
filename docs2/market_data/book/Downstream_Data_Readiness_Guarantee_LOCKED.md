@@ -4,7 +4,7 @@ This document states only the minimum upstream readiness guarantee required by d
 It does not introduce any downstream screening, scoring, grouping, ranking, or portfolio logic.
 
 ## Downstream-safe conditions
-For effective trade date D, Market Data Platform guarantees safe consumption only if:
+For effective trade date D, Market Data Platform guarantees safe consumption only if all of the following refer to the same finalized run context:
 1) `eod_runs` has a finalized sealed `SUCCESS` run that resolves D
 2) canonical bars exist for D
 3) indicator rows exist for D with `is_valid` and `indicator_set_version`
@@ -17,3 +17,4 @@ For effective trade date D, Market Data Platform guarantees safe consumption onl
 - compute indicators from bars
 - use unsealed datasets
 - treat missing eligibility rows as implicit exclusion logic
+- mix artifacts from different runs just because they share the same `trade_date`

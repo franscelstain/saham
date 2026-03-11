@@ -17,10 +17,19 @@ Consumers must never read `eod_invalid_bars` as market data input.
 1) Acquire raw provider bars for requested date T.
 2) Map provider identifiers to `ticker_id`.
 3) Normalize units, number types, and timestamps.
-4) Validate each row against `EOD_Bars_Contract`.
-5) Publish valid bars into `eod_bars` via idempotent upsert.
-6) Publish invalid rows into `eod_invalid_bars` for audit.
-7) Compute readiness via run gates, effective date, hashes, and seal.
+4) Resolve provider duplicates for the same `(trade_date, ticker_id)` using the deterministic duplicate rule below.
+5) Validate each row against `EOD_Bars_Contract`.
+6) Publish valid bars into `eod_bars` via idempotent upsert.
+7) Publish invalid rows into `eod_invalid_bars` for audit.
+8) Compute readiness via run gates, effective date, hashes, and seal.
+
+## Deterministic duplicate-provider rule (LOCKED)
+If the provider delivers multiple candidate rows for the same `(trade_date, ticker_id)` within one run, the pipeline must choose exactly one canonical candidate before validation using a deterministic precedence chain:
+1) latest provider payload timestamp if the provider exposes it
+2) otherwise latest acquisition timestamp recorded by the platform
+3) if still tied, lexical maximum of `provider_payload_ref`
+
+All non-selected duplicates must be recorded as non-canonical audit rows with a reason code such as `BAR_DUPLICATE_SUPERSEDED` and must never reach `eod_bars`.
 
 ## Idempotency (LOCKED)
 - Rerun for the same requested date must not duplicate canonical PKs.

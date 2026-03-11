@@ -51,3 +51,4 @@ Excluded:
 - Consumers must read indicators from `eod_indicators`; consumers must not recompute indicators from `eod_bars` at read-time.
 - Consumers must treat `SEALED` as a hard readiness condition.
 - If requested trade date T is not finalized and sealed for consumption, consumers must fall back to the latest prior sealed `SUCCESS` effective date.
+- Artifacts for one readable date must come from one coherent finalized run context; implementations must not mix rows across runs for the same date.

@@ -13,6 +13,7 @@
 - Canonicalization_Contract_EOD_Bars.md
 - EOD_Bars_Contract.md
 - Invalid_Bar_Storage_Policy_LOCKED.md
+- EOD_Data_Retention_and_History_Rewrite_Policy_LOCKED.md
 
 ## Indicators and adjustments
 - EOD_Indicators_Contract.md

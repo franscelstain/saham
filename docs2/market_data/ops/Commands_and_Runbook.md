@@ -19,24 +19,26 @@ Dokumen ini **tidak** membahas screening, scoring, grouping, ranking, atau logik
 - update `eod_indicators` + telemetry
 
 ### 3) `market-data:eod-eligibility:build`
-- bangun 1 row per ticker coverage universe untuk D
+- bangun 1 row per ticker coverage universe untuk T
 - set `eligible` dan `reason_code`
 
-### 4) `market-data:run:finalize`
-- evaluasi gates
-- tetapkan status run
-- resolve `trade_date_effective`
-
-### 5) `market-data:audit:hash`
+### 4) `market-data:audit:hash`
 - hitung hash untuk bars/indicators/eligibility berdasarkan format dan ordering yang terkunci
+- hanya atas artifact consumer-visible milik `run_id` yang sedang diproses
 
-### 6) `market-data:dataset:seal`
-- tulis metadata seal pada run yang final
+### 5) `market-data:dataset:seal`
+- tulis metadata seal untuk date yang lolos preconditions
 - tanpa seal, dataset dianggap belum siap dibaca
+
+### 6) `market-data:run:finalize`
+- evaluasi gates terakhir
+- tetapkan status final run
+- resolve `trade_date_effective`
+- dilarang menghasilkan `SUCCESS` bila hash atau seal belum ada
 
 ## Command pelengkap yang direkomendasikan
 ### 7) `market-data:daily`
-Menjalankan urutan harian: ingest -> compute -> eligibility -> finalize -> hash -> seal
+Menjalankan urutan harian: ingest -> compute -> eligibility -> hash -> seal -> finalize
 
 ### 8) `market-data:backfill`
 Backfill/recompute per range trading-day dengan mode `bars|indicators|eligibility|all`
@@ -56,5 +58,5 @@ Purge intraday berdasarkan TTL.
 
 ## Locking and ownership rule (LOCKED)
 - satu requested date hanya boleh punya satu writer aktif untuk pipeline harian
-- finalize/hash/seal harus dieksekusi dalam kepemilikan run yang sama
+- hash/seal/finalize harus dieksekusi dalam kepemilikan run yang sama
 - command pelengkap tidak boleh mengubah sealed dataset tanpa controlled correction flow
