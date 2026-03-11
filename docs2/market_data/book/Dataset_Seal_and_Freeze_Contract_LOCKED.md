@@ -1,16 +1,20 @@
 # Dataset Seal and Freeze Contract (LOCKED)
 
-Purpose:
-- freeze dataset for effective date D so Watchlist PLAN doesn't drift.
+## Purpose
+Freeze the published dataset for effective date D so downstream consumers read a stable, non-drifting upstream input.
 
-Seal when:
-- run finalized
-- eligibility built
-- hashes computed
+## Seal preconditions (LOCKED)
+Seal may be written only when all conditions hold:
+- run is finalized
+- eligibility exists for D
+- hashes exist for bars, indicators, and eligibility
 
+## Freeze rule (LOCKED)
 After seal:
-- dataset for D must not change unless controlled correction (new run_id, notes, new hashes, reseal)
+- dataset for D must not change silently
+- any correction requires controlled correction flow with new `run_id`, new hashes, and reseal
+- prior sealed state must remain auditable
 
 ## Consumer dependency (LOCKED)
-Watchlist PLAN must only run on SEALED datasets.
-Unsealed datasets are considered "not ready" even if status is SUCCESS.
+Any downstream consumer may read only SEALED datasets.
+Unsealed datasets are `not ready` even if the run status is otherwise `SUCCESS`.

@@ -1,8 +1,32 @@
-# Intraday Snapshot Contract (for Consumer CONFIRM)
+# Intraday Snapshot Contract
 
-Snapshot is event-based, not streaming.
-Default slots: OPEN_CHECK 09:10, optional 13:30, 14:45.
-Scope: picks-only OR eligibility set (never all tickers by default).
-Fields: last_price, prev_close, chg_pct, volume, day_high/low + audit columns.
-Retention: 14–30 days (default locked elsewhere to 30).
-Failure must not block EOD PLAN generation.
+## Scope
+Intraday snapshot is an optional, best-effort upstream artifact for downstream consumers that need a same-day overlay.
+It is not streaming data and it must not mutate EOD canonical datasets.
+
+## Default slots
+- `OPEN_CHECK` around 09:10
+- optional `MIDDAY_CHECK` around 13:30
+- optional `PRE_CLOSE_CHECK` around 14:45
+
+## Scope rule (LOCKED)
+Default scope is the eligibility set for the effective trade date D unless a narrower upstream-approved scope contract exists.
+Default behavior must never assume downstream picks/rankings.
+
+## Minimum fields
+- `trade_date`
+- `snapshot_slot`
+- `ticker_id`
+- `captured_at`
+- `last_price`
+- `prev_close`
+- `chg_pct`
+- `volume`
+- `day_high`
+- `day_low`
+- source/audit/error fields
+
+## Locked rules
+- `trade_date` must equal `trade_date_effective`
+- failure or absence of an intraday snapshot must never block EOD finalization or sealing
+- retention and slot tolerance are governed by locked intraday defaults

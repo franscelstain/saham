@@ -1,6 +1,6 @@
 # Invalid Bar Storage Policy (LOCKED)
 
-Selected default:
-- store invalid bars in eod_bars for audit
-- but always eligible=0 (ELIG_INVALID_BAR)
-- indicators is_valid=0 (IND_INVALID_BAR)
+- invalid provider rows must not be inserted into canonical `eod_bars`
+- invalid provider rows may be stored in `eod_invalid_bars` for auditability
+- downstream readers must ignore `eod_invalid_bars` as data input
+- invalid rows must contribute to eligibility reasoning and run telemetry only

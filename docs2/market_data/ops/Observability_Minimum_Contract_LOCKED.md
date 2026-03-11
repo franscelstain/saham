@@ -1,3 +1,11 @@
-# Observability Minimum (LOCKED)
+# Observability Minimum Contract (LOCKED)
 
-Required logs/metrics/alerts for FAILED, coverage low, format change, retry spikes, replay hash drift.
+Minimum observable artifacts per requested date T:
+- one `eod_runs` record representing final outcome
+- structured stage/event trail in `eod_run_events`
+- row counts for bars, indicators, eligibility
+- invalid/warning/hard reject counts
+- final hashes
+- seal metadata when run becomes consumable
+
+If these artifacts are incomplete, the requested date must not be treated as operationally healthy.

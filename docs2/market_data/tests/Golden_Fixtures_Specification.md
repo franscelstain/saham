@@ -1,4 +1,18 @@
 # Golden Fixtures Spec
 
-Defines fixture files (bars_valid, invalid cases, calendar sample, indicator vectors, expected eligibility, expected hashes).
-Fixtures immutable; changes require new fixture version.
+Defines immutable fixtures for deterministic contract tests and replay tests.
+
+## Required fixture sets
+- valid canonical bars
+- invalid provider bars
+- minimal market calendar sample
+- ticker identity mapping sample
+- indicator vectors with expected outputs
+- expected eligibility snapshot
+- expected serialized hash inputs and hash outputs
+- requested-date fallback scenarios
+
+## Fixture rules
+- fixtures are immutable once published
+- changes require new fixture version and explicit note
+- fixture filenames should encode semantic version, not ad-hoc timestamps

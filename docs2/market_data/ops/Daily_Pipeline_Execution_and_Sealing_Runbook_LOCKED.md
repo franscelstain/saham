@@ -1,50 +1,42 @@
 # Daily Pipeline Execution and Sealing Runbook (LOCKED)
 
 ## Purpose
-Ensure daily runs produce a sealed dataset so Watchlist PLAN reads a frozen input.
+Ensure daily runs produce a frozen upstream dataset that downstream consumers can read safely.
 
 ## Daily order (LOCKED)
-1) Acquire + publish canonical EOD bars for requested date T
-2) Compute indicators for T (indicator_set_version locked)
-3) Build eligibility for effective date D
-4) Finalize run status + effective date
-5) Compute audit hashes
-6) Seal dataset for effective date D
+1) acquire and publish canonical EOD bars for requested date T
+2) compute indicators for T using locked semantics and version
+3) build eligibility for effective date D
+4) finalize run status and resolve effective date
+5) compute audit hashes
+6) write seal metadata for D
 
-## Rule (LOCKED)
-Watchlist PLAN may only use:
-- trade_date_effective D that is SUCCESS
-- and the dataset must be SEALED
+## Readiness rule (LOCKED)
+Downstream consumers may only use:
+- `trade_date_effective = D` that resolves to a finalized safe date
+- and a dataset that is SEALED
 
-If run is HELD/FAILED:
+If requested date is `HELD/FAILED` or unsealed:
 - effective date falls back
-- watchlist must use the fallback D (and ideally show it)
+- downstream readers must use fallback D
 
 ## Sealing storage (LOCKED default)
-Use fields on eod_runs (recommended):
-- sealed_at DATETIME
-- sealed_by VARCHAR(64)
-- seal_note VARCHAR(255) (optional)
-
-Alternative (allowed):
-- separate eod_dataset_seals table
-
-## Seal conditions (LOCKED)
-- status is finalized
-- eligibility exists for D
-- hashes exist (bars/indicators/eligibility)
+Recommended storage is on `eod_runs`:
+- `sealed_at`
+- `sealed_by`
+- `seal_note`
 
 ## Controlled correction
-If provider correction happens for a sealed date:
-- new run_id
-- recompute indicators
-- new hashes
+If provider correction occurs for a sealed date:
+- create new run
+- recompute artifacts
+- recompute hashes
 - reseal
-Old sealed dataset remains auditable via old run_id/hashes.
+- preserve old run for audit
 
-## Operator checklist (daily)
-- run status SUCCESS?
-- coverage_ratio ok?
+## Operator checklist
+- final status appropriate?
+- coverage ratio passes?
 - hashes non-null?
-- sealed_at non-null?
-If any missing => treat as not ready for Watchlist.
+- `sealed_at` non-null for consumable date?
+If not, requested date is not ready.

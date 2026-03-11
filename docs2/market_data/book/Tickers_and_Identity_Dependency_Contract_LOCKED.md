@@ -2,27 +2,25 @@
 
 ## Purpose
 Lock what Market Data Platform requires from the global `tickers` master so:
-- coverage_ratio denominator is deterministic
+- coverage denominator is deterministic
 - provider symbol mapping is stable
-- watchlist consumes consistent ticker_id
+- downstream consumers receive stable `ticker_id`
 
-## Required fields (semantic, names can differ)
-- ticker_id (INT, PK) — immutable identity
-- ticker_code (STRING) — exchange code (e.g., BBCA), may change over time but must map to ticker_id
-- is_active (BOOLEAN/flag) — indicates active listing eligibility for coverage universe
+## Required fields
+- `ticker_id` (immutable PK)
+- `ticker_code` (display / exchange code)
+- `is_active` (membership signal for default coverage universe)
 
-Recommended fields (if available)
-- ticker_type (equity/etf/warrant/etc) — only if reliable; used to refine coverage universe
-- listed_since (DATE)
-- delisted_since (DATE nullable)
+## Recommended fields
+- `ticker_type` when reliable and versioned
+- `listed_since`
+- `delisted_since`
 
-## LOCKED rules
-1) ticker_id is the only identity used in all market_data tables.
-2) ticker_code changes must not break mapping: provider adapter must resolve code->ticker_id using tickers master.
-3) coverage universe (for coverage_ratio) = tickers where is_active=1, unless a reliable ticker_type filter is explicitly enabled.
-4) When delisted_since is set and trade_date > delisted_since:
-   - ingestion may stop
-   - eligibility must be 0 for that trade_date
+## Locked rules
+1) `ticker_id` is the canonical identity used in all market-data tables.
+2) provider mapping must resolve provider symbols to `ticker_id` via the ticker master.
+3) coverage universe defaults to tickers where `is_active=1` as-of D, unless a documented upstream refinement is enabled.
+4) when `delisted_since` exists and `trade_date > delisted_since`, ingestion may stop and eligibility for that date must be 0.
 
 ## Consumer impact
-Watchlist must treat ticker_id as canonical; ticker_code is display only.
+Downstream consumers must treat `ticker_id` as canonical identity. `ticker_code` is not a stable join key across time.

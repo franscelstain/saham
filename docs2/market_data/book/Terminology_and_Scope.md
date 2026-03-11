@@ -2,32 +2,35 @@
 
 ## Scope
 This module covers:
-- Acquiring EOD OHLCV from a provider (API).
-- Normalizing/canonicalizing into internal schema.
-- Computing EOD indicators from EOD bars.
-- Quality gates + declaring an effective trade date for consumers.
-- Publishing a daily eligibility snapshot for consumers.
+- acquiring EOD OHLCV from provider APIs
+- mapping provider payloads into canonical schema
+- validating and publishing canonical bars
+- computing EOD indicators from canonical bars using trading-day windows
+- declaring run status, quality gates, effective trade date, audit hashes, and seal state
+- publishing daily eligibility snapshot for downstream consumers
+- publishing optional intraday snapshots as best-effort overlays
 
-This module does NOT cover:
-- Watchlist scoring/grouping (policy logic).
-- Intraday streaming (intraday snapshot is event-based, best-effort).
-- Master data for tickers and market calendar (assumed managed elsewhere).
+This module does **not** cover:
+- downstream scoring/grouping/ranking
+- trade recommendation policy
+- order routing / execution
+- portfolio or risk allocation logic
+- streaming market data
+- maintenance of ticker master or market calendar beyond consuming them as dependencies
 
 ## Key terms
-- Trading Day: exchange trading date.
-- EOD Bar: OHLCV for one ticker on one Trading Day.
-- EOD Indicator: daily derived feature computed from EOD bars using Trading Day windows.
-- Run: one pipeline execution for a target date or date range (backfill).
-- Quality Gate: pass/fail rules declaring whether data is safe to consume.
-- Effective Trade Date: the official EOD date that consumers must use (may fallback).
-- Eligibility Snapshot: daily list of tickers eligible for consumption.
-
-## Ticker identity
-- ticker_id: integer primary key in tickers.
-- ticker_code: unique exchange code like BBCA.
+- **Trading Day**: exchange trading date from the market calendar, not a calendar day inferred from timestamps.
+- **Requested Trade Date (T)**: trade date asked for by the operator/job.
+- **Effective Trade Date (D)**: official trade date consumers must read. D may equal T or the latest prior sealed `SUCCESS` date.
+- **Canonical EOD Bar**: one validated OHLCV record per `(trade_date, ticker_id)` in `eod_bars`.
+- **Invalid Provider Bar**: provider row that failed canonical bar validation and is stored only for audit in `eod_invalid_bars`.
+- **Indicator Window**: ordered trading-day sequence using market calendar continuity.
+- **Eligibility Snapshot**: one row per ticker in the coverage universe for D with `eligible=1/0` and reason code.
+- **Seal**: readiness marker proving dataset for D is finalized, hashed, and frozen.
+- **Controlled Correction**: explicit rerun for an already sealed date, producing a new `run_id`, new hashes, and a new seal record while preserving auditability.
 
 ## Design principles (LOCKED)
-1) Deterministic: same inputs => same outputs.
-2) Auditable: every output traceable to run_id, row counts, reason codes, hashes.
-3) Fail-safe: if data is not ready, consumers must not consume partial data.
-4) Separation of concerns: consumers do not compute indicators from bars.
+1) Deterministic: same source rows + same config registry + same calendar/ticker mapping => same outputs.
+2) Auditable: every output is traceable to `run_id`, versioned config, counts, hashes, and reason codes.
+3) Fail-safe: consumers never read partial, unsealed, or unqualified datasets.
+4) Upstream/downstream separation: upstream publishes data contracts; downstream owns policy logic.

@@ -1,12 +1,16 @@
 # Watchlist Consumer Read Model Contract (LOCKED)
 
-Official read sequence:
-1) resolve effective date D from eod_runs
-2) load eligible tickers from eod_eligibility (D, eligible=1)
-3) join eod_indicators (D, is_valid=1)
-4) optional join eod_bars for display
+This document remains only as an example consumer contract. It does not define watchlist policy logic.
 
-Never:
-- infer dates by max(trade_date)
+## Official read sequence
+1) resolve effective sealed date D from `eod_runs`
+2) load readable universe from `eod_eligibility(D, eligible=1)`
+3) join `eod_indicators(D, is_valid=1)`
+4) optionally join `eod_bars(D)` for display-only fields
+
+## Never
+- infer dates by `MAX(trade_date)`
 - compute indicators at read-time
-- include eligible=0
+- include `eligible=0`
+- read unsealed datasets
+- reinterpret upstream reason codes as downstream ranking rules

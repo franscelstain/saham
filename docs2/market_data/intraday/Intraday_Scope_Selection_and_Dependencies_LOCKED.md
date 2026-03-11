@@ -1,25 +1,21 @@
 # Intraday Scope Selection and Dependencies (LOCKED)
 
 ## Purpose
-Make intraday snapshot implementation feasible without depending on incomplete Watchlist features.
+Keep intraday snapshot feasible without depending on downstream policy outputs.
 
-## Scope options (LOCKED)
-A) Eligibility-set snapshots (recommended first)
-- snapshot tickers from eod_eligibility(D) where eligible=1
-- does NOT require Watchlist picks output
-- higher load than picks-only, but still bounded (typically 100–300)
+## Scope options
+### A) Eligibility-set snapshots (default)
+- snapshot tickers from `eod_eligibility(D)` where `eligible=1`
+- does not require any downstream picks/ranking interface
+- bounded and upstream-owned
 
-B) Picks-only snapshots (later optimization)
-- snapshot only Watchlist picks list for the day
-- REQUIRES Watchlist module to provide "picks list" as an input
-- market_data must not invent picks
+### B) External-scope snapshots (optional later)
+- snapshot only a narrower externally supplied ticker list
+- requires a stable, documented interface from the requesting downstream system
+- market-data must not invent that list
 
-## LOCKED rule
-Until Watchlist provides a stable picks list interface:
-- market_data must implement Eligibility-set snapshots (Option A).
-
-Once picks interface exists:
-- Option B may be enabled as config switch.
+## Locked rule
+Until a stable external scope interface exists, Market Data Platform must implement option A.
 
 ## Alignment rule
-All intraday snapshots must tag trade_date = trade_date_effective D.
+All intraday snapshots must use `trade_date = trade_date_effective D`.

@@ -1,55 +1,40 @@
 # Bootstrap and Backfill Runbook (LOCKED)
 
 ## Purpose
-Ensure Market Data Platform produces enough historical EOD bars + indicators so Watchlist does not see:
-- ELIG_INSUFFICIENT_HISTORY everywhere
-- unstable coverage and incomplete indicators
+Ensure Market Data Platform has enough historical data to produce stable upstream indicators and eligibility without warmup-driven distortion.
 
 ## Minimum bootstrap target (LOCKED)
-To support Weekly Swing baseline indicators (dv20, atr14, roc20, hh20, vol_ratio):
-- minimum history required per ticker: >= 60 trading days
-Recommended for real usage (calibration + stability):
-- >= 3 years trading days
+To support the baseline indicators:
+- minimum history per ticker: >= 60 trading days
+Recommended for production stability and replay confidence:
+- >= 3 years of trading days
 
-## Steps (LOCKED)
-
-### Step 0 — Validate global dependencies
-- tickers master exists and active tickers are correct
+## Steps
+### Step 0 — validate global dependencies
+- ticker master exists and is correct
 - market calendar exists and trading-day order is correct
 
-### Step 1 — Bars backfill (month batches)
-Run month-by-month:
-- ingest canonical bars for the date range
-- validate coverage and invalid patterns
+### Step 1 — bars backfill
+- ingest canonical bars by date range
+- validate coverage and invalid-bar patterns
 
-Expected output:
-- eod_bars populated for the range
-- eod_runs recorded per run
+### Step 2 — indicators backfill
+- compute indicators with explicit `indicator_set_version`
+- respect trading-day windows and null policy
 
-### Step 2 — Indicators backfill (same ranges)
-Compute indicators for the same date range:
-- must set indicator_set_version explicitly
-- must respect trading-day windows and null policy
+### Step 3 — eligibility build
+- build one eligibility row per ticker/date
+- warmup gaps become `eligible=0` with explicit reason code
 
-Expected output:
-- eod_indicators populated
-- early dates may be NULL until warmup satisfied
-
-### Step 3 — Eligibility build for each effective date
-- build eod_eligibility after indicators for each date
-- tickers without warmup => eligible=0 ELIG_INSUFFICIENT_HISTORY
-
-### Step 4 — Replay (data-quality backtest)
-Run historical replay (minimum 60 trading days sample):
-- verify determinism hashes are stable for SUCCESS days
-- verify coverage_ratio distribution is sane
+### Step 4 — historical replay
+- verify deterministic hashes on stable inputs
+- verify effective-date and seal behavior on degraded scenarios
 
 ## Resume requirement (LOCKED)
-Backfill must be resumable:
-- checkpoint per month
-- rerun must be idempotent
+- backfill is resumable by date range
+- rerun is idempotent
 
-## When bootstrap is considered DONE
-- last 60 trading days: SUCCESS rate high, coverage meets threshold
-- eligible tickers count is stable and not dominated by insufficient history
-- watchlist consumer read model can load D without missing tables
+## Done criteria
+- recent sample dates meet coverage threshold
+- eligibility population is no longer dominated by insufficient history
+- downstream consumer read path can resolve and read D without missing upstream artifacts

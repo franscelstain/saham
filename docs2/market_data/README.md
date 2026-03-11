@@ -1,30 +1,50 @@
 # Market Data Platform (EOD) — Documentation
 
 ## Purpose
-Market Data Platform (EOD) provides:
-1) Canonical EOD OHLCV data that is deterministic and auditable.
-2) EOD indicators computed from canonical EOD bars.
-3) Run status + quality gates to declare when data is safe for consumers.
-4) An effective trade date rule so consumers never guess dates.
-5) A daily eligibility snapshot so consumers avoid ad-hoc filtering from raw tables.
+Market Data Platform (EOD) is an upstream data-production module. Its job is to produce market data that is canonical, validated, deterministic, auditable, and safe for downstream consumers.
 
-This module is upstream. Consumers (including Watchlist policies) must treat it as the source of truth.
+This module provides:
+1) Canonical EOD OHLCV bars.
+2) Deterministic EOD indicators computed from canonical bars.
+3) Run status, quality gates, and effective trade date resolution.
+4) Eligibility snapshot so consumers never infer readiness from raw tables.
+5) Audit hashes and dataset seal/freeze semantics.
+6) Optional intraday snapshots as best-effort overlay input for downstream consumers.
+
+This module does **not** define downstream policy logic such as scoring, grouping, ranking, or portfolio selection.
+
+## Scope boundary (LOCKED)
+Included:
+- provider acquisition
+- mapping and canonicalization
+- bar validation
+- indicator computation
+- eligibility publication
+- effective-date fallback
+- audit hashes
+- dataset sealing
+- runbooks, locking, logging, replay, and contract tests
+
+Excluded:
+- watchlist scoring/grouping/ranking
+- portfolio logic
+- trading signals
+- execution logic
+- broker integration
 
 ## Folder structure
-- book/ — core contracts (stable, referenced by all consumers)
-- db/ — MariaDB schema contracts and DDL
-- registry/ — reason codes + indicator baseline + platform config
-- ops/ — operational playbooks and runbooks
-- indicators/ — deterministic indicator formulas
-- intraday/ — best-effort snapshot contracts for CONFIRM consumers
-- tests/ — contract tests specs + golden fixtures guidance
-- backtest/ — historical replay (data-quality backtest) specs
+- `book/` — core contracts and locked semantics
+- `db/` — MariaDB schema contracts and DDL
+- `registry/` — output-affecting registries and defaults
+- `ops/` — operational runbooks and failure handling
+- `indicators/` — deterministic formula specification
+- `intraday/` — best-effort intraday snapshot contracts
+- `tests/` — contract tests and golden fixtures
+- `backtest/` — historical replay and data-quality backtest specs
 
-## Consumer rules (LOCKED summary)
-- Consumers must read trade_date_effective from eod_runs.
-- Consumers must use eod_eligibility (eligible=1) to select candidates.
-- Consumers must not compute indicators from eod_bars directly.
-- If run is not SUCCESS for the requested trading day, consumers must use the effective trade date (fallback).
-
-## Ops
-- See ops/Commands_and_Runbook.md and ops/Failure_Playbook.md
+## Consumer invariants (LOCKED summary)
+- Consumers must resolve `trade_date_effective` from `eod_runs` and must not infer dates via `MAX(trade_date)`.
+- Consumers must treat `eod_eligibility(trade_date = D, eligible = 1)` as the official readable universe for D.
+- Consumers must read indicators from `eod_indicators`; consumers must not recompute indicators from `eod_bars` at read-time.
+- Consumers must treat `SEALED` as a hard readiness condition.
+- If requested trade date T is not finalized `SUCCESS`, consumers must fall back to the latest prior sealed `SUCCESS` effective date.

@@ -1,18 +1,40 @@
 # Run Status and Quality Gates (LOCKED)
 
 ## Purpose
-Run telemetry + pass/fail rules so consumers never consume half-ready data.
+Run telemetry and finalization rules so consumers never consume half-ready data.
 
-## eod_runs fields (conceptual)
-- run_id, trade_date_requested, trade_date_effective
-- status: SUCCESS | HELD | FAILED
-- stage: INGEST_BARS | PUBLISH_BARS | COMPUTE_INDICATORS | BUILD_ELIGIBILITY
-- coverage_ratio, row counts, invalid counts, notes
+## `eod_runs` conceptual fields
+- requested/effective dates
+- status
+- current/final stage
+- coverage ratio
+- row counts
+- invalid counts
+- warning/hard reject counts
+- hashes
+- seal metadata
+- notes and timestamps
 
-## Gates (LOCKED minimum)
-- coverage_ratio >= COVERAGE_MIN else HELD
-- indicators stage must complete else FAILED
-- eligibility must exist for effective date else FAILED
+## Final statuses (LOCKED)
+- `SUCCESS`: all required stages completed, gates passed, hashes present, dataset sealed.
+- `HELD`: technical pipeline may have completed, but output is not safe to consume for requested date T.
+- `FAILED`: required stage failed or mandatory artifact is missing.
 
-Consumer rule:
-- must use trade_date_effective
+## Minimum gates (LOCKED)
+1) canonical bar publish completed
+2) indicator compute completed
+3) eligibility snapshot built
+4) `coverage_ratio >= COVERAGE_MIN`
+5) no mandatory artifact missing for requested date T
+6) hashes present before seal
+7) finalization occurs only after cutoff contract permits it
+
+## Minimum status mapping (LOCKED)
+- bars missing or coverage below threshold => `HELD`
+- indicators missing => `FAILED`
+- eligibility missing => `FAILED`
+- hashes missing at finalization time => `FAILED`
+- unsealed dataset => not ready; requested date must not become effective
+
+## Consumer rule
+Consumers must use `trade_date_effective`, not `trade_date_requested`.
