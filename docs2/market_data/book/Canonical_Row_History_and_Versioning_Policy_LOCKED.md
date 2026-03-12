@@ -1,11 +1,9 @@
 # Canonical Row History and Versioning Policy (LOCKED)
 
 ## Purpose
-Define the approved strategy for preserving historical row-level auditability of canonical upstream artifacts across corrected publications.
+Define the official row-history strategy for preserving historical canonical artifact state across corrections and publication changes.
 
-This policy exists because publication/history may be preserved in more than one way, but the chosen strategy must be explicit and non-misleading.
-
-This applies to:
+This policy applies to:
 - canonical bars
 - indicators
 - eligibility
@@ -13,98 +11,92 @@ This applies to:
 ## Core principle (LOCKED)
 A corrected publication for trade date D must never make prior consumer-visible row state disappear silently from auditability.
 
-The system must preserve row-history semantics in one explicit way:
-- either by immutable publication-bound row snapshots
-- or by explicitly documented reliance on publication trail + hash trail + correction evidence
-
-Silent ambiguity about row-history depth is forbidden.
-
-## Approved strategies
+## Official production-grade strategy (LOCKED)
+For production-grade Market Data Platform, the official default and required strategy is:
 
 ### Strategy A — Immutable publication-bound row snapshots
-This is the preferred and stronger audit strategy.
 
 Under Strategy A:
-- each publication for D has its own immutable row snapshot
-- row snapshots are preserved in history tables such as:
+- each publication for D has its own immutable row snapshot set
+- row snapshots are preserved in history tables:
   - `eod_bars_history`
   - `eod_indicators_history`
   - `eod_eligibility_history`
 - current readable state may still be served from current artifact tables
-- historical row-level audit can be reconstructed exactly per publication
+- historical row-level audit must be reconstructable exactly per publication
 
-### Strategy B — Publication + hash + correction evidence only
-This is allowed for simpler deployments where explicit row-history tables are not materialized.
+## Strategy B status
+Strategy B (publication trail + hash trail + correction evidence only) is not the default production-grade strategy.
 
-Under Strategy B:
-- current readable artifact tables store only the current state
-- historical row-level audit is inferred from:
-  - publication trail
-  - content hashes
-  - correction request/evidence
-  - replay and artifact evidence where available
+It may exist only as:
+- legacy note
+- simplified non-production deployment note
+- explicitly weaker fallback model
 
-This strategy is weaker than Strategy A for row-level audit, but may still be acceptable if documented honestly.
-
-## Locked requirement
-One of the above strategies must be explicitly chosen.
-
-The implementation must not:
-- imply publication-bound row snapshots exist when they do not
-- imply current artifact tables alone preserve historical row state
-- silently replace prior row state without correction/publication trail
-
-## Recommended default
-For stronger auditability and correction traceability, Strategy A is recommended.
+It must not be presented as equal in strength to Strategy A.
 
 ## Strategy A rules (LOCKED)
-If Strategy A is implemented:
+If Strategy A is implemented, all of the following must hold:
 1. each sealed publication must have one immutable snapshot set
 2. history rows must be keyed by `publication_id` plus row identity
 3. history rows must never be updated in place
 4. corrected publication produces a new snapshot set
-5. prior snapshot set remains queryable even after supersession
+5. prior snapshot set remains queryable after supersession
+6. history snapshot rows must link to `eod_publications`
+7. history snapshot writes must happen only for sealed publication states
 
-## Strategy B rules (LOCKED)
-If Strategy B is implemented:
-1. current artifact tables must be treated as current-state tables only
-2. prior row-level state is not assumed to remain queryable from current tables
-3. historical audit relies on publication trail + hash trail + correction evidence
-4. contracts and runbooks must state this explicitly
-5. unchanged rerun must not create fake historical row version state
+## Required history-table semantics
+History tables must support:
+- exact row-state recovery for one publication
+- clear publication linkage
+- append-only / immutable behavior
+- no ambiguity between current-state tables and historical snapshot tables
 
-## Consumer rule
-Consumers must always read the current sealed publication state.
-Historical row-history strategy is for audit and replay, not for normal consumer read paths.
+## Current-state vs history-state distinction
+Current-state tables:
+- `eod_bars`
+- `eod_indicators`
+- `eod_eligibility`
+
+serve the current readable state.
+
+History tables:
+- `eod_bars_history`
+- `eod_indicators_history`
+- `eod_eligibility_history`
+
+serve immutable publication-bound audit state.
+
+These roles must never be confused.
 
 ## Correction rule
 On correction for D:
-- Strategy A: create new immutable snapshot set and preserve old snapshot set
-- Strategy B: preserve old publication/hash/evidence trail and document that row-level snapshots are not materialized
+- prior publication snapshot remains preserved
+- corrected publication creates a new snapshot set
+- corrected snapshot becomes associated with the new current publication
+- prior snapshot remains audit-only but fully queryable
 
 ## Minimum audit questions this policy must support
-For any corrected date D, the system must be able to answer:
+For any corrected date D, the system must answer:
 1. what was the prior current publication?
-2. what is the new current publication?
-3. what changed at artifact level?
-4. what hash trail proves the change?
-5. what row-history strategy is being used?
-6. if snapshots exist, where are they?
-7. if snapshots do not exist, what evidence replaces them?
+2. what exact rows belonged to that prior publication?
+3. what exact rows belong to the new publication?
+4. which publication is current now?
+5. which history-table snapshot corresponds to each publication?
 
-## Relationship to schema
+## Required schema alignment
 This policy must be reflected in:
 - `Database_Schema_MariaDB.sql`
 - `Database_Schema_Contracts_MariaDB.md`
-- correction contract
-- audit evidence pack contract
+- `History_Table_Immutability_Guards_LOCKED.sql`
+- publication/correction contracts
 
-## Cross-contract alignment
-This policy must remain aligned with:
-- `Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Downstream_Consumer_Read_Model_Contract_LOCKED.md`
-- `Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
-- `Database_Schema_Contracts_MariaDB.md`
+## Required evidence alignment
+Executed evidence examples should demonstrate:
+- prior publication snapshot
+- corrected publication snapshot
+- publication manifest
+- correction diff artifact
 
 ## Anti-ambiguity rule (LOCKED)
-If an implementation cannot clearly state whether it uses immutable row snapshots or publication/hash/evidence-only history, then its row-history policy is incomplete and must not be treated as audit-grade.
+If the platform claims production-grade auditability but cannot point to immutable publication-bound history rows, then row-history integrity is overstated.

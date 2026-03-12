@@ -270,8 +270,8 @@ CREATE TABLE IF NOT EXISTS eod_dataset_corrections (
 ) ENGINE=InnoDB;
 
 -- =========================================================
--- Optional immutable publication-bound snapshot tables
--- Recommended for stronger row-history/version auditability
+-- Immutable publication-bound history tables
+-- Production-grade default strategy
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS eod_bars_history (
@@ -290,7 +290,9 @@ CREATE TABLE IF NOT EXISTS eod_bars_history (
   PRIMARY KEY (publication_id, trade_date, ticker_id),
   KEY idx_bars_history_trade_date (trade_date),
   KEY idx_bars_history_ticker_date (ticker_id, trade_date),
-  KEY idx_bars_history_run (run_id)
+  KEY idx_bars_history_run (run_id),
+  CONSTRAINT fk_bars_history_publication
+    FOREIGN KEY (publication_id) REFERENCES eod_publications(publication_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS eod_indicators_history (
@@ -310,7 +312,9 @@ CREATE TABLE IF NOT EXISTS eod_indicators_history (
   PRIMARY KEY (publication_id, trade_date, ticker_id),
   KEY idx_indicators_history_trade_date (trade_date),
   KEY idx_indicators_history_ticker_date (ticker_id, trade_date),
-  KEY idx_indicators_history_run (run_id)
+  KEY idx_indicators_history_run (run_id),
+  CONSTRAINT fk_indicators_history_publication
+    FOREIGN KEY (publication_id) REFERENCES eod_publications(publication_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS eod_eligibility_history (
@@ -324,17 +328,17 @@ CREATE TABLE IF NOT EXISTS eod_eligibility_history (
   PRIMARY KEY (publication_id, trade_date, ticker_id),
   KEY idx_eligibility_history_trade_date (trade_date),
   KEY idx_eligibility_history_ticker_date (ticker_id, trade_date),
-  KEY idx_eligibility_history_run (run_id)
+  KEY idx_eligibility_history_run (run_id),
+  CONSTRAINT fk_eligibility_history_publication
+    FOREIGN KEY (publication_id) REFERENCES eod_publications(publication_id)
 ) ENGINE=InnoDB;
 
 -- LOCKED HISTORY NOTE
--- 1. The *_history tables are immutable publication-bound snapshots.
--- 2. They are the recommended strategy for explicit row-history/version auditability.
--- 3. Current readable state may still be served from eod_bars / eod_indicators / eod_eligibility,
---    while historical publication-specific row audit is preserved in *_history tables.
--- 4. If these tables are implemented, each new current publication should write one full immutable snapshot set.
--- 5. If an implementation chooses not to materialize these tables, it must explicitly rely on
---    publication trail + hash trail + correction evidence as its row-history strategy and say so in contracts.
+-- 1. Strategy A is the default production-grade row-history strategy.
+-- 2. The *_history tables are immutable publication-bound snapshots.
+-- 3. Each snapshot row set belongs to exactly one publication_id.
+-- 4. Snapshot rows must be written only for a sealed publication.
+-- 5. Snapshot rows must never be updated or deleted in normal operation.
 
 -- =========================================================
 -- Replay result storage
