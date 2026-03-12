@@ -3,8 +3,10 @@
 ## Purpose
 Define the minimum MariaDB schema semantics required to implement Market Data Platform contracts safely, deterministically, and auditably.
 
-This document is normative.
+This document is normative for schema semantics only.
 It complements the concrete DDL in `Database_Schema_MariaDB.sql`.
+
+It must not redefine book-level behavioral contracts such as current-publication read resolution.
 
 ## Core schema goals
 The schema must support:
@@ -174,7 +176,9 @@ Use tables such as:
 These preserve exact row sets per publication.
 
 ### Strategy B — Publication + hash + correction evidence only
-Allowed for simpler deployments, but only if explicitly documented as the chosen history strategy.
+Allowed only for explicitly documented non-production, legacy, or intentionally weaker deployments.
+
+Strategy B must not be presented as equal in audit strength to Strategy A and must not be described as the default production-grade strategy.
 
 If Strategy B is chosen:
 - contracts must explicitly state that row-level historical audit is derived from publication trail + hash trail + correction evidence
@@ -227,7 +231,10 @@ This schema contract must remain aligned with:
 - `../book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
 - `../book/Determinism_Invariants_LOCKED.md`
 - `../book/Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
+- `../book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
 - `Indices_and_Constraints_Contract_LOCKED.md`
+
+For current-publication resolution behavior, the book-level pointer contract remains the sole behavioral owner. Schema notes and DDL may enforce that contract, but must not soften it.
 
 ## Anti-ambiguity rule (LOCKED)
 If a required audit artifact, invalid-row evidence, run-state dimension, or row-history strategy is described as mandatory in contracts but not represented or explicitly chosen in schema design, then the schema is incomplete and not contract-consistent.

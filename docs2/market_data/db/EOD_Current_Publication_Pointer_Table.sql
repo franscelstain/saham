@@ -17,4 +17,4 @@ CREATE TABLE IF NOT EXISTS eod_current_publication_pointer (
 -- 2. There can be at most one current publication pointer row for one trade_date because trade_date is the primary key.
 -- 3. publication_id is also unique so one publication cannot be current for more than one trade_date.
 -- 4. This table does not replace eod_publications history; it provides a hardened current-state pointer.
--- 5. Consumer-readable publication resolution should prefer this pointer where implemented.
+-- 5. Consumer-readable publication resolution must use this pointer first where implemented; behavioral meaning is owned by ../book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md.

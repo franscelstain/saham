@@ -1,7 +1,12 @@
 # Publication Current Pointer Integrity Contract (LOCKED)
 
+## Normative ownership (LOCKED)
+This document is the only normative contract for current-publication pointer integrity and current-publication read resolution.
+
+No database note, SQL file, runbook, or schema companion document may redefine, weaken, or soften the behavioral rules stated here.
+
 ## Purpose
-Define the hardened database-facing rule for resolving the one current readable publication for a trade date.
+Define the hardened rule for resolving the one current readable publication for a trade date.
 
 This contract strengthens current-publication integrity beyond a soft `is_current` flag pattern.
 
@@ -31,7 +36,7 @@ The current-publication pointer table hardens this by making:
 6. Pointer update must occur transactionally with publication-state promotion.
 
 ## Source-of-truth precedence hierarchy (LOCKED)
-If the current-publication pointer table is implemented, then current publication resolution must follow this hierarchy:
+If the current-publication pointer table is implemented, current publication resolution must follow this hierarchy:
 
 1. `eod_current_publication_pointer`
 2. pointed `eod_publications` row validation
@@ -43,7 +48,7 @@ Under this hierarchy:
 - `eod_runs.is_current_publication` is a consistency mirror / supporting state
 
 ## Read-resolution rule (LOCKED)
-If this pointer table is implemented, consumer-readable publication resolution must prefer:
+If this pointer table is implemented, consumer-readable publication resolution must use:
 1. `eod_current_publication_pointer`
 2. validate the pointed publication row
 3. validate seal/current/readability consistency
@@ -68,6 +73,11 @@ If:
 - pointer row and publication row disagree materially,
 
 then readability for that trade date must be treated as unsafe until reconciled.
+
+## Derived implementation documents
+The following documents may describe enforcement, DDL, transaction flow, or operational handling, but they are subordinate to this contract and must not redefine its behavior:
+- `../db/Database_Schema_Contracts_MariaDB.md`
+- `../ops/Commands_and_Runbook_LOCKED.md`
 
 ## Cross-contract alignment
 This contract must remain aligned with:
