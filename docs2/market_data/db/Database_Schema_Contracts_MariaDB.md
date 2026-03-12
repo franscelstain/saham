@@ -1,23 +1,25 @@
 # Database Schema Contracts (MariaDB)
 
 ## Purpose
-Define the minimum MariaDB schema semantics required to implement Market Data Platform contracts safely and deterministically.
+Define the minimum MariaDB schema semantics required to implement Market Data Platform contracts safely, deterministically, and auditably.
 
-This document describes schema intent and required semantics.
+This document is normative.
 It complements the concrete DDL in `Database_Schema_MariaDB.sql`.
 
 ## Core schema goals
 The schema must support:
 - canonical EOD bars
+- invalid/rejected source-row audit evidence
 - deterministic indicator storage
 - explicit eligibility snapshot
-- run-level terminal status
+- separated run-state semantics
 - append-only event trail
 - hash and seal evidence
-- effective-date publication semantics
+- current publication resolution
 - historical correction trail
 - replay/result evidence
 - auditable registry linkage
+- explicit row-history strategy
 
 ## Required core tables
 Minimum required schema support must exist for concepts equivalent to:
@@ -27,156 +29,188 @@ Minimum required schema support must exist for concepts equivalent to:
 - `eod_eligibility`
 - `eod_runs`
 - `eod_run_events`
+- `eod_publications`
 - reason-code registry table
 
-Equivalent naming is allowed if semantics remain identical.
+Equivalent naming is allowed only if semantics remain identical.
 
 ## Required table semantics
 
 ### 1. Canonical bars
 Must support:
-- one canonical row per `(trade_date, ticker_id)`
-- deterministic storage of canonical OHLCV fields
-- source identity for canonical winner row
-- prevention of ambiguous duplicates
+- exactly one current canonical row per `(trade_date, ticker_id)`
+- deterministic canonical winner selection
+- readable-state linkage to run/publication context
 
 ### 2. Invalid bars
 Must support:
-- rejected row evidence
+- rejected source-row evidence
 - invalid reason code
-- source row reference or equivalent traceability
-- association to relevant run/date
+- source row traceability
+- duplicate-loser preservation when needed
+- run/date linkage
 
 ### 3. Indicators
 Must support:
-- one indicator row per `(trade_date, ticker_id)`
+- exactly one current row per `(trade_date, ticker_id)`
 - explicit validity state
-- invalid reason code when invalid
+- invalid reason code
 - indicator-set version identity
+- readable-state linkage to run/publication context
 
 ### 4. Eligibility
 Must support:
-- one row per coverage-universe ticker/date
+- exactly one current row per `(trade_date, ticker_id)`
 - explicit `eligible` state
-- explicit blocking `reason_code`
-- deterministic downstream-readable readiness artifact
+- explicit blocking reason code
+- readable-state linkage to run/publication context
 
 ### 5. Runs
-Must support:
+Must support, at minimum:
 - requested trade date
 - effective trade date
+- lifecycle state
 - terminal status
-- stage identity
-- counts and gate-related telemetry
+- quality gate state
+- publishability state
+- stage
+- counts and telemetry
 - hash fields
 - seal metadata
-- config identity linkage
-- current publication semantics for corrected history if implemented in run table
+- config identity
+- correction/publication linkage
 
 ### 6. Run events
 Must support:
 - append-only event trail
 - stage/event traceability
-- event severity
+- severity
 - optional reason-code linkage
-- run association
+- structured payload detail
+- run/date linkage
 
-### 7. Reason-code registry
+### 7. Publications
 Must support:
-- stable code identity
-- category
-- description
-- severity/classification
-- active/inactive state
+- current publication for one trade date
+- superseded publication history
+- publication version
+- explicit readable-vs-audit-only distinction
 
 ## Required uniqueness and integrity constraints (LOCKED)
 
 ### Required uniqueness
-- `eod_bars`: exactly one row per `(trade_date, ticker_id)`
-- `eod_indicators`: exactly one row per `(trade_date, ticker_id)`
-- `eod_eligibility`: exactly one row per `(trade_date, ticker_id)`
-- replay reason-code count: one row per `(replay_id, trade_date, reason_code)`
-- correction request identity: unique correction primary key and deterministic run linkage
+- `eod_bars`: exactly one current row per `(trade_date, ticker_id)`
+- `eod_indicators`: exactly one current row per `(trade_date, ticker_id)`
+- `eod_eligibility`: exactly one current row per `(trade_date, ticker_id)`
+- `md_replay_reason_code_counts`: one row per `(replay_id, trade_date, reason_code)`
+- `eod_publications`: one row per `(trade_date, publication_version)`
 
 ### Required integrity semantics
-- one coherent run context must back one sealed readable publication
-- corrected publication must explicitly supersede prior publication
-- superseded publication must remain queryable
-- consumer-readable publication resolution must not depend on timestamp guessing
+- one coherent publication context must back one readable state
+- one trade date must resolve to at most one current publication
+- prior superseded publication must remain auditable
+- invalid bars must never leak into canonical readable bars
+- run events must remain append-only
+
+## Run-state model requirement (LOCKED)
+The schema must distinguish, semantically and preferably physically, at minimum:
+
+### A. Lifecycle state
+Execution progression state, for example:
+- `PENDING`
+- `RUNNING`
+- `FINALIZING`
+- `COMPLETED`
+- `FAILED`
+- `CANCELLED`
+
+### B. Terminal status
+Consumer-facing terminal outcome:
+- `SUCCESS`
+- `HELD`
+- `FAILED`
+
+### C. Quality gate state
+Gate evaluation state:
+- `PENDING`
+- `PASS`
+- `FAIL`
+- `BLOCKED`
+
+### D. Publishability state
+Readability state:
+- `NOT_READABLE`
+- `READABLE`
+
+These meanings must remain distinct.
+A single overloaded `status` column is not sufficient for strong contract closure.
 
 ## Required schema support for effective-date publication
 The schema must support a consumer-readable publication model where:
-- one effective dataset publication is readable for one date D
-- consumers can resolve the current readable publication safely
-- consumers do not need to guess using latest timestamps or max dates
+- one trade date D may have multiple historical publications
+- only one publication may be current
+- only the current sealed publication is consumer-readable
+- superseded publications remain audit-only
 
-## Required schema support for historical correction integrity (LOCKED)
-The schema must support all semantics required by:
-- `Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Dataset_Seal_and_Freeze_Contract_LOCKED.md`
+## Required schema support for historical correction integrity
+The schema must be able to represent:
+- prior current publication
+- new correction run
+- approval metadata
+- old/new hash trails
+- publication switch result
+- supersession relation
 
-At minimum, the storage model must be able to represent:
-- historical run identity
-- current published sealed state for one trade date D
-- superseded prior publication state for D
-- correction request metadata
-- approval trail
-- correction execution linkage
-- old/new hash trail
-- publication switch without silent overwrite
+## Required schema support for explicit row-history strategy
+The schema must support one of the following clearly documented strategies:
 
-Allowed implementation patterns:
-1. fields on `eod_runs` such as:
-   - `supersedes_run_id`
-   - `publication_version`
-   - `is_current_publication`
-2. separate publication table
-3. correction request table + publication table + run linkage
+### Strategy A — Immutable publication-bound history tables
+Recommended.
+Use tables such as:
+- `eod_bars_history`
+- `eod_indicators_history`
+- `eod_eligibility_history`
 
-The contract does not force one exact schema pattern, but all semantics above are mandatory.
+These preserve exact row sets per publication.
 
-## Required schema support for determinism and reproducibility
-The schema must preserve enough data to prove:
-- which artifact set was hashed
-- which run produced the publication
-- which config identity was used
-- which seal was current
-- which historical publication was superseded by correction
+### Strategy B — Publication + hash + correction evidence only
+Allowed for simpler deployments, but only if explicitly documented as the chosen history strategy.
 
-## Required replay-proof schema support (LOCKED)
-Replay result storage must be able to represent:
+If Strategy B is chosen:
+- contracts must explicitly state that row-level historical audit is derived from publication trail + hash trail + correction evidence
+- the implementation must not imply richer row-history than it actually stores
+
+## Required replay-proof schema support
+Replay storage must be able to represent:
 - requested trade date
 - effective trade date
 - terminal status
 - comparison result
 - comparison note
-- seal state
-- expected-vs-actual mismatch summary
-- reason-code counts
+- artifact-changed scope
 - config identity
-- publication version if replay is correction-aware
-
-If replay storage is split across multiple tables, the overall semantics must still remain queryable without guessing.
+- publication version where relevant
+- seal state
+- mismatch summary
+- reason-code counts
 
 ## Application-enforced integrity where MariaDB cannot express partial uniqueness
-Some invariants may require application transaction discipline or locked stored-procedure flow, for example:
+Some invariants may require application transaction discipline or locked procedure flow, including:
 - exactly one current publication per trade date
 - no ambiguous publication switch
-- no dual-current corrected publication state
-- no mixed old/new publication exposure during switch
+- no dual-current publication state
+- no mixed current/superseded read state
 
-If MariaDB cannot express the invariant directly as a partial unique index, the implementation must still enforce it deterministically.
+If MariaDB cannot express the invariant directly, the implementation must still enforce it deterministically.
 
 ## Severity model distinction
-Two different severity layers may exist:
+Two severity layers may exist:
 
 ### Reason-code severity
-Registry-level classification such as:
+Registry classification such as:
 - `INFO`
 - `WARN`
 - `HARD`
-
-This classifies the semantic seriousness of the code itself.
 
 ### Event severity
 Run-event log severity such as:
@@ -184,28 +218,16 @@ Run-event log severity such as:
 - `WARN`
 - `ERROR`
 
-This classifies the event/log occurrence in run execution.
+These do not need identical enums, but the distinction must remain explicit.
 
-These two layers do not need identical enums, but the distinction must remain documented and intentional.
-
-## Optional tables
-Examples of optional but supported tables include:
-- `md_replay_daily_metrics`
-- `md_replay_reason_code_counts`
-- per-ticker optional fetch-failure table
-- correction request / publication history tables if correction lifecycle is implemented separately from `eod_runs`
-- explicit `eod_publications` table if publication semantics are separated from `eod_runs`
+## Cross-contract alignment
+This schema contract must remain aligned with:
+- `Historical_Correction_and_Reseal_Contract_LOCKED.md`
+- `Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+- `Downstream_Data_Readiness_Guarantee_LOCKED.md`
+- `Determinism_Invariants_LOCKED.md`
+- `Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
+- `Indices_and_Constraints_Contract_LOCKED.md`
 
 ## Anti-ambiguity rule (LOCKED)
-The schema must be rich enough that:
-- consumer-readable state can be resolved deterministically
-- correction history can be audited without guessing
-- replay results can be interpreted without hidden assumptions
-- reason-code usage remains consistent with the official registry
-
-## See also
-- `Database_Schema_MariaDB.sql`
-- `Indices_and_Constraints_Contract_LOCKED.md`
-- `EOD_Publications_Table.sql`
-- `../book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
-- `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
+If a required audit artifact, invalid-row evidence, run-state dimension, or row-history strategy is described as mandatory in contracts but not represented or explicitly chosen in schema design, then the schema is incomplete and not contract-consistent.

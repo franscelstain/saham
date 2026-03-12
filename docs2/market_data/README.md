@@ -80,10 +80,10 @@ Per-run provenance such as `run_id`, `asof_run_id`, timestamps of ingestion, and
 - db/Database_Schema_Contracts_MariaDB.md
 - db/Indices_and_Constraints_Contract_LOCKED.md
 - db/EOD_Publications_Table.sql
-- ops/Commands_and_Runbook.md
-- ops/Failure_Playbook.md
+- ops/Commands_and_Runbook_LOCKED.md
+- ops/Failure_Playbook_LOCKED.md
 - ops/Run_Ownership_and_Recovery_LOCKED.md
-- ops/Run_Artifacts_Format.md
+- ops/Run_Artifacts_Format_LOCKED.md
 - ops/Audit_Evidence_Pack_Contract_LOCKED.md
 
 ## Testing, fixtures, and replay proof
@@ -93,3 +93,7 @@ Per-run provenance such as `run_id`, `asof_run_id`, timestamps of ingestion, and
 - tests/Test_Implementation_Guidance_LOCKED.md
 - backtest/Historical_Replay_and_Data_Quality_Backtest.md
 - backtest/Replay_Results_Schema_MariaDB.sql
+
+## Freeze status
+This documentation set is the locked source of truth for Market Data Platform (EOD).
+Changes to locked contracts, publication semantics, correction flow, replay proof, or consumer-readiness behavior must be versioned and reviewed explicitly.

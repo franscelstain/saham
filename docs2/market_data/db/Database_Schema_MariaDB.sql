@@ -1,5 +1,23 @@
 -- =========================================================
--- Core uniqueness constraints (LOCKED)
+-- Market Data Platform (EOD) — Core MariaDB Schema
+-- LOCKED DDL
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS eod_reason_codes (
+  code VARCHAR(64) NOT NULL,
+  category VARCHAR(32) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  severity ENUM('INFO','WARN','HARD') NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NULL,
+  updated_at DATETIME NULL,
+  PRIMARY KEY (code),
+  KEY idx_reason_codes_category (category),
+  KEY idx_reason_codes_active (is_active)
+) ENGINE=InnoDB;
+
+-- =========================================================
+-- Canonical readable bars
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS eod_bars (
@@ -13,11 +31,52 @@ CREATE TABLE IF NOT EXISTS eod_bars (
   adj_close DECIMAL(20,4) NULL,
   source VARCHAR(32) NOT NULL,
   run_id BIGINT UNSIGNED NOT NULL,
+  publication_id BIGINT UNSIGNED NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (trade_date, ticker_id),
   KEY idx_eod_bars_ticker_date (ticker_id, trade_date),
-  KEY idx_eod_bars_run (run_id)
+  KEY idx_eod_bars_run (run_id),
+  KEY idx_eod_bars_publication (publication_id)
 ) ENGINE=InnoDB;
+
+-- LOCKED NOTE
+-- eod_bars stores the current canonical readable row set for a given trade_date.
+-- Historical auditability across corrections is provided through publication trail,
+-- hash trail, correction evidence, and optional immutable snapshot tables below.
+
+-- =========================================================
+-- Invalid/rejected source-row evidence
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS eod_invalid_bars (
+  invalid_bar_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  trade_date DATE NOT NULL,
+  ticker_id BIGINT UNSIGNED NULL,
+  run_id BIGINT UNSIGNED NOT NULL,
+  source VARCHAR(32) NOT NULL,
+  source_row_ref VARCHAR(255) NULL,
+  open DECIMAL(20,4) NULL,
+  high DECIMAL(20,4) NULL,
+  low DECIMAL(20,4) NULL,
+  close DECIMAL(20,4) NULL,
+  volume BIGINT NULL,
+  adj_close DECIMAL(20,4) NULL,
+  invalid_reason_code VARCHAR(64) NOT NULL,
+  invalid_note VARCHAR(255) NULL,
+  loser_of_trade_date DATE NULL,
+  loser_of_ticker_id BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (invalid_bar_id),
+  KEY idx_invalid_bars_trade_date_ticker (trade_date, ticker_id),
+  KEY idx_invalid_bars_run (run_id),
+  KEY idx_invalid_bars_reason_code (invalid_reason_code),
+  KEY idx_invalid_bars_source_row_ref (source_row_ref),
+  KEY idx_invalid_bars_duplicate_loser (loser_of_trade_date, loser_of_ticker_id)
+) ENGINE=InnoDB;
+
+-- =========================================================
+-- Indicator artifact
+-- =========================================================
 
 CREATE TABLE IF NOT EXISTS eod_indicators (
   trade_date DATE NOT NULL,
@@ -31,12 +90,18 @@ CREATE TABLE IF NOT EXISTS eod_indicators (
   roc20 DECIMAL(20,10) NULL,
   hh20 DECIMAL(20,4) NULL,
   run_id BIGINT UNSIGNED NOT NULL,
+  publication_id BIGINT UNSIGNED NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (trade_date, ticker_id),
   KEY idx_eod_indicators_ticker_date (ticker_id, trade_date),
   KEY idx_eod_indicators_run (run_id),
-  KEY idx_eod_indicators_invalid_reason (invalid_reason_code)
+  KEY idx_eod_indicators_invalid_reason (invalid_reason_code),
+  KEY idx_eod_indicators_publication (publication_id)
 ) ENGINE=InnoDB;
+
+-- =========================================================
+-- Eligibility artifact
+-- =========================================================
 
 CREATE TABLE IF NOT EXISTS eod_eligibility (
   trade_date DATE NOT NULL,
@@ -44,22 +109,29 @@ CREATE TABLE IF NOT EXISTS eod_eligibility (
   eligible TINYINT(1) NOT NULL,
   reason_code VARCHAR(64) NULL,
   run_id BIGINT UNSIGNED NOT NULL,
+  publication_id BIGINT UNSIGNED NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (trade_date, ticker_id),
   KEY idx_eod_eligibility_ticker_date (ticker_id, trade_date),
   KEY idx_eod_eligibility_run (run_id),
-  KEY idx_eod_eligibility_reason (reason_code)
+  KEY idx_eod_eligibility_reason (reason_code),
+  KEY idx_eod_eligibility_publication (publication_id)
 ) ENGINE=InnoDB;
 
 -- =========================================================
--- Runs with correction/publication semantics (LOCKED)
+-- Runs with separated state model
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS eod_runs (
   run_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   trade_date_requested DATE NOT NULL,
   trade_date_effective DATE NULL,
-  status ENUM('SUCCESS','HELD','FAILED') NOT NULL,
+
+  lifecycle_state ENUM('PENDING','RUNNING','FINALIZING','COMPLETED','FAILED','CANCELLED') NOT NULL,
+  terminal_status ENUM('SUCCESS','HELD','FAILED') NULL,
+  quality_gate_state ENUM('PENDING','PASS','FAIL','BLOCKED') NOT NULL DEFAULT 'PENDING',
+  publishability_state ENUM('NOT_READABLE','READABLE') NOT NULL DEFAULT 'NOT_READABLE',
+
   stage ENUM('INGEST_BARS','PUBLISH_BARS','COMPUTE_INDICATORS','BUILD_ELIGIBILITY','HASH','SEAL','FINALIZE') NOT NULL,
   source VARCHAR(32) NOT NULL,
 
@@ -97,15 +169,51 @@ CREATE TABLE IF NOT EXISTS eod_runs (
   updated_at DATETIME NOT NULL,
 
   PRIMARY KEY (run_id),
-  KEY idx_runs_requested_status_stage (trade_date_requested, status, stage),
-  KEY idx_runs_effective (trade_date_effective),
-  KEY idx_runs_effective_status_sealed (trade_date_effective, status, sealed_at),
+  KEY idx_runs_requested_lifecycle (trade_date_requested, lifecycle_state),
+  KEY idx_runs_requested_terminal (trade_date_requested, terminal_status),
+  KEY idx_runs_effective_terminal (trade_date_effective, terminal_status),
+  KEY idx_runs_effective_publishability (trade_date_effective, publishability_state),
+  KEY idx_runs_gate_state (quality_gate_state),
+  KEY idx_runs_stage (stage),
   KEY idx_runs_trade_date_current_pub (trade_date_effective, is_current_publication),
   KEY idx_runs_supersedes (supersedes_run_id)
 ) ENGINE=InnoDB;
 
+-- LOCKED SEMANTICS
+-- 1. lifecycle_state tracks execution progression.
+-- 2. terminal_status tracks consumer-facing terminal outcome.
+-- 3. quality_gate_state tracks gate evaluation.
+-- 4. publishability_state tracks readability.
+-- 5. These meanings must remain distinct; do not collapse them back into one overloaded status.
+-- 6. terminal_status may remain NULL until finalization resolves outcome.
+-- 7. publishability_state='READABLE' must never coexist with missing required seal/publication semantics.
+
 -- =========================================================
--- Optional explicit publication table (recommended)
+-- Append-only run event trail
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS eod_run_events (
+  event_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  run_id BIGINT UNSIGNED NOT NULL,
+  trade_date_requested DATE NOT NULL,
+  event_time DATETIME NOT NULL,
+  stage VARCHAR(64) NOT NULL,
+  event_type VARCHAR(64) NOT NULL,
+  severity ENUM('INFO','WARN','ERROR') NOT NULL,
+  reason_code VARCHAR(64) NULL,
+  message VARCHAR(255) NULL,
+  event_payload_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (event_id),
+  KEY idx_run_events_run_time (run_id, event_time),
+  KEY idx_run_events_trade_date_time (trade_date_requested, event_time),
+  KEY idx_run_events_stage_time (stage, event_time),
+  KEY idx_run_events_reason_code (reason_code),
+  KEY idx_run_events_severity_time (severity, event_time)
+) ENGINE=InnoDB;
+
+-- =========================================================
+-- Explicit publication table
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS eod_publications (
@@ -115,23 +223,29 @@ CREATE TABLE IF NOT EXISTS eod_publications (
   publication_version INT UNSIGNED NOT NULL,
   is_current TINYINT(1) NOT NULL DEFAULT 0,
   supersedes_publication_id BIGINT UNSIGNED NULL,
+  seal_state ENUM('SEALED','UNSEALED') NOT NULL DEFAULT 'SEALED',
+  bars_batch_hash VARCHAR(64) NULL,
+  indicators_batch_hash VARCHAR(64) NULL,
+  eligibility_batch_hash VARCHAR(64) NULL,
   sealed_at DATETIME NOT NULL,
   created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
   PRIMARY KEY (publication_id),
   UNIQUE KEY uq_publication_trade_date_version (trade_date, publication_version),
   KEY idx_publication_trade_date_current (trade_date, is_current),
   KEY idx_publication_run (run_id),
-  KEY idx_publication_supersedes (supersedes_publication_id)
+  KEY idx_publication_supersedes (supersedes_publication_id),
+  KEY idx_publication_trade_date_sealed (trade_date, seal_state, sealed_at)
 ) ENGINE=InnoDB;
 
--- IMPORTANT LOCKED NOTE:
--- MariaDB cannot express "only one row with is_current=1 per trade_date"
+-- IMPORTANT NOTE
+-- MariaDB cannot enforce "only one row with is_current=1 per trade_date"
 -- as a partial unique index in the same way some other databases can.
--- Therefore this invariant must be enforced by application transaction discipline
--- or a locked stored-procedure publication-switch flow.
+-- Therefore the single-current-publication invariant must be enforced by
+-- application transaction discipline or locked publication-switch procedure flow.
 
 -- =========================================================
--- Optional correction request table
+-- Correction request table
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS eod_dataset_corrections (
@@ -154,6 +268,73 @@ CREATE TABLE IF NOT EXISTS eod_dataset_corrections (
   KEY idx_corr_prior_run (prior_run_id),
   KEY idx_corr_new_run (new_run_id)
 ) ENGINE=InnoDB;
+
+-- =========================================================
+-- Optional immutable publication-bound snapshot tables
+-- Recommended for stronger row-history/version auditability
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS eod_bars_history (
+  publication_id BIGINT UNSIGNED NOT NULL,
+  trade_date DATE NOT NULL,
+  ticker_id BIGINT UNSIGNED NOT NULL,
+  open DECIMAL(20,4) NOT NULL,
+  high DECIMAL(20,4) NOT NULL,
+  low DECIMAL(20,4) NOT NULL,
+  close DECIMAL(20,4) NOT NULL,
+  volume BIGINT NOT NULL,
+  adj_close DECIMAL(20,4) NULL,
+  source VARCHAR(32) NOT NULL,
+  run_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (publication_id, trade_date, ticker_id),
+  KEY idx_bars_history_trade_date (trade_date),
+  KEY idx_bars_history_ticker_date (ticker_id, trade_date),
+  KEY idx_bars_history_run (run_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS eod_indicators_history (
+  publication_id BIGINT UNSIGNED NOT NULL,
+  trade_date DATE NOT NULL,
+  ticker_id BIGINT UNSIGNED NOT NULL,
+  is_valid TINYINT(1) NOT NULL,
+  invalid_reason_code VARCHAR(64) NULL,
+  indicator_set_version VARCHAR(64) NOT NULL,
+  dv20_idr DECIMAL(24,2) NULL,
+  atr14_pct DECIMAL(20,10) NULL,
+  vol_ratio DECIMAL(20,10) NULL,
+  roc20 DECIMAL(20,10) NULL,
+  hh20 DECIMAL(20,4) NULL,
+  run_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (publication_id, trade_date, ticker_id),
+  KEY idx_indicators_history_trade_date (trade_date),
+  KEY idx_indicators_history_ticker_date (ticker_id, trade_date),
+  KEY idx_indicators_history_run (run_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS eod_eligibility_history (
+  publication_id BIGINT UNSIGNED NOT NULL,
+  trade_date DATE NOT NULL,
+  ticker_id BIGINT UNSIGNED NOT NULL,
+  eligible TINYINT(1) NOT NULL,
+  reason_code VARCHAR(64) NULL,
+  run_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (publication_id, trade_date, ticker_id),
+  KEY idx_eligibility_history_trade_date (trade_date),
+  KEY idx_eligibility_history_ticker_date (ticker_id, trade_date),
+  KEY idx_eligibility_history_run (run_id)
+) ENGINE=InnoDB;
+
+-- LOCKED HISTORY NOTE
+-- 1. The *_history tables are immutable publication-bound snapshots.
+-- 2. They are the recommended strategy for explicit row-history/version auditability.
+-- 3. Current readable state may still be served from eod_bars / eod_indicators / eod_eligibility,
+--    while historical publication-specific row audit is preserved in *_history tables.
+-- 4. If these tables are implemented, each new current publication should write one full immutable snapshot set.
+-- 5. If an implementation chooses not to materialize these tables, it must explicitly rely on
+--    publication trail + hash trail + correction evidence as its row-history strategy and say so in contracts.
 
 -- =========================================================
 -- Replay result storage
@@ -192,7 +373,9 @@ CREATE TABLE IF NOT EXISTS md_replay_daily_metrics (
   PRIMARY KEY (replay_id, trade_date),
   KEY idx_replay_daily_status (replay_id, status),
   KEY idx_replay_daily_effective (replay_id, trade_date_effective),
-  KEY idx_replay_daily_compare (replay_id, comparison_result)
+  KEY idx_replay_daily_compare (replay_id, comparison_result),
+  KEY idx_replay_daily_publication_version (replay_id, publication_version),
+  KEY idx_replay_daily_config_identity (replay_id, config_identity)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS md_replay_reason_code_counts (
