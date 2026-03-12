@@ -1,0 +1,17 @@
+{
+  "test_id": "correction_failed_reseal_no_switch",
+  "fixture_family": "fixture_correction_reseal_fail",
+  "execution_time": "2026-04-22T10:40:00+07:00",
+  "result": "PASS",
+  "assertion_layers": [
+    "run",
+    "publication"
+  ],
+  "details": {
+    "prior_current_run_id": 5001,
+    "candidate_run_id": 5011,
+    "publication_switch": false,
+    "candidate_seal_state": "UNSEALED",
+    "prior_publication_preserved": true
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "run_id": 8124,
+  "trade_date_requested": "2026-04-21",
+  "event_count": 17,
+  "first_event": {
+    "event_time": "2026-04-21T17:31:00+07:00",
+    "stage": "INGEST_BARS",
+    "event_type": "RUN_CREATED",
+    "severity": "INFO"
+  },
+  "last_event": {
+    "event_time": "2026-04-21T17:39:20+07:00",
+    "stage": "FINALIZE",
+    "event_type": "FINAL_STATUS_COMMITTED",
+    "severity": "INFO"
+  },
+  "dominant_warning_reason_codes": [
+    {
+      "reason_code": "BAR_DUPLICATE_SOURCE_ROW",
+      "count": 1
+    },
+    {
+      "reason_code": "BAR_INVALID_OHLC_ORDER",
+      "count": 1
+    }
+  ]
+}

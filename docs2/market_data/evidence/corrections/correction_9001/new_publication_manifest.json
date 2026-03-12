@@ -1,0 +1,18 @@
+{
+  "publication_id": 1201,
+  "trade_date": "2026-03-05",
+  "run_id": 5009,
+  "publication_version": 2,
+  "is_current": true,
+  "supersedes_publication_id": 1188,
+  "seal_state": "SEALED",
+  "sealed_at": "2026-03-06T10:15:00+07:00",
+  "config_identity": "cfg_2026_03_v1",
+  "bars_batch_hash": "H2B",
+  "indicators_batch_hash": "H2I",
+  "eligibility_batch_hash": "H2E",
+  "bars_rows_written": 1000,
+  "indicators_rows_written": 1000,
+  "eligibility_rows_written": 1000,
+  "trade_date_effective": "2026-03-05"
+}

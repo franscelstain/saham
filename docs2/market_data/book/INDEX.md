@@ -10,9 +10,10 @@
 - Downstream_Data_Readiness_Guarantee_LOCKED.md
 - Determinism_Invariants_LOCKED.md
 
-## Publication identity, switch safety, and correction integrity
+## Publication identity, pointer integrity, switch safety, and correction integrity
 - Publication_Manifest_Contract_LOCKED.md
 - Publication_Switch_Integrity_Contract_LOCKED.md
+- Publication_Current_Pointer_Integrity_Contract_LOCKED.md
 - Historical_Correction_and_Reseal_Contract_LOCKED.md
 - Canonical_Row_History_and_Versioning_Policy_LOCKED.md
 
@@ -50,6 +51,7 @@
 ## Audit and proof hardening
 - Publication_Manifest_Contract_LOCKED.md
 - Publication_Switch_Integrity_Contract_LOCKED.md
+- Publication_Current_Pointer_Integrity_Contract_LOCKED.md
 - Canonical_Row_History_and_Versioning_Policy_LOCKED.md
 
 ## Supporting datasets
@@ -77,6 +79,7 @@ The following folders are normative companions to this book and must be treated 
    - `Determinism_Invariants_LOCKED.md`
    - `Publication_Manifest_Contract_LOCKED.md`
    - `Publication_Switch_Integrity_Contract_LOCKED.md`
+   - `Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
 5. Lock calendar, identity, coverage, and symbol-lifecycle dependencies before implementing ingest.
 6. Implement upstream flow in this exact order:
    - bars
@@ -91,3 +94,6 @@ The following folders are normative companions to this book and must be treated 
 ## Freeze note
 This index maps the locked book-level contracts only.
 Companion folders contain normative schema, operations, testing, replay, evidence, and example layers that complete the same source of truth.
+
+## Evidence note
+Archived actual execution evidence is part of the normative proof ecosystem, but is expected to live outside the book folder in an evidence archive area or equivalent official repository.

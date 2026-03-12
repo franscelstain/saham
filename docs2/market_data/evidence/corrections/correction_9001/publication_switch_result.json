@@ -1,0 +1,14 @@
+{
+  "trade_date": "2026-03-05",
+  "pointer_table_used": true,
+  "old_current_publication_id": 1188,
+  "new_current_publication_id": 1201,
+  "switch_executed_at": "2026-03-06T10:20:00+07:00",
+  "switch_result": "SUCCESS",
+  "post_switch_validation": {
+    "exactly_one_current_publication": true,
+    "current_pointer_matches_publication": true,
+    "new_publication_sealed": true,
+    "old_publication_preserved": true
+  }
+}
