@@ -216,8 +216,8 @@ Unless the implementation documents a stricter rule, expected comparisons should
 
 ## Cross-contract alignment
 This file must remain aligned with:
-- `EOD_Indicators_Formula_Spec.md`
-- `EOD_Indicators_Contract.md`
+- `../indicators/EOD_Indicators_Formula_Spec.md`
+- `../book/EOD_Indicators_Contract.md`
 - `Golden_Fixture_Examples_LOCKED.md`
 - `Contract_Test_Matrix_LOCKED.md`
 

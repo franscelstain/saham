@@ -86,9 +86,9 @@ For any corrected date D, the system must answer:
 
 ## Required schema alignment
 This policy must be reflected in:
-- `Database_Schema_MariaDB.sql`
-- `Database_Schema_Contracts_MariaDB.md`
-- `History_Table_Immutability_Guards_LOCKED.sql`
+- `../db/Database_Schema_MariaDB.sql`
+- `../db/Database_Schema_Contracts_MariaDB.md`
+- `../ops/History_Table_Immutability_Guards_LOCKED.sql`
 - publication/correction contracts
 
 ## Required evidence alignment

@@ -74,7 +74,7 @@ Executed evidence may be preserved through:
 This contract must remain aligned with:
 - `Audit_Evidence_Pack_Contract_LOCKED.md`
 - `Run_Artifacts_Format_LOCKED.md`
-- `Executed_Proof_Admission_Criteria_LOCKED.md`
+- `../tests/Executed_Proof_Admission_Criteria_LOCKED.md`
 - examples folder contracts/examples
 
 ## Anti-ambiguity rule (LOCKED)

@@ -199,9 +199,9 @@ But the evidence contract is about semantic completeness, not just filenames.
 
 ## Cross-contract alignment
 This contract must remain aligned with:
-- `Run_Artifacts_Format.md`
-- `Failure_Playbook.md`
-- `Historical_Correction_and_Reseal_Contract_LOCKED.md`
+- `Run_Artifacts_Format_LOCKED.md`
+- `Failure_Playbook_LOCKED.md`
+- `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
 - replay schema/contracts
 - publication/readiness contracts
 

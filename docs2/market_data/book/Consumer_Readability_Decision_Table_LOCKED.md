@@ -95,7 +95,6 @@ This document must remain aligned with:
 - `Downstream_Data_Readiness_Guarantee_LOCKED.md`
 - `Effective_Trade_Date_Contract_LOCKED.md`
 - `Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Publication_Switch_Integrity_Contract_LOCKED.md`
 
 ## Anti-ambiguity rule (LOCKED)
 If two readers can follow this table honestly and still resolve different readable publication states for the same request, the publication/readiness contracts are incomplete.

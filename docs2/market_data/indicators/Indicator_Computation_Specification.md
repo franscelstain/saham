@@ -73,4 +73,4 @@ This is based on real highs, not adjusted price basis.
 
 ## Rounding/storage (LOCKED)
 Store using output column precision defined in schema.
-Hash serialization formatting is governed separately by `Hash_Number_Formatting_LOCKED.md`.
+Hash serialization formatting is governed separately by `../book/Hash_Number_Formatting_LOCKED.md`.

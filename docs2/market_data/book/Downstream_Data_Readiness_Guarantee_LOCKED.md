@@ -119,7 +119,6 @@ This readiness guarantee must remain aligned with:
 - `Effective_Trade_Date_Contract_LOCKED.md`
 - `Dataset_Seal_and_Freeze_Contract_LOCKED.md`
 - `Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Publication_Resolution_Contract_LOCKED.md` if implemented separately
 
 ## Anti-ambiguity rule (LOCKED)
 If a consumer cannot explain why D is readable in terms of current publication, seal state, and effective-date resolution, then D is not safely readable under this contract.

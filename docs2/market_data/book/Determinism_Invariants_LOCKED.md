@@ -143,7 +143,7 @@ Together, these invariants protect:
 ## Required cross-contract alignment
 These invariants must remain aligned with:
 - `Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
-- `EOD_Indicators_Formula_Spec.md`
+- `../indicators/EOD_Indicators_Formula_Spec.md`
 - `Dataset_Seal_and_Freeze_Contract_LOCKED.md`
 - `Historical_Correction_and_Reseal_Contract_LOCKED.md`
 - `Downstream_Consumer_Read_Model_Contract_LOCKED.md`
@@ -156,6 +156,6 @@ If an implementation cannot explain its behavior using these invariants without 
 ## See also
 - `Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
 - `../indicators/EOD_Indicators_Formula_Spec.md`
-- `Historical_Replay_and_Data_Quality_Backtest.md`
+- `../backtest/Historical_Replay_and_Data_Quality_Backtest.md`
 - `Historical_Correction_and_Reseal_Contract_LOCKED.md`
 - `Downstream_Consumer_Read_Model_Contract_LOCKED.md`

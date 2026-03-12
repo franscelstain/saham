@@ -171,7 +171,7 @@ An audit-grade implementation must be able to answer all the questions above qui
 This cookbook must remain aligned with:
 - `Audit_Evidence_Pack_Contract_LOCKED.md`
 - `Run_Artifacts_Format_LOCKED.md`
-- `Database_Schema_Contracts_MariaDB.md`
+- `../db/Database_Schema_Contracts_MariaDB.md`
 - correction/publication contracts
 - replay contracts
 

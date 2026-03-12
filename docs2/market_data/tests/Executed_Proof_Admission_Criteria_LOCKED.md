@@ -46,7 +46,7 @@ Examples may still be kept in docs, but they must be distinguishable from execut
 ## Cross-contract alignment
 This contract must remain aligned with:
 - `Test_Implementation_Guidance_LOCKED.md`
-- `Run_Execution_Evidence_Pack_Contract_LOCKED.md`
+- `../ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md`
 - examples folder evidence docs
 
 ## Anti-ambiguity rule (LOCKED)

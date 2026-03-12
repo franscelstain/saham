@@ -146,7 +146,7 @@ This document must remain aligned with:
 - `Downstream_Consumer_Read_Model_Contract_LOCKED.md`
 - `Downstream_Data_Readiness_Guarantee_LOCKED.md`
 - `EOD_Eligibility_Snapshot_Contract_LOCKED.md`
-- `Session_Snapshot_Contract_LOCKED.md`
+- `../session_snapshot/Session_Snapshot_Contract_LOCKED.md`
 
 ## Anti-domain-leak rule (LOCKED)
 If a document in this module can be read as producing trading advice, watchlist ranking, or execution guidance rather than upstream market-data readiness/publication semantics, that document violates the domain boundary.

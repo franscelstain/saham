@@ -78,10 +78,10 @@ But archived actual evidence should live in a distinct archive area such as `evi
 
 ## Cross-contract alignment
 This file must remain aligned with:
-- `Archived_Actual_Execution_Evidence_Contract_LOCKED.md`
-- `Run_Execution_Evidence_Pack_Contract_LOCKED.md`
-- `Executed_Run_Admission_Criteria_LOCKED.md`
-- `Executed_Proof_Admission_Criteria_LOCKED.md`
+- `../ops/Archived_Actual_Execution_Evidence_Contract_LOCKED.md`
+- `../ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md`
+- `../ops/Executed_Run_Admission_Criteria_LOCKED.md`
+- `../tests/Executed_Proof_Admission_Criteria_LOCKED.md`
 
 ## Anti-ambiguity rule (LOCKED)
 If archived actual evidence and illustrative examples are mixed without clear distinction, the proof layer becomes misleading.

@@ -46,7 +46,6 @@ Read the boundary layer first:
 - `book/Determinism_Invariants_LOCKED.md`
 - `book/Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
 - `book/Publication_Manifest_Contract_LOCKED.md`
-- `book/Publication_Switch_Integrity_Contract_LOCKED.md`
 - `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
 - `book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
 - `book/Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
@@ -68,7 +67,6 @@ Read the boundary layer first:
 - `ops/Audit_Query_Cookbook_LOCKED.md`
 - `ops/Incident_Classification_and_Response_Matrix_LOCKED.md`
 - `ops/Operator_Decision_Trees_LOCKED.md`
-- `ops/Correction_Diff_Artifact_Contract_LOCKED.md`
 - `ops/History_Table_Immutability_Guards_LOCKED.sql`
 - `ops/Performance_SLO_and_Limits_LOCKED.md`
 - `ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md`
@@ -107,7 +105,6 @@ These example files exist to demonstrate proof-by-execution style evidence, not 
    - `book/Determinism_Invariants_LOCKED.md`
    - `book/Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
    - `book/Publication_Manifest_Contract_LOCKED.md`
-   - `book/Publication_Switch_Integrity_Contract_LOCKED.md`
    - `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
 5. Read dependency and canonical data contracts before implementing ingest:
    - calendar

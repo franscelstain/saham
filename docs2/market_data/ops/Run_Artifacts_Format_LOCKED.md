@@ -212,8 +212,8 @@ Artifacts must not expose:
 ## Cross-contract alignment
 These formats must remain aligned with:
 - `Audit_Evidence_Pack_Contract_LOCKED.md`
-- `Failure_Playbook.md`
-- `Historical_Correction_and_Reseal_Contract_LOCKED.md`
+- `Failure_Playbook_LOCKED.md`
+- `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
 - replay contracts
 - publication/readiness contracts
 
@@ -222,6 +222,6 @@ If two artifacts for the same requested date tell conflicting stories about stat
 
 ## See also
 - `Audit_Evidence_Pack_Contract_LOCKED.md`
-- `Failure_Playbook.md`
+- `Failure_Playbook_LOCKED.md`
 - `Historical_Correction_Runbook_LOCKED.md`
 - `../backtest/Historical_Replay_and_Data_Quality_Backtest.md`

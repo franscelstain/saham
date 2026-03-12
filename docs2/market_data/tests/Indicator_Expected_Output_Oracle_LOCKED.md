@@ -60,8 +60,8 @@ A serious proof implementation should compare actual output rows against this or
 ## Cross-contract alignment
 This file must remain aligned with:
 - `Indicator_Test_Vectors_LOCKED.md`
-- `EOD_Indicators_Formula_Spec.md`
-- `EOD_Indicators_Contract.md`
+- `../indicators/EOD_Indicators_Formula_Spec.md`
+- `../book/EOD_Indicators_Contract.md`
 - `Contract_Test_Matrix_LOCKED.md`
 
 ## Anti-ambiguity rule (LOCKED)

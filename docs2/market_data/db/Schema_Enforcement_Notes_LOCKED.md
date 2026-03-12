@@ -68,7 +68,6 @@ Enforcement evidence should be visible through:
 This file must remain aligned with:
 - `Database_Schema_Contracts_MariaDB.md`
 - `Indices_and_Constraints_Contract_LOCKED.md`
-- `Publication_Switch_Integrity_Contract_LOCKED.md`
 - `Publication_Switch_Procedure_LOCKED.sql`
 
 ## Anti-ambiguity rule (LOCKED)

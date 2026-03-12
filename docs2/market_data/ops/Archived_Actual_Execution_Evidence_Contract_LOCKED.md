@@ -87,7 +87,7 @@ or an equivalent official evidence repository.
 This contract must remain aligned with:
 - `Run_Execution_Evidence_Pack_Contract_LOCKED.md`
 - `Executed_Run_Admission_Criteria_LOCKED.md`
-- `Executed_Proof_Admission_Criteria_LOCKED.md`
+- `../tests/Executed_Proof_Admission_Criteria_LOCKED.md`
 - executed evidence examples
 - audit evidence pack contracts
 

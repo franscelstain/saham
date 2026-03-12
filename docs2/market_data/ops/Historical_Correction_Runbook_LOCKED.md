@@ -4,9 +4,9 @@
 Provide the minimum operator flow for handling historical corrections safely, without silently mutating prior sealed upstream publications.
 
 This runbook complements:
-- `Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Dataset_Seal_and_Freeze_Contract_LOCKED.md`
-- `Commands_and_Runbook.md`
+- `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
+- `../book/Dataset_Seal_and_Freeze_Contract_LOCKED.md`
+- `Commands_and_Runbook_LOCKED.md`
 - replay and publication contracts
 
 ## Operator goals
@@ -274,7 +274,7 @@ If the correction flow cannot explain exactly which publication is current, whic
 
 ## See also
 - `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Failure_Playbook.md`
+- `Failure_Playbook_LOCKED.md`
 - `Run_Ownership_and_Recovery_LOCKED.md`
-- `Run_Artifacts_Format.md`
+- `Run_Artifacts_Format_LOCKED.md`
 - `Audit_Evidence_Pack_Contract_LOCKED.md`

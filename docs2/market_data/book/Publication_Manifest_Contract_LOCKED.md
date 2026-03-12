@@ -91,7 +91,7 @@ This contract must remain aligned with:
 - `Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
 - `Downstream_Consumer_Read_Model_Contract_LOCKED.md`
 - `Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Audit_Evidence_Pack_Contract_LOCKED.md`
+- `../ops/Audit_Evidence_Pack_Contract_LOCKED.md`
 - `Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
 
 ## Anti-ambiguity rule (LOCKED)

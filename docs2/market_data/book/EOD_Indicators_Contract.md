@@ -12,7 +12,7 @@ This contract governs:
 - deterministic interpretation
 
 This document complements:
-- `indicators/EOD_Indicators_Formula_Spec.md`
+- `../indicators/EOD_Indicators_Formula_Spec.md`
 - indicator test fixtures
 - eligibility contracts
 

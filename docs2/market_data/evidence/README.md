@@ -19,7 +19,7 @@ Artifacts in this folder should satisfy:
 - no placeholder-only bundles
 
 See:
-- `ops/Archived_Actual_Execution_Evidence_Contract_LOCKED.md`
-- `ops/Executed_Run_Admission_Criteria_LOCKED.md`
-- `tests/Executed_Proof_Admission_Criteria_LOCKED.md`
-- `examples/ARCHIVED_EVIDENCE_FOLDER_STRUCTURE_LOCKED.md`
+- `../ops/Archived_Actual_Execution_Evidence_Contract_LOCKED.md`
+- `../ops/Executed_Run_Admission_Criteria_LOCKED.md`
+- `../tests/Executed_Proof_Admission_Criteria_LOCKED.md`
+- `../examples/ARCHIVED_EVIDENCE_FOLDER_STRUCTURE_LOCKED.md`

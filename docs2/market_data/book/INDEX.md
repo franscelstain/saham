@@ -12,7 +12,6 @@
 
 ## Publication identity, pointer integrity, switch safety, and correction integrity
 - Publication_Manifest_Contract_LOCKED.md
-- Publication_Switch_Integrity_Contract_LOCKED.md
 - Publication_Current_Pointer_Integrity_Contract_LOCKED.md
 - Historical_Correction_and_Reseal_Contract_LOCKED.md
 - Canonical_Row_History_and_Versioning_Policy_LOCKED.md
@@ -50,7 +49,6 @@
 
 ## Audit and proof hardening
 - Publication_Manifest_Contract_LOCKED.md
-- Publication_Switch_Integrity_Contract_LOCKED.md
 - Publication_Current_Pointer_Integrity_Contract_LOCKED.md
 - Canonical_Row_History_and_Versioning_Policy_LOCKED.md
 
@@ -78,7 +76,6 @@ The following folders are normative companions to this book and must be treated 
 4. Read the determinism and publication identity core:
    - `Determinism_Invariants_LOCKED.md`
    - `Publication_Manifest_Contract_LOCKED.md`
-   - `Publication_Switch_Integrity_Contract_LOCKED.md`
    - `Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
 5. Lock calendar, identity, coverage, and symbol-lifecycle dependencies before implementing ingest.
 6. Implement upstream flow in this exact order:

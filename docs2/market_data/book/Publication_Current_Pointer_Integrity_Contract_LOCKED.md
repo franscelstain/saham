@@ -71,11 +71,10 @@ then readability for that trade date must be treated as unsafe until reconciled.
 
 ## Cross-contract alignment
 This contract must remain aligned with:
-- `Publication_Switch_Integrity_Contract_LOCKED.md`
 - `Downstream_Consumer_Read_Model_Contract_LOCKED.md`
 - `Consumer_Readability_Decision_Table_LOCKED.md`
-- `Publication_Current_Pointer_Switch_Procedure_LOCKED.sql`
-- `Database_Schema_Contracts_MariaDB.md`
+- `../db/Publication_Current_Pointer_Switch_Procedure_LOCKED.sql`
+- `../db/Database_Schema_Contracts_MariaDB.md`
 
 ## Anti-ambiguity rule (LOCKED)
 If the system claims one current readable publication per trade date but cannot prove both:

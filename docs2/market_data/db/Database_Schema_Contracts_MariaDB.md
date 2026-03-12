@@ -222,11 +222,11 @@ These do not need identical enums, but the distinction must remain explicit.
 
 ## Cross-contract alignment
 This schema contract must remain aligned with:
-- `Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `Downstream_Consumer_Read_Model_Contract_LOCKED.md`
-- `Downstream_Data_Readiness_Guarantee_LOCKED.md`
-- `Determinism_Invariants_LOCKED.md`
-- `Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
+- `../book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
+- `../book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+- `../book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
+- `../book/Determinism_Invariants_LOCKED.md`
+- `../book/Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
 - `Indices_and_Constraints_Contract_LOCKED.md`
 
 ## Anti-ambiguity rule (LOCKED)
