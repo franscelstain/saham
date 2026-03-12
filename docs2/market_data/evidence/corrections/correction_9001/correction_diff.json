@@ -8,14 +8,14 @@
   "new_publication_version": 2,
   "changed_artifact_scope": "bars_and_indicators",
   "old_hashes": {
-    "bars_batch_hash": "H1B",
-    "indicators_batch_hash": "H1I",
-    "eligibility_batch_hash": "H1E"
+    "bars_batch_hash": "5f8c1d3e7a9b2c4d6e8f0a1b3c5d7e9f1a2b4c6d8e0f3a5b7c9d1e2f4a6b8c0",
+    "indicators_batch_hash": "6a9d2e4f8b1c3d5e7f0a2b4c6d8e1f3a5b7c9d0e2f4a6b8c1d3e5f7a9b0c2d4",
+    "eligibility_batch_hash": "7b0e3f5a9c2d4e6f8a1b3c5d7e9f0a2b4c6d8e1f3a5b7c9d0e2f4a6b8c1d3e5"
   },
   "new_hashes": {
-    "bars_batch_hash": "H2B",
-    "indicators_batch_hash": "H2I",
-    "eligibility_batch_hash": "H2E"
+    "bars_batch_hash": "8c1f4a6d9b2e5f7a0c3d6e8f1a4b7c9d2e5f0a3b6c8d1e4f7a9b2c5d8e0f3a6",
+    "indicators_batch_hash": "9d2a5b7e0c3f6a8b1d4e7f9a2b5c8d0e3f6a1b4c7d9e2f5a8b0c3d6e9f1a4b7",
+    "eligibility_batch_hash": "0e3b6c8f1d4a7b9c2e5f8a0b3c6d9e1f4a7b2c5d8e0f3a6b9c1d4e7f0a2b5c8"
   },
   "publication_switch": true
 }
