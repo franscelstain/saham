@@ -51,8 +51,9 @@ WS wajib memiliki blok berikut:
 File ini tidak menyertakan JSON penuh; gunakan 05 registry + validator 06 sebagai sumber kebenaran.
 
 LOCKED (provenance):
-- Setiap parameter **wajib** berupa object audit: `{ value, origin, status, bt_target, rationale, change_triggers }`.
-- Tidak ada `provenance` top-level pada WS; provenance dianggap **implicit** di setiap parameter node.
+- Setiap parameter **wajib** berupa canonical object audit: `{ value, origin, status, bt_target, rationale, change_triggers }`.
+- Provenance **wajib melekat pada setiap node parameter**.
+- `provenance` top-level atau map dotted-path alternatif **dilarang** pada WS.
 
 ## Outputs
 - Kontrak paramset WS yang harus dipatuhi.

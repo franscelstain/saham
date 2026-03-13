@@ -32,6 +32,7 @@ Minimum required schema support must exist for concepts equivalent to:
 - `eod_runs`
 - `eod_run_events`
 - `eod_publications`
+- `eod_current_publication_pointer` when the hardened current-publication model is used
 - reason-code registry table
 
 Equivalent naming is allowed only if semantics remain identical.
@@ -98,6 +99,13 @@ Must support:
 - publication version
 - explicit readable-vs-audit-only distinction
 
+### 8. Current-publication pointer
+When the hardened pointer model is adopted, schema must support:
+- exactly one pointer row per readable trade date
+- one pointed publication per trade date
+- publication-to-trade-date consistency
+- transactional alignment with publication switch flow
+
 ## Required uniqueness and integrity constraints (LOCKED)
 
 ### Required uniqueness
@@ -110,6 +118,7 @@ Must support:
 ### Required integrity semantics
 - one coherent publication context must back one readable state
 - one trade date must resolve to at most one current publication
+- where the hardened pointer model is used, current-publication resolution must prefer `eod_current_publication_pointer`
 - prior superseded publication must remain auditable
 - invalid bars must never leak into canonical readable bars
 - run events must remain append-only

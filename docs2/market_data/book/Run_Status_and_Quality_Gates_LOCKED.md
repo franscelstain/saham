@@ -189,7 +189,7 @@ Lifecycle/terminal/gate/publishability tell *what that means*.
 
 ### Example D — Candidate ready except seal missing
 - lifecycle state: `FINALIZING`
-- terminal status: not yet final or eventually `FAILED/HELD`
+- terminal status: not yet final or eventually `FAILED` / `HELD`
 - quality gate state: `BLOCKED`
 - publishability state: `NOT_READABLE`
 

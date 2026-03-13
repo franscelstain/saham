@@ -245,6 +245,31 @@ CREATE TABLE IF NOT EXISTS eod_publications (
 -- application transaction discipline or locked publication-switch procedure flow.
 
 -- =========================================================
+-- Hardened current-publication pointer
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS eod_current_publication_pointer (
+  trade_date DATE NOT NULL,
+  publication_id BIGINT UNSIGNED NOT NULL,
+  run_id BIGINT UNSIGNED NOT NULL,
+  publication_version INT UNSIGNED NOT NULL,
+  sealed_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (trade_date),
+  UNIQUE KEY uq_current_publication_pointer_publication (publication_id),
+  KEY idx_current_publication_pointer_run (run_id),
+  CONSTRAINT fk_current_publication_pointer_publication
+    FOREIGN KEY (publication_id) REFERENCES eod_publications(publication_id)
+) ENGINE=InnoDB;
+
+-- LOCKED SEMANTICS
+-- 1. This table is the hardened DB-facing pointer for "one current publication per trade_date".
+-- 2. trade_date as PK guarantees at most one pointer row per trade_date.
+-- 3. publication_id uniqueness guarantees one publication cannot be current for multiple trade dates.
+-- 4. Consumer-readable current publication resolution must prefer this pointer table where implemented.
+-- 5. eod_publications history and eod_runs state remain required supporting evidence; the pointer does not replace them.
+
+-- =========================================================
 -- Correction request table
 -- =========================================================
 

@@ -39,7 +39,7 @@ Requires current bar and previous canonical bar.
 Seed at the first date with 14 available TR values:
 `ATR14_seed = AVG(TR(x))` over the first 14 TR observations.
 Recursive form afterward:
-`ATR14(D) = ((ATR14(D[-1]) * 13) + TR(D)) / 14`
+the locked Wilder recursion formula
 Requires trading-day continuity per ticker.
 
 Warmup implication:
@@ -47,16 +47,16 @@ Warmup implication:
 - before that point, `ATR14` and `atr14_pct` are NULL
 
 ### 5) `atr14_pct`
-`atr14_pct(D) = (ATR14(D) / close(D)) * 100`
+the locked percentage formula
 If `close(D) <= 0` the source bar is invalid and the indicator must not be computed.
 
 ### 6) `vol_ratio`
-`vol_ratio(D) = volume(D) / AVG(volume(x))` over `window(D[-1], 20)`
+the locked prior-20 volume-ratio formula over `window(D[-1], 20)`
 This uses the current day volume divided by the average volume of the **20 prior trading days excluding D**.
 Requires 21 canonical bars total: D plus D[-1]..D[-20].
 
 ### 7) `roc20`
-`roc20(D) = (P(D) / P(D[-20])) - 1`
+the locked ROC20 formula
 Requires both `P(D)` and `P(D[-20])`.
 This is a pure ratio, not a percentage-multiplied-by-100 field.
 

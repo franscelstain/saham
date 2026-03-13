@@ -18,11 +18,35 @@ Definisi “identik” (LOCKED):
 
 Definisi `plan_hash` (LOCKED):
 - `plan_hash = SHA256( canonical_plan_payload(items[]) )`
-- Aturan canonical payload **wajib** mengikuti: [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md) bagian **3.2.2 Canonicalization for `meta.plan_hash`**.
-- Ringkasannya (LOCKED):
-  - urutan item: `rank ASC, ticker ASC`
-  - field yang diikutkan: `ticker,rank,group_semantic,score_total,levels(entry_ref/entry_band_low/entry_band_high/stop_price/tp1_price),flags(eligible/hidden),reasons(code,severity)`
-  - `message` dan `payload` **dilarang** masuk hash
+- `canonical_plan_payload(items[])` **ditentukan penuh oleh dokumen ini**; dokumen referensi hanya boleh memberi contoh, bukan aturan baru.
+
+Aturan canonical payload (LOCKED):
+1. Bentuk yang di-hash adalah array `items[]` setelah ranking final.
+2. Jika run PLAN berstatus `NO_TRADE`, maka `items[]` **wajib** `[]`; canonical payload untuk hash adalah array kosong.
+3. Urutan item **wajib**: `rank ASC`, lalu `ticker ASC`.
+4. Untuk setiap item, field yang boleh masuk hash **hanya**:
+   - `ticker`
+   - `rank`
+   - `group_semantic`
+   - `score_total`
+   - `levels.entry_ref`
+   - `levels.entry_band_low`
+   - `levels.entry_band_high`
+   - `levels.stop_price`
+   - `levels.tp1_price`
+   - `flags.eligible`
+   - `flags.hidden`
+   - `reasons[]` dengan field reason yang boleh ikut hanya `code` dan `severity`
+5. `message` dan `payload` pada reason **dilarang** masuk hash.
+6. Urutan `reasons[]` per item **wajib**: severity desc (`BLOCK` > `WARN` > `INFO`), lalu `code ASC`.
+7. Format angka **wajib fixed**:
+   - `score_total` 4 decimal
+   - semua `levels.*` 4 decimal
+8. Serialisasi canonical payload **wajib**:
+   - JSON UTF-8
+   - object keys diurutkan alfabetis (`sort_keys=true`)
+   - tanpa whitespace (`separators=(',', ':')`)
+9. Hasil hash ditulis sebagai SHA-256 hex lowercase.
 
 Scope write yang diizinkan saat CONFIRM (LOCKED):
 - hanya menulis `confirm_result` / `confirm_reasons` / `confirm_meta` (storage terpisah)
@@ -108,7 +132,7 @@ Definisi `meta.plan_hash` harus **mekanis** dan hanya memiliki **satu** sumber k
 
 **Sumber kebenaran tunggal (LOCKED):**
 - `meta.plan_hash = SHA256(canonical_plan_payload(items[]))`
-- Canonical payload dan aturan serialisasi **wajib** mengikuti [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md) bagian **3.2.2 Canonicalization for `meta.plan_hash`**.
+- Canonical payload dan aturan serialisasi `meta.plan_hash` mengikuti definisi LOCKED pada dokumen ini.
 - Urutan item canonical **wajib**: `rank ASC, ticker ASC`.
 - `message` dan `payload` pada `reasons[]` **dilarang** masuk ke `meta.plan_hash`.
 

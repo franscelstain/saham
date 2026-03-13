@@ -17,7 +17,7 @@ Downstream consumers may only use:
 - `trade_date_effective = D` that resolves to a finalized safe date
 - and a dataset that is SEALED
 
-If requested date is `HELD/FAILED` or unsealed:
+If requested date is `HELD` / `FAILED` or unsealed:
 - effective date falls back
 - downstream readers must use fallback D
 

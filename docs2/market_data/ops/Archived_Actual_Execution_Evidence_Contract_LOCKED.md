@@ -67,7 +67,7 @@ At least one archived actual evidence bundle should be preserved for each major 
 If the platform evolves, additional archived bundles are encouraged, but these minimum classes should never drop to zero.
 
 ## Relationship to examples
-Files in `examples/` may:
+Files in `../examples/` may:
 - show expected shape
 - show illustrative structure
 - show redacted or representative bundles
@@ -76,10 +76,10 @@ But archived actual execution evidence should exist separately from examples and
 
 ## Recommended archive locations
 Archived actual evidence may be stored in a folder such as:
-- `evidence/runs/`
-- `evidence/replays/`
-- `evidence/corrections/`
-- `evidence/tests/`
+- `../evidence/runs/`
+- `../evidence/replays/`
+- `../evidence/corrections/`
+- `../evidence/tests/`
 
 or an equivalent official evidence repository.
 

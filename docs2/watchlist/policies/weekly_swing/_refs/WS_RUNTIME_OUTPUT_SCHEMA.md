@@ -1,31 +1,30 @@
-# WS Runtime Output Schema (LOCKED)
+# WS Runtime Output Schema — Reference
 
 ## Purpose
-Schema referensi output runtime Weekly Swing.
+Merangkum bentuk payload runtime Weekly Swing untuk kebutuhan API/UI/audit.
+
+> **Status:** reference-only. Dokumen ini berada di `_refs/` dan tidak menjadi sumber aturan utama. Aturan normatif tetap mengikuti dokumen bernomor pada folder WS utama.
 
 ## Scope
-Mengunci bentuk payload output PLAN/CONFIRM yang dibaca API/UI/audit.
+Dokumen ini merangkum bentuk payload output PLAN dan CONFIRM yang dipakai sebagai acuan pembacaan response.
+Ini **bukan** schema tabel/database maupun bentuk record persistence.
 
 ## Inputs
 - Engineer serializer/API/UI, reviewer, dan auditor.
 
 ## Outputs
-- Kontrak schema output runtime Weekly Swing.
+- Peta schema referensi output runtime Weekly Swing.
 
-Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
+Field `meta` dan `items[]` adalah **view model** yang boleh berasal dari agregasi beberapa tabel/record (mis. plan_run/plan_item + metrics + confirm overlay).
+Prinsip utamanya tetap mengikuti kontrak WS utama: **CONFIRM tidak boleh mengubah PLAN** dan output CONFIRM harus terpisah.
 
-> **Scope (LOCKED):** Dokumen ini mendefinisikan **schema output API/UI** (response payload) untuk ditampilkan ke user.
-> Ini **bukan** schema tabel/database maupun bentuk record persistence.
-> Field `meta` dan `items[]` adalah **view model** yang boleh berasal dari agregasi beberapa tabel/record (mis. plan_run/plan_item + metrics + confirm overlay).
-> Prinsip utama: **CONFIRM tidak boleh mengubah PLAN**. Output CONFIRM harus terpisah.
-
-**Contoh pasangan (LOCKED):** lihat `../examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json` (PLAN hash sebelum/sesudah harus identik).
+**Contoh pasangan referensi:** lihat `../examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json` (PLAN hash sebelum/sesudah harus identik menurut kontrak utama).
 
 ---
 
-## 1) PLAN Output (LOCKED)
+## 1) PLAN Output (reference shape)
 
-### JSON Schema (contoh canonical)
+### JSON Schema (contoh shape canonical)
 ```json
 {
   "meta": {
@@ -92,9 +91,9 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
   }
 }
 ```
-**Contoh file (LOCKED):** lihat `../examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk payload PLAN yang valid terhadap schema ini (termasuk `meta.plan_hash`).
+**Contoh file referensi:** lihat `../examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk payload PLAN yang sesuai dengan bentuk referensi ini (termasuk `meta.plan_hash`).
 
-### Field semantics (LOCKED)
+### Field semantics (reference summary)
 - `meta.policy`: selalu `"WEEKLY_SWING"`.
 - `meta.asof_eod_date`: tanggal data EOD yang menjadi basis PLAN.
 - `meta.trade_date`: tanggal eksekusi manual (umumnya `asof_eod_date + 1 trading day`).
@@ -126,9 +125,9 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 
 ---
 
-## 2) CONFIRM Output (LOCKED)
+## 2) CONFIRM Output (reference shape)
 
-### JSON Schema (contoh canonical)
+### JSON Schema (contoh shape canonical)
 ```json
 {
   "meta": {
@@ -164,9 +163,9 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 }
 ```
 
-**Contoh file (LOCKED):** lihat `../examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk payload CONFIRM yang valid terhadap schema ini.
+**Contoh file referensi:** lihat `../examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk payload CONFIRM yang sesuai dengan bentuk referensi ini.
 
-### Field semantics (LOCKED)
+### Field semantics (reference summary)
 - `meta.policy`: selalu `"WEEKLY_SWING"`.
 - `meta.checked_at`: waktu sistem menghasilkan confirm result.
 - `meta.snapshot_ts`: timestamp snapshot input.
@@ -185,24 +184,24 @@ Dokumen ini mengunci schema output **PLAN** dan **CONFIRM** untuk UI dan audit.
 
 ---
 
-## 3) Canonical rules (LOCKED)
+## 3) Canonical rules (reference summary)
 
 ### 3.1 General
-- Output wajib valid JSON.
-- Tidak ada field tambahan di luar schema ini kecuali disebut eksplisit sebagai **optional** di dokumen policy WS.
-- Angka wajib berupa number JSON, bukan string angka.
-- Timestamp wajib ISO-8601 (`YYYY-MM-DDTHH:MM:SSZ`) atau format canonical yang dikunci di dokumen eksekusi.
+- Output harus valid JSON sesuai kontrak WS utama.
+- Field tambahan di luar bentuk ini hanya boleh muncul bila diizinkan oleh dokumen policy WS utama.
+- Angka harus berupa number JSON, bukan string angka.
+- Timestamp mengikuti format yang ditetapkan oleh dokumen eksekusi WS utama.
 
 ### 3.2 PLAN rules
 
-#### 3.2.1 Precision & Rounding (LOCKED)
+#### 3.2.1 Precision & rounding (reference summary)
 - `score_total` dan semua `scores.*` **dibulatkan 4 decimal** pada output UI/API.
 - Semua harga pada `levels.*` **dibulatkan 4 decimal**.
 - `meta.coverage_ratio` dibulatkan 4 decimal.
 - Dilarang mengubah precision ini per lingkungan (dev/prod).
 
-#### 3.2.2 Canonicalization for `meta.plan_hash` (LOCKED)
-`meta.plan_hash` dihitung dari **PLAN output** (bukan dari input indikator) dengan aturan mekanis berikut:
+#### 3.2.2 Canonicalization for `meta.plan_hash` (reference summary)
+`meta.plan_hash` pada praktiknya mengikuti kontrak hash WS utama; ringkasan bentuknya sebagai berikut:
 
 1) Bentuk data yang di-hash adalah array `items[]` setelah **ranking final**.
 2) Item yang diikutkan dalam hash:

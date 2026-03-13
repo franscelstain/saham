@@ -3,7 +3,7 @@
 ## Purpose
 This folder stores archived actual execution evidence.
 
-It is separate from `examples/`, which may contain illustrative or representative structures.
+It is separate from `../examples/`, which may contain illustrative or representative structures.
 
 ## Evidence classes
 - `runs/` for actual executed run evidence

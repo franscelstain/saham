@@ -19,6 +19,12 @@ It defines:
 5. Expected outputs are part of the fixture family, not optional commentary.
 6. If a fixture family supports correction-aware or publication-aware behavior, that scope must be explicit.
 
+## Catalog execution rule (LOCKED)
+Every fixture family listed below is a required semantic family.
+A compliant implementation must materialize each required family as an executable package matching:
+- `Golden_Fixtures_Specification.md`
+- `Fixture_Package_Manifest_LOCKED.md`
+
 ## Fixture catalog
 
 ### `fixture_calendar_v1`

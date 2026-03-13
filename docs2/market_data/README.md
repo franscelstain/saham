@@ -2,6 +2,7 @@
 
 ## Purpose
 This documentation set is the locked source of truth for Market Data Platform (EOD).
+It is written as system specification, not as exploratory notes.
 
 It defines the upstream market-data layer that produces:
 - canonical EOD bars
@@ -37,94 +38,21 @@ Read the boundary layer first:
 - `book/Terminology_and_Scope.md`
 - `book/Domain_Boundary_Invariants_LOCKED.md`
 
-## Final locked contracts
-- `book/Terminology_and_Scope.md`
-- `book/Domain_Boundary_Invariants_LOCKED.md`
-- `book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
-- `book/Consumer_Readability_Decision_Table_LOCKED.md`
-- `book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
-- `book/Determinism_Invariants_LOCKED.md`
-- `book/Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
-- `book/Publication_Manifest_Contract_LOCKED.md`
-- `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
-- `book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
-- `book/Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
+## Start here
+Read in this order before going deeper into schema, ops, or proof packs:
+1. `book/Terminology_and_Scope.md`
+2. `book/Domain_Boundary_Invariants_LOCKED.md`
+3. `book/INDEX.md`
 
-## Implementation-critical schema and operations
-- `db/Database_Schema_MariaDB.sql`
-- `db/Database_Schema_Contracts_MariaDB.md`
-- `db/Indices_and_Constraints_Contract_LOCKED.md`
-- `db/EOD_Publications_Table.sql`
-- `db/EOD_Current_Publication_Pointer_Table.sql`
-- `db/Publication_Switch_Procedure_LOCKED.sql`
-- `db/Publication_Current_Pointer_Switch_Procedure_LOCKED.sql`
-- `db/Schema_Enforcement_Notes_LOCKED.md`
-- `ops/Commands_and_Runbook_LOCKED.md`
-- `ops/Failure_Playbook_LOCKED.md`
-- `ops/Run_Ownership_and_Recovery_LOCKED.md`
-- `ops/Run_Artifacts_Format_LOCKED.md`
-- `ops/Audit_Evidence_Pack_Contract_LOCKED.md`
-- `ops/Audit_Query_Cookbook_LOCKED.md`
-- `ops/Incident_Classification_and_Response_Matrix_LOCKED.md`
-- `ops/Operator_Decision_Trees_LOCKED.md`
-- `ops/History_Table_Immutability_Guards_LOCKED.sql`
-- `ops/Performance_SLO_and_Limits_LOCKED.md`
-- `ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md`
-- `ops/Executed_Run_Admission_Criteria_LOCKED.md`
+After that, continue according to the work being done:
+- implementation and publication flow → focus on the implementation-critical contracts referenced by `book/INDEX.md`, then continue to `db/`, `ops/`, and `indicators/` as needed
+- compliance, replay, and correction proof → continue to `tests/`, `backtest/`, and the related proof contracts referenced by `book/INDEX.md`
+- example shape and executed evidence review → use `examples/` and `evidence/` only as companion material, not as a source of new behavior
 
-## Testing, fixtures, and replay proof
-- `tests/Contract_Test_Matrix_LOCKED.md`
-- `tests/Golden_Fixture_Catalog_LOCKED.md`
-- `tests/Golden_Fixture_Examples_LOCKED.md`
-- `tests/Test_Implementation_Guidance_LOCKED.md`
-- `tests/Fixture_Package_Manifest_LOCKED.md`
-- `tests/Test_Coverage_Closure_Contract_LOCKED.md`
-- `tests/Negative_Test_Catalog_LOCKED.md`
-- `tests/Indicator_Test_Vectors_LOCKED.md`
-- `tests/Indicator_Expected_Output_Oracle_LOCKED.md`
-- `tests/Executed_Proof_Admission_Criteria_LOCKED.md`
-- `backtest/Historical_Replay_and_Data_Quality_Backtest.md`
-- `backtest/Replay_Results_Schema_MariaDB.sql`
-
-## Executed evidence examples
-These example files exist to demonstrate proof-by-execution style evidence, not just proof specification.
-- `examples/Executed_Replay_Evidence_Example_LOCKED.md`
-- `examples/Executed_Publication_Manifest_Example_LOCKED.md`
-- `examples/Executed_Correction_Diff_Example_LOCKED.md`
-- `examples/Executed_Test_Run_Example_LOCKED.md`
-- `examples/Executed_Run_Evidence_Bundle_Example_LOCKED.md`
-
-## Recommended reading order
-1. Read `book/Terminology_and_Scope.md` first.
-2. Read `book/Domain_Boundary_Invariants_LOCKED.md` to lock the upstream-only boundary and anti-domain-leak rules.
-3. Read the consumer-readability and publication core:
-   - `book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
-   - `book/Consumer_Readability_Decision_Table_LOCKED.md`
-   - `book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
-4. Read the determinism and publication identity core:
-   - `book/Determinism_Invariants_LOCKED.md`
-   - `book/Audit_Hash_and_Reproducibility_Contract_LOCKED.md`
-   - `book/Publication_Manifest_Contract_LOCKED.md`
-   - `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
-5. Read dependency and canonical data contracts before implementing ingest:
-   - calendar
-   - identity
-   - coverage universe
-   - source acquisition
-   - source mapping
-   - canonicalization
-6. Read indicator contracts, vectors, and oracle before implementing indicator compute.
-7. Implement upstream flow in this exact order:
-   - bars
-   - indicators
-   - eligibility
-   - hash
-   - seal
-   - finalize
-8. Read correction, switch, and row-history policy before implementing correction or publication switching:
-   - `book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
-   - `book/Canonical_Row_History_and_Versioning_Policy_LOCKED.md`
-9. Treat `db/`, `ops/`, `tests/`, `registry/`, `backtest/`, `indicators/`, `session_snapshot/`, and `examples/` as normative companions to the book, not optional notes.
+## Reading rule
+Use this README for orientation only.
+Use `book/INDEX.md` as the contract map for the Market Data Platform (EOD) book.
+Use the companion folders (`db/`, `ops/`, `tests/`, `registry/`, `backtest/`, `indicators/`, `session_snapshot/`, `examples/`) only after the boundary and book-level contract map are understood.
 
 ## Normative companion folders
 The following folders are normative parts of the same source of truth:
@@ -180,7 +108,7 @@ See:
 - `examples/ARCHIVED_EVIDENCE_FOLDER_STRUCTURE_LOCKED.md`
 
 ## Current-publication precedence
-If the hardened current-publication pointer model is implemented, current publication resolution must use:
+For the hardened production model, current publication resolution must use:
 1. `eod_current_publication_pointer`
 2. pointed publication validation
 3. supporting consistency checks on `eod_publications` and `eod_runs`
@@ -192,6 +120,7 @@ See:
 
 ## Freeze status
 This documentation set is the locked source of truth for Market Data Platform (EOD).
+It is written as system specification, not as exploratory notes.
 
 Changes to locked contracts, publication semantics, correction flow, replay proof, consumer-readiness behavior, schema enforcement, row-history strategy, or audit evidence requirements must be versioned and reviewed explicitly.
 

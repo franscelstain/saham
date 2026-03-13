@@ -69,12 +69,12 @@ Sensitive values may be redacted if needed, but:
 - placeholder-only bundles do not qualify as archived actual evidence
 
 ## Relationship to examples
-The `examples/` folder may still contain:
+The `./` folder may still contain:
 - illustrative shapes
 - representative examples
 - template bundles
 
-But archived actual evidence should live in a distinct archive area such as `evidence/`.
+But archived actual evidence should live in a distinct archive area such as `../evidence/`.
 
 ## Cross-contract alignment
 This file must remain aligned with:

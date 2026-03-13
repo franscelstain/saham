@@ -51,3 +51,16 @@ Allowed values:
 
 ## Locked rule
 Every real fixture package should be describable by one manifest like this.
+
+## Package filesystem minimum (LOCKED)
+A real fixture package must be shippable as one stable directory or archive with this minimum shape:
+- `manifest.json`
+- `inputs/`
+- `expected/`
+- optional `notes/` for explanatory, non-normative context
+
+Rules:
+- files listed in `manifest.json` must resolve to actual package contents
+- expected outputs must live under `expected/`
+- input source material must live under `inputs/`
+- explanatory notes must never replace missing expected outputs

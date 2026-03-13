@@ -15,8 +15,8 @@ Dokumen ini tidak mengatur detail business logic score/selection.
 Dokumen ini hanya mengatur **parity struktur** dan **breaking-change discipline**.
 
 ## Inputs
-- [`docs/watchlist/db/02_DB_SCHEMA_MARIADB.md`](../../db/02_DB_SCHEMA_MARIADB.md)
-- [`docs/watchlist/db/05_DB_DDL_MARIADB.sql`](../../db/05_DB_DDL_MARIADB.sql)
+- [`../../db/02_DB_SCHEMA_MARIADB.md`](../../db/02_DB_SCHEMA_MARIADB.md)
+- [`../../db/05_DB_DDL_MARIADB.sql`](../../db/05_DB_DDL_MARIADB.sql)
 - definisi kolom/table di codebase (mis. `Repository::COLUMNS`, DTO contract, anti-drift tests)
 
 ## Outputs
@@ -49,10 +49,10 @@ Contoh Weekly Swing dirujuk dari:
 Untuk contract tables, source of truth dibagi sebagai berikut:
 
 ### A) Human-readable schema
-- [`docs/watchlist/db/02_DB_SCHEMA_MARIADB.md`](../../db/02_DB_SCHEMA_MARIADB.md)
+- [`../../db/02_DB_SCHEMA_MARIADB.md`](../../db/02_DB_SCHEMA_MARIADB.md)
 
 ### B) Executable DDL
-- [`docs/watchlist/db/05_DB_DDL_MARIADB.sql`](../../db/05_DB_DDL_MARIADB.sql)
+- [`../../db/05_DB_DDL_MARIADB.sql`](../../db/05_DB_DDL_MARIADB.sql)
 
 ### C) Code-level contract representation
 - konstanta daftar kolom di repository / data access layer,
@@ -149,4 +149,4 @@ Sebuah patch dianggap lolos parity hanya jika:
 - dan semua anti-drift tests terkait lolos.
 
 ## Next
-- [`docs/watchlist/policies/_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`](07_CONTRACT_FAILURE_CODES_LOCKED.md)
+- [`07_CONTRACT_FAILURE_CODES_LOCKED.md`](07_CONTRACT_FAILURE_CODES_LOCKED.md)

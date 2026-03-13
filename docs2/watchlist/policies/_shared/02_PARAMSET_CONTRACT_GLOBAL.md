@@ -23,12 +23,14 @@ Mengunci kontrak minimum paramset lintas policy agar semua policy punya bentuk, 
 Jangan membuat field alternatif yang diam-diam diperlakukan sama.
 
 ## Provenance per-parameter (LOCKED)
-Setiap parameter **wajib** punya provenance, dalam salah satu dari dua bentuk:
-- (A) **Implicit**: setiap node parameter berbentuk object audit  
+Setiap parameter **wajib** memakai **satu bentuk canonical yang sama**:
+- setiap node parameter berbentuk object audit  
   `{ value, origin, status, bt_target, rationale, change_triggers }`
-- (B) **Explicit**: top-level `provenance` map per dotted-path
 
-Satu policy boleh pilih salah satu pendekatan, tetapi implementasi validator dan audit harus konsisten.
+Aturan tambahan (LOCKED):
+- top-level `provenance` map per dotted-path **dilarang**
+- validator, audit, hash, dan serializer harus membaca provenance dari node parameter itu sendiri
+- policy tidak boleh memperkenalkan bentuk provenance alternatif yang maknanya sama
 
 ## Yang tidak boleh
 - parameter tanpa `origin`

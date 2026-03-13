@@ -11,7 +11,7 @@ Entry point dokumentasi watchlist tingkat sistem.
 Pembaca mulai dari sini untuk memahami governance, struktur folder, dan urutan baca.
 
 ## Inputs
-- Pembaca manusia, reviewer, engineer, dan AI yang akan menelusuri dokumen watchlist.
+- Pembaca, reviewer, implementer, dan auditor yang akan menelusuri dokumen watchlist.
 
 ## Outputs
 - Peta baca dan batas source of truth lintas layer watchlist.

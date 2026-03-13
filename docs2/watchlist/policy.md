@@ -2,7 +2,7 @@
 
 ## Purpose
 Dokumen ini mengunci governance tingkat root untuk seluruh paket [`docs/watchlist/`](./README.md).
-Fungsi utamanya adalah memastikan pembaca, implementer, reviewer, dan AI memahami:
+Fungsi utamanya adalah memastikan pembaca, implementer, reviewer, auditor, dan tooling memahami:
 - dokumen mana yang normatif,
 - dokumen mana yang referensial,
 - urutan baca yang benar,
@@ -42,11 +42,11 @@ Dokumentasi katalog dan struktur policy ada di:
 Semua dokumen watchlist wajib dipahami menurut kelas berikut:
 
 ### 1) Normative / Contract Documents
-Dokumen yang mengandung kata seperti `LOCKED`, `CONTRACT`, `CANONICAL`, `SCHEMA`, `VALIDATOR`, `MANIFEST`, atau `PROCEDURES` dianggap normatif.
+Dokumen dianggap normatif bila **berada pada jalur normatif resmi** dan perannya memang kontraktual, misalnya dokumen bernomor policy, dokumen `_shared`, dokumen schema/DDL resmi, atau dokumen lain yang secara eksplisit dinyatakan LOCKED/contractual di folder normatifnya.
 Dokumen jenis ini adalah source of truth perilaku sistem atau struktur artefak.
 
 ### 2) Reference Documents
-Dokumen di `_refs/` bersifat referensial.
+Dokumen di `_refs/` selalu bersifat referensial, walaupun nama file mengandung kata seperti `LOCKED`, `CONTRACT`, `CANONICAL`, atau `SCHEMA`.
 Dokumen ini membantu implementasi, audit, contoh runtime, glossary, atau worked example.
 Dokumen referensi **tidak boleh** membatalkan kontrak normatif.
 Jika ada mismatch, dokumen normatif menang.

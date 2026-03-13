@@ -19,7 +19,7 @@ Target: `eod_bars(trade_date, ticker_id, open, high, low, close, volume, adj_clo
 - `run_id = current run id`
 
 ## Date alignment (LOCKED)
-- system timezone: `Asia/Jakarta`
+- system timezone: timezone name **Asia/Jakarta**
 - source date/timestamp must map to exchange trading day and be validated by market calendar
 - manual rows must still pass the same market-calendar alignment rule
 

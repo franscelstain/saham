@@ -105,3 +105,13 @@ When a contract meaning changes intentionally:
 - keep prior fixture version preserved for historical comparison where needed
 
 Do not silently edit old fixture semantics and pretend nothing changed.
+
+## Executable package rule (LOCKED)
+Golden fixtures are not satisfied by prose-only specification.
+Each required fixture family must be packageable into concrete files that can be loaded by test runners without inventing missing rows, missing expected outputs, or missing manifest metadata.
+
+Minimum expectation per fixture family:
+- at least one concrete input file
+- at least one concrete expected-output file
+- manifest coverage that names the package and its assertion layers
+- stable semantic version identifier

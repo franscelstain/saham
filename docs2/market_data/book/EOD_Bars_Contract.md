@@ -6,7 +6,7 @@
 Columns:
 - `trade_date` DATE
 - `ticker_id` INT
-- `open/high/low/close` DECIMAL(18,4)
+- `open`, `high`, `low`, `close` DECIMAL(18,4)
 - `volume` BIGINT
 - `adj_close` DECIMAL(18,4) NULL
 - `source` VARCHAR(32)
