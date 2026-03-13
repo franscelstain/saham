@@ -23,14 +23,10 @@ Fokusnya bukan nama tabel fisik, tetapi **struktur minimum, makna kolom, unit, k
 Baca berurutan:
 1. [`01_MARKET_CALENDAR.md`](01_MARKET_CALENDAR.md)
 2. [`02_TICKERS_MASTER.md`](02_TICKERS_MASTER.md)
-3. [`03_EOD_OHLCV.md`](03_EOD_OHLCV.md)
-4. [`04_EOD_INDICATORS.md`](04_EOD_INDICATORS.md)
 
 ## Apa yang dikunci di folder ini
 - **Tanggal perdagangan**: definisi hari bursa yang dipakai PLAN/backtest/audit.
 - **Identitas ticker**: canonical code, status aktif, dan histori listing/delisting.
-- **OHLCV EOD**: key unik, unit volume, mode adjusted/unadjusted, finalization semantics.
-- **Indicators EOD**: unit indikator, parity terhadap OHLCV source, dan syarat minimum data.
 
 ## Source of truth
 - Untuk **kontrak data sumber**, dokumen di folder ini ([`./`](./README.md)) adalah **source of truth**.
