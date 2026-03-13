@@ -39,7 +39,8 @@ Urutan baca yang paling aman:
 ## Source of truth per layer
 - [`policy.md`](policy.md) — governance lintas policy + aturan cara baca
 - [`db/`](db/README.md) — schema/DDL database watchlist aplikasi
-- [`../db/`](../db/README.md) — kontrak data sumber market data (calendar, ticker master, OHLCV, indicators)
+- [`../db/`](../db/README.md) — shared foundation lintas domain (market calendar, ticker master)
+- [`../market_data/`](../market_data/README.md) — kontrak data upstream market-data (bars, indicators, publication/read model, readiness)
 - [`policies/_shared/`](policies/_shared/README.md) — kontrak global lintas policy
 - `policies/<policy>/` — aturan bisnis policy spesifik
 

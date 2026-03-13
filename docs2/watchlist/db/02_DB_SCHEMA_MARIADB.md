@@ -127,7 +127,7 @@ Detail confirm untuk ticker yang dievaluasi.
 - label (CONFIRMED/NEUTRAL/CAUTION/DELAY)
 - runtime_json (LONGTEXT) — key yang diizinkan (LOCKED):
   - `last_price`, `chg_pct`, `volume_shares`, `turnover_idr`, `drift_pct`, `snapshot_age_sec`
-  - dilarang menambah key lain tanpa update kontrak output (`../policies/weekly_swing/_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`).
+  - dilarang menambah key lain tanpa update kontrak output normatif Weekly Swing (mapping PLAN di `../policies/weekly_swing/03_WS_DATA_MODEL_MARIADB.md` dan output minimum CONFIRM di `../policies/weekly_swing/10_WS_CONFIRM_OVERLAY.md`).
 - reason_codes_json (LONGTEXT)
 - created_at
 

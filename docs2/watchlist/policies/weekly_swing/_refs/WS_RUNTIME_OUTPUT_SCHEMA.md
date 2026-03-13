@@ -3,7 +3,7 @@
 ## Purpose
 Merangkum bentuk payload runtime Weekly Swing untuk kebutuhan API/UI/audit.
 
-> **Status:** reference-only. Dokumen ini berada di `_refs/` dan tidak menjadi sumber aturan utama. Aturan normatif tetap mengikuti dokumen bernomor pada folder WS utama.
+> **Status:** reference-only. Dokumen ini berada di `_refs/` dan tidak menjadi sumber aturan utama. Aturan normatif tetap mengikuti dokumen bernomor pada folder WS utama; dokumen ini hanya merangkum bentuk referensi yang harus konsisten dengan kontrak normatif tersebut.
 
 ## Scope
 Dokumen ini merangkum bentuk payload output PLAN dan CONFIRM yang dipakai sebagai acuan pembacaan response.

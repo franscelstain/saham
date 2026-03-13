@@ -52,9 +52,9 @@ After that, continue according to the work being done:
 ## Reading rule
 Use this README for orientation only.
 Use `book/INDEX.md` as the contract map for the Market Data Platform (EOD) book.
-Use the companion folders (`db/`, `ops/`, `tests/`, `registry/`, `backtest/`, `indicators/`, `session_snapshot/`, `examples/`) only after the boundary and book-level contract map are understood.
+Use the companion folders (`db/`, `ops/`, `tests/`, `registry/`, `backtest/`, `indicators/`, `session_snapshot/`) only after the boundary and book-level contract map are understood. Use `examples/` and `evidence/` only as companion review material.
 
-## Normative companion folders
+## Normative implementation and proof folders
 The following folders are normative parts of the same source of truth:
 - `book/`
 - `db/`
@@ -64,7 +64,11 @@ The following folders are normative parts of the same source of truth:
 - `backtest/`
 - `indicators/`
 - `session_snapshot/`
+
+## Companion review folders
+The following folders are companion material and do not define new behavior beyond the normative contracts above:
 - `examples/`
+- `evidence/`
 
 ## Production-grade auditability stance
 Production-grade row-history strategy is Strategy A:

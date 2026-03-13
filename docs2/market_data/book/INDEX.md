@@ -47,10 +47,6 @@
 - Audit_Hash_and_Reproducibility_Contract_LOCKED.md
 - Hash_Number_Formatting_LOCKED.md
 
-## Audit and proof hardening
-- Publication_Manifest_Contract_LOCKED.md
-- Publication_Current_Pointer_Integrity_Contract_LOCKED.md
-- Canonical_Row_History_and_Versioning_Policy_LOCKED.md
 
 ## Supporting datasets
 - Market_Daily_Metrics_Contract.md
@@ -64,11 +60,15 @@ The following folders are normative companions to this book and must be treated 
 - `../backtest/`
 - `../indicators/`
 - `../session_snapshot/`
+
+## Companion review folders
+The following folders are companion material for review and illustration. They do not define new behavior beyond the normative contracts above:
 - `../examples/`
+- `../evidence/`
 
 ## Freeze note
 This index maps the locked book-level contracts only.
-Companion folders contain normative schema, operations, testing, replay, evidence, and example layers that complete the same source of truth.
+Normative companion folders contain schema, operations, testing, replay, and proof layers that complete the same source of truth. Companion review folders contain illustration and archived review material only.
 
 ## Evidence note
 Archived actual execution evidence is part of the normative proof ecosystem, but is expected to live outside the book folder in an evidence archive area or equivalent official repository.
