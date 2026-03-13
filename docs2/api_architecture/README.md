@@ -203,3 +203,13 @@ Bila folder ini diterapkan dengan benar:
 - data besar diproses dengan strategi yang masuk akal;
 - retry dan rerun tidak merusak state;
 - logging cukup untuk observabilitas tanpa membocorkan data sensitif.
+
+## Dokumen penyempurnaan akhir
+
+- `pseudo-code-contoh-arsitektur.md`
+  - pseudo-code ringkas untuk pola sehat dan pola buruk.
+- `glosarium-istilah.md`
+  - definisi singkat istilah utama yang dipakai di seluruh paket.
+- `panduan-adopsi-minimum.md`
+  - panduan bertahap agar tim kecil atau proyek awal tetap bisa memakai dokumen ini tanpa terasa terlalu berat.
+
