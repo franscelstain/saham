@@ -129,6 +129,29 @@ Buka file ini bila ingin memahami:
 - batas aman terhadap data sensitif;
 - bagaimana log dipakai untuk observabilitas tanpa berubah jadi noise.
 
+
+## Posisi checklist
+
+Checklist review tidak lagi disebar di setiap file utama.
+
+Seluruh checklist review dipusatkan di:
+- `checklist-review-arsitektur.md`
+
+Artinya:
+- file utama dipakai sebagai panduan arsitektur dan aturan implementasi;
+- file checklist dipakai saat review desain, review PR, audit, atau pengecekan cepat.
+
+## Dokumen tambahan
+
+Selain dokumen aturan utama, folder ini juga berisi dokumen pendukung berikut:
+
+- `contoh-implementasi-nyata.md`
+  - contoh alur implementasi sehat dan pola buruk sebagai pembanding.
+- `template-pengecualian-arsitektur.md`
+  - template resmi untuk mencatat penyimpangan yang sah dan terkontrol.
+- `template-review-per-jenis-perubahan.md`
+  - template review praktis untuk endpoint baru, batch job, perubahan repository, perubahan domain, perubahan DTO, integrasi eksternal, dan pengecualian arsitektur.
+
 ## Aturan konflik antar dokumen
 
 - Dokumen yang lebih spesifik mengalahkan dokumen yang lebih umum untuk topik yang sama.
