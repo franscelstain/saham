@@ -37,7 +37,7 @@ Split harus berbasis urutan waktu (time series), bukan random split.
 ### Step 2: Evaluate on OOS
 - Jalankan evaluasi pada OOS window menggunakan `param_id_best_is` TANPA re-tuning.
 - Simpan hasilnya sebagai bukti OOS.
-- Evidence wajib diringkas dalam [`_refs/WS_OOS_EVIDENCE_GOLDEN.md`](_refs/WS_OOS_EVIDENCE_GOLDEN.md) (GOLDEN).
+- Evidence dapat diringkas menggunakan format referensi pada [`_refs/WS_OOS_EVIDENCE_NOTE.md`](_refs/WS_OOS_EVIDENCE_NOTE.md), tetapi kewajiban bukti OOS tetap dikunci oleh dokumen ini.
 
 ### Step 3: Optional rolling walk-forward (recommended)
 Jika ingin lebih kuat, lakukan rolling window:

@@ -3,22 +3,23 @@
 > **Status:** LOCKED (Normative)
 > **Doc Role:** System governance index
 
-
 ## Purpose
 Entry point dokumentasi watchlist tingkat sistem.
 
 ## Scope
-Pembaca mulai dari sini untuk memahami governance, struktur folder, dan urutan baca.
+Pembaca mulai dari sini untuk memahami governance, struktur folder, batas ownership domain, dan jalur baca awal.
 
 ## Inputs
 - Pembaca, reviewer, implementer, dan auditor yang akan menelusuri dokumen watchlist.
 
 ## Outputs
-- Peta baca dan batas source of truth lintas layer watchlist.
+- Peta baca awal.
+- Batas source of truth lintas layer watchlist.
+- Penunjuk domain owner untuk area yang memang berada di luar watchlist.
 
 Folder utama: [`docs/watchlist/`](./README.md).
 
-Dokumentasi ini mencakup sistem watchlist secara global: governance, database watchlist aplikasi, kontrak data sumber, dan dokumen per-policy.
+Dokumentasi ini mencakup sistem watchlist secara global: governance, database watchlist aplikasi, kontrak lintas-policy, dan dokumen policy spesifik.
 
 ## Start here
 Urutan baca yang paling aman:
@@ -37,14 +38,14 @@ Urutan baca yang paling aman:
 - Keputusan eksekusi tetap **manual** di luar aplikasi; CONFIRM hanya saran tambahan.
 
 ## Source of truth per layer
-- [`policy.md`](policy.md) — governance lintas policy + aturan cara baca
-- [`db/`](db/README.md) — schema/DDL database watchlist aplikasi
-- [`../db/`](../db/README.md) — shared foundation lintas domain (market calendar, ticker master)
-- [`../market_data/`](../market_data/README.md) — kontrak data upstream market-data (bars, indicators, publication/read model, readiness)
-- [`policies/_shared/`](policies/_shared/README.md) — kontrak global lintas policy
-- `policies/<policy>/` — aturan bisnis policy spesifik
+- [`policy.md`](policy.md) — governance lintas policy dan aturan cara baca.
+- [`db/`](db/README.md) — schema/DDL database watchlist aplikasi.
+- shared foundation lintas domain — berada di luar paket `docs/watchlist/`; jangan diperlakukan sebagai owner aturan watchlist.
+- `docs/market_data/` — owner authoritative untuk kontrak upstream market-data seperti bars, indicators, publication/read model, dan readiness.
+- [`policies/_shared/`](policies/_shared/README.md) — kontrak global lintas policy watchlist.
+- `policies/<policy>/` — aturan bisnis policy spesifik.
 
 ## Navigasi
 - [`policy.md`](policy.md) — governance policy dan standar dokumentasi.
 - [`db/`](db/README.md) — schema + seed database watchlist (baca berurutan mulai 01).
-- [`policies/`](policies/README.md) — katalog policy (lihat [`policies/README.md`](policies/README.md)).
+- [`policies/`](policies/README.md) — katalog policy.

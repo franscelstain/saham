@@ -91,4 +91,5 @@ Export snapshot PLAN dianggap sah hanya jika:
 
 ## Reference
 - `../15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`
-- `../_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`
+- `../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+- `../03_WS_DATA_MODEL_MARIADB.md`

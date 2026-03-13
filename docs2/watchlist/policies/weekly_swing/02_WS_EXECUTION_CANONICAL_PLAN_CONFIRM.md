@@ -125,7 +125,7 @@ Untuk mencegah writeback tidak sengaja, ruang lingkup operasi DB saat CONFIRM ad
 
 **Contract test wajib:**
 - `plan_hash_before == plan_hash_after`
-- Test suite **wajib** memiliki audit “DB Write-Scope” (lihat [`_refs/WS_CONTRACT_TESTS_SPEC.md`](_refs/WS_CONTRACT_TESTS_SPEC.md) Test 2C). Tanpa audit ini, kontrak dianggap **belum terpenuhi**.
+- Test suite **wajib** memiliki audit “DB Write-Scope” sebagai bagian dari checklist kontrak Weekly Swing (lihat [`13_WS_CONTRACT_TEST_CHECKLIST.md`](13_WS_CONTRACT_TEST_CHECKLIST.md)). Untuk inventaris fixture dan pemetaan fungsi uji, implementasi boleh merujuk ke [`_refs/WS_FIXTURE_INVENTORY.md`](_refs/WS_FIXTURE_INVENTORY.md). Untuk walkthrough contoh alur end-to-end, implementasi boleh merujuk ke [`_refs/WS_WORKED_EXAMPLE_E2E.md`](_refs/WS_WORKED_EXAMPLE_E2E.md). Folder `_refs/` tidak menjadi sumber aturan utama. Tanpa audit ini, kontrak dianggap **belum terpenuhi**.
 
 ## LOCKED — PLAN Hash Scope (Immutability)
 Definisi `meta.plan_hash` harus **mekanis** dan hanya memiliki **satu** sumber kebenaran.

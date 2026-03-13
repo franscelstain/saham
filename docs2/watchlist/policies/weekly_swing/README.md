@@ -50,5 +50,11 @@ Lanjutkan ke dokumen berikut bila membutuhkan pembuktian, kalibrasi, atau verifi
 - `_refs/` tidak boleh menjadi sumber aturan baru.
 - Jika aturan normatif sudah tertulis pada dokumen bernomor, `_refs/` hanya boleh mengulangi atau mencontohkan aturan tersebut.
 
+## Source-of-truth boundaries
+
+Di dalam domain Weekly Swing, file bernomor adalah satu-satunya rumah aturan wajib. Folder `_refs/` hanya berfungsi sebagai referensi pembaca. Folder `examples/` hanya memuat contoh yang patuh kontrak. Folder `fixtures/` hanya memuat artefak uji yang tunduk ke kontrak normatif.
+
+Reviewer dan implementer tidak boleh mengangkat aturan baru dari `_refs/`, examples, atau fixtures bila aturan tersebut belum tertulis di file bernomor.
+
 ## Status
 Dokumen bernomor di folder ini adalah kontrak (normatif) kecuali yang jelas diberi label `_refs` atau `reference`.

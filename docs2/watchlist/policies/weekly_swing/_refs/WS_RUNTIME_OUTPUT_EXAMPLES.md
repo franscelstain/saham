@@ -1,256 +1,131 @@
-# Runtime Output Examples — Weekly Swing (WS_EOD_PLAN_CONFIRM)
+# Runtime Output Examples — Weekly Swing (Reference)
+
+## Reference status
+Dokumen ini membantu engineer, reviewer, dan UI developer melihat bentuk output runtime Weekly Swing yang biasanya muncul dalam praktik. Dokumen ini bukan owner kontrak output; owner normatif tetap berada pada dokumen bernomor dan file contoh JSON di folder `examples/` dipakai sebagai payload referensial yang patuh kontrak.
 
 ## Purpose
-Contoh bentuk output minimum agar implementasi runtime, persistence, dan UI tidak berbeda-beda.
-
-## Scope
-Dipakai saat membaca bentuk payload PLAN/CONFIRM dan contoh persistence.
+Gunakan dokumen ini untuk tiga kebutuhan praktis:
+1. melihat shape PLAN dan CONFIRM tanpa harus membuka kontrak penuh lebih dulu,
+2. memahami field mana yang biasanya dibaca oleh UI, reviewer, atau audit,
+3. memilih contoh JSON yang paling dekat dengan skenario implementasi yang sedang dikerjakan.
 
 ## Inputs
-- Schema resmi runtime output dan contoh payload terkait.
+- dokumen normatif output runtime dan persistence Weekly Swing,
+- file JSON contoh di folder `examples/`,
+- contract test checklist saat bentuk output sedang diverifikasi.
 
 ## Outputs
-- Contoh payload runtime yang konsisten dengan schema utama.
+- quick shape guide PLAN dan CONFIRM,
+- contoh pembacaan field yang paling sering dipakai,
+- pointer ke payload JSON yang paling berguna untuk implementasi.
 
-## Notes
-- **LOCKED:** File ini berisi dua jenis contoh:
-  - **API/UI RESPONSE**: contoh payload yang harus sesuai [`WS_RUNTIME_OUTPUT_SCHEMA.md`](WS_RUNTIME_OUTPUT_SCHEMA.md).
-  - **PERSISTENCE RECORD**: contoh bentuk record `plan_run` / `plan_item` untuk audit/debug.
-- Contoh **PERSISTENCE RECORD** bukan kontrak UI, dan tidak wajib 1:1 dengan schema API/UI.
-- Kontrak payload API/UI yang wajib diikuti ada di [`WS_RUNTIME_OUTPUT_SCHEMA.md`](WS_RUNTIME_OUTPUT_SCHEMA.md).
+## A. Quick shape guide
 
-## B. API/UI Response Examples (LOCKED)
+### PLAN output shape (reference)
+PLAN runtime umumnya memuat tiga blok besar:
+- `meta`: konteks run seperti `policy`, `asof_eod_date`, `trade_date`, `paramset_id`, `plan_hash`, `generated_at`, dan `fail_code` bila run gagal atau NO_TRADE,
+- `items[]`: kandidat hasil seleksi berisi `ticker`, `rank`, `group_semantic`, `score_total`, `scores`, `levels`, `flags`, dan `reasons`,
+- `summary`: ringkasan hasil run seperti jumlah kandidat layak, pembagian `top_picks` / `secondary` / `watch_only`, dan sinyal `no_trade`.
 
-- PLAN example (schema-valid + plan_hash): `../examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json`
-- CONFIRM example (schema-valid): `../examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json`
-- PLAN+CONFIRM invariant pair (plan_hash unchanged): `../examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json`
+Shape ini berguna saat engineer membangun serializer runtime, saat reviewer ingin membaca hasil PLAN dengan cepat, atau saat UI perlu memisahkan metadata run dari data kandidat per-item.
 
-## A. Persistence Examples (Canonical DB Shape)
+### CONFIRM output shape (reference)
+CONFIRM runtime umumnya memuat tiga blok besar:
+- `meta`: konteks pembacaan snapshot seperti `policy`, `checked_at`, `snapshot_ts`, `snapshot_age_sec`, dan informasi sumber snapshot,
+- `items[]`: hasil overlay per ticker berisi `ticker`, `label`, dan `reasons`,
+- `summary`: ringkasan jumlah outcome seperti `confirmed_count`, `neutral_count`, `caution_count`, dan `delay_count`.
 
-Catatan:
-- Bagian ini harus mengikuti shape persistence canonical sesuai data model dan DDL.
-- Jangan memakai flattened/debug fields di bagian ini kecuali field tersebut memang tersimpan di kolom JSON resmi (`run_metrics_json`, `scores_json`, `inputs_json`, `plan_levels_json`, `runtime_json`).
+Shape ini berguna saat engineer membangun endpoint CONFIRM, saat reviewer ingin membaca outcome intraday secara cepat, atau saat UI perlu membedakan hasil PLAN dari hasil overlay intraday.
 
-### Example A — plan_run
+## B. Concrete examples from `examples/`
+
+### 1. PLAN runtime example
+File: `examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json`
+
+Snippet ringkas yang biasanya cukup untuk desain endpoint atau kartu UI:
+
 ```json
 {
-  "plan_run_id": 1001,
-  "policy_code": "WS",
-  "policy_version": "WS_EOD_PLAN_CONFIRM",
-  "plan_trade_date": "2026-02-28",
-  "asof_eod_date": "2026-02-27",
-  "param_set_id": 55,
-  "data_batch_hash": "ac919a05cf7a1b567a9029bf67963b6996b3c588014f470dd57a0c1fc493f269",
-  "hash_count": 900,
-  "missing_required_count": 0,
-  "processed_count": 900,
-  "eligible_count": 318,
-  "run_status": "OK",
-  "fail_code": null,
-  "run_metrics_json": {
-    "top_picks_count": 8,
-    "secondary_count": 12,
-    "watch_only_count": 34,
-    "avoid_count": 264
-  },
-  "supersedes_plan_run_id": null,
-  "is_active": "Yes",
-  "created_at": "2026-02-27T18:10:00+07:00"
-}
-```
-
-### Example B — plan_item
-```json
-{
-  "plan_item_id": 2001,
-  "plan_run_id": 1001,
-  "policy_code": "WS",
-  "trade_date": "2026-02-28",
-  "ticker_id": 501,
-  "group_semantic": "SECONDARY",
-  "selection_reason_code": "WS_GRP_SEC",
-  "score_total": 0.788846,
-  "display_bucket": "SHOW",
-  "scores_json": {
-    "score_momentum": 0.546154,
-    "score_breakout": 0.750000,
-    "score_volume": 1.000000,
-    "score_risk": 1.000000
-  },
-  "inputs_json": {
-    "liq_bucket": "STRONG",
-    "risk_bucket": "IDEAL"
-  },
-  "plan_levels_json": {
-    "entry_ref": 1020.0000,
-    "entry_band_low": 1009.8000,
-    "entry_band_high": 1030.2000,
-    "stop_price": 937.3800,
-    "tp1_price": 1143.9300,
-    "rr": 1.500000
-  },
-  "reason_codes_json": [
-    "WS_LIQ_STRONG",
-    "WS_RISK_IDEAL",
-    "WS_GRP_SEC",
-    "WS_SHOW"
+  "meta": {"policy": "weekly_swing", "trade_date": "2026-03-13", "plan_hash": "..."},
+  "items": [
+    {"ticker": "AAA", "rank": 1, "group_semantic": "TOP_PICKS", "score_total": 0.75},
+    {"ticker": "BBB", "rank": 2, "group_semantic": "TOP_PICKS", "score_total": 0.70}
   ],
-  "created_at": "2026-02-27T18:10:01+07:00"
+  "summary": {"top_picks": 2, "secondary": 1, "watch_only": 1, "avoid": 1}
 }
 ```
 
-### Example C — plan_item (WATCH ONLY) 
+Contoh ini menunjukkan run PLAN yang berhasil dengan lima kandidat dan pembagian group yang jelas:
+- `AAA` dan `BBB` berada di `TOP_PICKS`,
+- `CCC` berada di `SECONDARY`,
+- `DDD` berada di `WATCH_ONLY`,
+- `EEE` berada di `AVOID` karena gagal guard likuiditas.
+
+Field yang paling sering dipakai implementasi:
+- `meta.plan_hash` untuk jejak audit run,
+- `items[].rank` dan `items[].group_semantic` untuk urutan serta grouping,
+- `items[].scores` untuk inspeksi alasan scoring,
+- `items[].levels` untuk referensi entry band, stop, dan target awal,
+- `summary` untuk ringkasan cepat pada UI atau laporan.
+
+### 2. CONFIRM runtime example
+File: `examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json`
+
+Snippet ringkas yang biasanya cukup untuk desain overlay atau tampilan status intraday:
+
 ```json
 {
-  "plan_item_id": 2002,
-  "plan_run_id": 1001,
-  "policy_code": "WS",
-  "trade_date": "2026-02-28",
-  "ticker_id": 502,
-  "group_semantic": "WATCH_ONLY",
-  "selection_reason_code": "WS_GRP_WATCH",
-  "score_total": 0.812541,
-  "display_bucket": "SHOW",
-  "scores_json": {
-    "score_momentum": 0.820000,
-    "score_breakout": 0.950000,
-    "score_volume": 0.700000,
-    "score_risk": 0.600000
-  },
-  "inputs_json": {
-    "breakout_state": "EXTENDED"
-  },
-  "plan_levels_json": {
-    "entry_ref": 1540.0000,
-    "entry_band_low": 1524.6000,
-    "entry_band_high": 1555.4000,
-    "stop_price": 1462.0000,
-    "tp1_price": 1657.0000,
-    "rr": 1.500000
-  },
-  "reason_codes_json": [
-    "WS_BO_EXT",
-    "WS_FW_EXT",
-    "WS_GRP_WATCH",
-    "WS_SHOW"
+  "meta": {"policy": "weekly_swing", "snapshot_age_sec": 90},
+  "items": [
+    {"ticker": "AAA", "label": "CONFIRMED"},
+    {"ticker": "BBB", "label": "CAUTION"}
   ],
-  "created_at": "2026-02-27T18:10:02+07:00"
+  "summary": {"confirmed_count": 1, "caution_count": 1, "delay_count": 0}
 }
 ```
 
-### Example D — confirm_item persistence record
-```json
-{
-  "confirm_item_id": 2001,
-  "confirm_check_id": 1001,
-  "ticker_id": 501,
-  "label": "CONFIRMED",
-  "runtime_json": {
-    "last_price": 1028.0000,
-    "snapshot_age_sec": 120,
-    "drift_pct": 0.007843,
-    "turnover_idr": 143960000000,
-    "volume_shares": 39330000
-  },
-  "reason_codes_json": [
-    "WS_CONFIRM_OK"
-  ],
-  "created_at": "2026-02-28T09:15:01+07:00"
-}
-```
+Contoh ini menunjukkan lima outcome CONFIRM yang berbeda dalam satu snapshot:
+- `AAA` = `CONFIRMED`,
+- `BBB` = `CAUTION`,
+- `CCC` = `NEUTRAL`,
+- `DDD` = `DELAY` karena harga runtime tidak tersedia,
+- `EEE` = `DELAY` karena field aggregate wajib belum lengkap.
 
-### Example E — no_trade run
-```json
-{
-  "plan_run_id": 1002,
-  "policy_code": "WS",
-  "policy_version": "WS_EOD_PLAN_CONFIRM",
-  "plan_trade_date": "2026-02-28",
-  "asof_eod_date": "2026-02-27",
-  "param_set_id": 55,
-  "data_batch_hash": "ac919a05cf7a1b567a9029bf67963b6996b3c588014f470dd57a0c1fc493f269",
-  "hash_count": 900,
-  "missing_required_count": 0,
-  "processed_count": 900,
-  "eligible_count": 12,
-  "run_status": "NO_TRADE",
-  "fail_code": "NO_TRADE",
-  "run_metrics_json": {
-    "top_picks_count": 0,
-    "secondary_count": 0,
-    "watch_only_count": 0,
-    "avoid_count": 0
-  },
-  "supersedes_plan_run_id": null,
-  "is_active": "Yes",
-  "created_at": "2026-02-27T18:11:00+07:00"
-}
-```
-### Example F — failed run
-```json
-{
-  "plan_run_id": 1003,
-  "policy_code": "WS",
-  "policy_version": "WS_EOD_PLAN_CONFIRM",
-  "plan_trade_date": "2026-02-28",
-  "asof_eod_date": "2026-02-27",
-  "param_set_id": 55,
-  "data_batch_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-  "hash_count": 0,
-  "missing_required_count": 900,
-  "processed_count": 0,
-  "eligible_count": 0,
-  "run_status": "FAILED",
-  "fail_code": "PLAN_ABORT_DATA_INCOMPLETE",
-  "run_metrics_json": {
-    "top_picks_count": 0,
-    "secondary_count": 0,
-    "watch_only_count": 0,
-    "avoid_count": 0
-  },
-  "supersedes_plan_run_id": null,
-  "is_active": "Yes",
-  "created_at": "2026-02-27T17:45:00+07:00"
-}
-```
+Field yang paling sering dipakai implementasi:
+- `meta.snapshot_age_sec` untuk membaca umur snapshot,
+- `items[].label` untuk outcome singkat di UI,
+- `items[].reasons[].code` dan `payload` untuk penjelasan hasil,
+- `summary` untuk melihat distribusi outcome overlay.
 
-## B. Canonical API / UI Output Examples
+### 3. PLAN–CONFIRM pair example
+File: `examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json`
 
-### Example A — confirm_item
+Mini pair di bawah ini cukup untuk melihat invariant yang paling penting:
+
 ```json
 {
-  "ticker": "ABCD",
-  "label": "CONFIRMED",
-  "reasons": [
-    {
-      "code": "WS_CONFIRM_OK",
-      "severity": "INFO",
-      "message": "Snapshot valid dan sehat; tidak ada sinyal negatif.",
-      "payload": {}
-    }
+  "plan_hash_before": "abc123...",
+  "plan_hash_after": "abc123...",
+  "confirm_items": [
+    {"ticker": "AAA", "label": "CONFIRMED"},
+    {"ticker": "BBB", "label": "CAUTION"}
   ]
 }
 ```
 
-### Example B — confirm_item (CAUTION)
-```json
-{
-  "ticker": "IJKL",
-  "label": "CAUTION",
-  "reasons": [
-    {
-      "code": "WS_DRIFT_FAR",
-      "severity": "WARN",
-      "message": "Harga runtime terlalu jauh dari entry band.",
-      "payload": {
-        "max_drift_from_entry_pct": 0.02,
-        "actual_drift_pct": 0.0315
-      }
-    }
-  ]
-}
-```
+Contoh pasangan ini berguna saat engineer atau reviewer ingin memastikan batas PLAN dan CONFIRM tetap terjaga. Bagian `invariant` menunjukkan `plan_hash_before` dan `plan_hash_after` tetap identik, sehingga pembaca bisa melihat secara konkret bahwa CONFIRM dibaca sebagai overlay di atas PLAN, bukan penulisan ulang PLAN.
 
-## C. Non-canonical / Internal Examples
-Tambahkan hanya jika memang perlu debug payload atau bentuk internal lain.
-Jika tidak perlu, bagian ini boleh dihilangkan.
+## C. Persistence reading notes
+Dokumen ini tidak menetapkan schema persistence final, tetapi pembaca biasanya perlu memperhatikan pola field berikut saat menelusuri artefak simpan:
+- identitas run (`policy`, `trade_date`, `generated_at`, `checked_at`),
+- identitas item (`ticker`, `rank`, `group_semantic`, `label`),
+- jejak audit (`plan_hash`, reason code, snapshot metadata),
+- outcome ringkas yang nanti perlu ditampilkan ulang atau diaudit.
+
+Saat implementasi storage, gunakan dokumen normatif persistence sebagai owner final. Dokumen ini hanya membantu pembaca mengenali bentuk data yang lazim mengalir dari runtime ke artefak simpan.
+
+## D. How to use this document during implementation
+- Saat membangun endpoint PLAN, mulai dari contoh PLAN runtime untuk melihat blok `meta`, `items[]`, dan `summary` yang biasanya perlu dipisahkan dengan jelas.
+- Saat membangun endpoint CONFIRM, mulai dari contoh CONFIRM runtime untuk melihat bagaimana label hasil dan reason payload biasanya disajikan.
+- Saat membangun UI atau contract test, gunakan pair example untuk memeriksa bahwa hasil CONFIRM tidak menulis ulang PLAN.
+- Saat ada perbedaan antara contoh dan dokumen normatif, dokumen normatif yang berlaku dan contoh di sini harus disesuaikan.

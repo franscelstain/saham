@@ -1,74 +1,44 @@
-# WS Parameter Coverage Matrix (LOCKED)
+# WS Parameter Coverage Matrix (Reference)
+
+## Reference status
+Matriks ini adalah alat bantu audit untuk melihat sebaran parameter Weekly Swing di berbagai dokumen dan titik penggunaan. Matriks ini bukan owner default value, provenance final, atau kewajiban runtime.
 
 ## Purpose
-Matriks cakupan parameter terhadap sumber pembuktian Weekly Swing.
+Tujuan matriks ini adalah membantu reviewer dan implementer menelusuri apakah parameter yang relevan sudah muncul pada rumah normatif yang benar dan pada area implementasi yang tepat.
 
 ## Scope
-Membantu audit apakah setiap parameter punya dasar BT/DET/MAN yang benar.
+Cakupan matriks ini terbatas pada pemetaan coverage. Bila ditemukan mismatch, keputusan final harus ditelusuri kembali ke dokumen normatif bernomor, lalu matriks ini diperbarui agar tetap konsisten.
 
 ## Inputs
-- Engineer riset, reviewer paramset, dan auditor.
+Matriks ini dibaca bersama dokumen normatif bernomor, paramset contract, serta referensi implementasi yang relevan. Pembaca tidak boleh menetapkan aturan baru hanya dari isi matriks.
 
 ## Outputs
-- Peta pembuktian parameter terhadap coverage dokumen.
+Keluaran dari matriks ini adalah gambaran coverage parameter dan pointer audit, bukan penetapan contract behavior, default value, atau provenance final.
 
-Tujuan: bukti 1 halaman bahwa parameter yang dipakai runtime punya coverage di:
-- kontrak: `../04_WS_PARAMSET_JSON_CONTRACT.md`
-- registry: `../05_WS_PARAMETER_REGISTRY_COMPLETE.md`
-- validator: `../06_WS_PARAMSET_VALIDATOR_SPEC.md`
-- eksekusi & algoritma:
-  - `../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
-  - `../08_WS_PLAN_ALGORITHM.md`
-  - `../09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`
-  - `../10_WS_CONFIRM_OVERLAY.md`
+## How to read this matrix
+Gunakan matriks ini untuk menjawab empat pertanyaan:
+1. parameter ini hidup di dokumen normatif mana,
+2. parameter ini dipakai pada tahap PLAN atau CONFIRM,
+3. parameter ini memengaruhi guard, scoring, grouping, atau overlay,
+4. apakah ada area yang tampak belum tercakup secara dokumentasi atau implementasi.
 
-Aturan (LOCKED): untuk parameter yang dipakai runtime, kolom 03/09/10/used_in wajib terisi.
+## Coverage matrix
+| Parameter | Domain stage | Dipakai untuk | Owner normatif utama | Referensi sekunder / implementasi | Catatan audit |
+|---|---|---|---|---|---|
+| `min_coverage_ratio` | PLAN guard | memastikan cakupan minimum terpenuhi | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` | `WS_FAILURE_BEHAVIOR_MATRIX.md` | review bila hasil abort coverage sering muncul |
+| `min_eligible_count` | PLAN guard / dynamic selection | memutuskan no-trade global bila kandidat terlalu sedikit | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_FAILURE_BEHAVIOR_MATRIX.md` | cek konsistensi dengan outcome `NO_TRADE` |
+| `min_rr` | PLAN level | memaksa kandidat menjadi `WATCH_ONLY` bila RR rendah | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` | `WS_WORKED_EXAMPLE_E2E.md` | pastikan tidak dipakai sebagai alasan ranking di tempat yang salah |
+| `max_drift_from_entry_pct` | CONFIRM overlay | memberi label caution saat drift terlalu jauh | `10_WS_CONFIRM_OVERLAY.md` | `WS_MANUAL_INPUT_TEMPLATE.md` | cek hubungan dengan `last_price` pada input manual |
+| `ttl_confirm_minutes` atau ekuivalennya | CONFIRM snapshot validity | menentukan stale snapshot | `10_WS_CONFIRM_OVERLAY.md` | `WS_GLOSSARY_REFERENCE.md` | pastikan pembaca membedakan TTL dari timestamp storage |
+| `top_n` / ukuran pool setara | PLAN grouping | membatasi kandidat utama | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_WORKED_EXAMPLE_E2E.md` | cek konsistensi dengan hasil grouping |
+| `secondary_n` / ukuran pool setara | PLAN grouping | membatasi kandidat pendukung | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_WORKED_EXAMPLE_E2E.md` | cek outcome saat pool sekunder kosong |
 
-last_updated=2026-02-22
+## Reading patterns
+### Saat ingin audit PLAN
+Lihat parameter guard, ranking, dan grouping terlebih dahulu. Setelah itu cocokkan dengan worked example atau failure matrix bila perilaku hasil sulit dipahami.
 
-| param_key | in_03 | in_09 | in_10 | used_in | provenance | default |
-|---|---:|---:|---:|---|---|---|
-| `confirm_overlay.max_drift_from_entry_pct` | Y | Y | Y | 06,10 | see 09 | see 03 |
-| `confirm_overlay.snapshot_max_age_sec` | Y | Y | Y | 06,07,10 | see 09 | see 03 |
-| `data_contract.disabled_fields` | Y | Y | Y | 06 | see 09 | see 03 |
-| `data_contract.required_fields` | Y | Y | Y | 06 | see 09 | see 03 |
-| `data_contract.required_sources` | Y | Y | Y | 06 | see 09 | see 03 |
-| `data_readiness.max_missing_bar_days_60d` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `data_readiness.min_coverage_ratio` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
-| `data_readiness.min_history_days` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `data_readiness.outlier_ruleset.value.enabled` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `data_readiness.outlier_ruleset.value.max_abs_return_1d_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `data_readiness.reject_if_eod_incomplete` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
-| `grouping.grouping_mode` | Y | Y | Y | 06,13 | see 09 | see 03 |
-| `grouping.rounding_mode` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `grouping.sort_keys` | Y | Y | Y | 06,13 | see 09 | see 03 |
-| `hash_contract.null_handling` | Y | Y | Y | 06 | see 09 | see 03 |
-| `hash_contract.order_by` | Y | Y | Y | 06,07 | see 09 | see 03 |
-| `hash_contract.scales` | Y | Y | Y | 06 | see 09 | see 03 |
-| `liquidity.dv20_strong_idr` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `liquidity.exclude_tickers` | Y | Y | Y | 06,08,12 | see 09 | see 03 |
-| `liquidity.min_dv20_idr` | Y | Y | Y | 06,07,08 | see 09 | see 03 |
-| `no_trade.min_eligible_count` | Y | Y | Y | 02,06,09 | see 09 | see 03 |
-| `no_trade.no_trade_hides_all.value` | Y | Y | Y | 06 | see 09 | see 03 |
-| `plan_levels.entry_band_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `plan_levels.entry_mode.value` | Y | Y | Y | 06 | see 09 | see 03 |
-| `risk.atr_ideal_high` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `risk.atr_ideal_low` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `risk.max_atr14_pct` | Y | Y | Y | 06,07,08 | see 09 | see 03 |
-| `risk.min_atr14_pct` | Y | Y | Y | 06,07,08 | see 09 | see 03 |
-| `risk.min_rr` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `risk.stop_atr_mult` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `risk.stop_mode.value` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `scoring.combine_mode.value` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `scoring.weights.value` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `grouping.secondary_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |
-| `grouping.secondary_target` | Y | Y | Y | 06,09 | see 09 | see 03 |
-| `setup.bo_max_ext_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `setup.bo_near_below_pct` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `setup.bo_trigger_mode.value` | Y | Y | Y | 06 | see 09 | see 03 |
-| `setup.mom_roc20_soft_min` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `setup.roc_hi` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `setup.roc_lo` | Y | Y | Y | 06,08 | see 09 | see 03 |
-| `grouping.top_min_score_q` | Y | Y | Y | 06,09 | see 09 | see 03 |
-| `grouping.top_picks_target` | Y | Y | Y | 06,09 | see 09 | see 03 |
+### Saat ingin audit CONFIRM
+Fokus pada parameter stale, drift, dan kelengkapan input intraday. Cross-check dengan manual input template agar pembacaan field tidak keliru.
+
+### Saat menemukan mismatch
+Jangan putuskan dari matriks ini saja. Buka owner normatif utama, lalu perbarui matriks bila mismatch memang nyata dan bukan sekadar pembacaan yang salah.

@@ -160,6 +160,10 @@ Jika tidak, kondisi itu dianggap **documentation parity failure**.
 Referensi integritas link dan konvensi path ada di:
 - [`00_LINK_INTEGRITY_CHECK_LOCKED.md`](00_LINK_INTEGRITY_CHECK_LOCKED.md)
 
+## Supporting Folder Naming
+
+Penamaan file di folder pendukung tidak boleh memberi ilusi ownership normatif. Label seperti `LOCKED`, `GOLDEN`, `SPEC`, atau `SCHEMA` di folder referensi hanya boleh dipakai bila status non-authoritative-nya dinyatakan tegas dan tidak menimbulkan kontrak bayangan. Bila label seperti itu membuat bias ownership, label tersebut harus diturunkan atau dihapus.
+
 ## Next
 Mulai dari:
 - [`policies/_shared/01_POLICY_FRAMEWORK_OVERVIEW.md`](policies/_shared/01_POLICY_FRAMEWORK_OVERVIEW.md)

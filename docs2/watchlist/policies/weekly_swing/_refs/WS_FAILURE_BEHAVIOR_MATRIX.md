@@ -1,16 +1,21 @@
-# Failure → Behavior Matrix — Weekly Swing (WS_EOD_PLAN_CONFIRM)
+# Failure → Behavior Matrix — Weekly Swing (Reference)
 
 ## Purpose
-Mengunci perilaku sistem saat kondisi invalid, stale, atau kualitas data buruk agar implementasi, output, dan UI tidak berbeda-beda.
+Merangkum konsekuensi operasional dari kondisi gagal yang sudah didefinisikan pada dokumen normatif Weekly Swing.
 
 ## Scope
-Pembaca memakai matrix ini saat memetakan detection -> status -> output/UI -> reason code.
+Dokumen ini membantu pembaca memetakan detection -> runtime status -> output/UI -> code.
+Dokumen ini bukan owner kontrak perilaku sistem.
 
-## Inputs
-- Condition/failure states dari dokumen utama dan runtime status yang relevan.
+## Normative owner
+Perilaku normatif yang diringkas di sini berasal dari:
+- [`../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)
+- [`../07_WS_REASON_CODES_AND_HASH.md`](../07_WS_REASON_CODES_AND_HASH.md)
+- [`../09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](../09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)
+- [`../10_WS_CONFIRM_OVERLAY.md`](../10_WS_CONFIRM_OVERLAY.md)
+- [`../13_WS_CONTRACT_TEST_CHECKLIST.md`](../13_WS_CONTRACT_TEST_CHECKLIST.md)
 
-## Outputs
-- Matriks perilaku sistem yang tidak boleh drift.
+Jika ada konflik antara matriks ini dan dokumen bernomor di atas, maka dokumen bernomor yang berlaku.
 
 ## Matrix
 
@@ -35,11 +40,5 @@ Pembaca memakai matrix ini saat memetakan detection -> status -> output/UI -> re
 | Hash mismatch (PLAN immutability) | Contract test / audit | Hard | Fail test / reject release | FAIL_TEST | Tidak relevan untuk UI runtime | WS_PLAN_HASH_MISMATCH |
 
 ## Notes
-- `FAILED` berarti run tidak menghasilkan output PLAN yang layak dipakai.
-- `NO_TRADE` berarti run valid; output API/UI tidak menampilkan kandidat PLAN, sedangkan persistence audit tetap menyimpan item dan seluruhnya `HIDE`.
-- `OK` berarti run tetap lanjut, namun item tertentu bisa berubah label menjadi `WATCH_ONLY`, `CAUTION`, atau `DELAY`.
-- `FAIL_TEST` hanya berlaku untuk contract test / release gate, bukan status runtime operasional.
+Matrix ini merangkum hubungan antara jenis failure dan perilaku sistem yang dirujuk oleh dokumen normatif Weekly Swing. Matrix ini tidak menetapkan acceptance rule baru. Untuk perilaku resmi, gunakan dokumen bernomor yang dirujuk oleh setiap baris matrix.
 
-## Intent
-- File ini tidak menambah rule baru.
-- File ini hanya mengunci konsekuensi sistem dari kondisi yang sudah didefinisikan di dokumen utama.

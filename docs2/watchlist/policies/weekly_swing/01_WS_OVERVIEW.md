@@ -17,12 +17,11 @@ Policy ini menghasilkan:
 
 ### Reference
 - [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)
-- [`_refs/WS_GLOSSARY_LOCKED.md`](_refs/WS_GLOSSARY_LOCKED.md)
-- [`_refs/WS_GOLDEN_MANUAL_INPUT_TEMPLATE.md`](_refs/WS_GOLDEN_MANUAL_INPUT_TEMPLATE.md)
+- [`_refs/WS_GLOSSARY_REFERENCE.md`](_refs/WS_GLOSSARY_REFERENCE.md)
+- [`_refs/WS_MANUAL_INPUT_TEMPLATE.md`](_refs/WS_MANUAL_INPUT_TEMPLATE.md)
 - [`_refs/WS_WORKED_EXAMPLE_E2E.md`](_refs/WS_WORKED_EXAMPLE_E2E.md)
-- [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md)
-- [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md)
-- [`_refs/WS_OOS_EVIDENCE_GOLDEN.md`](_refs/WS_OOS_EVIDENCE_GOLDEN.md)
+- [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md) — contoh output runtime dan quick shape guide; kontrak normatif tetap dikunci oleh dokumen bernomor Weekly Swing, terutama [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md) untuk PLAN dan [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md) untuk CONFIRM
+- [`_refs/WS_OOS_EVIDENCE_NOTE.md`](_refs/WS_OOS_EVIDENCE_NOTE.md) — catatan referensi bukti OOS; bukan sumber aturan utama
 
 ## Governance & Audit (Index)
 - [`_refs/WS_PARAMETER_COVERAGE_MATRIX.md`](_refs/WS_PARAMETER_COVERAGE_MATRIX.md) — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator serta algoritma eksekusi WS ([`08_WS_PLAN_ALGORITHM.md`](08_WS_PLAN_ALGORITHM.md), [`09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)).

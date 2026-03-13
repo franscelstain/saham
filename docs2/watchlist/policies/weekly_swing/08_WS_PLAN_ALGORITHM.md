@@ -6,11 +6,11 @@ Menetapkan algoritma PLAN WS dari EOD snapshot sampai menghasilkan plan_items de
 ## Prerequisites
 ### Weekly Swing
 - 07_WS_REASON_CODES_AND_HASH.md
-- ../../../db/04_EOD_INDICATORS.md (LOCKED — definisi indikator EOD: dv20_idr, atr14_pct, roc20, hh20)
+- docs/market_data/ (authoritative upstream indicator contract: field, meaning, validity, readiness)
 
 ## Inputs
 - asof_eod_date D
-- OHLCV(D), indicators(D): dv20_idr, atr14_pct, roc20, hh20 (lihat kontrak: `../../../db/04_EOD_INDICATORS.md`)
+- OHLCV(D), indicators(D): dv20_idr, atr14_pct, roc20, hh20, vol_ratio (lihat kontrak authoritative: `docs/market_data/`)
 - params_json WS (ACTIVE)
 
 ## LOCKED — Units & Scales for Indicator Inputs
@@ -21,7 +21,7 @@ Agar implementasi tidak drift (mis. persen vs desimal), unit/scale berikut **waj
 - `hh20` = harga **price-level** (bukan persen), high tertinggi 20 hari.
 - `close`/`asof_close` = harga **price-level** pada `asof_eod_date`.
 
-Jika kontrak indikator (`../../../db/04_EOD_INDICATORS.md`) berbeda, maka kontrak indikator menang. PLAN wajib mengikuti kontrak indikator.
+Jika ada perbedaan interpretasi terhadap field, unit, validity, readiness, atau perilaku indikator upstream, maka kontrak authoritative indikator di `docs/market_data/` yang berlaku. PLAN wajib mengikuti kontrak indikator upstream tersebut.
 
 ## LOCKED — Precision, Rounding, dan Comparator
 

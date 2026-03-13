@@ -89,7 +89,7 @@ Aturan:
 
 ## Output Model (LOCKED)
 
-CONFIRM menghasilkan output **terpisah** dari PLAN. Kontrak output final API/UI yang bersifat normatif dikunci oleh dokumen bernomor Weekly Swing ini; [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md) hanya menjadi ringkasan referensi dan tidak boleh diperlakukan sebagai sumber aturan utama.
+CONFIRM menghasilkan output **terpisah** dari PLAN. Kontrak output final API/UI yang bersifat normatif dikunci oleh dokumen bernomor Weekly Swing ini; [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md) hanya menjadi referensi contoh output dan quick shape guide, dan tidak boleh diperlakukan sebagai sumber aturan utama.
 
 Bentuk minimum output final:
 - `meta`:

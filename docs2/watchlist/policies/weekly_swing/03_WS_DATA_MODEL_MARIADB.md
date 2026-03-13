@@ -62,7 +62,7 @@ Menetapkan mapping kebutuhan WS terhadap schema global watchlist (tabel global a
 
 ## LOCKED — Persisted Records ↔ Runtime Output Mapping
 
-Bagian ini mengunci bagaimana data yang dipersist ke tabel global dipetakan ke runtime output (API/UI) pada policy Weekly Swing. Untuk PLAN, mapping normatif dikunci pada bagian ini. Untuk CONFIRM, bentuk output minimum normatif dikunci pada `10_WS_CONFIRM_OVERLAY.md`. Dokumen [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md) hanya menjadi ringkasan referensi dan tidak boleh diperlakukan sebagai sumber aturan utama.
+Bagian ini mengunci bagaimana data yang dipersist ke tabel global dipetakan ke runtime output (API/UI) pada policy Weekly Swing. Untuk PLAN, mapping normatif dikunci pada bagian ini. Untuk CONFIRM, bentuk output minimum normatif dikunci pada `10_WS_CONFIRM_OVERLAY.md`. Dokumen [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md) hanya menjadi referensi contoh output dan quick shape guide, dan tidak boleh diperlakukan sebagai sumber aturan utama.
 
 ### A) PLAN header: `watchlist_plan_runs` → `WS_PLAN_RUNTIME_OUTPUT.meta`
 Mapping (LOCKED):

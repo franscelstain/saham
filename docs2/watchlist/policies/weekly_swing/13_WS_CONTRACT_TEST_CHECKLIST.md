@@ -27,9 +27,15 @@ Dokumen ini adalah jembatan antara kontrak normatif dan implementasi test.
 
 ## Prerequisites
 - [`12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md`](12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md)
-- [`_refs/WS_GOLDEN_FIXTURES.md`](_refs/WS_GOLDEN_FIXTURES.md)
-- [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md)
+- [`_refs/WS_FIXTURE_INVENTORY.md`](_refs/WS_FIXTURE_INVENTORY.md) — inventaris referensi fixture; bukan sumber aturan utama
+- [`02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)
+- [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md)
+- [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md)
 - `../_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`
+
+
+## Rule of use for `_refs/` (LOCKED)
+Seluruh dokumen `_refs/` yang membahas contract tests, fixture inventory, atau worked examples bersifat elaborasi pendukung dan tidak mengalahkan checklist ini. Perubahan test minimum, acceptance, dan PASS/FAIL resmi harus dilakukan di checklist ini terlebih dahulu, lalu referensi pendukung disinkronkan.
 
 ## 1) Official Fixture Root (LOCKED)
 Source of truth fixture Weekly Swing ada di:
@@ -243,10 +249,11 @@ Satu implementasi Weekly Swing dianggap siap merge hanya jika:
 ## 6) Anti-Drift Rule
 Jika ada kontrak baru yang membutuhkan fixture baru:
 - file fixture fisik wajib ditambahkan pada [`fixtures/`](fixtures/README.md),
-- dokumen [`_refs/WS_GOLDEN_FIXTURES.md`](_refs/WS_GOLDEN_FIXTURES.md) wajib diupdate,
+- dokumen [`_refs/WS_FIXTURE_INVENTORY.md`](_refs/WS_FIXTURE_INVENTORY.md) wajib diupdate,
 - dan inventory test pada dokumen ini wajib diperbarui pada commit yang sama.
 
 ## Reference
 - [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)
-- [`_refs/WS_GOLDEN_FIXTURES.md`](_refs/WS_GOLDEN_FIXTURES.md)
-- [`_refs/WS_RUNTIME_OUTPUT_SCHEMA.md`](_refs/WS_RUNTIME_OUTPUT_SCHEMA.md)
+- [`_refs/WS_FIXTURE_INVENTORY.md`](_refs/WS_FIXTURE_INVENTORY.md) — inventaris referensi fixture; bukan sumber aturan utama
+- [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md)
+- [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md)

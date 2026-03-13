@@ -1,179 +1,151 @@
-# Worked Example E2E — Weekly Swing (WS_EOD_PLAN_CONFIRM)
+# Worked Example E2E — Weekly Swing (Reference Walkthrough)
+
+## Reference status
+Dokumen ini adalah walkthrough contoh untuk membantu pembaca memahami alur Weekly Swing dari guards sampai output akhir. Dokumen ini bukan replay proof normatif dan bukan owner expected result resmi.
 
 ## Purpose
-Contoh 1 ticker dari input EOD sampai hasil PLAN dan CONFIRM agar implementasi tidak menebak.
-
-## Scope
-Dipakai untuk membantu pembaca mengikuti alur PLAN dan CONFIRM langkah demi langkah.
-
-## Outputs
-- Narasi E2E yang membantu implementasi dan audit.
+Gunakan dokumen ini saat engineer atau reviewer ingin melihat bagaimana satu kelompok kandidat dapat bergerak dari data awal, melewati guard, membentuk skor, masuk grouping, lalu dibaca ulang oleh CONFIRM.
 
 ## Inputs
-- ticker_id: ABCD
-- trade_date: 2026-02-27
-- close: 1020
-- high: 1035
-- low: 995
-- volume: 12500000
-- dv20_idr: 6800000000
-- atr14_pct: 0.054
-- roc20: 0.091
-- hh20: 1030
+- dokumen normatif guard, PLAN, grouping, dan CONFIRM,
+- contoh runtime output di folder `examples/`,
+- fixture kecil atau fixture kaya bila pembaca ingin menelusuri ulang contoh.
 
-## Paramset Used
-- `../db/PARAMSET_WS_ACTIVE_EXAMPLE.json`
+## Outputs
+- gambaran konkret perubahan status kandidat dari awal sampai akhir,
+- contoh angka sederhana yang mudah dibaca,
+- pointer ke artefak yang relevan bila pembaca ingin replay contoh.
+
+## Paramset used
+Contoh ini memakai asumsi sederhana yang konsisten dengan arah Weekly Swing: guard likuiditas aktif, ATR berada pada zona yang masih layak, grouping memisahkan kandidat utama dari kandidat pendukung, dan CONFIRM membaca snapshot intraday tanpa mengubah PLAN.
+
+## Kandidat contoh
+| Ticker | Ringkasan awal | Tujuan contoh |
+|---|---|---|
+| A | data siap, likuid, momentum dan breakout kuat | kandidat yang bertahan sampai CONFIRM |
+| B | data siap, cukup baik, tetapi tidak sekuat A | kandidat yang lolos PLAN tetapi outcome CONFIRM lebih hati-hati |
+| C | data siap tetapi gagal di guard awal | kandidat yang berhenti sebelum scoring lanjut |
 
 ## Step 1 — Guards
-- `liquidity.min_dv20_idr = 1000000000` → PASS (`6800000000 >= 1000000000`)
-- `risk.min_atr14_pct = 0.02` → PASS (`0.054 >= 0.02`)
-- `risk.max_atr14_pct = 0.12` → PASS (`0.054 <= 0.12`)
-- `data_readiness.outlier_ruleset.max_abs_return_1d_pct = 0.25` → PASS
-- `data_readiness.outlier_ruleset.max_high_low_range_1d_pct = 0.30` → PASS
+Misalkan tiga kandidat awal memiliki ringkasan berikut:
 
-## Step 2 — Component Scores
-### score_momentum
-- `setup.roc_lo = 0.02`
-- `setup.roc_hi = 0.15`
-- `roc20 = 0.091`
-- Normalisasi:
-  - `(0.091 - 0.02) / (0.15 - 0.02) = 0.546154`
-- `score_momentum = 0.546154`
+| Ticker | dv20_idr | atr14_pct | vol_ratio | Hasil guard |
+|---|---:|---:|---:|---|
+| A | 3,000,000,000 | 3.0 | 1.3 | lolos |
+| B | 2,400,000,000 | 3.8 | 1.1 | lolos |
+| C | 300,000,000 | 3.2 | 0.9 | gagal likuiditas |
 
-### score_breakout
-- `setup.bo_near_below_pct = 0.02`
-- `setup.bo_max_ext_pct = 0.05`
-- `hh20 = 1030`
-- `close = 1020`
-- `distance_to_hh20_pct = (1030 - 1020) / 1030 = 0.009709`
-- Karena masih di bawah HH20 dan jarak <= `bo_near_below_pct`, maka:
-- `score_breakout = 0.75`
+Pembacaan praktis:
+- A dan B lanjut ke scoring karena masih berada pada zona yang layak,
+- C berhenti di sini karena likuiditas terlalu rendah untuk strategi mingguan.
 
-### score_volume
-- `liquidity.min_dv20_idr = 1000000000`
-- `liquidity.dv20_strong_idr = 5000000000`
-- `dv20_idr = 6800000000`
-- Karena `dv20_idr >= dv20_strong_idr`, maka:
-- `score_volume = 1.0`
+## Step 2 — Component scores
+Untuk kandidat yang lolos, misalkan komponen skor dibaca seperti berikut:
 
-### score_risk
-- `risk.atr_ideal_low = 0.035`
-- `risk.atr_ideal_high = 0.075`
-- `atr14_pct = 0.054`
-- Karena ATR berada di zona ideal:
-- `score_risk = 1.0`
+| Ticker | score_momentum | score_breakout | score_volume | score_risk |
+|---|---:|---:|---:|---:|
+| A | 0.50 | 1.00 | 0.50 | 1.00 |
+| B | 0.40 | 0.80 | 0.75 | 0.85 |
+
+Pembacaan praktis:
+- A kuat pada breakout dan risk profile,
+- B masih menarik tetapi tidak sekuat A pada breakout.
 
 ## Step 3 — score_total
-- `scoring.combine_mode = NORM_WEIGHTED_SUM_CLAMP01`
-- `weights.momentum = 0.30`
-- `weights.breakout = 0.30`
-- `weights.volume = 0.20`
-- `weights.risk = 0.20`
+Setelah agregasi sederhana, misalkan hasil total menjadi:
 
-Perhitungan:
-- `score_total = clamp01(0.30*0.546154 + 0.30*0.75 + 0.20*1.0 + 0.20*1.0)`
-- `score_total = clamp01(0.163846 + 0.225 + 0.20 + 0.20)`
-- `score_total = 0.788846`
+| Ticker | score_total |
+|---|---:|
+| A | 0.75 |
+| B | 0.70 |
+
+Di titik ini urutan relatif sudah terlihat. A berada di atas B, sedangkan C tidak ikut lagi karena gugur di guard. Pembaca bisa melihat bahwa ranking terbentuk dari akumulasi komponen, bukan dari satu sinyal tunggal.
 
 ## Step 4 — Grouping / Dynamic Selection
-Misal hasil hari itu:
-- `grouping.top_min_score_q.value = 0.80`
-- `grouping.secondary_min_score_q.value = 0.65`
-- `top_cutoff_today = 0.812000`
-- `secondary_cutoff_today = 0.701000`
+Misalkan rule grouping menghasilkan:
 
-Evaluasi:
-- `score_total = 0.788846`
-- `score_total < top_cutoff_today` → bukan `TOP_PICKS`
-- `score_total >= secondary_cutoff_today` → masuk `SECONDARY`
+| Ticker | score_total | Group |
+|---|---:|---|
+| A | 0.75 | `TOP_PICKS` |
+| B | 0.70 | `SECONDARY` |
+| C | — | `AVOID` |
 
-Hasil:
-- `group_semantic = SECONDARY`
+Pembacaan praktis:
+- A menjadi kandidat utama,
+- B tetap muncul, tetapi tidak setara dengan A,
+- C tidak masuk pool kandidat aktif karena sudah gagal di guard.
 
-## Step 5 — PLAN Levels
-- `plan_levels.entry_band_pct = 0.01`
-- `entry_ref = close = 1020`
-- `entry_band_low = 1020 * (1 - 0.01) = 1009.80`
-- `entry_band_high = 1020 * (1 + 0.01) = 1030.20`
+## Step 5 — PLAN levels
+Untuk dua kandidat yang lolos ke hasil PLAN, misalkan level referensinya dibaca sebagai berikut:
 
-Stop:
-- `risk.stop_mode = ATR`
-- `risk.stop_atr_mult = 1.5`
-- `atr14_pct = 0.054`
-- `stop_price = 1020 * (1 - (1.5 * 0.054))`
-- `stop_price = 1020 * (1 - 0.081)`
-- `stop_price = 937.38`
+| Ticker | entry_ref | entry_band_low | entry_band_high | stop_price | tp1_price |
+|---|---:|---:|---:|---:|---:|
+| A | 100.0 | 99.0 | 101.0 | 94.0 | 112.0 |
+| B | 100.0 | 99.0 | 101.0 | 90.8 | 118.4 |
 
-TP1:
-- `risk.min_rr = 1.5`
-- `risk_per_share = 1020 - 937.38 = 82.62`
-- `tp1_price = 1020 + (1.5 * 82.62)`
-- `tp1_price = 1143.93`
+Hasil PLAN yang dibaca reviewer:
+- A layak diprioritaskan,
+- B tetap layak dipantau atau diposisikan sebagai kandidat pendukung,
+- C tidak ikut output kandidat aktif.
 
-## Step 6 — Confirm Overlay
-Misal data runtime:
-- `last_price = 1028`
-- `snapshot_age_sec = 120`
-- `turnover_idr = 143960000000`
-- `volume_shares = 39330000`
-- `drift_pct = (1028 - 1020) / 1020 = 0.007843`
+## Step 6 — CONFIRM overlay
+Misalkan pada hari intraday snapshot memberi hasil berikut:
 
-Check:
-- `snapshot_age_sec <= snapshot_max_age_sec` (LOCKED: 900) → valid
-- `turnover_idr > 0 dan volume_shares > 0` → pass
-- `drift_pct <= 0.03` → pass
+| Ticker | snapshot_age_sec | Kondisi overlay | Label CONFIRM |
+|---|---:|---|---|
+| A | 90 | snapshot segar, tidak ada sinyal negatif | `CONFIRMED` |
+| B | 420 | snapshot mulai tua dan volume lemah | `CAUTION` |
 
-Hasil:
-- `label = CONFIRMED`
-- `reasons = []` karena tidak ada warning/block/info tambahan dari CONFIRM
+Pembacaan praktis:
+- A tetap layak setelah overlay,
+- B tidak otomatis dibuang, tetapi outcome menjadi lebih hati-hati karena snapshot lebih tua dan volume intraday tidak sekuat kandidat utama,
+- PLAN tetap sama; yang berubah hanya pembacaan intraday di atas PLAN.
 
-## Final Output Summary
-- `plan_trade_date = 2026-02-28`
-- `ticker_id = ABCD`
-- `score_total = 0.788846`
-- `group_semantic = SECONDARY`
-- `entry_ref = 1020`
-- `entry_band_low = 1009.80`
-- `entry_band_high = 1030.20`
-- `stop_price = 937.38`
-- `tp1_price = 1143.93`
-- `label = CONFIRMED`
-- `reasons = []`
+Alasan kenapa B menjadi `CAUTION`, bukan `CONFIRMED`:
+- snapshot B masih cukup untuk dibaca, jadi belum masuk `DELAY`,
+- tetapi kualitas intraday-nya tidak sekuat A sehingga outcome yang lebih masuk akal adalah hati-hati,
+- hasil ini menunjukkan bahwa CONFIRM dapat menurunkan keyakinan tanpa menghapus kandidat dari hasil PLAN.
 
----
+## Before → after snapshot
 
-## Artifacts Produced (GOLDEN, LOCKED)
-Dokumen ini dianggap “golden runnable example”. Minimal artefak yang harus dapat dihasilkan ulang:
+| Ticker | Setelah PLAN | Setelah CONFIRM | Inti perubahan |
+|---|---|---|---|
+| A | `TOP_PICKS`, prioritas utama | `CONFIRMED` | keyakinan tetap kuat |
+| B | `SECONDARY`, kandidat pendukung | `CAUTION` | tetap layak dibaca, tetapi keyakinan turun |
+| C | `AVOID` / gugur di guard | tidak ikut CONFIRM aktif | berhenti sebelum overlay |
 
-### A) PLAN (persisted)
-- `plan_run` untuk `trade_date=T`
-- `plan_items` untuk `trade_date=T` (minimal 1 ticker contoh ini)
+## Final output summary
+Ringkasan contoh ini dapat dibaca seperti berikut:
+- kandidat A bertahan dari guard sampai CONFIRM dengan outcome yang tetap kuat,
+- kandidat B lolos PLAN tetapi hasil CONFIRM menjadi lebih hati-hati,
+- kandidat C berhenti di awal dan tidak ikut output aktif.
 
-### B) CONFIRM snapshot input (persisted, manual)
-- `watchlist_confirm_snapshots` (header) untuk `(policy_code='WS', trade_date=T)`
-- `watchlist_confirm_snapshot_items` (items) untuk `ticker_code=ABCD` dengan field:
-  - `last_price`, `chg_pct`, `volume_shares`, `turnover_idr`, `captured_at`
+Jika pembaca membuka contoh runtime JSON, pola ini paling dekat dengan pembacaan bahwa PLAN menentukan siapa yang tampil dan bagaimana prioritas awalnya, sedangkan CONFIRM menentukan seberapa aman kandidat itu dibaca pada snapshot intraday.
 
-### C) CONFIRM output (runtime)
-- Output mengikuti schema di [`WS_RUNTIME_OUTPUT_SCHEMA.md`](WS_RUNTIME_OUTPUT_SCHEMA.md).
-- Contoh output referensi ada di [`WS_RUNTIME_OUTPUT_EXAMPLES.md`](WS_RUNTIME_OUTPUT_EXAMPLES.md).
+Invariant yang terlihat langsung dari contoh ini:
+- kandidat yang gugur di guard tidak tiba-tiba muncul kembali sebagai kandidat aktif di CONFIRM,
+- kandidat yang lolos PLAN tetap membawa jejak prioritas awalnya meskipun outcome intraday dapat berubah,
+- overlay CONFIRM menambah pembacaan intraday tanpa menulis ulang hasil PLAN.
 
-Catatan (LOCKED):
-- CONFIRM memakai **intraday aggregate snapshot**, **bukan ladder**.
+## Artifacts referenced by this walkthrough
+Artefak yang paling dekat dengan walkthrough ini adalah:
+- `examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk melihat pembagian group dan plan levels,
+- `examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json` untuk melihat label outcome CONFIRM,
+- fixture PLAN kecil bila pembaca ingin memeriksa guard atau tie-break secara sempit,
+- fixture CONFIRM pair bila pembaca ingin mengecek immutability PLAN.
 
----
+## How to replay this walkthrough
+1. buka contoh PLAN runtime dan identifikasi kandidat utama, pendukung, dan yang tidak layak,
+2. cocokkan pembacaan itu dengan fixture PLAN kecil jika ingin fokus pada satu perilaku,
+3. buka contoh CONFIRM runtime untuk melihat bagaimana label overlay dibentuk,
+4. cocokkan hasil contoh dengan dokumen normatif guard, grouping, dan CONFIRM bila ada keraguan,
+5. gunakan pair example atau fixture immutability jika ingin menelusuri bahwa PLAN tidak ditulis ulang.
 
-## Replay Checklist (GOLDEN, LOCKED)
-Tujuan: reviewer/operator bisa mengulang hasil dengan data yang sama.
+## Test reading notes for this walkthrough
+Walkthrough ini berguna sebagai panduan baca pengujian end-to-end, terutama untuk melihat titik verifikasi yang biasanya dibandingkan:
+- siapa yang gugur di guard,
+- siapa yang tetap aktif di PLAN,
+- siapa yang berubah outcome saat CONFIRM,
+- dan apakah jejak PLAN tetap utuh setelah overlay.
 
-1) Pastikan paramset yang dipakai sama:
-   - `../db/PARAMSET_WS_ACTIVE_EXAMPLE.json`
-2) Jalankan PLAN untuk `trade_date=2026-02-27` (PLAN rekomendasi untuk `plan_trade_date=2026-02-28`).
-3) Input snapshot CONFIRM manual untuk `trade_date=2026-02-27`:
-   - `captured_at` sesuai contoh (snapshot_age_sec <= snapshot_max_age_sec (LOCKED: 900))
-   - Items: `last_price=1028`, `volume_shares=39330000`, `turnover_idr=143960000000`
-4) Jalankan CONFIRM overlay.
-5) Assert hasil sesuai “Final Output Summary” di atas.
-
-Invariant (LOCKED):
-- CONFIRM tidak boleh mengubah PLAN (plan_hash_before == plan_hash_after).
+Bagian ini tidak menetapkan test minimum baru; fungsinya hanya membantu pembaca memahami urutan verifikasi end-to-end.
