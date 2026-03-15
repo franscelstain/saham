@@ -1,5 +1,5 @@
 {
-  "note": "LOCKED: CONFIRM output terpisah dan tidak mengubah PLAN. plan_hash harus identik.",
+  "note": "Example pair: CONFIRM output tetap terpisah dari PLAN dan nilai plan_hash pada contoh ini tetap identik.",
   "plan_output_file": "WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json",
   "confirm_output_file": "WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json",
   "invariant": {

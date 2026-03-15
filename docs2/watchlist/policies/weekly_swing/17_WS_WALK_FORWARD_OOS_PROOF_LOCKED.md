@@ -1,6 +1,9 @@
 # 17 - WS Walk-Forward / Out-of-Sample Proof (LOCKED)
 
 ## Purpose (LOCKED)
+
+Dokumen ini mengunci bukti OOS minimum yang wajib ada sebelum promote paramset WS.
+
 Membuktikan bahwa parameter terbaik hasil kalibrasi tidak hanya menang di in-sample,
 tetapi tetap perform di out-of-sample (OOS), sehingga layak dipromote menjadi candidate ACTIVE.
 
@@ -40,6 +43,9 @@ Split harus berbasis urutan waktu (time series), bukan random split.
 - Evidence dapat diringkas menggunakan format referensi pada [`_refs/WS_OOS_EVIDENCE_NOTE.md`](_refs/WS_OOS_EVIDENCE_NOTE.md), tetapi kewajiban bukti OOS tetap dikunci oleh dokumen ini.
 
 ### Step 3: Optional rolling walk-forward (recommended)
+
+Rolling walk-forward adalah penguat bukti yang direkomendasikan, bukan syarat minimum promote kecuali kemudian dinyatakan LOCKED secara eksplisit.
+
 Jika ingin lebih kuat, lakukan rolling window:
 - Train 6 bulan → Test 3 bulan (rolling maju), ulang sampai akhir range.
 
@@ -48,6 +54,9 @@ Versi minimum yang wajib untuk validasi adalah split 70/30.
 ---
 
 ## OOS acceptance criteria (LOCKED)
+
+Kriteria ini berlaku untuk proof minimum. Dokumen lain tidak boleh menurunkan threshold ini secara implisit.
+
 
 A) Coverage
 - picks_count_oos >= `ws.eval.min_trades_oos` (default 40 untuk 2 tahun split; documented)
@@ -67,6 +76,9 @@ Jika gagal salah satu → param_id tidak boleh dipromote ACTIVE walaupun IS mena
 ---
 
 ## Required artifacts (LOCKED)
+
+Nama artefak fisik dapat bervariasi, tetapi shape evidence yang dipakai harus konsisten dan termasuk dalam artefak resmi yang diizinkan. Dokumen ini mengunci bukti minimum; allowlist artefak resminya tetap mengikuti manifest artefak WS.
+
 Wajib ada 2 record evaluasi tersimpan:
 1) IS eval: watchlist_bt_eval (from_date_is, to_date_is)
 2) OOS proof: watchlist_bt_oos_eval_ws (from_date_oos, to_date_oos)

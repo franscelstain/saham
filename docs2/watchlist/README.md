@@ -4,48 +4,70 @@
 > **Doc Role:** System governance index
 
 ## Purpose
-Entry point dokumentasi watchlist tingkat sistem.
+
+`docs/watchlist/` adalah domain owner untuk aturan, kontrak, dan governance sistem watchlist. Domain ini mendefinisikan bagaimana strategi watchlist dibaca, divalidasi, dijalankan, diuji, dan dihubungkan ke artefak persistence yang dimiliki watchlist.
 
 ## Scope
-Pembaca mulai dari sini untuk memahami governance, struktur folder, batas ownership domain, dan jalur baca awal.
 
-## Inputs
-- Pembaca, reviewer, implementer, dan auditor yang akan menelusuri dokumen watchlist.
+Domain watchlist mencakup:
 
-## Outputs
-- Peta baca awal.
-- Batas source of truth lintas layer watchlist.
-- Penunjuk domain owner untuk area yang memang berada di luar watchlist.
+- governance domain watchlist,
+- policy lintas strategy,
+- policy strategy-specific,
+- kontrak output dan persistence yang dimiliki watchlist,
+- contract-test anchors,
+- dokumen referensial,
+- contoh output,
+- golden fixtures,
+- dan artefak database milik watchlist.
 
-Folder utama: [`docs/watchlist/`](./README.md).
+Strategy yang saat ini terdokumentasi penuh di domain ini adalah **Weekly Swing**. Kontrak strategy-specific yang bersifat wajib dibaca hidup di `docs/watchlist/policies/weekly_swing/`, sedangkan dokumen pada root domain ini menetapkan governance dan jalur baca tingkat domain.
 
-Dokumentasi ini mencakup sistem watchlist secara global: governance, database watchlist aplikasi, kontrak lintas-policy, dan dokumen policy spesifik.
+## Relationship to Other Domains
 
-## Start here
-Urutan baca yang paling aman:
-1. [`policy.md`](policy.md)
-2. [`00_LINK_INTEGRITY_CHECK_LOCKED.md`](00_LINK_INTEGRITY_CHECK_LOCKED.md)
-3. [`db/01_DB_OVERVIEW.md`](db/01_DB_OVERVIEW.md)
-4. [`policies/README.md`](policies/README.md)
-5. [`policies/_shared/README.md`](policies/_shared/README.md)
-6. policy spesifik yang mau diimplementasikan
+Watchlist adalah consumer downstream terhadap `market_data`. Kontrak upstream seperti bars/OHLCV, indicators, publication, readiness, dan validity tetap dimiliki secara authoritative oleh `docs/market_data/` dan tidak didefinisikan ulang di domain watchlist.
 
-## Prinsip sistem (scope saat ini: Weekly Swing EOD)
-- Berbasis **EOD (end-of-day)** untuk menghasilkan rekomendasi **Weekly Swing**.
-- Dua tahap tegas:
-  - **PLAN** dibuat dari data EOD hari ini untuk rekomendasi **besok** (next trading day), disimpan sebagai snapshot.
-  - **CONFIRM** memakai data runtime/intraday sebagai pengecekan keyakinan yang sifatnya sesaat dan **tidak boleh mengubah atau mempengaruhi hasil PLAN**.
-- Keputusan eksekusi tetap **manual** di luar aplikasi; CONFIRM hanya saran tambahan.
+Dokumen watchlist hanya boleh menyatakan ketergantungan terhadap kontrak upstream yang telah tersedia bagi consumer watchlist.
 
-## Source of truth per layer
-- [`policy.md`](policy.md) — governance lintas policy dan aturan cara baca.
-- [`db/`](db/README.md) — schema/DDL database watchlist aplikasi.
-- shared foundation lintas domain — berada di luar paket `docs/watchlist/`; jangan diperlakukan sebagai owner aturan watchlist.
-- `docs/market_data/` — owner authoritative untuk kontrak upstream market-data seperti bars, indicators, publication/read model, dan readiness.
-- [`policies/_shared/`](policies/_shared/README.md) — kontrak global lintas policy watchlist.
-- `policies/<policy>/` — aturan bisnis policy spesifik.
+## Structure
 
-## Navigasi
-- [`policy.md`](policy.md) — governance policy dan standar dokumentasi.
-- [`db/`](db/README.md) — schema + seed database watchlist (baca berurutan mulai 01).
-- [`policies/`](policies/README.md) — katalog policy.
+Struktur domain ini dibagi menjadi:
+
+- `policy.md`  
+  Governance tertinggi domain watchlist.
+
+- `policies/_shared/`  
+  Aturan lintas strategy yang berlaku bersama.
+
+- `policies/<strategy>/`  
+  Dokumen normatif strategy-specific.
+
+- `policies/<strategy>/_refs/`  
+  Dokumen referensial strategy-scoped yang menjelaskan atau merangkum kontrak normatif strategy terkait.
+
+- `policies/<strategy>/examples/`  
+  Contoh output atau representasi runtime strategy-scoped yang tunduk pada kontrak normatif strategy terkait.
+
+- `policies/<strategy>/fixtures/`  
+  Golden test assets strategy-scoped untuk validasi determinism, acceptance, dan contract behavior.
+
+- `db/`  
+  Artefak persistence dan implementasi database global milik watchlist.
+
+- `policies/<strategy>/db/`  
+  Artefak persistence atau SQL strategy-scoped yang merealisasikan kebutuhan strategy tertentu tanpa mengambil alih kontrak upstream atau governance domain.
+
+## Recommended Reading Order
+
+Jalur baca yang dianjurkan adalah:
+
+1. `docs/watchlist/policy.md`
+2. `docs/watchlist/README.md`
+3. `docs/watchlist/policies/README.md`
+4. strategy entry README yang relevan
+5. file normatif bernomor pada strategy yang relevan
+6. `_refs/`, `examples/`, `fixtures/`, dan `db/` sebagai dokumen pendukung
+
+## Reading Rule
+
+Dokumen pada root domain ini tidak menggantikan kontrak strategy-specific. Untuk implementasi Weekly Swing, pembaca harus melanjutkan ke `docs/watchlist/policies/weekly_swing/` dan mengikuti file normatif bernomor sebagai source of truth utama di level strategy.

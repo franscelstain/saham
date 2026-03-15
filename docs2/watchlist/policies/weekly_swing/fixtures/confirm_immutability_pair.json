@@ -1,7 +1,7 @@
 {
   "fixture_id": "WS_CONFIRM_IMMUTABILITY_PAIR_V2",
   "policy_code": "WS",
-  "note": "LOCKED: CT_010. CONFIRM hanya menghasilkan confirm_result terpisah. PLAN output tidak boleh berubah (hash identik) sebelum vs sesudah.",
+  "note": "Reference to CT_010. Fixture ini menggambarkan bahwa CONFIRM menghasilkan confirm_result terpisah dan PLAN output tetap identik sebelum vs sesudah.",
   "plan_output": {
     "meta": {
       "policy": "WEEKLY_SWING",

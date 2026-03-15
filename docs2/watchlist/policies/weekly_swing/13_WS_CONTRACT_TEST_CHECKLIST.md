@@ -1,259 +1,183 @@
-# 13 — Contract Test Checklist — WS_EOD_PLAN_CONFIRM (LOCKED)
+# 13 — Weekly Swing Contract Test Checklist
 
 ## Purpose
-Mengunci daftar minimum contract tests Weekly Swing agar seluruh kontrak WS dapat diterjemahkan ke test suite nyata tanpa tafsir bebas.
 
-## Scope
-Dokumen ini berlaku untuk test contract Weekly Swing pada area:
-- paramset validation,
-- PLAN determinism,
-- CONFIRM isolation,
-- grouping semantics,
-- backtest governance,
-- artifact governance.
+Dokumen ini adalah simpul acceptance untuk Weekly Swing. Dokumen ini merangkum kondisi minimum yang wajib lolos agar implementasi dapat dianggap sesuai kontrak strategy.
 
-Dokumen ini tidak menggantikan validator spec, runtime schema, atau algorithm doc.
-Dokumen ini adalah jembatan antara kontrak normatif dan implementasi test.
+## A. PLAN Runtime Shape Acceptance
 
-## Inputs
-- fixture resmi pada folder [`fixtures/`](fixtures/README.md),
-- contoh paramset resmi,
-- kontrak WS dari file 01–12 dan 14–20.
+**Acceptance Item**
+PLAN runtime output wajib memiliki top-level shape `meta`, `items`, `summary` serta field-field normatif yang ditetapkan pada data model.
 
-## Outputs
-- inventory test case minimum,
-- mapping fixture ke test,
-- acceptance rule untuk CI / pre-merge verification.
+**Owner Contract**
+- `03_WS_DATA_MODEL_MARIADB.md`
+- `08_WS_PLAN_ALGORITHM.md`
 
-## Prerequisites
-- [`12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md`](12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md)
-- [`_refs/WS_FIXTURE_INVENTORY.md`](_refs/WS_FIXTURE_INVENTORY.md) — inventaris referensi fixture; bukan sumber aturan utama
-- [`02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)
-- [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md)
-- [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md)
-- `../_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`
+**Supporting Artifacts**
+- `examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json`
+- `examples/WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_NO_TRADE.json`
 
+**Expected Result**
+PLAN payload **must fail acceptance** bila top-level shape bukan `meta`, `items`, `summary`, atau bila field normatif aktif hanya muncul di examples tetapi tidak dapat ditelusuri ke owner contract.
 
-## Rule of use for `_refs/` (LOCKED)
-Seluruh dokumen `_refs/` yang membahas contract tests, fixture inventory, atau worked examples bersifat elaborasi pendukung dan tidak mengalahkan checklist ini. Perubahan test minimum, acceptance, dan PASS/FAIL resmi harus dilakukan di checklist ini terlebih dahulu, lalu referensi pendukung disinkronkan.
+## B. CONFIRM Runtime Shape Acceptance
 
-## 1) Official Fixture Root (LOCKED)
-Source of truth fixture Weekly Swing ada di:
-- [`fixtures/`](fixtures/README.md)
+**Acceptance Item**
+CONFIRM runtime output wajib memiliki top-level shape `meta`, `items`, `summary` serta field-item `ticker`, `label`, `reasons`.
 
-Jika test suite di codebase ingin memirror fixture ke folder lain, mirror tersebut **harus byte-identical** terhadap source of truth di atas.
-Contoh path mirror yang diizinkan:
-- `tests/Fixtures/watchlist/ws/`
+**Owner Contract**
+- `03_WS_DATA_MODEL_MARIADB.md`
+- `10_WS_CONFIRM_OVERLAY.md`
 
-Namun dokumen ini selalu menyebut fixture dengan **path relatif eksplisit dari root policy Weekly Swing**, misalnya:
-- [`fixtures/paramset_valid.json`](fixtures/paramset_valid.json)
-- [`fixtures/confirm_immutability_pair.json`](fixtures/confirm_immutability_pair.json)
+**Supporting Artifacts**
+- `examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json`
 
-Aturan:
-- tidak boleh mengandalkan nama file telanjang tanpa path,
-- tidak boleh mengandalkan base-path inference diam-diam,
-- dan tidak boleh menyebut fixture yang file fisiknya tidak ada.
+**Expected Result**
+CONFIRM payload **must fail acceptance** bila top-level shape drift dari `meta`, `items`, `summary` atau bila field item kontraktual `ticker`, `label`, `reasons` tidak tersedia sesuai owner normatif.
 
-## 2) Minimal Fixture Inventory (LOCKED)
-Fixture minimum yang wajib tersedia:
+## C. PLAN / CONFIRM Pair Immutability
 
-### A) Paramset validator fixtures
-- [`fixtures/paramset_valid.json`](fixtures/paramset_valid.json)
-- [`fixtures/paramset_missing_required_key.json`](fixtures/paramset_missing_required_key.json)
-- [`fixtures/paramset_unknown_key.json`](fixtures/paramset_unknown_key.json)
-- [`fixtures/paramset_type_drift.json`](fixtures/paramset_type_drift.json)
-- [`fixtures/paramset_missing_audit_field.json`](fixtures/paramset_missing_audit_field.json)
-- [`fixtures/paramset_bad_enum.json`](fixtures/paramset_bad_enum.json)
-- [`fixtures/paramset_bad_hash_contract.json`](fixtures/paramset_bad_hash_contract.json)
-- [`fixtures/paramset_bad_eval.json`](fixtures/paramset_bad_eval.json)
+**Acceptance Item**
+PLAN hash tidak boleh berubah akibat proses CONFIRM.
 
-### B) PLAN / grouping fixtures
-- [`fixtures/PLAN_FIXTURE_A_TIES_V1.json`](fixtures/PLAN_FIXTURE_A_TIES_V1.json)
-- [`fixtures/plan_items_guard_fail.json`](fixtures/plan_items_guard_fail.json)
-- [`fixtures/plan_items_forced_watch_only.json`](fixtures/plan_items_forced_watch_only.json)
-- [`fixtures/plan_items_no_trade_hide_all.json`](fixtures/plan_items_no_trade_hide_all.json)
-- [`fixtures/plan_items_no_trade_min_eligible.json`](fixtures/plan_items_no_trade_min_eligible.json)
-- [`fixtures/plan_items_artificial_ties.json`](fixtures/plan_items_artificial_ties.json)
-- [`fixtures/scored_items_quantile_cutoff.json`](fixtures/scored_items_quantile_cutoff.json)
-- [`fixtures/plan_universe_snapshot_sample.json`](fixtures/plan_universe_snapshot_sample.json)
+**Owner Contract**
+- `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+- `03_WS_DATA_MODEL_MARIADB.md`
+- `10_WS_CONFIRM_OVERLAY.md`
 
-### C) CONFIRM fixtures
-- [`fixtures/confirm_immutability_pair.json`](fixtures/confirm_immutability_pair.json)
-- [`fixtures/confirm_snapshots_two.json`](fixtures/confirm_snapshots_two.json)
-- [`fixtures/confirm_payload_with_orderbook_fields.json`](fixtures/confirm_payload_with_orderbook_fields.json)
+**Supporting Artifacts**
+- `examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json`
+- `fixtures/confirm_immutability_pair.json`
 
-### D) Backtest governance fixtures
-- [`fixtures/bt_coverage_guard_minimal.json`](fixtures/bt_coverage_guard_minimal.json)
-- [`fixtures/universe_equivalence_sample.json`](fixtures/universe_equivalence_sample.json)
-- [`fixtures/bt_eval_metrics_minimal.json`](fixtures/bt_eval_metrics_minimal.json)
-- [`fixtures/bt_oos_proof_minimal.json`](fixtures/bt_oos_proof_minimal.json)
-- [`fixtures/artifact_reference_guard_minimal.json`](fixtures/artifact_reference_guard_minimal.json)
+**Expected Result**
+PLAN/CONFIRM pair **must preserve** `plan_hash_before = plan_hash_after` dan `plan_hash_unchanged = true`; setiap drift pada hash akibat proses CONFIRM **must fail acceptance**.
 
-### E) Hash fixture
-- [`fixtures/hash_contract_vectors.json`](fixtures/hash_contract_vectors.json)
+## D. Paramset Shape Acceptance
 
-## 3) Global Test Hook Rules (LOCKED)
-Implementasi test wajib memenuhi semua syarat berikut:
-- deterministic,
-- self-contained sebisa mungkin,
-- tidak mengandalkan data DB liar untuk membuktikan kontrak,
-- failure harus menghasilkan code/reason yang jelas,
-- dan CI harus punya satu jalur standar untuk menjalankan seluruh contract tests WS.
+**Acceptance Item**
+Paramset Weekly Swing wajib memiliki seluruh required top-level keys dan required section keys.
 
-Contoh entrypoint yang diizinkan:
-- `php artisan watchlist:contract:ws`
-- `vendor/bin/phpunit --group watchlist_ws_contract`
+**Owner Contract**
+- `04_WS_PARAMSET_JSON_CONTRACT.md`
 
-Nama final boleh berbeda, tetapi fungsi kontraknya harus sama.
+**Supporting Artifacts**
+- `db/PARAMSET_WS_ACTIVE_EXAMPLE.json`
+- `fixtures/paramset_valid.json`
+- `fixtures/paramset_missing_required_key.json`
 
-## 4) Official Test Inventory (LOCKED)
+**Expected Result**
+Missing required top-level key **must fail validation**; misalnya hilangnya `risk` **must fail** dan payload tidak boleh dianggap paramset valid.
 
-### WS_CT_001 — Paramset valid harus PASS
-- Fixture: [`fixtures/paramset_valid.json`](fixtures/paramset_valid.json)
-- Assertion: validator PASS tanpa unknown/missing/type/enum errors.
-- Assertion (LOCKED unit invariant):
-  - 0 < risk.min_atr14_pct.value <= 1
-  - 0 < risk.max_atr14_pct.value <= 1
-  - 0 < risk.atr_ideal_low.value <= 1
-  - 0 < risk.atr_ideal_high.value <= 1
-  - `atr14_pct` wajib unit fraction (0..1); input percent-point (mis. 1.0 = 1%) dianggap salah unit dan wajib FAIL di validator.
+## E. Unknown-Key Acceptance
 
+**Acceptance Item**
+Unknown root key pada paramset wajib ditolak.
 
-### WS_CT_002 — Missing required key harus FAIL
-- Fixture: [`fixtures/paramset_missing_required_key.json`](fixtures/paramset_missing_required_key.json)
-- Expected fail code: `CF_PARAMSET_MISSING_KEY`
+**Owner Contract**
+- `04_WS_PARAMSET_JSON_CONTRACT.md`
+- `06_WS_PARAMSET_VALIDATOR_SPEC.md`
 
-### WS_CT_003 — Unknown key harus FAIL
-- Fixture: [`fixtures/paramset_unknown_key.json`](fixtures/paramset_unknown_key.json)
-- Expected fail code: `CF_PARAMSET_UNKNOWN_KEY`
+**Supporting Artifacts**
+- `fixtures/paramset_unknown_key.json`
 
-### WS_CT_004 — Type drift harus FAIL
-- Fixture: [`fixtures/paramset_type_drift.json`](fixtures/paramset_type_drift.json)
-- Expected fail code: `CF_PARAMSET_TYPE_DRIFT`
+**Expected Result**
+Payload dengan `unknown_root_key` **must fail validation** dan tidak boleh di-normalisasi diam-diam sebagai paramset valid.
 
-### WS_CT_005 — Missing audit field harus FAIL
-- Fixture: [`fixtures/paramset_missing_audit_field.json`](fixtures/paramset_missing_audit_field.json)
-- Expected fail code: `CF_PARAMSET_AUDIT_SCHEMA_INVALID`
+## F. Audit Object Completeness Acceptance
 
-### WS_CT_006 — Bad enum harus FAIL
-- Fixture: [`fixtures/paramset_bad_enum.json`](fixtures/paramset_bad_enum.json)
-- Expected fail code: `CF_PARAMSET_ENUM_INVALID`
+**Acceptance Item**
+Audit object leaf wajib punya `value`, `origin`, `status`, `bt_target`, `rationale`, `change_triggers`.
 
-### WS_CT_007 — Hash contract violation harus FAIL
-- Fixture: [`fixtures/paramset_bad_hash_contract.json`](fixtures/paramset_bad_hash_contract.json)
-- Expected fail code: `CF_HASH_CONTRACT_VIOLATION`
+**Owner Contract**
+- `04_WS_PARAMSET_JSON_CONTRACT.md`
+- `06_WS_PARAMSET_VALIDATOR_SPEC.md`
 
-### WS_CT_008 — Eval gate invalid harus FAIL
-- Fixture: [`fixtures/paramset_bad_eval.json`](fixtures/paramset_bad_eval.json)
-- Expected fail code: `CF_EVAL_GATE_INVALID`
+**Supporting Artifacts**
+- `fixtures/paramset_missing_audit_field.json`
 
-### WS_CT_009 — PLAN determinism harus PASS
-- Fixtures:
-  - [`fixtures/PLAN_FIXTURE_A_TIES_V1.json`](fixtures/PLAN_FIXTURE_A_TIES_V1.json)
-  - [`fixtures/paramset_valid.json`](fixtures/paramset_valid.json)
-- Assertions:
-  - run PLAN 2x dengan input sama menghasilkan output canonical identik,
-  - `meta.plan_hash` identik,
-  - ranking dan grouping identik.
+**Expected Result**
+Payload tanpa field audit wajib seperti `liquidity.min_dv20_idr.rationale` **must fail validation**; validator tidak boleh mengisi field audit yang hilang secara implisit.
 
-### WS_CT_010 — Confirm isolation / plan immutability harus PASS
-- Fixture: [`fixtures/confirm_immutability_pair.json`](fixtures/confirm_immutability_pair.json)
-- Assertions:
-  - `plan_hash_before == plan_hash_after`
-  - tidak ada mutation pada PLAN persistence scope.
+## G. Type and Enum Acceptance
 
-### WS_CT_011 — Confirm snapshot selection harus PASS
-- Fixture: [`fixtures/confirm_snapshots_two.json`](fixtures/confirm_snapshots_two.json)
-- Assertions:
-  - snapshot terpilih = `captured_at DESC`,
-  - jika tie, `snapshot_id DESC`.
+**Acceptance Item**
+Type drift dan invalid enum wajib ditolak.
 
-### WS_CT_012 — Confirm ignores non-contract fields harus PASS
-- Fixture: [`fixtures/confirm_payload_with_orderbook_fields.json`](fixtures/confirm_payload_with_orderbook_fields.json)
-- Assertions:
-  - output CONFIRM identik dengan dan tanpa non-contract fields,
-  - non-contract fields tidak menghasilkan reason baru,
-  - field di luar kontrak di-ignore.
+**Owner Contract**
+- `04_WS_PARAMSET_JSON_CONTRACT.md`
+- `06_WS_PARAMSET_VALIDATOR_SPEC.md`
 
-### WS_CT_013 — Group semantics rules harus PASS
-- Fixtures:
-  - [`fixtures/plan_items_guard_fail.json`](fixtures/plan_items_guard_fail.json)
-  - [`fixtures/plan_items_forced_watch_only.json`](fixtures/plan_items_forced_watch_only.json)
-- Assertions:
-  - guard fail -> `AVOID`,
-  - forced watch only -> `WATCH_ONLY`,
-  - forced watch only tidak boleh naik menjadi `TOP_PICKS`/`SECONDARY` walau skor tinggi.
+**Supporting Artifacts**
+- `fixtures/paramset_type_drift.json`
+- `fixtures/paramset_bad_enum.json`
 
-### WS_CT_014 — Tie-breaker sort keys harus PASS
-- Fixtures:
-  - [`fixtures/PLAN_FIXTURE_A_TIES_V1.json`](fixtures/PLAN_FIXTURE_A_TIES_V1.json)
-  - atau [`fixtures/plan_items_artificial_ties.json`](fixtures/plan_items_artificial_ties.json)
-- Assertion:
-  - order deterministic sesuai sort keys contract.
+**Expected Result**
+String numerik untuk threshold aktif **must fail** sebagai type drift, dan enum seperti `origin` yang tidak valid **must fail** sebagai enum violation.
 
-### WS_CT_015 — Qualified pools / quantile cutoff contract harus PASS
-- Fixtures:
-  - [`fixtures/PLAN_FIXTURE_A_TIES_V1.json`](fixtures/PLAN_FIXTURE_A_TIES_V1.json)
-  - atau [`fixtures/scored_items_quantile_cutoff.json`](fixtures/scored_items_quantile_cutoff.json)
-- Assertion:
-  - qualified pools dan cutoff sesuai kontrak grouping.
+## H. Hash Contract Acceptance
 
-### WS_CT_016 — BT coverage guard contract harus PASS
-- Fixture: [`fixtures/bt_coverage_guard_minimal.json`](fixtures/bt_coverage_guard_minimal.json)
-- Assertion:
-  - parameter BT tidak boleh lolos tanpa bukti coverage matrix / grid / cutoffs / picks yang sah.
+**Acceptance Item**
+Hash contract Weekly Swing wajib tetap locked pada `order_by`, `null_handling`, dan `scales` yang aktif.
 
-### WS_CT_017 — NO_TRADE hide-all contract harus PASS
-- Fixture: [`fixtures/plan_items_no_trade_hide_all.json`](fixtures/plan_items_no_trade_hide_all.json)
-- Assertions:
-  - `meta.fail_code = "NO_TRADE"`
-  - `meta.fail_reason_codes` memuat `WS_NO_TRADE_ALL_FILTERED`
-  - `items = []`
-  - `meta.plan_hash` sesuai hash payload kosong canonical.
+**Owner Contract**
+- `07_WS_REASON_CODES_AND_HASH.md`
+- `06_WS_PARAMSET_VALIDATOR_SPEC.md`
 
-### WS_CT_017B — NO_TRADE min-eligible contract harus PASS
-- Fixture: [`fixtures/plan_items_no_trade_min_eligible.json`](fixtures/plan_items_no_trade_min_eligible.json)
-- Assertions:
-  - `meta.fail_code = "NO_TRADE"`
-  - `meta.fail_reason_codes = ["WS_NO_TRADE_MIN_ELIGIBLE"]`
-  - `items = []`
-  - `meta.plan_hash` sesuai hash payload kosong canonical.
+**Supporting Artifacts**
+- `fixtures/paramset_bad_hash_contract.json`
+- `fixtures/hash_contract_vectors.json`
 
-### WS_CT_018 — Universe equivalence audit harus PASS
-- Fixture: [`fixtures/universe_equivalence_sample.json`](fixtures/universe_equivalence_sample.json)
-- Expected fail code jika mismatch: `CF_UNIVERSE_EQUIVALENCE_MISMATCH`
+**Expected Result**
+Drift hash contract seperti perubahan `null_handling` menjadi `INCLUDE_IN_HASH_PAYLOAD` atau perubahan scale aktif **must fail** validation / acceptance.
 
-### WS_CT_019 — PLAN universe snapshot export schema harus PASS
-- Fixture: [`fixtures/plan_universe_snapshot_sample.json`](fixtures/plan_universe_snapshot_sample.json)
-- Expected fail code jika invalid: `CF_PLAN_UNIVERSE_SNAPSHOT_SCHEMA_INVALID`
+## I. Confirm Strictness Acceptance
 
-### WS_CT_020 — Eval metrics sufficiency guard harus PASS
-- Fixture: [`fixtures/bt_eval_metrics_minimal.json`](fixtures/bt_eval_metrics_minimal.json)
-- Expected fail code jika kurang: `CF_EVAL_METRICS_INSUFFICIENT`
+**Acceptance Item**
+Unknown top-level field pada payload CONFIRM wajib dianggap schema drift, sedangkan orderbook non-contract fields wajib diabaikan dan tidak memengaruhi decision.
 
-### WS_CT_021 — OOS proof guard harus PASS
-- Fixture: [`fixtures/bt_oos_proof_minimal.json`](fixtures/bt_oos_proof_minimal.json)
-- Expected fail code jika gagal: `CF_OOS_PROOF_FAILED`
+**Owner Contract**
+- `03_WS_DATA_MODEL_MARIADB.md`
+- `10_WS_CONFIRM_OVERLAY.md`
 
-### WS_CT_022 — Artifact reference guard harus PASS
-- Fixture: [`fixtures/artifact_reference_guard_minimal.json`](fixtures/artifact_reference_guard_minimal.json)
-- Expected fail code jika melanggar: `CF_ARTIFACT_REFERENCE_VIOLATION`
+**Supporting Artifacts**
+- `fixtures/confirm_payload_with_unknown_top_level_field.json`
+- `fixtures/confirm_payload_with_orderbook_fields.json`
 
-## 5) Acceptance Rules (LOCKED)
-Satu implementasi Weekly Swing dianggap siap merge hanya jika:
-- semua test di atas ada,
-- semua fixture resmi bisa ditemukan pada path yang disebut,
-- tidak ada fixture phantom,
-- dan semua failure class mengeluarkan fail code/reason code deterministik.
+**Expected Result**
+- payload dengan `unknown_top_level` harus fail dengan `INVALID_SCHEMA_DRIFT`,
+- field `bid1_price`, `ask1_price`, `spread`, dan `orderbook_json` harus diabaikan penuh, tidak masuk contract shape, dan tidak boleh mengubah confirm decision bila elemen kontraktualnya valid.
 
-## 6) Anti-Drift Rule
-Jika ada kontrak baru yang membutuhkan fixture baru:
-- file fixture fisik wajib ditambahkan pada [`fixtures/`](fixtures/README.md),
-- dokumen [`_refs/WS_FIXTURE_INVENTORY.md`](_refs/WS_FIXTURE_INVENTORY.md) wajib diupdate,
-- dan inventory test pada dokumen ini wajib diperbarui pada commit yang sama.
+## J. Promote Procedure Acceptance
 
-## Reference
-- [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)
-- [`_refs/WS_FIXTURE_INVENTORY.md`](_refs/WS_FIXTURE_INVENTORY.md) — inventaris referensi fixture; bukan sumber aturan utama
-- [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md)
-- [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md)
+**Acceptance Item**
+Promote / activate paramset Weekly Swing wajib mengikuti preconditions, lock semantics, dan OOS gate aktif.
+
+**Owner Contract**
+- `20_WS_CANONICAL_PARAMSET_PROCEDURES.md`
+
+**Supporting Artifacts**
+- `db/PROMOTE_PARAMSET.sql`
+
+**Expected Result**
+Promote **must be accepted only if** target paramset `DRAFT`, policy-scoped lock berhasil diperoleh, existing `ACTIVE` dideprecate, target dipromote menjadi `ACTIVE`, OOS gate aktif lolos, dan lock dilepas / rollback dijalankan sesuai hasil prosedur.
+
+## K. Policy Identifier Parity
+
+**Acceptance Item**
+Identifier strategy harus konsisten antara canonical internal policy code dan runtime / display label.
+
+**Owner Contract**
+- `03_WS_DATA_MODEL_MARIADB.md`
+- `04_WS_PARAMSET_JSON_CONTRACT.md`
+- `20_WS_CANONICAL_PARAMSET_PROCEDURES.md`
+
+**Supporting Artifacts**
+- runtime examples PLAN / CONFIRM
+- active paramset example
+
+**Expected Result**
+`policy_code = WS` **must be treated as** canonical internal policy code, sedangkan `meta.policy = WEEKLY_SWING` **must be treated as** runtime / display label untuk strategy yang sama; perbedaan ini tidak boleh dianggap drift kontrak.
+
+## Final Acceptance Rule
+
+Implementasi Weekly Swing hanya dapat dianggap sesuai spesifikasi jika seluruh acceptance item yang relevan terhadap area perubahan lolos tanpa membuat kontrak ganda, schema drift, atau perpindahan ownership ke examples, fixtures, atau SQL artifacts.

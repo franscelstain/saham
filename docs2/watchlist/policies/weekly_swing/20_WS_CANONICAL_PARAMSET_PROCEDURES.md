@@ -1,115 +1,120 @@
-# 20 — Canonical ParamSet Procedures — Weekly Swing
+# 20 — Weekly Swing Canonical Paramset Procedures
 
 ## Purpose
-Menetapkan cara:
-- memilih ACTIVE param_set WS secara deterministik
-- mempromosikan param_set WS sambil menjaga auditability (plan_run menyimpan param_set_id)
 
-Rule (LOCKED):
-Paramset hasil kalibrasi tidak boleh dipromote menjadi ACTIVE tanpa OOS proof yang lulus sesuai:
-[`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`](17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md).
+Dokumen ini adalah owner normatif untuk prosedur canonical pemilihan, validasi, promosi, dan aktivasi paramset Weekly Swing.
 
-Tanpa OOS proof, paramset hanya boleh berstatus DRAFT.
+## Scope
 
-## Prerequisites
-### Weekly Swing
-- 19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md
-- 17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md
+Dokumen ini mengunci:
 
-## Inputs
-- watchlist_param_sets
-- params_json WS (validator pass)
-- contoh paramset ACTIVE (non-normatif): [`db/PARAMSET_WS_ACTIVE_EXAMPLE.json`](db/PARAMSET_WS_ACTIVE_EXAMPLE.json)
-- lock mechanism GET_LOCK
-- OOS proof storage: `watchlist_bt_oos_eval_ws`
+- preconditions promote / activate,
+- validation gates yang wajib lolos,
+- status transition canonical,
+- postconditions yang wajib benar setelah promote,
+- dan relationship ke SQL artifact yang merealisasikan prosedur teknis.
 
-## Process
+## Ownership Rule
 
-### 1) Canonical query: ambil ACTIVE param_set WS
-```sql
-SELECT *
-FROM watchlist_param_sets
-WHERE policy_code = 'WS'
-  AND status = 'ACTIVE'
-ORDER BY updated_at DESC, param_set_id DESC
-LIMIT 1;
-```
+`db/PROMOTE_PARAMSET.sql` merealisasikan prosedur yang ditetapkan di dokumen ini. SQL artifact tidak menjadi owner preconditions, gate semantics, atau postconditions.
 
-Wajib cek:
-- policy_version match
-- validator WS pass (lihat [`06_WS_PARAMSET_VALIDATOR_SPEC.md`](06_WS_PARAMSET_VALIDATOR_SPEC.md))
+## A. Promotion Preconditions
 
-### 2) Lifecycle status (LOCKED)
-- DRAFT: kandidat (boleh dibuat/diupdate), belum boleh dipakai live
-- ACTIVE: dipakai live
-- DEPRECATED: tidak dipakai lagi (audit)
+Sebelum promote dijalankan, kondisi berikut wajib benar:
 
-Rule (LOCKED):
-- Hanya boleh ada 1 ACTIVE untuk `policy_code='WS'` pada waktu tertentu.
+1. target paramset berada pada `policy_code = WS` sebagai canonical internal policy code untuk Weekly Swing,
+2. target paramset memakai `policy_version` yang relevan untuk run Weekly Swing,
+3. target row ada,
+4. target status adalah `DRAFT`.
 
-### 3) Promotion atomic (WS)
-Sebelum promote ke ACTIVE, wajib lolos gate ini:
+Jika salah satu kondisi ini tidak terpenuhi, promote wajib gagal.
 
-Checklist gate (LOCKED):
-1) Pastikan OOS proof tersedia untuk hasil kalibrasi terkait (lihat [`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`](17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md)).
-2) Pastikan ada record di watchlist_bt_oos_eval_ws yang relevan untuk param hasil kalibrasi.
+## B. Concurrency Lock
 
-Rule (LOCKED): definisi "record OOS yang relevan"
-Record OOS dianggap relevan hanya jika memenuhi:
-- policy_code = 'WS'
-- policy_version sama dengan policy_version paramset yang akan dipromote
-- eval_model sama dengan eval_model yang dipakai saat menghasilkan bt_eval/OOS
-- window IS/OOS match (from_date_is/to_date_is dan from_date_oos/to_date_oos) terhadap run kalibrasi
-- param_id_best_is sama dengan param_id hasil pemilihan best param untuk kalibrasi tersebut
+Promote canonical wajib memakai policy-scoped lock untuk mencegah promote paralel yang saling menimpa.
 
-Jika tidak bisa melakukan match ini secara deterministik, proses promote wajib menerima `oos_id`
-sebagai input dan memverifikasi semua kondisi di atas terhadap row tersebut.
+SQL artifact saat ini merealisasikan lock tersebut dengan primitive `GET_LOCK` dan `RELEASE_LOCK`, memakai lock name:
+- `WS:PARAMSET`
 
-3) Pastikan metrik OOS memenuhi acceptance criteria (lihat [`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`](17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md)).
+dan timeout lock:
+- `10` detik.
 
-Jika salah satu gagal:
-- proses promote harus abort
-- status paramset tetap DRAFT
-- dilarang promote ACTIVE
+Jika lock tidak diperoleh, promote wajib gagal dan tidak boleh lanjut ke status transition.
 
-Langkah (transactional, LOCKED):
-1) Validate `params_json` (app-layer) + `policy_version` match
-2) Tentukan `target_param_set_id`, `target_bt_param_id`, dan identitas OOS proof (`oos_id` atau tuple deterministic yang setara)
-3) Jalankan Gate OOS proof (section 3) dan pastikan record OOS memang milik `target_bt_param_id` yang menjadi asal parameter BT pada paramset target
-4) `GET_LOCK('WS:PARAMSET', 10)` dan **cek hasil lock = 1**; jika tidak, abort
-5) `START TRANSACTION`
-6) Deprecate current ACTIVE (jika ada)
-7) Promote target `param_set_id` -> ACTIVE
-8) `COMMIT`
-9) `RELEASE_LOCK`
+## C. Required Validation Gate Before Promote
 
-Rule (LOCKED):
-- Jika gagal di langkah mana pun setelah lock diperoleh, wajib `ROLLBACK` dan `RELEASE_LOCK`.
-- Deprecate dan Promote harus berada dalam 1 transaksi yang sama.
-- SQL util script tidak boleh mengabaikan hasil `GET_LOCK`.
-- Promote tanpa OOS proof yang lolos adalah invalid meskipun SQL update berhasil.
-- `param_set_id` (row aktif di `watchlist_param_sets`) **bukan** `param_id_best_is` (row di `watchlist_bt_param_grid`); keduanya tidak boleh disamakan.
+Promote canonical Weekly Swing mensyaratkan OOS proof yang lolos acceptance gate berikut:
 
-Catatan:
-- Fail codes dictionary global ada di: ../../db/04_DB_SEED_GLOBAL.sql
+- `picks_count_oos > 0`
+- `avg_ret_net_top_oos > 0`
+- `median_ret_net_top_oos >= 0`
+- `month_win_rate_min_oos >= 0.45`
+- `p25_ret_net_top_oos >= -0.03`
 
-## Outputs
-- Hanya 1 ACTIVE paramset WS pada waktu tertentu.
-- Paramset ACTIVE selalu memiliki OOS proof lulus.
+Selain itu, OOS proof yang dicek harus cocok terhadap:
 
-## Failure modes
-- lock timeout → abort
-- invalid json / policy_version mismatch / validator fail → abort
-- OOS proof missing / tidak lulus → abort
-- error DB → rollback + release lock
+- `policy_code = WS`
+- `policy_version` target
+- `param_id_best_is = target BT param id`
+- `oos_id = target OOS id`
 
-## Reference
-- [`db/PARAMSET_WS_ACTIVE_EXAMPLE.json`](db/PARAMSET_WS_ACTIVE_EXAMPLE.json) (contoh paramset ACTIVE untuk bootstrap/dev; bukan kontrak)
-- [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md)
+Jika gate ini tidak lolos, promote wajib gagal dan target tidak boleh menjadi `ACTIVE`.
 
-## Next
-### Weekly Swing
-Selesai.
-### Action
-- db/PROMOTE_PARAMSET.sql
-- db/REASON_CODES_SEED.sql
+## D. Canonical Status Transition
+
+Status transition canonical Weekly Swing saat promote adalah:
+
+1. existing paramset `ACTIVE` untuk `policy_code = WS` diubah menjadi `DEPRECATED`,
+2. target paramset `DRAFT` diubah menjadi `ACTIVE`.
+
+Tidak boleh ada hasil akhir di mana lebih dari satu paramset untuk `policy_code = WS` tetap `ACTIVE` akibat promote yang sama.
+
+## E. Postconditions
+
+Setelah promote sukses, kondisi berikut wajib benar:
+
+- tepat satu target row berhasil dipromote menjadi `ACTIVE`,
+- tidak ada lebih dari satu row `ACTIVE` yang tersisa untuk `policy_code = WS`,
+- existing `ACTIVE` lama telah diturunkan menjadi `DEPRECATED`,
+- transaction committed,
+- lock dilepas melalui `RELEASE_LOCK`.
+
+Jika target row tidak benar-benar terpromote, prosedur wajib dianggap gagal.
+
+## F. Failure Handling
+
+Jika terjadi exception SQL atau salah satu gate gagal:
+
+- transaction wajib rollback,
+- lock wajib dilepas melalui `RELEASE_LOCK`,
+- target tidak boleh dianggap promoted.
+
+## G. Relationship to JSON Contract and Validator
+
+Promote canonical harus dibaca bersama:
+
+- `04_WS_PARAMSET_JSON_CONTRACT.md`
+- `06_WS_PARAMSET_VALIDATOR_SPEC.md`
+
+Shape paramset dan validitas paramset adalah precondition normatif bagi lifecycle promote / activate ini.
+
+## H. Policy Identifier Parity
+
+Untuk parity lintas dokumen dan artifacts, `policy_code = WS` adalah canonical internal policy code yang dipakai oleh paramset dan procedure artifacts. Runtime outputs dapat memakai `meta.policy = WEEKLY_SWING` sebagai runtime / display label untuk strategy yang sama. Perbedaan ini tidak boleh dianggap drift kontrak selama semantics strategy-nya tetap sama.
+
+## I. Relationship to SQL Artifact
+
+`db/PROMOTE_PARAMSET.sql` adalah implementation artifact yang saat ini merealisasikan:
+
+- lock acquisition,
+- DRAFT-only target validation,
+- OOS acceptance gate,
+- ACTIVE -> DEPRECATED transition,
+- DRAFT -> ACTIVE promotion,
+- rollback / release-lock failure handling.
+
+Jika SQL artifact berbeda dari dokumen ini, dokumen ini selalu menang dan SQL artifact harus diperbarui.
+
+## Final Procedure Rule
+
+Tidak ada paramset yang boleh dianggap canonically promoted atau canonically active bila status tersebut tidak dapat ditelusuri ke preconditions, validation gates, status transitions, dan postconditions yang ditetapkan secara normatif di dokumen ini.

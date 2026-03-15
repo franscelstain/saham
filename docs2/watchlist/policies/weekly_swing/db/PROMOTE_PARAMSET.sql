@@ -1,3 +1,14 @@
+-- Implementation artifact for canonical Weekly Swing paramset promotion.
+-- Normative procedure owner:
+-- docs/watchlist/policies/weekly_swing/20_WS_CANONICAL_PARAMSET_PROCEDURES.md
+-- Related contract owners:
+-- docs/watchlist/policies/weekly_swing/04_WS_PARAMSET_JSON_CONTRACT.md
+-- docs/watchlist/policies/weekly_swing/06_WS_PARAMSET_VALIDATOR_SPEC.md
+--
+-- This SQL file realizes the promotion flow defined by normative policy documents.
+-- It does not become the owner of business-rule semantics, validation ownership,
+-- or activation requirements.
+
 -- PROMOTE_PARAMSET.sql
 -- Util script khusus WS untuk promosi param_set.
 -- Validasi JSON tetap wajib di app layer, tetapi script ini juga menjaga gate OOS minimum.

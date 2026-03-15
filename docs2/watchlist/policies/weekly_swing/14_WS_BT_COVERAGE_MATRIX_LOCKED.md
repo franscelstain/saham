@@ -1,6 +1,9 @@
 # 14 — WS BT Coverage Matrix (LOCKED)
 
 ## Purpose
+
+Dokumen ini mengunci coverage proof antara parameter runtime WS dan bukti BT yang sah; dokumen ini bukan registry parameter dan bukan validator.
+
 Mengunci definisi coverage minimum untuk parameter Weekly Swing yang berasal dari backtest (`origin = BT`) agar setiap parameter BT yang dipakai runtime punya bukti artefak kalibrasi yang nyata, dapat diaudit, dan dapat dilacak ke grid / cutoffs / picks.
 
 ## Scope
@@ -23,6 +26,9 @@ Dokumen ini tidak mengganti algorithm scoring, validator, atau sufficiency gate 
 - [`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`](18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md)
 
 ## 1) Rule of Coverage (LOCKED)
+
+Jika sebuah parameter belum memiliki coverage proof, status parameter tersebut tidak otomatis invalid secara schema, tetapi tidak boleh diklaim sebagai BT-backed tanpa pengecualian terdokumentasi.
+
 Setiap parameter dengan `origin = BT` yang dipakai runtime wajib memiliki bukti minimal berikut:
 1. parameter itu muncul pada grid / evaluasi yang resmi,
 2. artefak hasilnya dapat ditelusuri ke cutoffs/picks/eval yang sah,
@@ -43,6 +49,9 @@ Catatan:
 - dokumen ini hanya menjelaskan relasi coverage-nya.
 
 ## 3) Coverage Matrix Minimum (LOCKED)
+
+Ownership daftar key canonical tetap berada pada file 05; dokumen ini hanya memetakan coverage evidencenya.
+
 Setiap parameter BT yang memengaruhi runtime harus punya row coverage matrix dengan kolom minimal berikut:
 - `param_key`
 - `origin`

@@ -1,71 +1,120 @@
 # 19 — WS Deprecated / Non-scope Artifacts Ledger (LOCKED)
 
 ## Purpose
-Mencatat artefak, istilah, atau nama objek yang pernah muncul pada diskusi/versi lama tetapi **bukan** artefak resmi Weekly Swing dalam paket dokumen final ini.
 
-Ledger ini mencegah artefak lama ikut terbawa seolah-olah masih aktif.
+Dokumen ini adalah ledger untuk artefak Weekly Swing yang berstatus deprecated, non-scope, atau historical reference dan tidak berada dalam allowlist artefak resmi strategy.
+
+Ledger ini mencegah artefak lama, istilah lama, atau objek diskusi lama ikut terbawa seolah-olah masih aktif dalam paket dokumen final Weekly Swing.
 
 ## Scope
+
 Dokumen ini berlaku untuk:
+
 - nama tabel lama,
 - export lama,
 - istilah artefak yang tidak masuk manifest resmi,
-- dan artefak diskusi yang tidak punya schema/kontrak final.
+- dan artefak diskusi yang tidak memiliki schema atau kontrak final yang aktif.
 
-## Inputs
-- artefak yang pernah disebut pada versi lama,
-- hasil audit referensi silang,
-- manifest artefak resmi WS.
+## Prerequisite
 
-## Outputs
-- daftar artefak non-scope/deprecated,
-- status default artefak yang tidak ada di manifest,
-- rule penggunaan ulang artefak lama.
-
-## Prerequisites
 - [`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`](18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md)
 
-## 1) Default Rule (LOCKED)
-Artefak yang tidak tercantum pada manifest resmi file 18 memiliki status default:
+## Default Rule (LOCKED)
+
+Ketiadaan nama artefak pada manifest resmi file 18 cukup untuk menjadikannya `NON_SCOPE`, tanpa keputusan tambahan.
+
+Artefak yang tidak tercantum pada manifest resmi memiliki status default:
+
 - `NON_SCOPE`
 
-Status default ini berlaku sampai artefak tersebut:
-- ditambahkan resmi ke manifest,
-- diberi schema/kontrak,
-- dan dijelaskan flow pembentukan + konsumennya.
+Status default ini tetap berlaku sampai artefak tersebut:
 
-## 2) Official Non-scope / Deprecated Items
+1. ditambahkan resmi ke manifest,
+2. memiliki schema atau kontrak yang sah,
+3. memiliki flow pembentukan yang jelas,
+4. dan memiliki consumer yang jelas.
 
-### A) `watchlist_bt_dataset_ws`
-- status: `NON_SCOPE`
-- alasan: tidak ada schema resmi final pada paket dokumen ini dan tidak dibutuhkan oleh flow calibration/final proof yang dikunci saat ini.
+## Item Format
 
-### B) `coverage_matrix_export.json`
-- status: `NON_SCOPE` sebagai artefak produksi resmi
-- alasan: coverage matrix di-govern oleh dokumen kontrak dan fixture, bukan oleh export file produksi baku.
+Setiap item pada ledger ini harus dibaca dengan format berikut:
 
-### C) Nama artefak lain yang tidak ada di manifest file 18
-- status default: `NON_SCOPE`
-- alasan: belum punya izin resmi untuk dipakai sebagai artefak WS final.
+- **Artifact**
+- **Status**
+- **Reason**
+- **Replacement Owner (if any)**
 
-## 3) Re-activation Rule (LOCKED)
-Artefak non-scope hanya boleh dipakai kembali jika semua syarat berikut dipenuhi:
+## Official Deprecated / Non-scope Items
+
+### Artifact
+`watchlist_bt_dataset_ws`
+
+**Status**  
+`NON_SCOPE`
+
+**Reason**  
+Tidak ada schema resmi final pada paket dokumen ini dan tidak dibutuhkan oleh flow calibration atau final proof yang dikunci saat ini.
+
+**Replacement Owner (if any)**  
+Tidak ada.
+
+---
+
+### Artifact
+`coverage_matrix_export.json`
+
+**Status**  
+`NON_SCOPE` sebagai artefak produksi resmi
+
+**Reason**  
+Coverage matrix di-govern oleh dokumen kontrak dan fixtures, bukan oleh export file produksi baku.
+
+**Replacement Owner (if any)**  
+Dokumen coverage dan artefak normatif yang relevan.
+
+---
+
+### Artifact
+Nama artefak lain yang tidak ada di manifest file 18
+
+**Status**  
+`NON_SCOPE` (default)
+
+**Reason**  
+Belum memiliki izin resmi untuk dipakai sebagai artefak final Weekly Swing.
+
+**Replacement Owner (if any)**  
+Belum ada sampai artefak tersebut masuk manifest resmi dan memiliki owner normatif yang jelas.
+
+## Re-activation Rule (LOCKED)
+
+Re-activation tidak boleh dilakukan hanya dengan menambahkan referensi silang. Artefak hanya boleh dipakai kembali jika seluruh syarat berikut terpenuhi:
+
 1. ditambahkan ke manifest resmi ([`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`](18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md)),
-2. punya schema/kontrak yang sah,
-3. dijelaskan bagaimana artefak itu dibentuk,
+2. memiliki schema atau kontrak yang sah,
+3. dijelaskan bagaimana artefak dibentuk,
 4. dijelaskan siapa konsumennya,
-5. dan semua referensi lama yang ambigu diperbarui.
+5. dan semua referensi lama yang ambigu telah diperbarui.
 
 Jika syarat ini belum lengkap, artefak tersebut tetap non-scope.
 
-## 4) Parity Failure Rule (LOCKED)
-Jika sebuah prosedur, evidence rule, promote rule, atau worked example menyebut artefak non-scope seolah-olah wajib/resmi, maka kondisi itu dianggap:
+## Parity Failure Rule (LOCKED)
+
+Jika sebuah procedure, evidence rule, promote rule, worked example, atau dokumen lain menyebut artefak non-scope seolah-olah wajib atau resmi, kondisi tersebut dianggap:
+
 - `ARTIFACT_REFERENCE_VIOLATION`
 
-## 5) Relationship with Manifest
+## Relationship with Manifest
+
+Jika terjadi konflik antara ledger ini dan manifest, manifest resmi adalah allowlist yang menang untuk status aktif artefak.
+
 - Manifest (file 18) adalah allowlist resmi.
-- Ledger ini adalah daftar penolakan/default non-scope.
+- Ledger ini adalah daftar penolakan / default non-scope.
 - Sebuah artefak tidak boleh berada di dua status sekaligus.
 
+## Final Rule
+
+Artefak yang berada pada ledger ini tidak boleh diperlakukan sebagai artefak aktif Weekly Swing sampai statusnya diubah secara normatif melalui manifest resmi dan owner kontrak yang relevan.
+
 ## Next
+
 - [`20_WS_CANONICAL_PARAMSET_PROCEDURES.md`](20_WS_CANONICAL_PARAMSET_PROCEDURES.md)

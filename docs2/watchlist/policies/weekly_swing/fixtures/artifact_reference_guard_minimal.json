@@ -2,7 +2,7 @@
   "fixture_id": "WS_ARTIFACT_REFERENCE_GUARD_MINIMAL_V3",
   "policy_code": "WS",
   "base_path_locked": "watchlist/policies/weekly_swing/fixtures/",
-  "rules_locked": [
+  "contract_reference_excerpt": [
     "Referensi artifact produksi wajib ada pada manifest resmi WS atau pada daftar fixture evidence yang eksplisit di file ini.",
     "Artifact name wajib sesuai allowlist dan scope policy.",
     "Jika artifact mengandung param_id, maka param_id wajib match dengan paramset/evidence yang mengklaimnya.",

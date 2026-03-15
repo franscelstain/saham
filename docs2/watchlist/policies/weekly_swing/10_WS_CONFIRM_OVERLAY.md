@@ -1,171 +1,139 @@
-# 10 — CONFIRM Overlay (Intraday Snapshot) — Weekly Swing
-
-> **Status:** LOCKED (Normative)
-> **Doc Role:** WS CONFIRM overlay contract
-
+# 10 — Weekly Swing CONFIRM Overlay
 
 ## Purpose
-Menetapkan CONFIRM sebagai **pengecekan keyakinan** berbasis **intraday snapshot manual** yang:
 
-- **tidak boleh mengubah PLAN** (PLAN immutability),
-- **tidak mengklaim real-time** (snapshot = sumber kebenaran CONFIRM),
-- otomatis **tidak sah** (EXPIRED) jika snapshot melewati TTL,
-- memaksa output yang **tidak bisa diperdebatkan**: benar/salahnya CONFIRM hanya ditentukan oleh **snapshot yang diinput** dan **usia snapshot**.
+Dokumen ini adalah owner normatif untuk behavior CONFIRM overlay Weekly Swing. Dokumen ini menetapkan bagaimana watchlist mengevaluasi snapshot intraday terhadap hasil PLAN yang sudah final tanpa mengubah PLAN tersebut.
 
+## Scope
 
-## Contract Strictness — LOCKED
+Dokumen ini mengunci:
 
-CONFIRM menerima payload snapshot intraday sebagai **input deterministik**. Untuk mencegah drift, aturan ketat berikut berlaku:
+- boundary CONFIRM terhadap PLAN,
+- input snapshot yang dipakai oleh CONFIRM,
+- rule evaluasi overlay per ticker,
+- output semantics label CONFIRM,
+- dan relationship terhadap data model, snapshot tables, dan acceptance tests.
 
-### 1) Unknown/extra fields
-- **Top-level unknown fields** (di luar kontrak) ⇒ **FAIL (INVALID_SCHEMA_DRIFT)**.
-- **Item-level unknown fields** (di dalam `items[]`) ⇒ **IGNORE** *tanpa efek ke keputusan*, tetapi **wajib dicatat** dalam output `confirm_meta.ignored_fields_by_item[]`.
+Dokumen ini tidak menetapkan kontrak publication, readiness, atau validity upstream.
 
-> Alasan: top-level drift berisiko mengubah arti payload secara global; sedangkan item-level “noise” seperti orderbook boleh lewat agar integrasi tidak rapuh, selama benar-benar tidak mempengaruhi keputusan.
+## Boundary to PLAN
 
-### 2) Non-contract “orderbook fields”
-Field seperti `bid1_price`, `ask1_price`, `spread`, `orderbook_json` **selalu dianggap non-contract** dan **harus diabaikan** (tidak boleh masuk perhitungan apapun).
-Fixture referensi: `fixtures/confirm_payload_with_orderbook_fields.json`.
+CONFIRM adalah tahap downstream yang berdiri di atas hasil PLAN yang sudah final.
 
-### 3) Logging minimum
-Output CONFIRM **wajib** memuat:
-- `confirm_meta.snapshot_captured_at`
-- `confirm_meta.snapshot_age_seconds`
-- `confirm_meta.ttl_seconds`
-- `confirm_meta.is_expired`
-- `confirm_meta.ignored_fields_by_item[]` (jika ada)
+Rule (LOCKED):
+- CONFIRM tidak boleh mengubah `rank`, `group_semantic`, `score_total`, `levels.*`, `flags.*`, atau `reasons[]` milik PLAN.
+- CONFIRM hanya menghasilkan keputusan overlay terpisah dengan shape runtime yang mengikuti `03_WS_DATA_MODEL_MARIADB.md`.
+- Invariant pair dan write-scope tetap mengikuti `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`.
 
-## Prerequisites
-- 09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md
+## Upstream Boundary
 
----
+Dokumen ini mengasumsikan bahwa input intraday atau snapshot yang dipakai watchlist telah tersedia bagi consumer sesuai kontrak authoritative pada domain `market_data`.
 
-## Inputs (LOCKED)
+Dokumen ini tidak mendefinisikan ulang:
 
-### A) PLAN
-- `plan_run_id` untuk `trade_date = T`
-- `plan_items[]` (ranking, group_semantic, score_total, reasons PLAN)
+- publication contract upstream,
+- readiness contract upstream,
+- validity contract upstream,
+- atau semantics asli data upstream yang dikonsumsi.
 
-### B) CONFIRM snapshot (manual, dari DB)
-Snapshot berasal dari tabel:
+Dokumen ini hanya menetapkan logic overlay Weekly Swing yang diterapkan di atas snapshot watchlist-owned atau input downstream-ready yang sudah tersedia.
+
+## Input Contract for CONFIRM
+
+Input persistence yang dipakai CONFIRM adalah representasi snapshot milik watchlist pada:
+
 - `watchlist_confirm_snapshots`
 - `watchlist_confirm_snapshot_items`
 
-**Kolom wajib per ticker** dan contoh data wajib mengikuti:
-- 11_WS_INTRADAY_SNAPSHOT_TABLES.md
+Owner persistence semantics untuk tabel di atas berada pada `11_WS_INTRADAY_SNAPSHOT_TABLES.md`.
 
-### C) Timestamps
-- `captured_at` (diisi manual)
-- `inserted_at` (otomatis)
-- `checked_at` (waktu CONFIRM dijalankan)
+Field input minimum yang relevan untuk overlay adalah:
 
-**LOCKED anti-manipulasi:**
-- `effective_captured_at = LEAST(captured_at, inserted_at)`
+- header snapshot: `snapshot_id`, `trade_date`, `captured_at`, `inserted_at`, `source`
+- item snapshot: `ticker_code`, `last_price`, `chg_pct`, `volume_shares`, `turnover_idr`
+- context runtime: `checked_at`
+- context PLAN: kandidat PLAN yang sedang dievaluasi beserta `levels.entry_ref`, `levels.entry_band_low`, `levels.entry_band_high`
 
-**Contoh (LOCKED):**
-- `captured_at=09:30`, `inserted_at=10:10` ⇒ `effective_captured_at=09:30` (snapshot bisa **EXPIRED** walau baru diinput jam 10:10).
+Rule (LOCKED):
+- `effective_captured_at = LEAST(captured_at, inserted_at)` dipakai sebagai acuan umur snapshot.
+- `snapshot_age_sec = TIMESTAMPDIFF(SECOND, effective_captured_at, checked_at)`.
+- Jika snapshot tidak ditemukan untuk run CONFIRM yang dimaksud, hasil per ticker yang terdampak wajib `label = DELAY` dengan reason `WS_SNAPSHOT_MISSING`.
+- Jika `snapshot_age_sec > confirm_overlay.snapshot_max_age_sec`, hasil per ticker yang terdampak wajib `label = DELAY` dengan reason `WS_STALE`.
 
----
+## Overlay Evaluation Steps
 
-## Validity & TTL (LOCKED)
+### A. Candidate Binding
 
-### TTL CONFIRM (Weekly Swing)
-- `snapshot_max_age_sec = 900` (**15 menit**)
+**Purpose**  
+Mengikat item snapshot ke kandidat PLAN yang sedang dievaluasi.
 
-Hitung:
-- `snapshot_age_sec = checked_at - effective_captured_at`
+**Rule (LOCKED)**  
+- Binding identity akhir dilakukan dengan `ticker_code` / ticker runtime (`ticker`) yang mereferensikan kandidat PLAN yang sama.
+- Snapshot untuk ticker yang tidak termasuk kandidat PLAN tidak membentuk kandidat CONFIRM baru.
+- CONFIRM tidak boleh memperluas universe PLAN.
 
-Aturan:
-- Jika `snapshot_age_sec > snapshot_max_age_sec` (LOCKED: 900 detik) → snapshot **EXPIRED** → output CONFIRM **wajib**:
-  - `label = DELAY`
-  - reason code wajib: `WS_STALE`
-  - karena ini kondisi snapshot-level, seluruh item hasil CONFIRM pada run tersebut wajib berlabel `DELAY`
-- Jika tidak ada snapshot → `label = DELAY`, reason code wajib: `WS_SNAPSHOT_MISSING`
-- LOCKED: `NO_TRADE` bukan label CONFIRM. `NO_TRADE` hanya berlaku untuk status run PLAN/global selection, sedangkan label CONFIRM hanya boleh `CONFIRMED`, `NEUTRAL`, `CAUTION`, atau `DELAY`.
+**Outputs**  
+Pasangan `(plan_item, snapshot_item)` atau state `snapshot missing`.
 
-**LOCKED:** snapshot yang diambil masa lalu tapi baru diinput sekarang **tetap sah sebagai snapshot**, namun bisa menjadi **EXPIRED** karena TTL.
+### B. Snapshot Freshness Gate
 
----
+**Purpose**  
+Memastikan snapshot masih layak dipakai.
 
-## Output Model (LOCKED)
+**Rule (LOCKED)**  
+- Freshness dihitung dari `effective_captured_at`, bukan dari `captured_at` saja jika `inserted_at` lebih awal.
+- TTL canonical mengikuti paramset active: `confirm_overlay.snapshot_max_age_sec`.
+- Snapshot yang stale atau missing menghasilkan `DELAY` dan menghentikan evaluasi yang membutuhkan snapshot valid.
 
-CONFIRM menghasilkan output **terpisah** dari PLAN. Kontrak output final API/UI yang bersifat normatif dikunci oleh dokumen bernomor Weekly Swing ini; [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md) hanya menjadi referensi contoh output dan quick shape guide, dan tidak boleh diperlakukan sebagai sumber aturan utama.
+**Outputs**  
+Status snapshot valid / stale / missing beserta reason code terkait.
 
-Bentuk minimum output final:
-- `meta`:
-  - `policy`
-  - `checked_at`
-  - `snapshot_ts`
-  - `snapshot_age_sec`
-  - `source.snapshot_id`
-- `items[]`:
-  - `ticker`
-  - `label` (`CONFIRMED` / `NEUTRAL` / `CAUTION` / `DELAY`)
-  - `reasons[]`:
-    - `code`
-    - `severity`
-    - `message`
-    - `payload`
-- `summary`:
-  - `confirmed_count`
-  - `neutral_count`
-  - `caution_count`
-  - `delay_count`
+### C. Drift Evaluation
 
-Catatan (LOCKED):
-- Field PLAN seperti `group_semantic`, `score_total`, `entry_ref`, atau ranking boleh dipakai **sebagai input evaluasi**, tetapi **tidak boleh** ditambahkan ke item output final CONFIRM kecuali schema runtime resmi diubah.
-- Nama field final yang sah hanya `ticker`, `label`, dan `reasons[]` pada level item.
+**Purpose**  
+Menilai apakah harga snapshot masih berada pada deviasi yang dapat diterima terhadap level entry PLAN.
 
----
+**Rule (LOCKED)**  
+- Acuan drift dihitung terhadap `levels.entry_ref` milik PLAN.
+- Batas drift mengikuti `confirm_overlay.max_drift_from_entry_pct` dari paramset aktif.
+- Dokumen ini menetapkan kebutuhan bahwa drift harus dievaluasi secara deterministik; rincian field output runtime tetap mengikuti `03_WS_DATA_MODEL_MARIADB.md` dan acceptance-nya mengikuti `13_WS_CONTRACT_TEST_CHECKLIST.md`.
+- Field non-contract seperti order-book ladder tidak boleh memengaruhi keputusan drift.
 
-## PLAN Immutability (LOCKED Invariant)
+**Outputs**  
+Reason overlay yang menjelaskan apakah snapshot masih within-band atau sudah drift terlalu jauh.
 
-CONFIRM **dilarang**:
-- mengubah record PLAN
-- mengubah ranking PLAN
-- mengubah `score_total`
-- mengubah `group_semantic`
-- mengganti top picks / secondary
+### D. Confirm Label Resolution
 
-Cara enforce (wajib ada di test/contract):
-- `plan_hash_before == plan_hash_after`
-- jumlah item PLAN tidak berubah
-- urutan ranking PLAN tidak berubah
+**Purpose**  
+Menetapkan label final CONFIRM untuk setiap item.
 
----
+**Rule (LOCKED)**  
+Label runtime CONFIRM yang resmi adalah:
+- `CONFIRMED`
+- `NEUTRAL`
+- `CAUTION`
+- `DELAY`
 
-## Snapshot Storage Rules (LOCKED)
+Aturan minimum label resolution:
+- `DELAY` dipakai bila snapshot missing atau stale.
+- Label selain `DELAY` hanya boleh dipakai bila snapshot valid dan evaluasi overlay selesai dijalankan.
+- Implementasi tidak boleh membuat label runtime baru tanpa pembaruan normatif pada dokumen owner Weekly Swing yang relevan.
 
-- Snapshot bersifat **append-only** (UPDATE/DELETE dilarang).
-- Jika input ulang snapshot untuk ticker yang sama, buat **snapshot baru** (snapshot_id baru).
-- Snapshot CONFIRM memakai **intraday aggregate** (last_price/chg_pct/volume_shares/turnover_idr). Order book ladder **bukan** input keputusan CONFIRM.
+**Outputs**  
+`label` dan `reasons[]` per ticker pada runtime output CONFIRM.
 
----
+## Strictness Boundary
 
-## Execution Steps (reference)
+Rule (LOCKED):
+- Unknown top-level field pada payload/runtime CONFIRM dianggap schema drift.
+- Field input non-contract yang bersifat orderbook-specific seperti `bid1_price`, `ask1_price`, `spread`, atau `orderbook_json` boleh hadir pada input/fixture, tetapi harus diabaikan penuh dan tidak boleh mengubah keputusan overlay.
 
-1) Load PLAN untuk `trade_date=T`
-2) Load snapshot terbaru untuk `(policy_code='WS', trade_date=T)` dengan urutan:
-   - `captured_at DESC`, lalu tie-breaker `snapshot_id DESC` (LOCKED)
-3) Hitung `snapshot_age_sec = checked_at - effective_captured_at`
-4) Jika `snapshot_age_sec > snapshot_max_age_sec` → hasilkan `label = DELAY` + `WS_STALE`
-5) Jika snapshot tidak ada → hasilkan `label = DELAY` + `WS_SNAPSHOT_MISSING`
-6) Jika `last_price` tidak ada → hasilkan `label = DELAY` + `WS_NO_PRICE`
-7) Jika snapshot valid:
-   - hitung `drift_pct = abs(last_price - entry_ref) / entry_ref`
-   - jika `drift_pct > max_drift_from_entry_pct` → tambah `WS_DRIFT_FAR`
-   - jika salah satu dari `volume_shares` atau `turnover_idr` tidak ada → tambah `WS_INPUT_INCOMPLETE` (BLOCK)
-8) Mapping label:
-   - ada `BLOCK` → `DELAY`
-   - else ada `WARN` → `CAUTION`
-   - else jika ada reason code `WS_CONFIRM_OK` → `CONFIRMED`
-   - else jika ada `INFO` lain (mis. `WS_CONFIRM_NEUTRAL`) → `NEUTRAL`
-   - else → `CONFIRMED`
-   - LOCKED: `WS_CONFIRM_OK` adalah positive confirmation code; `WS_CONFIRM_NEUTRAL` adalah informational-neutral code.
-   - LOCKED: CONFIRM tidak boleh menambahkan reason code yang hanya mengulang label akhir.
-  `CONFIRMED`, `NEUTRAL`, `CAUTION`, dan `DELAY` adalah label hasil evaluasi, bukan reason code tersendiri.
-9) Output CONFIRM **tidak mengubah PLAN** (invariant harus lolos)
+Boundary strictness ini harus dibaca bersama `03_WS_DATA_MODEL_MARIADB.md` dan `13_WS_CONTRACT_TEST_CHECKLIST.md`.
 
-## Next
-### Weekly Swing
-- 11_WS_INTRADAY_SNAPSHOT_TABLES.md (tabel & kolom input manual CONFIRM)
+## Relationship to Snapshot Tables
+
+Jika CONFIRM menggunakan persistence snapshot milik watchlist, shape tabel dan semantics field wajib dibaca bersama `11_WS_INTRADAY_SNAPSHOT_TABLES.md`. Dokumen ini menetapkan behavior overlay; dokumen `11` menetapkan rumah persistence semantics untuk snapshot watchlist-owned.
+
+## Final Rule
+
+Tidak ada behavior CONFIRM yang boleh dianggap resmi hanya karena muncul di example, fixture, atau implementasi teknis apabila behavior tersebut tidak dapat ditelusuri ke dokumen ini, `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`, `03_WS_DATA_MODEL_MARIADB.md`, atau `11_WS_INTRADAY_SNAPSHOT_TABLES.md`.

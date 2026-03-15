@@ -1,6 +1,9 @@
 # 15 - WS Universe & Data-Quality Equivalence Contract (LOCKED)
 
 ## Purpose (LOCKED)
+
+Dokumen ini mengunci kesetaraan universe dan guardrail outcome antara production PLAN dan backtest WS; dokumen ini tidak mendefinisikan ulang algoritma scoring.
+
 Backtest WS dianggap valid hanya jika universe selection dan data-quality guardrails pada backtest
 SETARA (equivalent) dengan production PLAN untuk tanggal EOD yang sama.
 
@@ -41,6 +44,9 @@ Untuk setiap `(asof_eod_date, ticker)`:
 ---
 
 ## Guardrails included (LOCKED)
+
+Daftar guardrail di bawah ini harus dibaca sebagai minimum equivalence set. Jika production menambah guardrail normatif baru, kontrak equivalence ini wajib ikut diperbarui.
+
 Guardrails WS yang wajib setara:
 
 1) Liquidity guard:
@@ -64,6 +70,9 @@ Jika ada guardrail baru di production, dokumen ini wajib diupdate bersama backte
 ---
 
 ## Reason code equivalence (LOCKED)
+
+Owner vocabulary reason code tetap pada file 07; dokumen ini hanya mengunci equivalence outcome dan prioritasnya.
+
 
 ### Rule: canonical fail reason
 Jika satu ticker gagal lebih dari satu guardrail, reason utama dipilih berdasarkan prioritas berikut dan **harus memakai kode WS_* yang sama** di backtest maupun production.
@@ -131,6 +140,9 @@ Acceptance:
 ---
 
 ## Audit queries (LOCKED)
+
+Dokumen ini mengunci audit proof shape, bukan nama file export ad-hoc.
+
 
 Backtest side:
 - `watchlist_bt_universe_ws` sebagai source of truth audit

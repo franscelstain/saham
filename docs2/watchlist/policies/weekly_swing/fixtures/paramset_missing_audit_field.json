@@ -440,7 +440,7 @@
       "origin": "DET",
       "status": "ACTIVE",
       "bt_target": false,
-      "rationale": "LOCKED: TTL canonical untuk validitas snapshot CONFIRM.",
+      "rationale": "TTL canonical untuk validitas snapshot CONFIRM sesuai kontrak normatif.",
       "change_triggers": [
         "Breaking change: redefinisi 'fresh snapshot' untuk WS (update docs + validator + contract tests)"
       ]

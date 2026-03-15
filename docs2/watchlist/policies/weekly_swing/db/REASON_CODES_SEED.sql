@@ -1,8 +1,17 @@
+-- Implementation seed for Weekly Swing reason codes.
+-- Normative owner:
+-- docs/watchlist/policies/weekly_swing/07_WS_REASON_CODES_AND_HASH.md
+--
+-- Seed values in this file must remain semantically identical to the
+-- normative reason-code contract.
+-- This file realizes seeded values for implementation and must not
+-- become the owner of reason-code meaning.
+
 -- REASON_CODES_SEED.sql
 -- Policy: WS_EOD_PLAN_CONFIRM
--- Table: watchlist_reason_codes(reason_code PK, scope, severity, short_id, description_id, description_en)
+-- Table: watchlist_reason_codes(policy_code + reason_code composite PK, scope, severity, short_id, description_id, description_en)
 
--- Tabel global watchlist_reason_codes dibuat oleh: ../../../db/04_DB_SEED_GLOBAL.sql
+-- Tabel global watchlist_reason_codes didefinisikan oleh: ../../../db/05_DB_DDL_MARIADB.sql
 INSERT INTO watchlist_reason_codes (policy_code, reason_code, scope, severity, short_id, description_id, description_en) VALUES
 ('WS','WS_DATA_MISSING','PLAN','BLOCK','data_missing',
  'Data wajib tidak lengkap untuk ticker ini (field input minimal tidak tersedia).',

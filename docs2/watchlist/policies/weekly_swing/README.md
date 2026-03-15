@@ -1,28 +1,28 @@
 # Weekly Swing (WS) — Index
 
 > **Status:** LOCKED (Normative)
-> **Doc Role:** Weekly Swing policy contract index
-
+> **Doc Role:** Weekly Swing strategy entry
 
 ## Purpose
-Entry point dokumentasi policy **Weekly Swing (WS)**.
+
+Dokumen ini adalah entry point strategy Weekly Swing. Dokumen ini memimpin jalur baca strategy, memetakan file normatif utama, dan menjelaskan batas antara kontrak inti dan artefak pendukung.
 
 ## Scope
-Dokumen di folder ini adalah kontrak normatif untuk:
-- proses PLAN (berbasis EOD) dan CONFIRM (runtime),
-- penilaian skor WS,
-- output runtime yang harus stabil,
-- governance backtest + kalibrasi parameter.
 
-## Inputs
-- Pembaca yang ingin mengimplementasikan policy WS (engineer, reviewer).
+Dokumen pada folder ini adalah kontrak normatif Weekly Swing untuk:
 
-## Outputs
-- Urutan baca yang benar.
-- Peta dokumen utama vs referensi.
+- execution canonical PLAN dan CONFIRM,
+- data model dan runtime output shape,
+- paramset contract dan validator,
+- PLAN algorithm dan deterministic selection,
+- CONFIRM overlay dan snapshot-related behavior,
+- contract-test acceptance,
+- serta governance backtest, evidence, dan procedures yang relevan.
 
-## Start here
-Baca dokumen bernomor berikut secara berurutan untuk implementasi inti:
+## Core Reading Order
+
+Untuk implementasi inti Weekly Swing, baca dokumen bernomor berikut secara berurutan:
+
 1. [`01_WS_OVERVIEW.md`](01_WS_OVERVIEW.md)
 2. [`02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)
 3. [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md)
@@ -33,28 +33,42 @@ Baca dokumen bernomor berikut secara berurutan untuk implementasi inti:
 8. [`08_WS_PLAN_ALGORITHM.md`](08_WS_PLAN_ALGORITHM.md)
 9. [`09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)
 10. [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md)
+11. [`11_WS_INTRADAY_SNAPSHOT_TABLES.md`](11_WS_INTRADAY_SNAPSHOT_TABLES.md)
+12. [`13_WS_CONTRACT_TEST_CHECKLIST.md`](13_WS_CONTRACT_TEST_CHECKLIST.md)
 
-Lanjutkan ke dokumen berikut bila membutuhkan pembuktian, kalibrasi, atau verifikasi kepatuhan:
+Dokumen berikut dibaca bila perubahan atau implementasi menyentuh area backtest, evidence, manifest, deprecated artifacts, atau canonical procedures:
+
 - [`12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md`](12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md)
-- [`13_WS_CONTRACT_TEST_CHECKLIST.md`](13_WS_CONTRACT_TEST_CHECKLIST.md)
 - [`14_WS_BT_COVERAGE_MATRIX_LOCKED.md`](14_WS_BT_COVERAGE_MATRIX_LOCKED.md)
 - [`15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md`](15_WS_UNIVERSE_EQUIVALENCE_CONTRACT_LOCKED.md)
 - [`16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md`](16_WS_EVAL_METRICS_SUFFICIENCY_LOCKED.md)
 - [`17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md`](17_WS_WALK_FORWARD_OOS_PROOF_LOCKED.md)
 - [`18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md`](18_WS_BACKTEST_ARTIFACT_MANIFEST_LOCKED.md)
+- [`19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md`](19_WS_DEPRECATED_OR_NONSCOPE_ARTIFACTS_LEDGER.md)
+- [`20_WS_CANONICAL_PARAMSET_PROCEDURES.md`](20_WS_CANONICAL_PARAMSET_PROCEDURES.md)
 
-## Folder pendukung
-- Artefak DB/seed WS: [`db/README.md`](db/README.md)
-- Referensi/fixture WS (non-normatif): [`_refs/README.md`](_refs/README.md)
-- `_refs/` hanya untuk contoh, glossary, worked example, dan schema ilustratif.
-- `_refs/` tidak boleh menjadi sumber aturan baru.
-- Jika aturan normatif sudah tertulis pada dokumen bernomor, `_refs/` hanya boleh mengulangi atau mencontohkan aturan tersebut.
+## Supporting Folders
 
-## Source-of-truth boundaries
+- Artefak DB / schema / SQL: [`db/README.md`](db/README.md)
+- Referensi penjelas: [`_refs/README.md`](_refs/README.md)
+- Contoh runtime output: [`examples/README.md`](examples/README.md)
+- Golden test assets: [`fixtures/README.md`](fixtures/README.md)
 
-Di dalam domain Weekly Swing, file bernomor adalah satu-satunya rumah aturan wajib. Folder `_refs/` hanya berfungsi sebagai referensi pembaca. Folder `examples/` hanya memuat contoh yang patuh kontrak. Folder `fixtures/` hanya memuat artefak uji yang tunduk ke kontrak normatif.
+## Ownership Boundaries
 
-Reviewer dan implementer tidak boleh mengangkat aturan baru dari `_refs/`, examples, atau fixtures bila aturan tersebut belum tertulis di file bernomor.
+Di dalam domain Weekly Swing, file bernomor adalah rumah utama aturan wajib.
 
-## Status
-Dokumen bernomor di folder ini adalah kontrak (normatif) kecuali yang jelas diberi label `_refs` atau `reference`.
+- `_refs/` hanya untuk referensi penjelas, glossary, template, worked example, dan matriks bantu baca.
+- `examples/` hanya untuk contoh output yang tunduk pada kontrak normatif.
+- `fixtures/` hanya untuk data uji, determinism, dan validation replay.
+- `db/` hanya untuk persistence dan implementation artifacts.
+
+Folder pendukung tidak boleh menjadi sumber aturan baru.
+
+## Relationship to Shared Policy
+
+Weekly Swing menggunakan baseline shared yang relevan dari `../_shared/`. Namun, aturan yang hanya berlaku untuk Weekly Swing tetap dimiliki oleh file normatif bernomor pada folder ini.
+
+## Final Rule
+
+Jika terdapat perbedaan antara README ini dan dokumen owner normatif Weekly Swing yang lebih rinci, dokumen owner normatif selalu menang.

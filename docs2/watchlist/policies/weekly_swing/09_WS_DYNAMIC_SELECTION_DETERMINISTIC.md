@@ -9,6 +9,9 @@ Kontrak utama:
 
 ## Normative Summary (LOCKED)
 
+Dokumen ini adalah turunan normatif dari algoritma PLAN pada file 08 dan mengunci determinism selection harian; dokumen ini bukan algoritma PLAN kedua.
+
+
 Bagian ini bersifat **normatif (mengikat)**. Bagian ilustrasi (jika ada) bersifat **non-normatif**. Jika terjadi konflik, yang dipakai adalah aturan normatif.
 
 Aturan yang dikunci:
@@ -87,6 +90,8 @@ Catatan (LOCKED):
 - Jika beberapa kondisi berlaku, gunakan prioritas di atas dan **jangan** override `AVOID` atau forced WATCH_ONLY oleh selection.
 
 ## Purpose & invariants (LOCKED)
+Dokumen ini tidak menghitung ulang formula score komponen maupun combine rule; ownership keduanya tetap pada `08_WS_PLAN_ALGORITHM.md`.
+
 
 ### Stop conditions (LOCKED)
 
@@ -116,6 +121,9 @@ Policy **Weekly Swing** tidak memakai market regime gate.
 Jika ingin gate berbasis kondisi pasar, buat policy terpisah dengan kontrak+validator+backtest terpisah.
 
 ## Pipeline selection (linear)
+
+Pipeline di bawah ini menjabarkan tahap seleksi deterministik setelah eligible universe dan score tersedia dari algoritma PLAN.
+
 Urutan berikut **wajib** dan menjadi acuan implementasi:
 
 1) **Eligible pool**
@@ -195,6 +203,9 @@ Cutoff harian ini disimpan di `watchlist_plan_runs.run_metrics_json` untuk audit
 Jika `top_pool` kosong (misalnya cutoff tinggi + core signals tidak terpenuhi), maka `TOP_PICKS` boleh bernilai 0. Ini valid untuk menjaga kualitas.
 
 ## Target dinamis (LOCKED)
+
+Target dinamis adalah hasil turunan per-run dari paramset aktif dan distribusi eligible hari itu; target ini bukan contract input baru dan tidak mengubah paramset canonical.
+
 Paramset menyimpan base target (MAN):
 - `grouping.top_picks_target`
 - `grouping.secondary_target`
@@ -238,6 +249,9 @@ Jika ada `min-count overrides`, override hanya boleh:
 - Jika stop condition (`NO_TRADE`) → output API/UI tidak menampilkan kandidat; persistence audit tetap tersimpan, dan run menyimpan `fail_code`.
 
 ## Outputs & audit (LOCKED)
+
+Dokumen ini tidak mendefinisikan ulang shape persisted PLAN; ownership shape persistence tetap berada pada file 03.
+
 Wajib tersimpan untuk setiap PLAN run:
 - `top_cutoff_today`, `secondary_cutoff_today`
 - `*_target_dynamic`
@@ -246,6 +260,9 @@ Wajib tersimpan untuk setiap PLAN run:
 - Semua diletakkan di `watchlist_plan_runs.run_metrics_json`.
 
 ## Failure modes & stop condition
+
+Stop condition di sini adalah rule seleksi WS, bukan taxonomy global failure code owner.
+
 
 ### FAILED stop condition
 Kondisi berikut adalah hard-fail dan wajib menghasilkan `run_status = FAILED`:

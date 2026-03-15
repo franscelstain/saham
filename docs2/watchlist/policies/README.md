@@ -1,38 +1,52 @@
 # Policies — Index
 
 > **Status:** LOCKED (Normative)
-> **Doc Role:** Policies catalog & minimum rules
-
+> **Doc Role:** Policy layer catalog
 
 ## Purpose
-Katalog policy watchlist dan aturan minimum per policy.
+
+Dokumen ini adalah katalog layer policy pada domain watchlist. Dokumen ini membantu pembaca masuk ke baseline lintas strategy dan memilih strategy policy yang relevan tanpa menggandakan governance root atau kontrak strategy.
 
 ## Scope
-Dipakai sebelum masuk ke policy spesifik agar pembaca tidak lompat langsung ke algoritma.
 
-## Inputs
-- Pembaca yang akan membuat, membaca, atau mengaudit policy.
+Dokumen ini dipakai setelah membaca `../policy.md` dan `../README.md` apabila pembaca ingin:
 
-## Outputs
-- Aturan navigasi dan baseline kontrak policy.
+- masuk ke layer policy watchlist,
+- memahami pembagian antara `_shared/` dan strategy-specific folders,
+- atau memilih strategy policy yang ingin ditelusuri.
 
-**Scope:** Folder ini berisi kumpulan policy watchlist.  
-**Audience:** IMPLEMENTER / OPERATOR / REVIEWER.
+Dokumen ini bukan entry point utama domain dan bukan README strategy.
 
-## Start here
-Urutan masuk yang benar:
+## Policy Layer Structure
+
+Layer policy di domain watchlist terdiri dari:
+
+- [`_shared/`](_shared/README.md)  
+  Baseline lintas strategy yang berlaku bersama.
+
+- folder strategy seperti [`weekly_swing/`](weekly_swing/README.md)  
+  Kontrak strategy-specific yang berdiri di atas baseline shared.
+
+## Reading Guidance
+
+Urutan baca minimum yang dianjurkan adalah:
+
 1. `../policy.md`
-2. [`_shared/README.md`](_shared/README.md)
-3. [`_shared/01_POLICY_FRAMEWORK_OVERVIEW.md`](_shared/01_POLICY_FRAMEWORK_OVERVIEW.md) sampai [`_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`](_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md)
-4. policy spesifik yang akan dikerjakan
+2. `../README.md`
+3. dokumen pada `_shared/` yang relevan
+4. README strategy yang relevan
+5. file normatif bernomor pada strategy tersebut
 
-## Struktur
-- [`_shared/`](_shared/README.md) — framework global lintas policy.
-- [`weekly_swing/`](weekly_swing/README.md) — dokumen spesifik policy Weekly Swing.
+Dokumen ini hanya memetakan letak policy. Urutan baca detail strategy tidak diulang panjang di sini dan tetap dipimpin oleh README strategy masing-masing.
 
-## Katalog policy
-- [`weekly_swing/`](weekly_swing/README.md) — Weekly Swing (EOD). Mulai dari [`weekly_swing/01_WS_OVERVIEW.md`](weekly_swing/01_WS_OVERVIEW.md).
+## Catalog
 
-## Rule
-- Policy baru tidak boleh langsung lompat ke algoritma tanpa punya kontrak minimum global.
-- Jika policy belum punya registry parameter, validator, execution canonical, dan contract tests, policy itu belum complete.
+- [`weekly_swing/`](weekly_swing/README.md) — Weekly Swing
+
+## Minimum Rule for Strategy Policies
+
+Setiap policy strategy harus dibangun di atas baseline `_shared/`. Dokumen strategy-specific tidak boleh mendefinisikan ulang kontrak minimum global yang sudah hidup di `_shared/`; strategy-specific hanya boleh menambahkan semantics, constraints, procedures, dan acceptance areas yang memang khusus untuk strategy tersebut.
+
+## Non-Authority Statement
+
+Dokumen ini tidak menjadi owner kontrak strategy maupun owner governance root. Jika ada perbedaan antara katalog ini dan dokumen owner normatif yang dirujuk, dokumen owner normatif selalu menang.

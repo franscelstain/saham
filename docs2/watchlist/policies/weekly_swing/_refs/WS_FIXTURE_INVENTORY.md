@@ -98,7 +98,7 @@ Kapan dipakai:
 
 | Fixture / category | Biasanya dipakai untuk | Pertanyaan yang dijawab | Dokumen normatif yang perlu dibuka |
 |---|---|---|---|
-| `paramset_valid.json` + validator fixtures | input/paramset validation | Apakah input salah ditolak dengan benar? | `11_WS_PARAMSET_JSON_CONTRACT.md`, `13_WS_CONTRACT_TEST_CHECKLIST.md` |
+| `paramset_valid.json` + validator fixtures | input/paramset validation | Apakah input salah ditolak dengan benar? | `04_WS_PARAMSET_JSON_CONTRACT.md`, `13_WS_CONTRACT_TEST_CHECKLIST.md` |
 | `PLAN_FIXTURE_A_TIES_V1.json` | PLAN determinism, plan levels, hash | Apakah run PLAN kaya tetap stabil? | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`, `07_WS_REASON_CODES_AND_HASH.md` |
 | `plan_items_artificial_ties.json` | tie-break diagnosis | Apakah ranking tetap deterministik saat skor sama? | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` |
 | `plan_items_guard_fail.json` | guard fail | Apakah kandidat gagal ditempatkan dengan reason yang benar? | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` |
@@ -128,7 +128,7 @@ Jika bug hanya muncul pada satu aspek, jangan langsung memakai fixture paling ka
 ### Pola 5 — Saat bug kompleks, susun fixture ladder
 Untuk bug yang melibatkan lebih dari satu lapisan, gunakan urutan berikut:
 1. mulai dari fixture validator atau fixture PLAN/CONFIRM kecil untuk memastikan perilaku dasar memang salah,
-2. naik ke fixture yang sedikit lebih kaya untuk melihat apakah interaksi antarfiel d atau antarlangkah mulai berpengaruh,
+2. naik ke fixture yang sedikit lebih kaya untuk melihat apakah interaksi antarfield atau antarlangkah mulai berpengaruh,
 3. pakai fixture kaya seperti `PLAN_FIXTURE_A_TIES_V1.json` atau pair example hanya setelah perilaku dasar sudah terisolasi.
 
 Pendekatan ini membantu engineer membedakan bug kontrak, bug parser, bug grouping, dan bug overlay tanpa langsung tenggelam di fixture yang terlalu besar.

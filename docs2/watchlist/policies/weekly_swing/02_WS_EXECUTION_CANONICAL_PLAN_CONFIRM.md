@@ -1,5 +1,10 @@
 # 02 — Execution Canonical: PLAN (EOD) → CONFIRM (Intraday Snapshot) — Weekly Swing
 
+## Purpose
+
+Dokumen ini mengunci urutan eksekusi canonical PLAN dan CONFIRM untuk Weekly Swing. Dokumen ini mengatur flow eksekusi; detail shape persistence dan runtime output tetap dirujuk ke file data model serta overlay contract terkait.
+
+
 Dokumen ini mengunci alur eksekusi Weekly Swing menjadi dua tahap yang tegas:
 
 - **PLAN** dibuat dari data **EOD hari ini** untuk rekomendasi **besok**.
@@ -8,6 +13,9 @@ Dokumen ini mengunci alur eksekusi Weekly Swing menjadi dua tahap yang tegas:
 **LOCKED:** CONFIRM tidak boleh mengubah PLAN.
 
 ## LOCKED — Invariant: PLAN Immutability (wajib bisa dites)
+
+Ownership atas persistence mapping tidak didefinisikan ulang di dokumen ini dan tetap mengikuti `03_WS_DATA_MODEL_MARIADB.md`.
+
 
 Saat CONFIRM dijalankan, **PLAN harus identik** sebelum vs sesudah eksekusi.
 
@@ -77,6 +85,9 @@ PLAN adalah **referensi utama**. PLAN tidak boleh berubah ketika CONFIRM jalan.
 
 ## C. CONFIRM (Intraday Snapshot) (LOCKED)
 
+Aturan field-level hasil CONFIRM dan bentuk output final tetap mengikuti `10_WS_CONFIRM_OVERLAY.md`; dokumen ini hanya mengunci urutan dan batas mutasi.
+
+
 ### C1) Sumber data CONFIRM
 CONFIRM memakai snapshot manual yang disimpan di DB, bukan data real-time.
 
@@ -137,7 +148,7 @@ Definisi `meta.plan_hash` harus **mekanis** dan hanya memiliki **satu** sumber k
 - `message` dan `payload` pada `reasons[]` **dilarang** masuk ke `meta.plan_hash`.
 
 **Larangan interpretasi lain (LOCKED):**
-- `meta.plan_hash` **tidak boleh** memasukkan field header/run-level seperti `policy_code`, `trade_date`, `param_id`, `data_batch_hash`, atau `plan_version`.
+- `meta.plan_hash` **tidak boleh** memasukkan field header/run-level seperti `policy_code`, `trade_date`, `paramset_id` / `param_set_id`, `data_batch_hash`, atau `plan_version`.
 - `meta.plan_hash` **tidak boleh** memakai urutan `ticker_code ASC` sebagai pengganti urutan canonical resmi.
 
 **Jika implementasi membutuhkan hash persistence/run-level terpisah:**

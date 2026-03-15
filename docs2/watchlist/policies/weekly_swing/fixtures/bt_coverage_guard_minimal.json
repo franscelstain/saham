@@ -6,7 +6,6 @@
     "to": "2025-12-31"
   },
   "notes": "Fixture untuk WS_CT_016: membuktikan gating rules COV-1..COV-5 (14_WS_BT_COVERAGE_MATRIX_LOCKED.md) terhadap artefak backtest (grid/cutoffs/picks).",
-
   "cases": [
     {
       "case_id": "PASS_MINIMAL",
@@ -58,16 +57,16 @@
           {
             "asof_eod_date": "2026-02-13",
             "param_id": 7,
-            "ticker_code": "AAA",
             "bucket_code": "TOP_PICKS",
-            "score_total": 0.75
+            "score_total": 0.75,
+            "ticker_id": 101
           },
           {
             "asof_eod_date": "2026-02-13",
             "param_id": 7,
-            "ticker_code": "CCC",
             "bucket_code": "SECONDARY",
-            "score_total": 0.7
+            "score_total": 0.7,
+            "ticker_id": 103
           }
         ]
       },
@@ -116,9 +115,9 @@
           {
             "asof_eod_date": "2026-02-13",
             "param_id": 9,
-            "ticker_code": "AAA",
             "bucket_code": "TOP_PICKS",
-            "score_total": 0.74
+            "score_total": 0.74,
+            "ticker_id": 101
           }
         ]
       },

@@ -1,6 +1,9 @@
 # 05 — Parameter Registry (Complete) — WS_EOD_PLAN_CONFIRM
 
 ## Purpose
+
+Dokumen ini adalah registry canonical key WS yang diizinkan. Dokumen ini bukan validator runtime dan bukan prosedur promotion.
+
 Daftar parameter WS yang **exhaustive**: semua key yang boleh dipakai runtime oleh code. Jika code butuh parameter, key **wajib** ada di file ini **dan** ada di params_json (paramset).
 
 ## Prerequisites
@@ -120,6 +123,9 @@ Parameter **tidak** diubah karena “feeling”. Ubah hanya jika ada sinyal obje
    - Tindakan: perketat readiness rules atau stop run (fail_code), bukan “menurunkan cutoff”.
 
 ## Update method (wajib)
+
+Aturan perubahan status paramset dan prosedur promote ACTIVE tetap dimiliki oleh `20_WS_CANONICAL_PARAMSET_PROCEDURES.md`.
+
 - Origin **BT**: hanya boleh diubah via proses backtest calibration + promote ke paramset baru.
 - Origin **DET**: perubahan harus disertai reasoning tertulis (prinsip pasar) dan dites pada window historis minimum.
 - Origin **MAN**: perubahan boleh manual, tapi wajib tercatat (who/when/why) dan menghasilkan paramset baru.

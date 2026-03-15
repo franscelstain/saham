@@ -3,6 +3,9 @@
 Default backtest window: 2 tahun (configurable).
 
 ## Purpose
+
+Dokumen ini adalah owner schema backtest WS dan flow kalibrasi parameter; evaluasi metrik minimum, OOS proof, dan artifact manifest dirujuk ke file khusus masing-masing.
+
 Dokumen ini mengunci schema backtest dan aturan perhitungan evaluasi untuk Weekly Swing agar kalibrasi reproducible, audit-able, dan konsisten dengan kontrak PLAN/CONFIRM.
 Dokumen ini juga menetapkan syarat validasi: BT coverage, universe equivalence, metric sufficiency, dan OOS proof.
 
@@ -189,6 +192,9 @@ dan **bukan** kolom wajib pada `watchlist_bt_eval`, kecuali schema `watchlist_bt
 Tanpa `watchlist_bt_oos_eval_ws` (OOS proof), kalibrasi tidak boleh dipromote menjadi ACTIVE.
 
 ### 3) Calibration procedure (ringkas)
+
+Dokumen ini tidak mengambil alih acceptance threshold OOS dan evaluation sufficiency; ownership threshold tetap pada file 16 dan 17.
+
 1) Generate param grid dari seed MAN (TEMP/bt_target=true).
 2) Run backtest 2 tahun untuk semua param_id.
 3) Pilih best param_id dengan query canonical:
@@ -246,6 +252,9 @@ Ringkasan OOS wajib tersimpan di:
 `watchlist_bt_oos_eval_ws`.
 
 ## Outputs
+
+Artefak resmi yang boleh dipakai sebagai proof atau promote harus tetap mengikuti manifest pada file 18.
+
 - Paramset BT validated + audit trail.
 
 ## Failure modes

@@ -1,3 +1,8 @@
+-- Historical / operational migration artifact for watchlist database changes.
+-- This file does not override active normative documents.
+-- If migration history differs from active normative ownership,
+-- the active normative documents remain authoritative.
+
 -- MIGRATIONS.sql
 -- Kumpulan ALTER untuk schema watchlist global (MariaDB 10.4).
 -- Jalankan hanya jika database sudah terlanjur dibuat dari versi DDL yang lebih lama.

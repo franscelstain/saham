@@ -1,3 +1,10 @@
+-- Global watchlist DDL implementation artifact.
+-- Normative ownership remains in watchlist governance, schema documentation,
+-- and applicable shared / strategy policy documents.
+--
+-- This SQL file realizes schema implementation and must not become the
+-- owner of business-rule semantics.
+
 -- 05_DB_DDL_MARIADB.sql
 -- DDL lengkap tabel global Watchlist (MariaDB 10.4)
 -- Prinsip:
@@ -18,7 +25,7 @@ CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
 CREATE TABLE IF NOT EXISTS watchlist_reason_codes (
   policy_code VARCHAR(16) NOT NULL,
   reason_code VARCHAR(64) NOT NULL,
-  scope ENUM('PLAN','CONFIRM') NOT NULL,
+  scope ENUM('PLAN','CONFIRM','BT') NOT NULL,
   severity ENUM('INFO','WARN','BLOCK') NOT NULL,
   short_id VARCHAR(32) NOT NULL,
   description_id TEXT NOT NULL,

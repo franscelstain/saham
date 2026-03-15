@@ -1,76 +1,60 @@
-# 01 — Weekly Swing Watchlist (EOD) — Book
+# 01 — Weekly Swing Watchlist (EOD) — Overview
 
 ## Purpose
-Mendefinisikan policy **Weekly Swing (WS)** berbasis EOD dengan target kualitas 95–100%.
-Policy ini menghasilkan:
-- **PLAN** dari data EOD hari ini untuk rekomendasi besok.
-- **CONFIRM** sebagai overlay runtime yang **tidak boleh** memodifikasi PLAN.
 
-## Policy identifiers (LOCKED)
-- `policy_code` (DB/persistence): `WS`
-- `policy` (UI/meta schema): `WEEKLY_SWING`
-- Aturan: `policy_code` dan `policy` tidak boleh saling menggantikan; keduanya punya domain berbeda (DB vs UI).
+Dokumen ini adalah overview strategy Weekly Swing. Dokumen ini merangkum ruang lingkup strategy dan jalur baca, tetapi tidak menggantikan dokumen normatif yang menjadi owner aturan detail.
 
-## Prerequisites
-### Shared Global
-- Baca kontrak global paramset di [`../_shared/`](../_shared/README.md) (dokumen kontrak paramset global).
+## Scope
 
-### Reference
-- [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)
-- [`_refs/WS_GLOSSARY_REFERENCE.md`](_refs/WS_GLOSSARY_REFERENCE.md)
-- [`_refs/WS_MANUAL_INPUT_TEMPLATE.md`](_refs/WS_MANUAL_INPUT_TEMPLATE.md)
-- [`_refs/WS_WORKED_EXAMPLE_E2E.md`](_refs/WS_WORKED_EXAMPLE_E2E.md)
-- [`_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md) — contoh output runtime dan quick shape guide; kontrak normatif tetap dikunci oleh dokumen bernomor Weekly Swing, terutama [`03_WS_DATA_MODEL_MARIADB.md`](03_WS_DATA_MODEL_MARIADB.md) untuk PLAN dan [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md) untuk CONFIRM
-- [`_refs/WS_OOS_EVIDENCE_NOTE.md`](_refs/WS_OOS_EVIDENCE_NOTE.md) — catatan referensi bukti OOS; bukan sumber aturan utama
+Weekly Swing mencakup:
 
-## Governance & Audit (Index)
-- [`_refs/WS_PARAMETER_COVERAGE_MATRIX.md`](_refs/WS_PARAMETER_COVERAGE_MATRIX.md) — bukti 1 halaman bahwa runtime params punya coverage di contract/registry/validator serta algoritma eksekusi WS ([`08_WS_PLAN_ALGORITHM.md`](08_WS_PLAN_ALGORITHM.md), [`09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`](09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md)).
+- kontrak eksekusi PLAN dan CONFIRM,
+- model data strategy,
+- kontrak paramset dan validator,
+- plan algorithm,
+- dynamic selection yang deterministik,
+- confirm overlay,
+- persistence artifacts yang dimiliki strategy,
+- contract-test anchors,
+- dan dokumen pendukung untuk contoh, fixture, serta referensi implementatif.
 
-## Inputs
-- EOD OHLCV (asof_eod_date)
-- EOD indicators (asof_eod_date)
-- Paramset WS (ACTIVE)
+## Core Reading Order
 
-## Reading Rules (WS folder)
+Untuk implementasi Weekly Swing, jalur baca inti yang dianjurkan adalah:
 
-## Konsep kunci (WS)
-- PLAN snapshot immutable untuk `plan_trade_date` (next trading day).
-- CONFIRM overlay intraday (bisa berubah 5–10 menit), hanya memberi label dan alasan tambahan.
+1. execution canonical,
+2. data model,
+3. paramset contract,
+4. validator spec,
+5. plan algorithm,
+6. dynamic selection,
+7. confirm overlay,
+8. contract test checklist.
 
-## Isi dokumen (urut)
-02 → 20 berurutan:
-- 02: Eksekusi canonical (PLAN + CONFIRM) — urutan eksekusi
-- 03: Schema & data model WS (MariaDB 10.4) 
-- 04: Kontrak params_json WS (termasuk key deterministik)
-- 05: Parameter registry WS (exhaustive)
-- 06: Validator WS (tambahan di atas global)
-- 07: Reason codes WS + hash field list WS
-- 08: Algoritma PLAN WS
-- 09: Selection dinamis deterministik (SHOW/HIDE)
-- 10: CONFIRM overlay WS
-- 11: Tabel Input Manual Intraday Snapshot (CONFIRM)
-- 12: Backtest schema & calibration WS
-- 13: Contract tests WS (tambahan di atas global)
-- 14: BT Coverage Matrix (LOCKED)
-- 15: Universe & Data-Quality Equivalence Contract (LOCKED)
-- 16: Evaluation Metrics Sufficiency (LOCKED)
-- 17: Walk-forward / Out-of-Sample Proof (LOCKED)
-- 18: Backtest Artifact Manifest (LOCKED)
-- 19: Deprecated / Non-scope Artifacts Ledger
-- 20: Canonical procedures WS (paramset promotion & active pick)
-- Catatan: artefak SQL (seed/promote/backtest DDL) berada di folder [`db/`](db/README.md) pada level Weekly Swing.
+Dokumen bernomor pada folder ini adalah source of truth utama di level strategy.
 
-## Artefak SQL
+## Supporting Folders
 
-- Backtest universe (wajib): `watchlist_bt_universe_ws` dibuat di [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql) (bukan dokumen bernomor).
-Artefak SQL untuk Weekly Swing berada di folder [`db/`](db/README.md) dan **bukan** bagian dari urutan dokumen `01_..20_` (MD).
+Folder pendukung pada strategy ini memiliki peran sebagai berikut:
 
-File yang tersedia saat ini:
-- [`db/BACKTEST_SCHEMA_DDL.sql`](db/BACKTEST_SCHEMA_DDL.sql)
-- [`db/PROMOTE_PARAMSET.sql`](db/PROMOTE_PARAMSET.sql)
-- [`db/REASON_CODES_SEED.sql`](db/REASON_CODES_SEED.sql)
-- [`db/PARAMSET_WS_ACTIVE_EXAMPLE.json`](db/PARAMSET_WS_ACTIVE_EXAMPLE.json)
+- `_refs/`  
+  Dokumen referensial yang menjelaskan atau merangkum kontrak normatif.
 
-## Next
-### Weekly Swing
-- 02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md
+- `examples/`  
+  Contoh output atau representasi runtime yang mengikuti kontrak strategy.
+
+- `fixtures/`  
+  Golden test assets untuk validasi determinism dan acceptance.
+
+- `db/`  
+  Artefak persistence dan implementasi SQL/schema yang mendukung strategy ini.
+
+Folder pendukung tersebut tidak menjadi owner aturan wajib strategy.
+
+## Relationship to Shared Policy
+
+Weekly Swing menggunakan baseline shared yang relevan dari `docs/watchlist/policies/_shared/`. Namun, semua aturan yang hanya berlaku untuk Weekly Swing tetap dimiliki oleh file normatif bernomor pada folder ini.
+
+## Non-Authority Statement
+
+Jika overview ini tampak berbeda dari dokumen normatif Weekly Swing yang lebih rinci, maka dokumen normatif yang menjadi owner topik selalu menang.

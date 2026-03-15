@@ -1,37 +1,36 @@
 # 01 — Policy Framework Overview (Global)
 
 ## Purpose
-Dokumen ini menjelaskan kontrak global untuk seluruh policy watchlist dan cara membacanya tanpa salah urut.
 
-## Yang dianggap global
-- Struktur `paramset` (kontrak JSON level global)
-- Validator & aturan anti-drift
-- Urutan eksekusi canonical lintas policy (PLAN selalu EOD snapshot; CONFIRM tidak mengubah PLAN)
-- Kontrak auditability (reason codes, fail codes, batch hash)
-- Kriteria minimum agar sebuah policy layak dianggap complete
+Dokumen ini adalah overview navigasional untuk policy framework lintas strategy di domain watchlist. Dokumen ini tidak menetapkan kontrak detail; setiap aturan wajib tetap dimiliki oleh dokumen owner yang dirujuk di folder `_shared/` maupun di folder strategy-specific yang relevan.
 
-## Start here
-Urutan baca global:
-1. [`01_POLICY_FRAMEWORK_OVERVIEW.md`](01_POLICY_FRAMEWORK_OVERVIEW.md)
-2. [`02_PARAMSET_CONTRACT_GLOBAL.md`](02_PARAMSET_CONTRACT_GLOBAL.md)
-3. [`03_VALIDATOR_SPEC_GLOBAL.md`](03_VALIDATOR_SPEC_GLOBAL.md)
-4. [`04_CONTRACT_TESTS_GLOBAL.md`](04_CONTRACT_TESTS_GLOBAL.md)
-5. [`05_EXECUTION_CANONICAL_GLOBAL.md`](05_EXECUTION_CANONICAL_GLOBAL.md)
-6. [`06_SCHEMA_PARITY_RULES.md`](06_SCHEMA_PARITY_RULES.md)
-7. [`07_CONTRACT_FAILURE_CODES_LOCKED.md`](07_CONTRACT_FAILURE_CODES_LOCKED.md)
+## Scope
 
-## Cara baca yang benar
-- Baca dokumen global dulu.
-- Setelah itu baru masuk ke folder policy spesifik.
-- Jika ada konflik antara aturan global dan interpretasi lokal yang tidak eksplisit, anggap itu defect dokumentasi yang harus dibereskan, bukan ruang improvisasi.
+Folder `_shared/` memuat aturan yang benar-benar lintas strategy. Isi folder ini digunakan untuk menjaga konsistensi kontrak dasar yang dapat diwarisi atau dirujuk oleh strategy-specific policies.
 
-## Hubungan dengan policy spesifik
-Dokumen policy spesifik (contoh Weekly Swing) berada di:
-- [`../weekly_swing/`](../weekly_swing/README.md) (mulai dari `../weekly_swing/01_WS_OVERVIEW.md` lalu lanjut sesuai nomor)
+Aturan yang hanya berlaku untuk satu strategy tidak boleh ditetapkan di folder ini dan harus hidup di folder strategy-specific yang relevan.
 
-## Output yang harus dihasilkan framework global
-Framework global harus cukup untuk menjawab 4 hal ini:
-1. PLAN vs CONFIRM dipisahkan bagaimana
-2. paramset sah itu seperti apa
-3. validator minimum wajib apa saja
-4. drift dideteksi dan diblok di layer mana
+## Shared Document Areas
+
+Dokumen shared di folder ini dibagi menjadi area berikut:
+
+- kontrak global paramset,
+- spesifikasi validator global,
+- baseline contract tests global,
+- canonical execution baseline,
+- schema parity rules,
+- dan failure code contract lintas strategy.
+
+Masing-masing area di atas tetap dimiliki oleh dokumen owner yang spesifik, bukan oleh overview ini.
+
+## Relationship to Strategy Policies
+
+Strategy-specific policies dapat merujuk atau mewarisi baseline shared yang relevan. Namun, strategy-specific policies tetap menjadi owner untuk aturan, perilaku, atau kontrak yang hanya berlaku pada strategy tersebut.
+
+## Reading Guidance
+
+Overview ini digunakan untuk memetakan dokumen shared yang relevan sebelum pembaca masuk ke strategy-specific policies. Untuk kontrak detail, pembaca harus berpindah ke dokumen owner yang ditunjuk oleh area shared yang sesuai.
+
+## Non-Authority Statement
+
+Dokumen ini tidak boleh dipakai sebagai dasar tunggal untuk menetapkan aturan implementasi. Jika terdapat perbedaan antara overview ini dan dokumen owner normatif, dokumen owner normatif selalu menang.

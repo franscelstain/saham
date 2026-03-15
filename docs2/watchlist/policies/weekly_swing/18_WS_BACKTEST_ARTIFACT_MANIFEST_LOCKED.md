@@ -6,6 +6,9 @@ Menjadi allowlist resmi untuk artefak backtest, calibration, dan proof yang dian
 Dokumen ini mencegah drift akibat penyebutan tabel/file/artefak yang tidak resmi atau tidak lagi dipakai.
 
 ## Scope
+
+Dokumen ini adalah allowlist artefak resmi WS; artefak di luar daftar ini dianggap non-scope sampai dinyatakan resmi.
+
 Dokumen ini berlaku untuk:
 - artefak tabel backtest resmi,
 - artefak proof produksi resmi,
@@ -44,6 +47,9 @@ Aturan:
 - dan artefak lain tidak boleh dianggap resmi hanya karena “mirip” fungsinya.
 
 ## 2) Official Production Proof Artifact (LOCKED)
+
+Shape proof resmi boleh diekspor ke media berbeda, tetapi konsumen tidak boleh mengandalkan nama file ad-hoc sebagai kontrak.
+
 Artefak proof produksi resmi yang dibutuhkan untuk equivalence adalah:
 1. export PLAN universe snapshot dengan shape mengikuti:
    - [`db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md`](db/PLAN_UNIVERSE_SNAPSHOT_SCHEMA.md)
@@ -53,6 +59,9 @@ Catatan:
 - implementasi boleh mengekspor ke file JSON/CSV atau bentuk lain selama shape-nya identik terhadap kontrak schema export resmi.
 
 ## 3) Official Supporting Governance Docs (LOCKED)
+
+Dokumen pendukung di daftar ini membantu governance artefak, tetapi tidak otomatis mengubah status artefak fisik menjadi resmi.
+
 Dokumen resmi yang mengendalikan artefak di atas adalah:
 - [`12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md`](12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md)
 - [`14_WS_BT_COVERAGE_MATRIX_LOCKED.md`](14_WS_BT_COVERAGE_MATRIX_LOCKED.md)
@@ -71,6 +80,9 @@ Artefak berikut **bukan** anggota manifest ini kecuali kelak ditambahkan secara 
 - tabel/folder/file yang hanya pernah muncul di diskusi lama
 
 ## 5) Reference Rule (LOCKED)
+
+Setiap penyebutan artefak resmi di dokumen lain harus memakai nama manifest yang sama dan tidak boleh memakai sinonim yang menciptakan artefak bayangan.
+
 Jika dokumen Weekly Swing menyebut artefak sebagai:
 - wajib,
 - resmi,

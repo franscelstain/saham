@@ -23,10 +23,10 @@ Untuk abort/failure di level run.
 Catatan: bukan milik policy tertentu.
 
 ### 2) watchlist_reason_codes (global with policy_code)
-Untuk alasan item-level (PLAN/CONFIRM).
+Untuk dictionary reason code policy-level/item-level watchlist, termasuk reason runtime `PLAN`, `CONFIRM`, dan governance `BT` bila policy memang menguncinya.
 - policy_code (part of PK)
 - reason_code (part of PK)
-- scope (PLAN/CONFIRM)
+- scope (PLAN/CONFIRM/BT)
 - severity (INFO/WARN/BLOCK)
 - short_id
 - description_id

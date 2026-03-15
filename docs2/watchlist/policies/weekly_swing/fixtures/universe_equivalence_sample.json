@@ -6,24 +6,24 @@
     {
       "ticker_code": "AAA",
       "eligible_plan": true,
-      "fail_reason": null
+      "canonical_fail_reason_code": null
     },
     {
       "ticker_code": "ILLQ",
       "eligible_plan": false,
-      "fail_reason": "WS_LIQ_FAIL"
+      "canonical_fail_reason_code": "WS_LIQ_FAIL"
     }
   ],
   "bt_snapshot": [
     {
       "ticker_code": "AAA",
-      "eligible_plan": true,
-      "fail_reason": null
+      "eligible_ok": true,
+      "reason_code": null
     },
     {
       "ticker_code": "ILLQ",
-      "eligible_plan": false,
-      "fail_reason": "WS_LIQ_FAIL"
+      "eligible_ok": false,
+      "reason_code": "WS_LIQ_FAIL"
     }
   ],
   "expected": {

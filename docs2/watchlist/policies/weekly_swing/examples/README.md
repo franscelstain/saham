@@ -1,52 +1,31 @@
-# Runtime Examples — Weekly Swing
-
-> **Status:** REFERENCE
-> **Doc Role:** Runtime examples index
+# Weekly Swing Examples
 
 ## Purpose
-Menjelaskan fungsi folder contoh runtime Weekly Swing dan cara memakainya tanpa menjadikannya sumber kontrak.
+
+Folder `examples/` berisi contoh bentuk output atau representasi runtime yang tunduk pada kontrak normatif Weekly Swing.
 
 ## Scope
-Dokumen ini hanya mengatur cara membaca dan merawat contoh output runtime.
-Dokumen ini bukan owner aturan perilaku sistem.
 
-## Inputs
-- Engineer serializer, reviewer, auditor, dan pembaca yang membutuhkan contoh bentuk output.
+Examples pada folder ini digunakan untuk:
 
-## Outputs
-- Peta contoh runtime yang tersedia.
-- Batas yang jelas antara contoh dan kontrak normatif.
+- membantu pembaca memahami representasi hasil,
+- mengilustrasikan output PLAN atau CONFIRM,
+- dan menunjukkan contoh pair relationship atau branch behavior yang sudah dikunci oleh dokumen normatif.
 
-Folder ini berisi contoh **output runtime** untuk policy Weekly Swing.
-Fungsinya adalah membantu pembaca melihat bentuk payload yang patuh kontrak, membantu regression test, dan membantu audit replay.
+## Ownership Rule
 
-## Normative owner
-Kontrak normatif untuk runtime output Weekly Swing tetap berada pada dokumen bernomor utama berikut:
-1. [`../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](../02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)
-2. [`../03_WS_DATA_MODEL_MARIADB.md`](../03_WS_DATA_MODEL_MARIADB.md)
-3. [`../07_WS_REASON_CODES_AND_HASH.md`](../07_WS_REASON_CODES_AND_HASH.md)
-4. [`../10_WS_CONFIRM_OVERLAY.md`](../10_WS_CONFIRM_OVERLAY.md)
+Examples tidak menjadi owner aturan final. Rules mengenai shape, invariant, acceptance, atau behavior tetap dimiliki oleh dokumen normatif Weekly Swing yang relevan.
 
-Referensi pendukung yang boleh membantu pembacaan:
-- [`../_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md`](../_refs/WS_RUNTIME_OUTPUT_EXAMPLES.md)
-- [`../_refs/WS_WORKED_EXAMPLE_E2E.md`](../_refs/WS_WORKED_EXAMPLE_E2E.md)
-- file JSON di folder ini
+## Reading Guidance
 
-Jika ada konflik antara contoh di folder ini dan dokumen normatif di atas, maka dokumen normatif yang berlaku dan contoh harus dirapikan.
+Jika pembaca mencari aturan final, pembaca harus merujuk ke dokumen owner yang relevan, seperti:
 
-## Isi folder
-- [`WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json`](WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_A.json) — contoh output PLAN.
-- [`WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json`](WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json) — contoh output CONFIRM sebagai overlay terpisah.
-- [`WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json`](WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json) — contoh pasangan PLAN + CONFIRM untuk memeriksa immutability PLAN.
+- execution canonical,
+- data model,
+- plan algorithm,
+- confirm overlay,
+- dan contract-test checklist.
 
-## Cara pakai
-- Pakai contoh di folder ini untuk melihat bentuk payload dan untuk golden assertion atas struktur output.
-- Jangan memakai contoh di folder ini sebagai sumber tunggal untuk scoring, ranking, grouping, atau keputusan trading.
-- Saat contoh diperbarui, acuan perbaikannya tetap dokumen normatif bernomor.
+## Maintenance Rule
 
-## Review minimum
-Sebelum contoh dianggap layak dipakai, cek bahwa:
-- nama field, tipe data, enum, dan nesting cocok dengan kontrak,
-- PLAN dan CONFIRM tidak tercampur,
-- contoh tidak melegitimasi perilaku yang dilarang,
-- perubahan contoh bisa dijelaskan dengan dasar dokumen normatif.
+Jika sebuah example tampak berbeda dari owner normatifnya, owner normatif selalu menang dan example harus diperbarui. Example tidak boleh dipakai untuk memperkenalkan rule baru yang belum hidup di dokumen normatif.

@@ -2,7 +2,7 @@
   "fixture_id": "WS_HASH_CONTRACT_VECTORS_V1",
   "policy_code": "WS",
   "doc_ref": "07_WS_REASON_CODES_AND_HASH.md",
-  "rules_locked": {
+  "contract_reference_excerpt": {
     "order_by": "ticker_id_asc",
     "null_handling": "EXCLUDE_FROM_HASH_PAYLOAD",
     "scales": {

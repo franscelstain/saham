@@ -1,255 +1,147 @@
-# 06 — ParamSet Validator Spec — WS_EOD_PLAN_CONFIRM
+# 06 — Weekly Swing Paramset Validator Specification
 
 ## Purpose
-Validasi wajib params_json WS sebelum eksekusi. PLAN/CONFIRM/backtest abort jika gagal.
 
-## Prerequisites
-### Weekly Swing
-05_WS_PARAMETER_REGISTRY_COMPLETE.md
+Dokumen ini adalah owner normatif untuk penentuan valid atau tidak validnya paramset Weekly Swing.
 
-## Inputs
-- params_json WS
+## Scope
 
-## Process
+Dokumen ini mengunci failure conditions dan expected validator outcomes untuk kontrak paramset aktif Weekly Swing.
 
-### 1) Failure output (LOCKED)
-- Setiap VALIDATION FAIL **wajib** mengeluarkan `cf_code` (string) yang canonical, referensi: `../_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`.
-- Pesan error bebas boleh ada sebagai context, tapi **tidak boleh menggantikan** `cf_code`.
+## Ownership Rule
 
-LOCKED — CF mapping (validator layer):
-- Missing required key (registry completeness) => `CF_PARAMSET_MISSING_KEY`
-- Unknown key (drift) => `CF_PARAMSET_UNKNOWN_KEY`
-- Type drift (value type != registry) => `CF_PARAMSET_TYPE_DRIFT`
-- Audit-node schema invalid (missing `{ value, origin, status, bt_target, rationale, change_triggers }`) => `CF_PARAMSET_AUDIT_SCHEMA_INVALID`
-- Enum invalid (origin/status/mode keys) => `CF_PARAMSET_ENUM_INVALID`
-- Hash contract lock violated => `CF_HASH_CONTRACT_VIOLATION`
-- Eval gate invalid => `CF_EVAL_GATE_INVALID`
+Fixtures negatif hanya membuktikan rule yang ditetapkan di dokumen ini. `_refs` tidak boleh lebih authoritative daripada dokumen ini.
 
-### 2) Output schema (LOCKED)
-Validator WS **wajib** menghasilkan JSON output dengan schema berikut:
+## A. Required Top-Level Presence
 
-Top-level (LOCKED):
-- `success` (bool) — TRUE jika **tidak ada** error severity `ERROR`; FALSE jika ada minimal 1 `ERROR`.
-- `policy_code` (string) = `WS`
-- `policy_version` (string) = `WS_EOD_PLAN_CONFIRM`
-- `schema_version` (string) = `PARAMSET_JSON`
-- `paramset_code` (string|null) — jika tidak ada di input, isi null (jangan omit).
-- `validated_at` (string) — RFC3339 dengan timezone (contoh `2026-03-03T09:15:00+07:00`).
-- `errors` (array) — wajib ada; empty array jika `success=true`.
+### Rule
+Paramset wajib memiliki seluruh required top-level keys yang ditetapkan di `04_WS_PARAMSET_JSON_CONTRACT.md`.
 
-Error item schema (LOCKED):
-- `cf_code` (string) — wajib; harus salah satu `CF_*` di `../_shared/07_CONTRACT_FAILURE_CODES_LOCKED.md`.
-- `severity` (enum) — `ERROR` | `WARN` (default: `ERROR`).
-- `path` (string) — dotted JSON path yang menunjuk lokasi masalah (contoh `risk.max_atr14_pct.value`).
-- `message` (string) — ringkas; boleh, tapi tidak menggantikan `cf_code`.
-- `expected` (string|number|array|null) — optional (dipakai untuk type drift/enum/lock).
-- `actual` (string|number|array|null) — optional.
-- `missing_fields` (array<string>) — optional (khusus `CF_PARAMSET_AUDIT_SCHEMA_INVALID`).
+### Failure Condition
+Jika satu required top-level key hilang, validator wajib fail.
 
-Determinism (LOCKED):
-- `errors[]` harus diurutkan deterministik: sort by `cf_code` ASC, lalu `path` ASC.
-- Batas maksimum errors: 50. Jika lebih, truncate dan tambahkan top-level `truncated: true` (bool).
+### Concrete Fixture Mapping
+- `fixtures/paramset_missing_required_key.json` menghilangkan top-level key `risk` dan harus gagal.
 
-Examples (non-normative):
-- Success:
-  - `{ "success": true, ..., "errors": [] }`
-- Fail:
-  - `{ "success": false, ..., "errors": [{"cf_code":"CF_PARAMSET_TYPE_DRIFT","severity":"ERROR","path":"risk.max_atr14_pct.value","expected":"number","actual":"string"}] }`
+### Expected Result
+Paramset dengan top-level required key yang hilang tidak boleh dianggap valid.
 
-### 3) JSON & identity
-- params_json valid JSON object
-- policy_code='WS'
-- policy_version='WS_EOD_PLAN_CONFIRM'
-- schema_version='PARAMSET_JSON'
-- jika `paramset_code` ada: string non-empty, pattern `^[A-Z0-9_]+$` (audit-friendly, stabil)
+## B. Unknown Root Key Rejection
 
-### 4) Enum rules
-- origin enum: DET, MAN, BT, DET+MAN, MAN+BT, DET+BT
-- status enum: ACTIVE, TEMP, DEPRECATED
-- TEMP => bt_target=true
-- origin=BT => status != TEMP
-- LOCKED: setiap leaf parameter **wajib** punya field audit `{ value, origin, status, bt_target, rationale, change_triggers }`
-- `change_triggers` wajib array (boleh kosong)
+### Rule
+Unknown root key dilarang.
 
-### 5) Type rules (ringkas)
-- boolean: data_readiness.reject_if_eod_incomplete, enabled flags, no_trade_hides_all
-- number: thresholds, weights, bounds
-- integer: dv20_idr, counts, dp scales
-- string: *mode keys
-- array: liquidity.exclude_tickers, grouping.sort_keys
-- object/map: grouping.min_count_overrides, scoring.weights.value
-- array/list: data_contract.required_fields.value, data_contract.required_sources.value
+### Failure Condition
+Jika terdapat key root yang tidak termasuk kontrak aktif Weekly Swing, validator wajib fail.
 
-### 6) Registry completeness check (LOCKED)
-Validator **wajib** menjadikan registry sebagai sumber kebenaran:
-- Load [`05_WS_PARAMETER_REGISTRY_COMPLETE.md`](05_WS_PARAMETER_REGISTRY_COMPLETE.md), ambil semua key yang terdefinisi:
-  - Expand shorthand `{a,b,c}` menjadi key individual.
-  - Untuk wildcard `.*`, treat sebagai “pattern” (bukan key tunggal).
-- Untuk setiap key non-wildcard:
-  - Key **wajib ada** di `params_json` sebagai node audit `{ value, origin, status, bt_target, rationale, change_triggers }`.
-  - Tipe `value` **wajib** sesuai definisi tipe di registry (bool / integer / number / string / array / object-map). Jika tidak match => FAIL (type drift).
-- Untuk wildcard `X.*`:
-  - Node base `X` **wajib ada** dan `X.value` harus **array(list) atau object(map)** yang **non-empty** (memuat minimal 1 item/entry).
-- Jika ada key di `params_json` yang **tidak ada** di registry (kecuali node base yang dibutuhkan oleh wildcard), maka FAIL (drift).
+### Concrete Fixture Mapping
+- `fixtures/paramset_unknown_key.json` menambahkan `unknown_root_key` dan harus gagal.
 
-### 7) Numeric sanity
-Liquidity:
-- liquidity.min_dv20_idr.value > 0
-- liquidity.dv20_strong_idr.value > liquidity.min_dv20_idr.value
+### Expected Result
+Validator menolak payload dengan unknown root key.
 
-Volume:
-- volume.min_vol_ratio.value >= 0
+## C. Audit Object Completeness
 
-ATR:
-- 0 < risk.min_atr14_pct.value <= 1   (unit: fraction; 0.02 = 2%)
-- 0 < risk.max_atr14_pct.value <= 1
-- risk.max_atr14_pct.value > risk.min_atr14_pct.value
-- 0 < risk.atr_ideal_low.value <= 1
-- 0 < risk.atr_ideal_high.value <= 1
-- risk.atr_ideal_low.value >= risk.min_atr14_pct.value
-- risk.atr_ideal_high.value <= risk.max_atr14_pct.value
-- risk.atr_ideal_low.value <= risk.atr_ideal_high.value
+### Rule
+Setiap audit object wajib memiliki field:
+- `value`
+- `origin`
+- `status`
+- `bt_target`
+- `rationale`
+- `change_triggers`
 
-Momentum:
-- setup.roc_lo.value < setup.roc_hi.value
+### Failure Condition
+Jika salah satu field audit wajib hilang, validator wajib fail.
 
-Breakout:
-- setup.bo_near_below_pct.value > 0
-- setup.bo_max_ext_pct.value > 0
-- setup.mom_roc20_soft_min.value is required
-- setup.mom_roc20_soft_min.value is number
-- -1 <= setup.mom_roc20_soft_min.value <= 1
+### Concrete Fixture Mapping
+- `fixtures/paramset_missing_audit_field.json` menghilangkan `liquidity.min_dv20_idr.rationale` dan harus gagal.
 
-Weights:
-- scoring.weights.value.momentum >= 0
-- scoring.weights.value.breakout >= 0
-- scoring.weights.value.volume >= 0
-- scoring.weights.value.risk >= 0
-- sum(scoring.weights.value.momentum + scoring.weights.value.breakout + scoring.weights.value.volume + scoring.weights.value.risk) > 0
+### Expected Result
+Audit object yang tidak lengkap dianggap invalid.
 
-Caps / targets ordering:
-- grouping.top_picks_target.value >= 0
-- grouping.secondary_target.value >= 0
-- Dynamic targets are derived per-run and may be 0 only under explicit stop condition (NO_TRADE).
+## D. Type Validation
 
-Plan:
-- plan_levels.entry_band_pct.value > 0
+### Rule
+Leaf value harus mengikuti type contract Weekly Swing.
 
-Risk:
-- risk.stop_atr_mult.value > 0
-- risk.min_rr.value > 0
+### Failure Condition
+String numerik, object yang salah bentuk, atau type drift lain pada leaf aktif menyebabkan validator fail.
 
-Confirm:
-- confirm_overlay.snapshot_max_age_sec.value == 900
-- confirm_overlay.max_drift_from_entry_pct.value > 0
+### Concrete Fixture Mapping
+- `fixtures/paramset_type_drift.json` mengubah `liquidity.min_dv20_idr.value` dari numerik menjadi string numerik dan harus gagal.
 
-No Trade:
-- no_trade.min_eligible_count.value >= 1
+### Expected Result
+Validator menolak type drift walaupun nilai string tampak dapat di-cast.
 
-Eval (backtest & OOS gates):
-- eval.min_trades_oos.value >= 0
-- eval.min_trades.value >= 0
-- eval.min_days_covered.value >= 0
-- eval.min_p25_ret_net_top.value is number
-- 0 <= eval.min_month_win_rate_min.value <= 1
-- eval.min_month_avg_ret_net_min.value is number
+## E. Origin Enum Validation
 
-Outlier:
-- if enabled: data_readiness.outlier_ruleset.value.max_abs_return_1d_pct > 0, data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct > 0
-- data_contract.required_fields.value (required, list non-empty)
-- data_contract.required_sources.value (required, list non-empty)
-- data_contract.disabled_fields.value (optional, list)
+### Rule
+`origin` wajib memakai enum yang diizinkan kontrak Weekly Swing.
 
-### 8) Locked invariants (must match exact)
-- scoring.combine_mode.value == 'NORM_WEIGHTED_SUM_CLAMP01'
-- grouping.grouping_mode.value == 'QUALIFIED_POOLS_QUANTILE_CUTOFF'
-- grouping.rounding_mode.value == 'FLOOR'
-- setup.bo_trigger_mode.value == 'CLOSE_GT_HH20'
-- risk.stop_mode.value == 'ATR'
-- plan_levels.entry_mode.value == 'BREAKOUT'
-- no_trade.no_trade_hides_all.value == true
-- confirm_overlay.snapshot_max_age_sec.value == 900
+### Failure Condition
+Nilai enum di luar set yang diizinkan menyebabkan validator fail.
 
-sort_keys exact order:
-1) score_total_desc
-2) score_breakout_desc
-3) score_momentum_desc
-4) dv20_idr_desc
-5) atr14_pct_asc
-6) ticker_id_asc
+### Concrete Fixture Mapping
+- `fixtures/paramset_bad_enum.json` mengubah `liquidity.min_dv20_idr.origin` menjadi `NOT_A_VALID_ORIGIN` dan harus gagal.
 
-hash_contract lock:
-- hash_contract.order_by.value == 'ticker_id_asc'
-- hash_contract.null_handling.value == 'EXCLUDE_FROM_HASH_PAYLOAD'
-- hash_contract.scales.value.close_price_dp == 4
-- hash_contract.scales.value.hh20_dp == 4
-- hash_contract.scales.value.roc20_dp == 6
-- hash_contract.scales.value.atr14_pct_dp == 4
-- hash_contract.scales.value.dv20_idr_dp == 0
+### Expected Result
+Validator menolak origin yang tidak terdaftar pada kontrak aktif.
 
-Catatan LOCKED: nilai dp ini **harus identik** dengan definisi di [`07_WS_REASON_CODES_AND_HASH.md`](07_WS_REASON_CODES_AND_HASH.md) dan fixture [`fixtures/hash_contract_vectors.json`](fixtures/hash_contract_vectors.json).
+## F. Hash Contract Lock Validation
 
-## Outputs
-- PASS/FAIL + daftar error.
+### Rule
+Hash contract pada paramset aktif wajib cocok dengan contract owner untuk:
+- `order_by`
+- `null_handling`
+- `scales`
 
-### Data readiness: coverage gate (LOCKED)
+### Failure Condition
+Perubahan pada nilai locked hash contract menyebabkan validator fail.
 
-- Required: `data_readiness.min_coverage_ratio`
-- Type: number
-- Range: `0.0 <= value <= 1.0`
+### Concrete Fixture Mapping
+- `fixtures/paramset_bad_hash_contract.json` mengubah `hash_contract.null_handling.value` menjadi `INCLUDE_IN_HASH_PAYLOAD` dan harus gagal.
 
-- Required: `data_readiness.min_history_days`
-- Type: integer
-- Range: value >= 1
+### Expected Result
+Validator menolak drift pada hash contract yang locked.
 
-- Required: `data_readiness.max_missing_bar_days_60d`
-- Type: integer
-- Range: value >= 0
+## G. Canonical Sort-Key Validation
 
-- Required: `data_readiness.outlier_ruleset.value.enabled`
-- Type: boolean
+### Rule
+`grouping.sort_keys.value` wajib mengikuti urutan canonical Weekly Swing:
 
-- Required: `data_readiness.outlier_ruleset.value.max_abs_return_1d_pct`
-- Type: number
-- Range: 0 < value <= 1
+- `score_total_desc`
+- `score_breakout_desc`
+- `score_momentum_desc`
+- `dv20_idr_desc`
+- `atr14_pct_asc`
+- `ticker_id_asc`
 
-- Required: `data_readiness.outlier_ruleset.value.max_high_low_range_1d_pct`
-- Type: number
-- Range: 0 < value <= 2
+### Failure Condition
+Perubahan order atau isi sort keys menyebabkan validator fail, kecuali ownership normatifnya diubah secara eksplisit.
 
-### Cutoff quantiles (LOCKED)
+## H. Contract Cohesion Rule
 
-- Required: `grouping.top_min_score_q`, `grouping.secondary_min_score_q`
-- Type: number
-- Range: `0.0 <= value <= 1.0`
+### Rule
+Validator tidak boleh menerima payload yang shape-nya lolos secara teknis tetapi melanggar fixed-value contract atau audit-object completeness.
 
-Relasi (LOCKED):
-- `grouping.top_min_score_q.value >= grouping.secondary_min_score_q.value`
+### Expected Result
+Payload hanya valid jika lolos seluruh rule shape, type, audit, enum, unknown-key, dan locked-contract validation yang relevan.
 
-### NO_TRADE gate (LOCKED)
-- Required: no_trade.min_eligible_count
-- Type: integer
-- Range: value >= 1
+## I. Supporting Fixtures
 
-Rasional: TOP_PICKS harus punya cutoff minimal yang **tidak lebih longgar** daripada SECONDARY.
+Fixtures utama untuk area validator saat ini adalah:
 
-## Plan immutability check (LOCKED)
+- `fixtures/paramset_valid.json`
+- `fixtures/paramset_missing_required_key.json`
+- `fixtures/paramset_unknown_key.json`
+- `fixtures/paramset_type_drift.json`
+- `fixtures/paramset_bad_enum.json`
+- `fixtures/paramset_missing_audit_field.json`
+- `fixtures/paramset_bad_hash_contract.json`
 
-Tujuan: memastikan implementasi tidak pernah “menyentuh” PLAN saat menjalankan CONFIRM.
+Fixtures tersebut mendukung dokumen ini dan tidak menggantikannya sebagai owner normatif.
 
-Contract check:
-- Input: satu `plan_record` (hasil PLAN yang tersimpan) + runtime input CONFIRM.
-- Hitung `plan_hash_before` dari `plan_record` (menggunakan canonical hash contract).
-- Jalankan CONFIRM overlay.
-- Hitung `plan_hash_after` dari `plan_record` yang sama.
-- Wajib: `plan_hash_before == plan_hash_after`.
+## Final Validator Rule
 
-Catatan:
-- Check ini bukan validasi paramset; ini **contract test/invariant** untuk pipeline eksekusi.
-
-## Reference
-- [`_refs/WS_FAILURE_BEHAVIOR_MATRIX.md`](_refs/WS_FAILURE_BEHAVIOR_MATRIX.md)
-
-## Next
-### Weekly Swing
-- 07_WS_REASON_CODES_AND_HASH.md
+Tidak ada invalid state Weekly Swing yang boleh hidup hanya di fixtures atau di file referensial tanpa rule normatif yang dapat ditelusuri ke dokumen ini.

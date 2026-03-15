@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "policy": "WEEKLY_SWING",
+    "asof_eod_date": "2026-02-13",
+    "trade_date": "2026-02-14",
+    "paramset_id": "WS_ACTIVE_EXAMPLE",
+    "paramset_hash": "5d8c7315a540cadc4e9a890a1e2a7cc2641d37dde63ee10805eff4dcfaa910ff",
+    "plan_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data_batch_hash": "c0949d4c5248ddf77e90dad82993e26f06c934de2744cb91e5962bc3f892c312",
+    "generated_at": "2026-03-04T00:00:00Z",
+    "source": {
+      "vendor": "INTERNAL_SAMPLE",
+      "dataset_id": "WS_PLAN_RUNTIME_OUTPUT_EXAMPLE_NO_TRADE",
+      "coverage_ratio": 1.0
+    },
+    "fail_code": null,
+    "fail_reason_codes": []
+  },
+  "items": [],
+  "summary": {
+    "eligible_count": 0,
+    "top_picks_count": 0,
+    "secondary_count": 0,
+    "watch_only_count": 0,
+    "avoid_count": 0,
+    "no_trade": true,
+    "no_trade_reason": {
+      "code": "WS_NO_TRADE_MIN_ELIGIBLE",
+      "message": "Jumlah kandidat eligible di bawah minimum untuk membuka posisi Weekly Swing."
+    }
+  }
+}

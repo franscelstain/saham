@@ -37,6 +37,6 @@
       "spread",
       "orderbook_json"
     ],
-    "notes": "Confirm must ignore non-contract orderbook fields (no influence on confirm decision)."
+    "notes": "Under the current contract, non-contract orderbook fields are ignored and do not influence the confirm decision."
   }
 }

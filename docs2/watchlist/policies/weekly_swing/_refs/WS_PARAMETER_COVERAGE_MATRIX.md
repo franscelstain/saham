@@ -25,13 +25,13 @@ Gunakan matriks ini untuk menjawab empat pertanyaan:
 ## Coverage matrix
 | Parameter | Domain stage | Dipakai untuk | Owner normatif utama | Referensi sekunder / implementasi | Catatan audit |
 |---|---|---|---|---|---|
-| `min_coverage_ratio` | PLAN guard | memastikan cakupan minimum terpenuhi | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` | `WS_FAILURE_BEHAVIOR_MATRIX.md` | review bila hasil abort coverage sering muncul |
-| `min_eligible_count` | PLAN guard / dynamic selection | memutuskan no-trade global bila kandidat terlalu sedikit | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_FAILURE_BEHAVIOR_MATRIX.md` | cek konsistensi dengan outcome `NO_TRADE` |
-| `min_rr` | PLAN level | memaksa kandidat menjadi `WATCH_ONLY` bila RR rendah | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` | `WS_WORKED_EXAMPLE_E2E.md` | pastikan tidak dipakai sebagai alasan ranking di tempat yang salah |
-| `max_drift_from_entry_pct` | CONFIRM overlay | memberi label caution saat drift terlalu jauh | `10_WS_CONFIRM_OVERLAY.md` | `WS_MANUAL_INPUT_TEMPLATE.md` | cek hubungan dengan `last_price` pada input manual |
-| `ttl_confirm_minutes` atau ekuivalennya | CONFIRM snapshot validity | menentukan stale snapshot | `10_WS_CONFIRM_OVERLAY.md` | `WS_GLOSSARY_REFERENCE.md` | pastikan pembaca membedakan TTL dari timestamp storage |
-| `top_n` / ukuran pool setara | PLAN grouping | membatasi kandidat utama | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_WORKED_EXAMPLE_E2E.md` | cek konsistensi dengan hasil grouping |
-| `secondary_n` / ukuran pool setara | PLAN grouping | membatasi kandidat pendukung | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_WORKED_EXAMPLE_E2E.md` | cek outcome saat pool sekunder kosong |
+| `data_readiness.min_coverage_ratio` | PLAN guard | memastikan cakupan minimum EOD terpenuhi | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` | `WS_FAILURE_BEHAVIOR_MATRIX.md` | review bila hasil abort coverage sering muncul |
+| `no_trade.min_eligible_count` | PLAN guard / dynamic selection | memutuskan `NO_TRADE` global bila kandidat eligible terlalu sedikit | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_FAILURE_BEHAVIOR_MATRIX.md` | cek konsistensi dengan outcome `NO_TRADE` |
+| `risk.min_rr` | PLAN level | memaksa kandidat menjadi `WATCH_ONLY` bila RR rendah | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_WORKED_EXAMPLE_E2E.md` | pastikan tidak dipakai sebagai alasan ranking di tempat yang salah |
+| `confirm_overlay.max_drift_from_entry_pct` | CONFIRM overlay | memberi label caution saat drift terlalu jauh | `10_WS_CONFIRM_OVERLAY.md` | `WS_MANUAL_INPUT_TEMPLATE.md` | cek hubungan dengan `last_price` pada input manual |
+| `confirm_overlay.snapshot_max_age_sec` | CONFIRM snapshot validity | menentukan stale snapshot | `10_WS_CONFIRM_OVERLAY.md` | `WS_GLOSSARY_REFERENCE.md` | pastikan pembaca membedakan TTL dari timestamp storage |
+| `grouping.top_picks_target` dan `grouping.top_min_score_q` | PLAN grouping | membentuk target dan cutoff kandidat utama | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_WORKED_EXAMPLE_E2E.md` | cek konsistensi dengan hasil grouping |
+| `grouping.secondary_target` dan `grouping.secondary_min_score_q` | PLAN grouping | membentuk target dan cutoff kandidat pendukung | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` | `WS_WORKED_EXAMPLE_E2E.md` | cek outcome saat pool sekunder kosong |
 
 ## Reading patterns
 ### Saat ingin audit PLAN

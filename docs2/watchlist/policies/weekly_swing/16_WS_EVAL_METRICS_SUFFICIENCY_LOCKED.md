@@ -1,6 +1,9 @@
 # 16 - WS Evaluation Metrics Sufficiency (LOCKED)
 
 ## Purpose (LOCKED)
+
+Dokumen ini mengunci metrik minimum dan gating evaluasi WS. Dokumen ini tidak menjadi owner schema backtest maupun prosedur promote.
+
 Menetapkan bahwa metrik di `watchlist_bt_eval` cukup untuk:
 - memilih param_id terbaik secara robust (bukan kebetulan/overfit),
 - menghindari hasil bagus palsu karena trade_count kecil,
@@ -15,6 +18,9 @@ Kalibrasi WS dianggap TIDAK VALID jika metrik minimum pada dokumen ini tidak ter
 ---
 
 ## Return definition (LOCKED)
+
+Model entry/exit yang dipilih harus terdokumentasi konsisten pada metadata evaluasi dan tidak boleh berubah antar run tanpa perubahan evaluasi model yang eksplisit.
+
 
 ### Trade timing model
 - PLAN dibuat dari data EOD (asof_eod_date).
@@ -44,6 +50,9 @@ Fee & slippage wajib eksplisit dan konsisten.
 ---
 
 ## Minimum metrics required in watchlist_bt_eval (LOCKED)
+
+Kolom wajib di sini adalah sufficiency contract; detail storage fisik tabel backtest tetap mengikuti file 12.
+
 
 Untuk tiap `(policy_code, param_id)` pada rentang backtest, `watchlist_bt_eval` WAJIB punya:
 
@@ -84,6 +93,9 @@ Jika belum ada agregasi bulanan:
 
 ## Gating rules for calibration validity (LOCKED)
 
+Threshold minimum ini adalah acceptance floor dan bukan ranking policy penuh; pemilihan kandidat terbaik tetap dapat memakai urutan ranking yang lebih kaya selama tidak melanggar floor ini.
+
+
 Kalibrasi param_id dianggap valid hanya jika:
 
 1) Minimum trade count
@@ -114,6 +126,8 @@ Jika salah satu gagal → param_id tidak boleh dipilih menjadi BEST/ACTIVE.
 ---
 
 ## Ranking policy (LOCKED)
+Ranking policy pada section ini hanya berlaku setelah semua floor sufficiency di atas lulus. Dokumen ini tidak mengubah prosedur promote ACTIVE ataupun artifact allowlist.
+
 
 Pemilihan param_id terbaik tidak boleh hanya berdasarkan `avg_ret_net_top`.
 

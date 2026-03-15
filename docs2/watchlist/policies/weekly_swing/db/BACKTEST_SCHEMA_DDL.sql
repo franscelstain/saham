@@ -1,3 +1,12 @@
+-- Implementation artifact for Weekly Swing backtest schema.
+-- Normative schema and calibration owner:
+-- docs/watchlist/policies/weekly_swing/12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md
+--
+-- Column semantics, scope, and backtest-related meaning must follow the
+-- normative Weekly Swing backtest documents.
+-- This SQL file realizes schema implementation and does not replace
+-- normative ownership.
+
 -- 08_WS_BACKTEST_SCHEMA_DDL.sql
 -- Schema backtest untuk policy Weekly Swing (WS)
 -- MariaDB 10.4 / InnoDB
