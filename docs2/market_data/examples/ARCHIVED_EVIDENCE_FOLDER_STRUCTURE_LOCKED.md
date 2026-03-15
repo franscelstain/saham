@@ -3,7 +3,7 @@
 ## Purpose
 Show the recommended structure for storing archived actual execution evidence separately from illustrative examples.
 
-This file describes archived actual evidence organization, not example-only files.
+This file is a layout and separation contract only. It does not make `examples/` the owner of archived evidence admission, and it does not change the rule that real execution evidence belongs in `../evidence/` under the admission controls defined by the authoritative ops/tests contracts.
 
 ## Recommended top-level structure
 

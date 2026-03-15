@@ -61,8 +61,9 @@ A conforming run evidence pack must include at minimum:
       ],
       "publication_resolution": {
         "trade_date_effective": "2026-03-09",
+        "publication_id": 1402,
         "publication_version": 3,
-        "is_current_publication": true
+        "is_current": true
       }
     }
 
@@ -108,14 +109,17 @@ A conforming correction evidence pack must include at minimum:
         "approved_at": "2026-03-06T09:00:00+07:00"
       },
       "prior_publication": {
+        "publication_id": 1188,
         "run_id": 5001,
         "publication_version": 1,
         "is_current": false
       },
       "new_publication": {
+        "publication_id": 1201,
         "run_id": 5009,
         "publication_version": 2,
-        "is_current": true
+        "is_current": true,
+        "supersedes_publication_id": 1188
       },
       "old_hashes": {
         "bars_batch_hash": "H1B",
@@ -191,7 +195,7 @@ A conforming replay mismatch evidence pack must include at minimum:
 ## Relationship to run artifacts
 Evidence packs may reference operator-facing artifacts such as:
 - `run_summary.json`
-- `anomaly_report.md`
+- archived anomaly-report artifact
 - `correction_evidence.json`
 - `replay_mismatch_summary.json`
 

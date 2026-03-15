@@ -12,6 +12,8 @@ Define the minimum automated contract tests required so Market Data Platform rem
 This specification is normative.
 It is not satisfied by smoke tests or process-completed assertions.
 
+Tests in this folder prove locked behavior from the normative contracts. They must not introduce new domain rules, silently narrow or widen contract meaning, or become a parallel owner for semantics already defined in `book/`, `db/`, or locked operational contracts.
+
 ## Test implementation rule (LOCKED)
 Every implemented contract test must map to:
 - a test ID from `Contract_Test_Matrix_LOCKED.md`

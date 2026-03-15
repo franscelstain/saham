@@ -77,6 +77,8 @@ Use the companion folders (`db/`, `ops/`, `tests/`, `registry/`, `backtest/`, `i
 
 ## Normative implementation and proof folders
 The following folders are normative parts of the same source of truth:
+
+Book-level contracts remain the primary behavioral owner for domain meaning and boundary. Companion folders may specify schema, formulas, procedures, tests, and proof obligations, but they must not redefine book-level ownership or create parallel contract authority.
 - `book/`
 - `db/`
 - `ops/`
@@ -88,6 +90,8 @@ The following folders are normative parts of the same source of truth:
 
 ## Companion review folders
 The following folders are companion material and do not define new behavior beyond the normative contracts above:
+
+They may illustrate, archive, or demonstrate compliance, but they must never become a second source of truth for domain behavior.
 - `examples/`
 - `evidence/`
 

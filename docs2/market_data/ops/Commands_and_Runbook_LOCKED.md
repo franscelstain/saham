@@ -85,7 +85,7 @@ Resolve terminal run status and effective-date readability.
 - `requested_date=T`
 
 #### Minimum output
-- final `status`
+- final `terminal_status`
 - `trade_date_effective`
 - final run evidence
 

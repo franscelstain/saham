@@ -19,7 +19,7 @@ At minimum, the following artifact shapes must be reconstructable:
 1. `run_summary.json`
 2. `eligibility_export.csv`
 3. `invalid_bars_export.csv` or equivalent bounded sample
-4. `anomaly_report.md` or equivalent machine-readable anomaly summary
+4. archived anomaly-report artifact (for example markdown or equivalent machine-readable anomaly summary)
 
 Where applicable, the following should also be available:
 5. `correction_evidence.json`
@@ -36,8 +36,9 @@ A conforming summary should contain at minimum:
       "run_id": 7001,
       "trade_date_requested": "2026-03-10",
       "trade_date_effective": "2026-03-09",
-      "status": "HELD",
-      "final_stage": "FINALIZE",
+      "lifecycle_state": "COMPLETED",
+      "terminal_status": "HELD",
+      "stage": "FINALIZE",
       "source": "API_FREE",
       "coverage_ratio": 0.8420,
       "bars_rows_written": 842,
@@ -62,7 +63,8 @@ A conforming summary should contain at minimum:
 
 ### Locked rules
 - summary must reflect actual persisted run outcome, not speculative operator interpretation
-- if status is readable success, seal state must be compatible with readability
+- `terminal_status` is the consumer-facing run outcome; `lifecycle_state` and `stage` must not be used as substitutes for it
+- if `terminal_status` is readable success, seal state must be compatible with readability
 - if requested date is held or failed, summary must not imply requested date is readable
 - config identity must be included when available
 - publication-related fields must be included where correction-aware publication semantics exist
@@ -108,7 +110,7 @@ Provide row-level audit evidence for rejected source rows.
 - invalid bars must not be confused with canonical readable bars
 - bounded sampling is allowed only if the summary states that sampling was used
 
-## 4. `anomaly_report.md`
+## 4. Archived anomaly-report artifact
 ### Purpose
 Provide a short operator-facing summary of what went wrong or what materially changed.
 

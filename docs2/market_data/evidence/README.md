@@ -3,7 +3,7 @@
 ## Purpose
 This folder stores archived actual execution evidence.
 
-It is separate from `../examples/`, which may contain illustrative or representative structures.
+It is separate from `../examples/`, which may contain illustrative or representative structures. This archive is a repository of produced evidence, not a normative owner of new domain behavior. Any behavioral rule referenced by archived evidence must trace back to the authoritative contracts in `../book/`, `../ops/`, `../tests/`, and other normative companion folders.
 
 ## Evidence classes
 - `runs/` for actual executed run evidence

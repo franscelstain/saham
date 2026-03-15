@@ -4,6 +4,8 @@
 This file is an implementation-facing companion specification.
 The normative owner for indicator semantics remains `../book/EOD_Indicators_Contract.md`, with formula authority in `EOD_Indicators_Formula_Spec.md`.
 
+This file may clarify computation order, warmup handling, and storage-facing implementation detail, but it must not redefine indicator identity, publication-context behavior, validity ownership, or downstream-read semantics that are already locked in the book-level contracts.
+
 ## Input source
 Input comes only from canonical `eod_bars` for valid trading days.
 Rows from `eod_invalid_bars` must never participate in indicator computation.

@@ -120,7 +120,7 @@ A missing dependency inside a required locked window is not the same as ordinary
     {
       "trade_date_requested": "2026-03-10",
       "trade_date_effective": "2026-03-09",
-      "status": "HELD",
+      "terminal_status": "HELD",
       "seal_state": "UNSEALED"
     }
 
@@ -141,10 +141,11 @@ Consumer readability is resolved by explicit effective-date logic, not by maximu
 ### Expected publication state before correction
 
     {
+      "publication_id": 1188,
       "trade_date": "2026-03-05",
       "publication_version": 1,
       "run_id": 5001,
-      "is_current_publication": 1,
+      "is_current": 1,
       "bars_batch_hash": "H1B",
       "indicators_batch_hash": "H1I",
       "eligibility_batch_hash": "H1E"
@@ -153,11 +154,12 @@ Consumer readability is resolved by explicit effective-date logic, not by maximu
 ### Expected publication state after correction
 
     {
+      "publication_id": 1201,
       "trade_date": "2026-03-05",
       "publication_version": 2,
       "run_id": 5009,
-      "is_current_publication": 1,
-      "supersedes_run_id": 5001,
+      "is_current": 1,
+      "supersedes_publication_id": 1188,
       "bars_batch_hash": "H2B",
       "indicators_batch_hash": "H2I",
       "eligibility_batch_hash": "H2E"
@@ -166,10 +168,11 @@ Consumer readability is resolved by explicit effective-date logic, not by maximu
 ### Expected preserved old state
 
     {
+      "publication_id": 1188,
       "trade_date": "2026-03-05",
       "publication_version": 1,
       "run_id": 5001,
-      "is_current_publication": 0
+      "is_current": 0
     }
 
 ### Locked proof intent
@@ -233,7 +236,7 @@ No ambiguous half-published correction state is allowed.
     {
       "trade_date_requested": "2025-12-10",
       "trade_date_effective": "2025-12-09",
-      "status": "HELD",
+      "terminal_status": "HELD",
       "comparison_result": "EXPECTED_DEGRADE",
       "mismatch_summary": null
     }
@@ -250,8 +253,9 @@ It must also prove expected degraded outcomes.
       "run_id": 7001,
       "trade_date_requested": "2026-03-10",
       "trade_date_effective": "2026-03-09",
-      "status": "HELD",
-      "final_stage": "FINALIZE",
+      "lifecycle_state": "COMPLETED",
+      "terminal_status": "HELD",
+      "stage": "FINALIZE",
       "source": "API_FREE",
       "coverage_ratio": 0.8420,
       "bars_rows_written": 842,

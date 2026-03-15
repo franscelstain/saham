@@ -53,6 +53,8 @@
 
 ## Normative companion folders
 The following folders are normative companions to this book and must be treated as part of the same source of truth:
+
+These folders extend implementation detail, persistence, proof, and operations. They do not replace book-level ownership for domain scope, boundary, publication semantics, or other core behavioral contracts unless a book contract explicitly delegates that narrower subject.
 - `../db/`
 - `../ops/`
 - `../tests/`

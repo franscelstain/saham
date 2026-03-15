@@ -124,7 +124,7 @@ Recommended severity defaults:
 ## Consumer rule (LOCKED)
 Consumers do not interpret raw error classes directly.
 Consumers rely on:
-- terminal `eod_runs.status`
+- terminal `eod_runs.terminal_status`
 - `trade_date_effective`
 - seal presence
 - eligibility snapshot for D
