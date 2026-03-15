@@ -85,6 +85,40 @@ Priority order (highest first):
 
 Backtest dan production wajib memakai prioritas yang sama agar audit konsisten.
 
+## Production snapshot contract for equivalence proof (LOCKED)
+
+Shape proof snapshot production untuk audit equivalence dimiliki oleh dokumen ini. Artefak pada folder `db/` hanya merealisasikan shape ini sebagai schema / implementation artifact.
+
+### Required fields
+Setiap row snapshot production wajib menyediakan:
+
+| field | required | rules |
+|---|---:|---|
+| `asof_eod_date` | YES | tanggal EOD basis PLAN |
+| `ticker_code` | YES | identitas ticker canonical untuk audit join |
+| `policy_code` | YES | untuk Weekly Swing nilainya `WS` |
+| `policy_version` | YES | versi contract/rule yang dipakai |
+| `eligible_plan` | YES | `TRUE` hanya jika data-quality dan guardrail lolos |
+| `canonical_fail_reason_code` | IF `eligible_plan = FALSE` | reason utama mengikuti priority order dokumen ini |
+| `dv20_idr` | YES | snapshot metric liquidity |
+| `atr14_pct` | YES | snapshot metric volatility |
+| `vol_ratio` | YES | snapshot metric volume participation |
+| `missing_fields` | YES | daftar field wajib yang missing / invalid; boleh array string atau representasi CSV stabil |
+| `generated_at` | YES | waktu snapshot proof dibuat |
+| `plan_hash` | YES | harus berasal dari `meta.plan_hash` PLAN canonical |
+
+### Field rules
+- `missing_fields` wajib selalu hadir, walau kosong.
+- Jika `missing_fields` non-empty, maka `eligible_plan = FALSE` dan `canonical_fail_reason_code = WS_DATA_MISSING`.
+- `plan_hash` tidak boleh dibuat dari payload custom lain; nilainya wajib mengikuti kontrak PLAN canonical.
+- Satu row snapshot mewakili tepat satu `(asof_eod_date, ticker_code)`.
+
+### Acceptance
+Proof snapshot equivalence dianggap sah hanya jika:
+- required fields tersedia,
+- semantics `eligible_plan` dan `canonical_fail_reason_code` mengikuti dokumen ini,
+- dan shape snapshot bisa dipakai langsung untuk join audit dengan `watchlist_bt_universe_ws`.
+
 ### Mapping rule (LOCKED)
 Untuk guardrails yang dicakup dokumen ini, **tidak ada alias nama**. Mapping 1:1 canonical adalah:
 

@@ -136,13 +136,13 @@
       },
       "flags": {
         "eligible": true,
-        "hidden": false
+        "hidden": true
       },
       "reasons": [
         {
           "code": "WS_HID_PCT",
           "severity": "INFO",
-          "message": "Skor di bawah cutoff eksekusi; ditampilkan untuk monitoring saja.",
+          "message": "Eligible tetapi tidak masuk cutoff/pool terpilih; item disembunyikan dari daftar tampil utama.",
           "payload": {
             "policy": "WS"
           }

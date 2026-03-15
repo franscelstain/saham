@@ -107,12 +107,13 @@ Spesifikasi tabel + kolom + contoh data:
 - `effective_captured_at = LEAST(captured_at, inserted_at)`
 
 ### C3) TTL CONFIRM (LOCKED)
-- TTL = 15 menit → `snapshot_max_age_sec = 900`
+- TTL CONFIRM mengikuti paramset aktif pada `confirm_overlay.snapshot_max_age_sec`.
 
 Aturan:
-- Jika `checked_at - effective_captured_at > snapshot_max_age_sec` (LOCKED: 900 detik) → snapshot **EXPIRED**
+- Jika `checked_at - effective_captured_at > confirm_overlay.snapshot_max_age_sec` → snapshot **EXPIRED**
   - CONFIRM wajib menghasilkan `label = DELAY` + `WS_STALE`
 - Jika snapshot tidak ada → `label = DELAY` + `WS_SNAPSHOT_MISSING`
+- Nilai TTL tidak boleh di-hardcode diam-diam di luar paramset aktif tanpa pembaruan normatif pada kontrak Weekly Swing yang relevan.
 - `NO_TRADE` tidak dipakai sebagai label hasil CONFIRM; `NO_TRADE` hanya berlaku pada status run PLAN/global selection.
 
 ---

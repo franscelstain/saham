@@ -130,7 +130,7 @@ Field normatif pada `summary` PLAN adalah:
 
 ### A4. Branch Rule for `NO_TRADE`
 
-Untuk branch `NO_TRADE`, top-level shape tetap `meta`, `items`, `summary`. Dalam example saat ini, `items` dapat kosong dan `summary.no_trade = true` dengan `summary.no_trade_reason` terisi.
+Untuk branch `NO_TRADE`, top-level shape tetap `meta`, `items`, `summary`. Dalam branch ini, `items` dapat kosong, `summary.no_trade = true`, `summary.no_trade_reason` terisi, dan `meta.fail_code` tetap dipakai hanya untuk abort/failure run-level yang memang memiliki dictionary fail code resmi.
 
 ## B. CONFIRM Runtime Output Shape
 
@@ -203,7 +203,7 @@ Kontrak pair mensyaratkan PLAN hash tidak berubah akibat proses CONFIRM. Relatio
 
 Fixture CONFIRM menunjukkan boundary shape berikut:
 
-- unknown top-level field pada payload CONFIRM dianggap schema drift dan expected fail dengan `INVALID_SCHEMA_DRIFT`,
+- unknown top-level field pada payload CONFIRM dianggap schema drift dan expected fail dengan `CF_SCHEMA_DRIFT`,
 - field non-contract yang bersifat orderbook-specific (`bid1_price`, `ask1_price`, `spread`, `orderbook_json`) dapat hadir pada payload input fixture tetapi harus diabaikan dan tidak boleh memengaruhi confirm decision.
 
 Rule strictness tersebut wajib dibaca bersama `10_WS_CONFIRM_OVERLAY.md` dan `13_WS_CONTRACT_TEST_CHECKLIST.md`.

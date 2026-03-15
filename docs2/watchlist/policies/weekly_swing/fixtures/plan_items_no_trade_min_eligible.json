@@ -33,17 +33,23 @@
     ],
     "plan_output_api": {
       "meta": {
-        "fail_code": "NO_TRADE",
+        "fail_code": null,
         "fail_reason_codes": [
           "WS_NO_TRADE_MIN_ELIGIBLE"
         ],
         "plan_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
       },
-      "items": []
+      "items": [],
+      "summary": {
+        "no_trade": true,
+        "no_trade_reason": {
+          "code": "WS_NO_TRADE_MIN_ELIGIBLE"
+        }
+      }
     }
   },
   "_fixture_expected": {
     "should_pass": true,
-    "notes": "Eligible tickers exist but eligible_total < ws.filters.min_eligible_count -> NO_TRADE (min eligible) and API/UI items are empty."
+    "notes": "Eligible tickers exist but eligible_total < no_trade.min_eligible_count -> NO_TRADE (min eligible) and API/UI items are empty."
   }
 }

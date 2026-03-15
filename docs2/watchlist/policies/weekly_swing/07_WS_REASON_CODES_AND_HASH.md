@@ -55,6 +55,7 @@ Daftar reason code aktif saat ini harus tetap parity dengan `db/REASON_CODES_SEE
 - `WS_HIDE`
 - `WS_RUN_CAPPED`
 - `WS_NO_TRADE_MIN_ELIGIBLE`
+- `WS_NO_TRADE_ALL_FILTERED`
 - `WS_PLAN_HASH_MISMATCH`
 - `WS_PLAN_WRITEBACK_DETECTED`
 
@@ -69,7 +70,6 @@ Daftar reason code aktif saat ini harus tetap parity dengan `db/REASON_CODES_SEE
 - `WS_CONFIRM_VOL_WEAK`
 - `WS_DRIFT_FAR`
 - `WS_OUT_BAND`
-- `WS_NO_TRADE_ALL_FILTERED`
 
 ### Backtest / coverage / eval / OOS / artifacts
 

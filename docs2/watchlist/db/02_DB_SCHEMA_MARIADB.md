@@ -125,9 +125,10 @@ Detail confirm untuk ticker yang dievaluasi.
 - confirm_check_id (FK)
 - ticker_id
 - label (CONFIRMED/NEUTRAL/CAUTION/DELAY)
-- runtime_json (LONGTEXT) — key yang diizinkan (LOCKED):
-  - `last_price`, `chg_pct`, `volume_shares`, `turnover_idr`, `drift_pct`, `snapshot_age_sec`
-  - dilarang menambah key lain tanpa update kontrak output normatif Weekly Swing (mapping PLAN di `../policies/weekly_swing/03_WS_DATA_MODEL_MARIADB.md` dan output minimum CONFIRM di `../policies/weekly_swing/10_WS_CONFIRM_OVERLAY.md`).
+- runtime_json (LONGTEXT) — payload runtime policy-scoped.
+  - Daftar key yang diizinkan tidak dimiliki oleh schema global ini.
+  - Allowed keys, semantics, dan strictness untuk payload ini harus mengikuti dokumen owner strategy yang relevan.
+  - Untuk Weekly Swing aktif saat ini, lihat `../policies/weekly_swing/03_WS_DATA_MODEL_MARIADB.md` dan `../policies/weekly_swing/10_WS_CONFIRM_OVERLAY.md`.
 - reason_codes_json (LONGTEXT)
 - created_at
 

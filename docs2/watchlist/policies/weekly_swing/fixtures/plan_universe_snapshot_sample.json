@@ -11,7 +11,9 @@
       "atr14_pct": 0.03,
       "vol_ratio": 1.2,
       "generated_at": "2026-02-13 16:10:00",
-      "plan_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+      "plan_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "canonical_fail_reason_code": null,
+      "missing_fields": []
     },
     {
       "asof_eod_date": "2026-02-13",
@@ -23,11 +25,13 @@
       "atr14_pct": 0.03,
       "vol_ratio": 1.2,
       "generated_at": "2026-02-13 16:10:00",
-      "plan_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+      "plan_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "canonical_fail_reason_code": "WS_LIQ_FAIL",
+      "missing_fields": []
     }
   ],
   "_fixture_expected": {
     "should_pass": true,
-    "notes": "Conforms to PLAN_UNIVERSE_SNAPSHOT_SCHEMA required fields."
+    "notes": "Conforms to required proof fields for the PLAN universe snapshot contract."
   }
 }

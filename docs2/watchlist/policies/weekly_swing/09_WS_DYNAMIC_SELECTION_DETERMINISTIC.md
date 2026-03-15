@@ -30,7 +30,7 @@ Aturan yang dikunci:
   - dipilih (TOP_PICKS/SECONDARY): `WS_SEL_PCT`
   - eligible tapi tersembunyi karena cutoff/target: `WS_HID_PCT`
   - tersembunyi karena cap: `WS_HID_CAP`
-- Stop condition **NO_TRADE** menghasilkan PLAN kosong pada output API/UI; alasan run-level disimpan sebagai `fail_code`.
+- Stop condition **NO_TRADE** menghasilkan PLAN kosong pada output API/UI; alasan run-level disimpan pada `meta.fail_reason_codes` / `summary.no_trade_reason`, bukan dengan membuat `fail_code` runtime baru.
 
 ## LOCKED — NO_TRADE Gate (non-ambiguous)
 
@@ -38,17 +38,23 @@ NO_TRADE adalah run PLAN yang **tidak menghasilkan daftar ticker untuk ditampilk
 Ada **dua** penyebab yang dibedakan oleh `meta.fail_reason_codes`:
 
 1) **MIN_ELIGIBLE**
-- Kondisi: `eligible_total < ws.filters.min_eligible_count`
+- Kondisi: `eligible_total < no_trade.min_eligible_count`
 - Output wajib:
-  - `meta.fail_code = "NO_TRADE"`
+  - `run_status = "NO_TRADE"`
+  - `meta.fail_code = null`
   - `meta.fail_reason_codes = ["WS_NO_TRADE_MIN_ELIGIBLE"]`
+  - `summary.no_trade = true`
+  - `summary.no_trade_reason.code = "WS_NO_TRADE_MIN_ELIGIBLE"`
   - `items = []`
 
 2) **ALL_FILTERED**
-- Kondisi: `eligible_total >= ws.filters.min_eligible_count` namun setelah guard + selection + display rules tidak ada satupun item yang lolos untuk ditampilkan (mis. seluruh candidate ter-hide/terfilter).
+- Kondisi: `eligible_total >= no_trade.min_eligible_count` namun setelah guard + selection + display rules tidak ada satupun item yang lolos untuk ditampilkan (mis. seluruh candidate ter-hide/terfilter).
 - Output wajib:
-  - `meta.fail_code = "NO_TRADE"`
+  - `run_status = "NO_TRADE"`
+  - `meta.fail_code = null`
   - `meta.fail_reason_codes = ["WS_NO_TRADE_ALL_FILTERED"]`
+  - `summary.no_trade = true`
+  - `summary.no_trade_reason.code = "WS_NO_TRADE_ALL_FILTERED"`
   - `items = []`
 
 Tambahan wajib (LOCKED):
@@ -246,7 +252,7 @@ Jika ada `min-count overrides`, override hanya boleh:
 
 ### D) AVOID / NO_TRADE
 - Jika gagal guardrails/data_ready → `AVOID` dengan reason sesuai dictionary.
-- Jika stop condition (`NO_TRADE`) → output API/UI tidak menampilkan kandidat; persistence audit tetap tersimpan, dan run menyimpan `fail_code`.
+- Jika stop condition (`NO_TRADE`) → output API/UI tidak menampilkan kandidat; persistence audit tetap tersimpan, `run_status = NO_TRADE`, dan alasan no-trade disimpan melalui `meta.fail_reason_codes` / `summary.no_trade_reason` tanpa membuat `fail_code` baru.
 
 ## Outputs & audit (LOCKED)
 
@@ -283,7 +289,8 @@ Jika NO_TRADE aktif:
 - `top_picks_target_dynamic=0`, `secondary_target_dynamic=0`,
 - output API/UI tidak menampilkan kandidat,
 - persistence audit tetap menyimpan item dengan `display_bucket = HIDE`,
-- `fail_code` run-level **wajib** diisi.
+- `run_status` run-level **wajib** bernilai `NO_TRADE`,
+- `fail_code` tidak dipakai untuk menciptakan kode baru `NO_TRADE`; alasan no-trade tetap memakai `WS_NO_TRADE_*`.
 
 ## Next
 ### Weekly Swing

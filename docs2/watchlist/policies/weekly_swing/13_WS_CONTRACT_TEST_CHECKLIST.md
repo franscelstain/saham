@@ -144,7 +144,7 @@ Unknown top-level field pada payload CONFIRM wajib dianggap schema drift, sedang
 - `fixtures/confirm_payload_with_orderbook_fields.json`
 
 **Expected Result**
-- payload dengan `unknown_top_level` harus fail dengan `INVALID_SCHEMA_DRIFT`,
+- payload dengan `unknown_top_level` harus fail dengan `CF_SCHEMA_DRIFT`,
 - field `bid1_price`, `ask1_price`, `spread`, dan `orderbook_json` harus diabaikan penuh, tidak masuk contract shape, dan tidak boleh mengubah confirm decision bila elemen kontraktualnya valid.
 
 ## J. Promote Procedure Acceptance
