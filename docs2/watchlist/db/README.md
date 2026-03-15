@@ -1,32 +1,29 @@
-# Watchlist DB Artifacts
+# Watchlist DB — Index
 
 ## Purpose
 
-Folder ini berisi artefak database global domain watchlist.
+Dokumen ini adalah entry point untuk artefak database watchlist global.
 
-## Scope
+## Hard Warning
 
-Artefak pada folder ini dapat mencakup:
+Folder `db/` bukan owner business-rule semantics strategy. Dokumen dan artefak di sini mengatur database global watchlist; perilaku strategy tetap dimiliki oleh policy strategy masing-masing.
 
-- schema documentation,
-- DDL implementation artifacts,
-- seed artifacts,
-- migration artifacts,
-- dan referensi persistence global yang relevan terhadap domain watchlist.
+## Reading Order
 
-## Ownership Rule
+1. `01_DB_OVERVIEW.md`
+2. `02_DB_SCHEMA_MARIADB.md`
+3. `03_DB_INDEXES_AND_CONSTRAINTS.md`
 
-Dokumen dan SQL pada folder ini merealisasikan kebutuhan persistence watchlist. Ownership rule bisnis, governance, dan kontrak normatif tetap mengikuti dokumen governance dan policy watchlist yang relevan.
-
-## Reading Guidance
-
-Pembaca harus merujuk kembali ke:
-
-- `docs/watchlist/policy.md`,
-- dokumen policy yang relevan,
-- dan `docs/watchlist/policies/_shared/06_SCHEMA_PARITY_RULES.md`
-  untuk menjaga parity antara dokumen normatif dan artefak implementasi database.
+Artefak executable:
+- `04_DB_SEED_GLOBAL.sql`
+- `05_DB_DDL_MARIADB.sql`
+- `MIGRATIONS.sql`
 
 ## Final Rule
 
-Jika terdapat perbedaan antara artefak database di folder ini dan dokumen normatif watchlist, dokumen normatif selalu menang dan artefak implementasi harus diperbarui.
+Jika ada konflik antara artefak executable dan dokumen normatif DB, dokumen normatif DB selalu menang.
+
+## What This Folder Must Not Do
+
+Folder `db/` tidak boleh menjadi tempat lahirnya business rule baru yang tidak hidup dulu pada dokumen normatif markdown. SQL artifact hanya merealisasikan rule yang sudah dikunci oleh dokumen owner.
+

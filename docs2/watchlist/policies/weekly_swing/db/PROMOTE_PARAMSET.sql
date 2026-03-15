@@ -1,3 +1,8 @@
+-- NON-NORMATIVE SQL ARTIFACT
+-- REVIEWER RULE: semantic changes must be introduced in normative markdown first.
+-- Dokumen owner semantik tetap berada pada file markdown normatif terkait.
+-- Jika ada konflik, file normatif markdown selalu menang dan SQL ini harus disesuaikan.
+
 -- Implementation artifact for canonical Weekly Swing paramset promotion.
 -- Normative procedure owner:
 -- docs/watchlist/policies/weekly_swing/20_WS_CANONICAL_PARAMSET_PROCEDURES.md

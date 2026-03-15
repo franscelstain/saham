@@ -66,7 +66,8 @@ Jalur baca yang dianjurkan adalah:
 3. `docs/watchlist/policies/README.md`
 4. strategy entry README yang relevan
 5. file normatif bernomor pada strategy yang relevan
-6. `_refs/`, `examples/`, `fixtures/`, dan `db/` sebagai dokumen pendukung
+6. blueprint implementasi strategy bila tersedia
+7. `_refs/`, `examples/`, `fixtures/`, dan `db/` sebagai dokumen pendukung
 
 ## Reading Rule
 

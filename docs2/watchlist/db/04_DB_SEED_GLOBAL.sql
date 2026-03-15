@@ -1,3 +1,8 @@
+-- NON-NORMATIVE SQL ARTIFACT
+-- REVIEWER RULE: semantic changes must be introduced in normative markdown first.
+-- Dokumen owner semantik tetap berada pada file markdown normatif terkait.
+-- Jika ada konflik, file normatif markdown selalu menang dan SQL ini harus disesuaikan.
+
 -- 04_DB_SEED_GLOBAL.sql
 -- Seed global tables for Watchlist platform (lintas policy)
 -- Catatan: struktur tabel global dibuat oleh 05_DB_DDL_MARIADB.sql; file ini hanya melakukan INSERT seed.

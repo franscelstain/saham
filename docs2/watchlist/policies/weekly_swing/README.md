@@ -17,7 +17,8 @@ Dokumen pada folder ini adalah kontrak normatif Weekly Swing untuk:
 - PLAN algorithm dan deterministic selection,
 - CONFIRM overlay dan snapshot-related behavior,
 - contract-test acceptance,
-- serta governance backtest, evidence, dan procedures yang relevan.
+- governance backtest, evidence, dan procedures yang relevan,
+- serta blueprint implementasi build order.
 
 ## Core Reading Order
 
@@ -35,6 +36,7 @@ Untuk implementasi inti Weekly Swing, baca dokumen bernomor berikut secara berur
 10. [`10_WS_CONFIRM_OVERLAY.md`](10_WS_CONFIRM_OVERLAY.md)
 11. [`11_WS_INTRADAY_SNAPSHOT_TABLES.md`](11_WS_INTRADAY_SNAPSHOT_TABLES.md)
 12. [`13_WS_CONTRACT_TEST_CHECKLIST.md`](13_WS_CONTRACT_TEST_CHECKLIST.md)
+13. [`21_WS_IMPLEMENTATION_BLUEPRINT.md`](21_WS_IMPLEMENTATION_BLUEPRINT.md)
 
 Dokumen berikut dibaca bila perubahan atau implementasi menyentuh area backtest, evidence, manifest, deprecated artifacts, atau canonical procedures:
 
@@ -65,6 +67,10 @@ Di dalam domain Weekly Swing, file bernomor adalah rumah utama aturan wajib.
 
 Folder pendukung tidak boleh menjadi sumber aturan baru.
 
+## Build Guidance
+
+Bila tujuan pembaca adalah membangun fitur, jangan berhenti di overview. Gunakan `21_WS_IMPLEMENTATION_BLUEPRINT.md` sebagai urutan bangun praktis setelah membaca owner normatif inti.
+
 ## Relationship to Shared Policy
 
 Weekly Swing menggunakan baseline shared yang relevan dari `../_shared/`. Namun, aturan yang hanya berlaku untuk Weekly Swing tetap dimiliki oleh file normatif bernomor pada folder ini.
@@ -72,3 +78,28 @@ Weekly Swing menggunakan baseline shared yang relevan dari `../_shared/`. Namun,
 ## Final Rule
 
 Jika terdapat perbedaan antara README ini dan dokumen owner normatif Weekly Swing yang lebih rinci, dokumen owner normatif selalu menang.
+
+## Hard Boundary
+
+Pembaca tidak boleh mengangkat file referensial atau executable menjadi owner kontrak hanya karena file tersebut lebih konkret. Owner final tetap berada pada dokumen bernomor Weekly Swing dan dokumen shared/global yang memang ditunjuk eksplisit.
+
+## Quick Owner Map
+
+- PLAN lifecycle = `02`
+- runtime output shape = `03`
+- paramset contract = `04`
+- validator = `06`
+- PLAN algorithm = `08`
+- deterministic selection = `09`
+- CONFIRM overlay = `10`
+- snapshot semantics = `11`
+- acceptance = `13`
+- implementation order = `21`
+
+## Do Not Use As Sole Owner
+
+- `_refs/*`
+- `examples/*`
+- `fixtures/*`
+- SQL files in `db/`
+

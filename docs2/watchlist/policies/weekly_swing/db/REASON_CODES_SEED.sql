@@ -1,3 +1,8 @@
+-- NON-NORMATIVE SQL ARTIFACT
+-- REVIEWER RULE: semantic changes must be introduced in normative markdown first.
+-- Dokumen owner semantik tetap berada pada file markdown normatif terkait.
+-- Jika ada konflik, file normatif markdown selalu menang dan SQL ini harus disesuaikan.
+
 -- Implementation seed for Weekly Swing reason codes.
 -- Normative owner:
 -- docs/watchlist/policies/weekly_swing/07_WS_REASON_CODES_AND_HASH.md

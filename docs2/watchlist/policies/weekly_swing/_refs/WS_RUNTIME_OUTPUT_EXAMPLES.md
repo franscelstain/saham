@@ -40,3 +40,15 @@ Keterikatan kontraktual pair tersebut tetap dimiliki oleh dokumen owner yang rel
 ## Maintenance Rule
 
 Jika sebuah field, shape, atau invariant hanya tampak pada contoh di dokumen ini tetapi tidak dapat ditelusuri ke dokumen owner normatif, maka substansinya harus dipindahkan atau ditegaskan pada dokumen owner yang benar.
+
+## Owner Mapping Reminder
+
+Untuk menilai apakah contoh output valid, pembaca wajib memeriksa owner berikut:
+- runtime field dan persistence shape → `03_WS_DATA_MODEL_MARIADB.md`
+- PLAN branch behavior → `08_WS_PLAN_ALGORITHM.md`
+- deterministic selection / grouping → `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`
+- CONFIRM label behavior → `10_WS_CONFIRM_OVERLAY.md`
+- acceptance akhir → `13_WS_CONTRACT_TEST_CHECKLIST.md`
+
+Contoh pada dokumen ini tidak boleh dipakai untuk menambah field, reason, label, atau branch baru yang belum hidup pada owner tersebut.
+

@@ -1,3 +1,8 @@
+-- NON-NORMATIVE SQL ARTIFACT
+-- REVIEWER RULE: semantic changes must be introduced in normative markdown first.
+-- Dokumen owner semantik tetap berada pada file markdown normatif terkait.
+-- Jika ada konflik, file normatif markdown selalu menang dan SQL ini harus disesuaikan.
+
 -- Global watchlist DDL implementation artifact.
 -- Normative ownership remains in watchlist governance, schema documentation,
 -- and applicable shared / strategy policy documents.

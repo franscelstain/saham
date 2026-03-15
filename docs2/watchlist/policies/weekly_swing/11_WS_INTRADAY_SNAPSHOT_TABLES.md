@@ -12,7 +12,9 @@ Dokumen ini mengunci:
 - field normatif minimum pada tabel tersebut,
 - lifecycle dan append-only behavior,
 - boundary antara representasi snapshot watchlist dan kontrak upstream `market_data`,
-- serta relationship terhadap confirm overlay behavior.
+- relationship terhadap confirm overlay behavior,
+- header-to-item integrity,
+- serta batas penggunaan tabel snapshot di runtime Weekly Swing.
 
 Dokumen ini tidak menjadi owner kontrak publication, readiness, atau validity upstream.
 
@@ -28,6 +30,14 @@ Dokumen ini tidak mendefinisikan ulang:
 - atau definisi data upstream yang dikonsumsi.
 
 Dokumen ini hanya mengatur representasi snapshot yang dimiliki watchlist setelah data tersebut diterima atau dicatat untuk kebutuhan CONFIRM.
+
+## Runtime Usage Constraint (LOCKED)
+
+- Tabel snapshot dipakai sebagai persistence contract untuk kebutuhan CONFIRM watchlist.
+- Tabel snapshot tidak boleh dipakai sebagai sumber kebenaran baru untuk memodifikasi PLAN.
+- Tabel snapshot tidak boleh dipakai untuk menginfer kontrak upstream baru yang tidak ada owner-nya.
+- Overlay CONFIRM hanya boleh memakai field snapshot yang normatif pada strategy Weekly Swing.
+- Jika implementasi butuh field baru untuk keputusan overlay, field itu harus ditambahkan ke owner normatif terlebih dahulu; tidak boleh hidup diam-diam hanya di DDL atau code.
 
 ## Table A — `watchlist_confirm_snapshots`
 
@@ -97,10 +107,44 @@ CONFIRM membaca item snapshot untuk binding kandidat, evaluasi freshness yang be
 - `../../../db/03_DB_INDEXES_AND_CONSTRAINTS.md`
 - `../../../db/05_DB_DDL_MARIADB.sql`
 
+## Header-to-Item Integrity Rules (LOCKED)
+
+- Setiap row item wajib mereferensikan header snapshot yang ada.
+- `policy_code` dan `trade_date` efektif item diwarisi dari header; implementasi tidak boleh memperlakukan item sebagai snapshot berdiri sendiri.
+- Jika header snapshot tidak valid / hilang, seluruh item yang bergantung padanya tidak boleh diperlakukan sebagai snapshot valid untuk CONFIRM.
+- Satu `ticker_code` tidak boleh muncul ganda dalam header snapshot yang sama.
+- Snapshot item tanpa `ticker_code` canonical tidak boleh dipakai untuk binding CONFIRM.
+
+## Freshness Companion Rule (LOCKED)
+
+- Evaluasi freshness CONFIRM tidak boleh hanya memakai `created_at` item.
+- Freshness runtime harus dapat ditelusuri ke semantics header snapshot, terutama `captured_at` dan `inserted_at`.
+- Jika implementasi menyimpan field teknis tambahan untuk freshness, field tersebut tidak otomatis menjadi contract kecuali dinyatakan normatif.
+- Snapshot item yang terlihat lengkap tetapi header-nya stale tetap menghasilkan branch `DELAY` pada CONFIRM.
+
+## Runtime Consumption Mapping (LOCKED)
+
+| Runtime need | Source table / field | Owner behavior |
+|---|---|---|
+| snapshot available? | header snapshot exists | `10_WS_CONFIRM_OVERLAY.md` |
+| snapshot fresh? | header `captured_at` / `inserted_at` semantics | `10_WS_CONFIRM_OVERLAY.md` + dokumen ini |
+| item bound to ticker? | item `ticker_code` | `10_WS_CONFIRM_OVERLAY.md` + dokumen ini |
+| confirm positive/warning inputs | item fields normatif seperti `last_price` | `10_WS_CONFIRM_OVERLAY.md` |
+| plan mutation? | tidak boleh dari tabel snapshot | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` |
+
+## What This Document Must Not Be Used For
+
+Dokumen ini tidak boleh dipakai untuk:
+
+- menetapkan label `DELAY` / `CAUTION` / `CONFIRMED` / `NEUTRAL` tanpa membaca dokumen 10,
+- mengubah shape runtime output tanpa membaca dokumen 03,
+- menyimpulkan kontrak upstream `market_data`,
+- atau memperlakukan DDL / seed / code sebagai owner semantics pengganti dokumen ini.
+
 ## Ownership Rule
 
 Semantics tabel snapshot watchlist-owned ditetapkan di dokumen ini dan dibaca bersama `10_WS_CONFIRM_OVERLAY.md` serta `03_WS_DATA_MODEL_MARIADB.md`. SQL artifacts hanya merealisasikan shape yang dikunci di sini dan tidak menggantikan dokumen ini sebagai owner semantics.
 
 ## Final Rule
 
-Jika sebuah field, table shape, atau usage behavior pada snapshot hanya tampak di SQL artifact, example, atau fixture tanpa owner normatif yang jelas di dokumen ini atau dokumen owner Weekly Swing terkait, maka behavior tersebut belum dianggap bagian resmi dari kontrak Weekly Swing.
+Jika sebuah field, table shape, atau usage behavior pada snapshot hanya tampak di SQL artifact, example, fixture, atau implementasi teknis tanpa owner normatif yang jelas di dokumen ini atau dokumen owner Weekly Swing terkait, maka behavior tersebut belum dianggap bagian resmi dari kontrak Weekly Swing.

@@ -1,3 +1,8 @@
+-- NON-NORMATIVE SQL ARTIFACT
+-- REVIEWER RULE: semantic changes must be introduced in normative markdown first.
+-- Dokumen owner semantik tetap berada pada file markdown normatif terkait.
+-- Jika ada konflik, file normatif markdown selalu menang dan SQL ini harus disesuaikan.
+
 -- Implementation artifact for Weekly Swing backtest schema.
 -- Normative schema and calibration owner:
 -- docs/watchlist/policies/weekly_swing/12_WS_BACKTEST_SCHEMA_AND_CALIBRATION.md
