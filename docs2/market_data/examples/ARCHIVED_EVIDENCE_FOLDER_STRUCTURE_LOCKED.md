@@ -3,7 +3,7 @@
 ## Purpose
 Show the recommended structure for storing archived actual execution evidence separately from illustrative examples.
 
-This file is a layout and separation contract only. It does not make `examples/` the owner of archived evidence admission, and it does not change the rule that real execution evidence belongs in `../evidence/` under the admission controls defined by the authoritative ops/tests contracts.
+This file describes archived actual evidence organization, not example-only files.
 
 ## Recommended top-level structure
 
@@ -85,3 +85,6 @@ This file must remain aligned with:
 
 ## Anti-ambiguity rule (LOCKED)
 If archived actual evidence and illustrative examples are mixed without clear distinction, the proof layer becomes misleading.
+## Canonical artifact-name rule
+- `run_summary.json`, `publication_manifest.json`, `run_event_summary.json`, `correction_evidence.json`, and `replay_result.json` are the canonical artifact filenames used by this domain when those artifacts are materialized as files.
+- Equivalent storage mechanisms are allowed, but companion documentation must not invent alternate canonical filenames for the same artifact family.

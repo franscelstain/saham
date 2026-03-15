@@ -41,6 +41,11 @@ Show what an executed proof-style test output looks like after a real test run.
       }
     }
 
+
+## Naming note
+Fields such as `prior_current_run_id` and `candidate_seal_state` are derived executed-proof fields.
+They summarize persisted publication/run state and must not be read as schema column names.
+
 ## What this proves
 - tests are not only specified, but can be represented as executed evidence
 - pass/fail evidence can be concrete

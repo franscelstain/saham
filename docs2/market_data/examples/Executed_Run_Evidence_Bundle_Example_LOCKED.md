@@ -43,12 +43,23 @@ Show what one real executed evidence bundle should contain when the platform wan
       "blocked_reason_code_counts": []
     }
 
-### D. Executed run-event trail reference
+### D. Executed `run_event_summary.json`
     {
       "run_id": 8124,
+      "trade_date_requested": "2026-04-21",
       "event_count": 17,
-      "first_event": "RUN_CREATED",
-      "last_event": "FINAL_STATUS_COMMITTED"
+      "first_event_time": "2026-04-21T17:31:00+07:00",
+      "last_event_time": "2026-04-21T17:39:18+07:00",
+      "first_event_type": "RUN_CREATED",
+      "last_event_type": "FINAL_STATUS_COMMITTED",
+      "highest_severity": "INFO",
+      "stage_counts": {
+        "INGEST": 5,
+        "CANONICALIZE": 4,
+        "INDICATORS": 3,
+        "FINALIZE": 5
+      },
+      "reason_code_counts": {}
     }
 
 ## What this bundle proves

@@ -28,5 +28,5 @@ A run may evaluate gates before seal, but it must not be recorded as finalized `
 - `trade_date_effective = D` becomes consumer-usable only together with finalized `SUCCESS` plus seal.
 
 ## Anti-ambiguity rule (LOCKED)
-Implementations must not expose a transient state where `status='SUCCESS'` but hashes or seal are still missing.
+Implementations must not expose a transient state where `terminal_status='SUCCESS'` but hashes or seal are still missing.
 If hash/seal is pending or failed, the run must remain non-consumable (`HELD`, `FAILED`, or equivalent pre-final status outside the downstream contract).

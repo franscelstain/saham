@@ -121,7 +121,7 @@ A missing dependency inside a required locked window is not the same as ordinary
       "trade_date_requested": "2026-03-10",
       "trade_date_effective": "2026-03-09",
       "terminal_status": "HELD",
-      "seal_state": "UNSEALED"
+      "publishability_state": "NOT_READABLE"
     }
 
 ### Locked proof intent
@@ -141,7 +141,6 @@ Consumer readability is resolved by explicit effective-date logic, not by maximu
 ### Expected publication state before correction
 
     {
-      "publication_id": 1188,
       "trade_date": "2026-03-05",
       "publication_version": 1,
       "run_id": 5001,
@@ -154,7 +153,6 @@ Consumer readability is resolved by explicit effective-date logic, not by maximu
 ### Expected publication state after correction
 
     {
-      "publication_id": 1201,
       "trade_date": "2026-03-05",
       "publication_version": 2,
       "run_id": 5009,
@@ -168,7 +166,6 @@ Consumer readability is resolved by explicit effective-date logic, not by maximu
 ### Expected preserved old state
 
     {
-      "publication_id": 1188,
       "trade_date": "2026-03-05",
       "publication_version": 1,
       "run_id": 5001,
@@ -200,6 +197,10 @@ It is â€œnew sealed publication + preserved prior trail + explicit supersessionâ
 
 ### Locked proof intent
 An unchanged rerun must not create fake correction history.
+
+### Naming note
+Fields such as `current_publication_run_id`, `new_rerun_run_id`, `candidate_run_id`, and `prior_current_run_id` are derived proof-artifact names.
+They summarize relationships across `eod_publications`, `eod_current_publication_pointer`, and `eod_runs`; they are not persisted column names that replace the schema contracts.
 
 ---
 
@@ -255,6 +256,8 @@ It must also prove expected degraded outcomes.
       "trade_date_effective": "2026-03-09",
       "lifecycle_state": "COMPLETED",
       "terminal_status": "HELD",
+      "quality_gate_state": "FAIL",
+      "publishability_state": "NOT_READABLE",
       "stage": "FINALIZE",
       "source": "API_FREE",
       "coverage_ratio": 0.8420,
@@ -268,9 +271,8 @@ It must also prove expected degraded outcomes.
       "bars_batch_hash": null,
       "indicators_batch_hash": null,
       "eligibility_batch_hash": null,
-      "seal_state": "UNSEALED",
       "sealed_at": null,
-      "config_identity": "cfg_2026_03_v1",
+      "config_version": "cfg_2026_03_v1",
       "started_at": "2026-03-10T15:01:00+07:00",
       "finished_at": "2026-03-10T15:09:30+07:00"
     }

@@ -24,9 +24,9 @@ Illustrative examples do not satisfy this requirement by themselves.
 ### A. Archived actual run evidence
 Minimum contents:
 - actual `run_summary.json`
-- actual publication manifest or publication resolution artifact
+- actual `publication_manifest.json` or publication resolution artifact
 - actual hash values
-- actual run-event summary or reference
+- actual `run_event_summary.json` or reference
 - actual config identity
 - actual timestamps
 
@@ -41,7 +41,7 @@ Minimum contents:
 
 ### C. Archived actual replay evidence
 Minimum contents:
-- actual replay result artifact
+- actual `replay_result.json` artifact
 - actual comparison result
 - actual config identity
 - actual hash outputs

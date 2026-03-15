@@ -5,7 +5,7 @@ Define the minimum machine-readable run-event payload used for auditability, tro
 
 ## Storage
 Structured events are written to `eod_run_events`.
-`payload_json` must be a valid JSON object when present.
+`event_payload_json` must be a valid JSON object when present.
 
 ## Minimum top-level fields
 - `run_id`
@@ -29,7 +29,7 @@ Structured events are written to `eod_run_events`.
 - `exception_message`
 
 ## Locked rules
-- logs must not be the only place where final status is stored; status still belongs to `eod_runs`
+- logs must not be the only place where final status is stored; terminal outcome still belongs to `eod_runs.terminal_status`
 - log entries must be append-only
 - event timestamps use platform timezone consistently per run
-- sensitive credentials must never be written to payload_json
+- sensitive credentials must never be written to event_payload_json

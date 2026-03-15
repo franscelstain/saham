@@ -3,7 +3,7 @@
 ## Purpose
 Show what a real replay evidence artifact should look like after actual execution, not just as a contract shape.
 
-## Example — Executed replay result
+## Example — Executed `replay_result.json`
 
 ### Replay summary
     {

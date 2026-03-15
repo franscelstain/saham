@@ -20,9 +20,9 @@ At least one executed evidence pack must be preservable for each major operation
 ## Minimum executed evidence pack for one requested-date run
 A real run evidence pack must include at minimum:
 - real `run_summary.json`
-- real publication manifest or publication resolution output
+- real `publication_manifest.json` or publication resolution output
 - real hash values
-- real run-event trail reference
+- real `run_event_summary.json` or run-event trail reference
 - real eligibility export or reason-code distribution
 - real config identity
 - real timestamps
@@ -39,7 +39,7 @@ Must include at minimum:
 
 ## Minimum executed replay evidence pack
 Must include at minimum:
-- real replay result object
+- real `replay_result.json` object
 - real comparison result
 - real config identity
 - real actual hashes

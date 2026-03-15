@@ -5,7 +5,7 @@
   "snapshots": [
     {
       "captured_at": "2026-02-14 09:05:00",
-      "source": "MANUAL",
+      "source": "manual",
       "items": [
         {
           "ticker_code": "AAA",
@@ -18,7 +18,7 @@
     },
     {
       "captured_at": "2026-02-14 10:30:00",
-      "source": "MANUAL",
+      "source": "manual",
       "items": [
         {
           "ticker_code": "AAA",

@@ -20,7 +20,7 @@ A run, correction, or replay outcome is not operationally healthy unless enough 
 The platform must be able to reconstruct at minimum:
 1. requested-date run evidence pack
 2. historical correction evidence pack
-3. replay mismatch evidence pack
+3. replay result evidence pack
 
 ---
 
@@ -32,6 +32,8 @@ Explain one requested trade date T and its resolved publication/readiness outcom
 ### Minimum contents
 A conforming run evidence pack must include at minimum:
 - run summary
+- publication manifest or explicit publication-resolution object
+- run-event summary or explicit event-trail reference
 - requested trade date
 - effective trade date
 - terminal status
@@ -49,21 +51,23 @@ A conforming run evidence pack must include at minimum:
 4. What effective date became readable, if any?
 5. Was the requested date sealed/readable?
 6. Which publication was current?
-7. What dominant anomalies occurred?
-8. Which config identity applied?
+7. What event trail summary proves the run actually executed?
+8. What dominant anomalies occurred?
+9. Which config identity applied?
 
 ### Minimum example shape
     {
       "run_summary": { "...": "..." },
+      "publication_manifest": { "...": "..." },
+      "run_event_summary": { "...": "..." },
       "dominant_reason_codes": [
         { "reason_code": "RUN_COVERAGE_LOW", "count": 1 },
         { "reason_code": "ELIG_MISSING_BAR", "count": 158 }
       ],
       "publication_resolution": {
         "trade_date_effective": "2026-03-09",
-        "publication_id": 1402,
         "publication_version": 3,
-        "is_current": true
+        "is_current_publication": true
       }
     }
 
@@ -109,17 +113,14 @@ A conforming correction evidence pack must include at minimum:
         "approved_at": "2026-03-06T09:00:00+07:00"
       },
       "prior_publication": {
-        "publication_id": 1188,
         "run_id": 5001,
         "publication_version": 1,
         "is_current": false
       },
       "new_publication": {
-        "publication_id": 1201,
         "run_id": 5009,
         "publication_version": 2,
-        "is_current": true,
-        "supersedes_publication_id": 1188
+        "is_current": true
       },
       "old_hashes": {
         "bars_batch_hash": "H1B",
@@ -136,13 +137,13 @@ A conforming correction evidence pack must include at minimum:
 
 ---
 
-## 3. Replay mismatch evidence pack
+## 3. Replay result evidence pack
 
 ### Purpose
 Explain why actual replay output diverged from expected outcome and classify the mismatch in a way that is auditable and actionable.
 
 ### Minimum contents
-A conforming replay mismatch evidence pack must include at minimum:
+A conforming replay result evidence pack must include at minimum:
 - replay identity
 - expected run summary/hash outcome
 - actual run summary/hash outcome
@@ -167,19 +168,19 @@ A conforming replay mismatch evidence pack must include at minimum:
     {
       "replay_id": 3001,
       "trade_date": "2025-12-10",
+      "trade_date_effective": "2025-12-10",
+      "status": "SUCCESS",
       "comparison_result": "MISMATCH",
+      "comparison_note": "eligibility output diverged",
       "artifact_changed_scope": "eligibility_only",
       "config_identity": "cfg_2025_12_v2",
-      "expected": {
-        "status": "SUCCESS",
-        "trade_date_effective": "2025-12-10",
-        "eligibility_batch_hash": "C1"
-      },
-      "actual": {
-        "status": "SUCCESS",
-        "trade_date_effective": "2025-12-10",
-        "eligibility_batch_hash": "C2"
-      },
+      "publication_version": 1,
+      "bars_batch_hash": "A1",
+      "indicators_batch_hash": "B1",
+      "eligibility_batch_hash": "C2",
+      "expected_status": "SUCCESS",
+      "expected_trade_date_effective": "2025-12-10",
+      "expected_seal_state": "SEALED",
       "mismatch_summary": "eligibility hash changed while bars hash remained unchanged"
     }
 
@@ -189,15 +190,15 @@ A conforming replay mismatch evidence pack must include at minimum:
 1. Evidence packs must preserve enough detail to support diagnosis, not just human narrative.
 2. Evidence packs must be internally consistent with authoritative persisted run/publication data.
 3. A correction evidence pack must always preserve both old and new state.
-4. A replay mismatch evidence pack must always preserve both expected and actual state.
+4. A replay result evidence pack must always preserve both expected and actual state.
 5. Evidence packs must not imply readability for an unsealed or non-current publication.
 
 ## Relationship to run artifacts
 Evidence packs may reference operator-facing artifacts such as:
 - `run_summary.json`
-- archived anomaly-report artifact
+- `anomaly_report.md`
 - `correction_evidence.json`
-- `replay_mismatch_summary.json`
+- `replay_result.json`
 
 But the evidence contract is about semantic completeness, not just filenames.
 

@@ -86,7 +86,7 @@ Resolve terminal run status and effective-date readability.
 
 #### Minimum output
 - final `terminal_status`
-- `trade_date_effective`
+- resolved `trade_date_effective`
 - final run evidence
 
 ### 7. `market-data:daily`

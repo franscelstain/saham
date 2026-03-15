@@ -50,9 +50,12 @@ Recommended:
 
 ### Runs
 Recommended:
-- `(trade_date_requested, status, stage)`
-- `(trade_date_effective)`
-- `(trade_date_effective, status, sealed_at)`
+- `(trade_date_requested, lifecycle_state)`
+- `(trade_date_requested, terminal_status)`
+- `(trade_date_effective, terminal_status)`
+- `(trade_date_effective, publishability_state)`
+- `(quality_gate_state)`
+- `(stage)`
 - `(trade_date_effective, is_current_publication)`
 - `(supersedes_run_id)`
 

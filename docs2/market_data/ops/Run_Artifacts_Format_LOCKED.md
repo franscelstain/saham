@@ -17,13 +17,15 @@ For one requested trade date T, the implementation should be able to produce art
 At minimum, the following artifact shapes must be reconstructable:
 
 1. `run_summary.json`
-2. `eligibility_export.csv`
-3. `invalid_bars_export.csv` or equivalent bounded sample
-4. archived anomaly-report artifact (for example markdown or equivalent machine-readable anomaly summary)
+2. `publication_manifest.json` for each readable or superseded publication state being evidenced
+3. `run_event_summary.json`
+4. `eligibility_export.csv`
+5. `invalid_bars_export.csv` or equivalent bounded sample
+6. `anomaly_report.md` or equivalent machine-readable anomaly summary
 
 Where applicable, the following should also be available:
-5. `correction_evidence.json`
-6. `replay_mismatch_summary.json`
+7. `correction_evidence.json`
+8. `replay_result.json`
 
 ## 1. `run_summary.json`
 ### Purpose
@@ -38,6 +40,8 @@ A conforming summary should contain at minimum:
       "trade_date_effective": "2026-03-09",
       "lifecycle_state": "COMPLETED",
       "terminal_status": "HELD",
+      "quality_gate_state": "FAIL",
+      "publishability_state": "NOT_READABLE",
       "stage": "FINALIZE",
       "source": "API_FREE",
       "coverage_ratio": 0.8420,
@@ -51,9 +55,10 @@ A conforming summary should contain at minimum:
       "bars_batch_hash": null,
       "indicators_batch_hash": null,
       "eligibility_batch_hash": null,
-      "seal_state": "UNSEALED",
       "sealed_at": null,
-      "config_identity": "cfg_2026_03_v1",
+      "config_version": "cfg_2026_03_v1",
+      "config_hash": "abc123",
+      "config_snapshot_ref": "configs/2026-03-10.json",
       "publication_version": null,
       "is_current_publication": false,
       "supersedes_run_id": null,
@@ -63,13 +68,75 @@ A conforming summary should contain at minimum:
 
 ### Locked rules
 - summary must reflect actual persisted run outcome, not speculative operator interpretation
-- `terminal_status` is the consumer-facing run outcome; `lifecycle_state` and `stage` must not be used as substitutes for it
-- if `terminal_status` is readable success, seal state must be compatible with readability
+- if `terminal_status` is readable success, seal/publication evidence must be compatible with readability
 - if requested date is held or failed, summary must not imply requested date is readable
-- config identity must be included when available
-- publication-related fields must be included where correction-aware publication semantics exist
+- run-summary fields that mirror persisted run state must use the persisted names from `eod_runs`
+- derived publication-facing fields may appear only when clearly marked as derived companion evidence, not as replacement names for persisted columns
 
-## 2. `eligibility_export.csv`
+## 2. `publication_manifest.json`
+### Purpose
+Provide the compact deterministic proof object for one readable or historical publication state.
+
+### Minimum fields
+A conforming manifest should contain at minimum:
+
+    {
+      "publication_id": 1201,
+      "trade_date": "2026-03-05",
+      "run_id": 5009,
+      "publication_version": 2,
+      "is_current": true,
+      "supersedes_publication_id": 1188,
+      "seal_state": "SEALED",
+      "sealed_at": "2026-03-06T10:15:00+07:00",
+      "config_identity": "cfg_2026_03_v1",
+      "bars_batch_hash": "H2B",
+      "indicators_batch_hash": "H2I",
+      "eligibility_batch_hash": "H2E",
+      "bars_rows_written": 1000,
+      "indicators_rows_written": 1000,
+      "eligibility_rows_written": 1000,
+      "trade_date_effective": "2026-03-05"
+    }
+
+### Locked rules
+- manifest field names must align with the publication-manifest contract, even when values are assembled from multiple persisted tables
+- `publication_manifest.json` is publication-shaped evidence, not a promise that every field lives in `eod_publications` itself
+- `is_current` and `supersedes_publication_id` are publication fields and must not be replaced by run-mirror names such as `is_current_publication` or `supersedes_run_id`
+- a superseded publication manifest remains audit-valid and must not be retroactively rewritten to look current
+
+## 3. `run_event_summary.json`
+### Purpose
+Provide a compact summary of the append-only `eod_run_events` trail for one run without replacing the underlying event log.
+
+### Minimum fields
+A conforming summary should contain at minimum:
+
+    {
+      "run_id": 8124,
+      "trade_date_requested": "2026-04-21",
+      "event_count": 17,
+      "first_event_time": "2026-04-21T17:31:00+07:00",
+      "last_event_time": "2026-04-21T17:39:18+07:00",
+      "first_event_type": "RUN_CREATED",
+      "last_event_type": "FINAL_STATUS_COMMITTED",
+      "highest_severity": "INFO",
+      "stage_counts": {
+        "INGEST": 5,
+        "CANONICALIZE": 4,
+        "INDICATORS": 3,
+        "FINALIZE": 5
+      },
+      "reason_code_counts": {}
+    }
+
+### Locked rules
+- summary must be derivable from `eod_run_events` and must not invent event history that is absent from the append-only trail
+- `first_event_type`, `last_event_type`, `highest_severity`, `stage_counts`, and `reason_code_counts` are derived summary fields, not persisted column names
+- if the underlying event trail contains `ERROR` severity, the summary must not present `highest_severity` as lower than `ERROR`
+- `run_event_summary.json` summarizes the event trail; it does not replace row-level inspection of `eod_run_events` when detailed diagnosis is required
+
+## 4. `eligibility_export.csv`
 ### Purpose
 Provide a row-level readable/blocking view for the resolved trade date D.
 
@@ -89,7 +156,7 @@ Provide a row-level readable/blocking view for the resolved trade date D.
 - blocked rows must carry registered reason codes
 - export must not mix current and superseded publication states
 
-## 3. `invalid_bars_export.csv`
+## 5. `invalid_bars_export.csv`
 ### Purpose
 Provide row-level audit evidence for rejected source rows.
 
@@ -110,7 +177,7 @@ Provide row-level audit evidence for rejected source rows.
 - invalid bars must not be confused with canonical readable bars
 - bounded sampling is allowed only if the summary states that sampling was used
 
-## 4. Archived anomaly-report artifact
+## 6. `anomaly_report.md`
 ### Purpose
 Provide a short operator-facing summary of what went wrong or what materially changed.
 
@@ -135,9 +202,12 @@ Provide a short operator-facing summary of what went wrong or what materially ch
 - anomaly report must be consistent with run summary
 - narrative explanation must not contradict status/seal/publication facts
 
-## 5. `correction_evidence.json`
+## 7. `correction_evidence.json`
 ### Purpose
 Provide a compact before/after proof package for a historical correction event.
+
+The JSON shape below is an operator-facing derived artifact.
+Fields such as `prior_publication_is_current` and `new_publication_is_current` summarize publication state and are not persisted column names in `eod_publications`.
 
 ### Minimum fields
     {
@@ -167,7 +237,7 @@ Provide a compact before/after proof package for a historical correction event.
 - unchanged rerun must not claim a publication switch
 - evidence must not imply silent overwrite of prior publication
 
-## 6. `replay_mismatch_summary.json`
+## 8. `replay_result.json`
 ### Purpose
 Provide a machine-readable summary when replay comparison does not fully match expectation.
 
@@ -175,29 +245,26 @@ Provide a machine-readable summary when replay comparison does not fully match e
     {
       "replay_id": 3001,
       "trade_date": "2025-12-10",
+      "trade_date_effective": "2025-12-10",
+      "status": "SUCCESS",
       "comparison_result": "MISMATCH",
       "comparison_note": "eligibility output diverged",
       "artifact_changed_scope": "eligibility_only",
       "config_identity": "cfg_2025_12_v2",
+      "publication_version": 1,
+      "bars_batch_hash": "A1",
+      "indicators_batch_hash": "B1",
+      "eligibility_batch_hash": "C2",
+      "seal_state": "SEALED",
       "expected_status": "SUCCESS",
-      "actual_status": "SUCCESS",
       "expected_trade_date_effective": "2025-12-10",
-      "actual_trade_date_effective": "2025-12-10",
-      "expected_hashes": {
-        "bars_batch_hash": "A1",
-        "indicators_batch_hash": "B1",
-        "eligibility_batch_hash": "C1"
-      },
-      "actual_hashes": {
-        "bars_batch_hash": "A1",
-        "indicators_batch_hash": "B1",
-        "eligibility_batch_hash": "C2"
-      },
+      "expected_seal_state": "SEALED",
       "mismatch_summary": "eligibility hash changed while bars hash remained unchanged"
     }
 
 ### Locked rules
-- mismatch artifact must preserve both expected and actual comparison context
+- replay-result fields that mirror `md_replay_daily_metrics` must use the persisted replay names from replay proof storage
+- expected comparison context must remain explicit through replay-expected fields such as `expected_status`, `expected_trade_date_effective`, and `expected_seal_state`
 - mismatch summary must not replace detailed evidence, only summarize it
 
 ## Artifact timestamp rule

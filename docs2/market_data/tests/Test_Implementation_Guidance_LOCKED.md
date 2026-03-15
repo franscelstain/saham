@@ -99,7 +99,7 @@ A good test implementation should conceptually follow this shape:
 The following are insufficient by themselves:
 - “command exited successfully”
 - “row count > 0”
-- “status is not null”
+- “terminal_status is not null”
 - “hash exists”
 - “publication table has one row”
 - “no exception thrown”
