@@ -7,18 +7,24 @@ This snapshot is an upstream readiness artifact for consumers.
 It does not encode ranking, scoring, picks, or trading decisions.
 
 ## Output definition
-For each trade date D, the platform must produce exactly one eligibility row per coverage-universe ticker for D.
+For each trade date D, the platform must produce exactly one live current eligibility row per coverage-universe ticker for D.
 
 Minimum fields:
 - `trade_date`
 - `ticker_id`
+- `publication_id`
 - `eligible`
 - `reason_code`
+- `run_id`
 
 ## Row cardinality rule (LOCKED)
-For one trade date D:
+For one trade date D in the live current readable table:
 - every ticker in coverage universe for D must have exactly one eligibility row
 - tickers outside coverage universe for D must not appear in the eligibility snapshot for D
+- `publication_id` must be populated on every live current row
+
+`publication_id` is mandatory publication context for the current readable row set, but it is not a second competing primary key for the live current table.
+Historical publication-bound snapshots belong in `eod_eligibility_history` or equivalent audit storage.
 
 ## Eligibility meaning
 - `eligible = 1` means the ticker is readable for downstream consumers under upstream readiness rules
@@ -90,12 +96,12 @@ Each eligibility row stores one blocking `reason_code` only.
 If multiple blocking conditions exist, the implementation must select the most specific dominant blocking reason according to locked precedence documented elsewhere.
 
 ## Consumer rule (LOCKED)
-Consumers must use the eligibility snapshot as published for D.
-Consumers must not:
-- recompute eligibility ad hoc from raw tables
-- ignore `reason_code`
-- infer eligibility from bars alone
-- infer eligibility from indicators alone
+Consumers must use the eligibility snapshot as published.
+Consumers must not reconstruct eligibility by guessing from bars or indicators independently of the published eligibility artifact.
 
-## Determinism rule (LOCKED)
-Given identical upstream inputs and identical locked contracts, eligibility output for D must be identical across reruns.
+## Anti-ambiguity rule (LOCKED)
+The following are forbidden:
+- multiple live eligibility rows for the same `(trade_date, ticker_id)`
+- `eligible = 0` with empty blocking reason
+- `eligible = 1` when mandatory upstream readiness conditions are not satisfied
+- live readable eligibility rows with `publication_id IS NULL`

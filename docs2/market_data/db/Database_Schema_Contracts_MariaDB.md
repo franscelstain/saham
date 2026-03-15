@@ -1,25 +1,13 @@
-# Database Schema Contracts (MariaDB)
+# Database Schema Contracts (MariaDB, LOCKED)
 
 ## Purpose
-Define the minimum MariaDB schema semantics required to implement Market Data Platform contracts safely, deterministically, and auditably.
-
-This document is normative for schema semantics only.
-It complements the concrete DDL in `Database_Schema_MariaDB.sql`.
-
-It must not redefine book-level behavioral contracts such as current-publication read resolution.
-
-## Core schema goals
-The schema must support:
-- canonical EOD bars
-- invalid/rejected source-row audit evidence
-- deterministic indicator storage
-- explicit eligibility snapshot
-- separated run-state semantics
-- append-only event trail
-- hash and seal evidence
-- current publication resolution
-- historical correction trail
-- replay/result evidence
+Define the minimum persistence contract required for the Market Data Platform in MariaDB so the schema supports:
+- canonical readable-state storage
+- invalid-row evidence
+- publication-aware consumer reads
+- sealed publication switching
+- correction-safe auditability
+- deterministic replay support
 - auditable registry linkage
 - explicit row-history strategy
 
@@ -41,8 +29,9 @@ Equivalent naming is allowed only if semantics remain identical.
 
 ### 1. Canonical bars
 Must support:
-- exactly one current canonical row per `(trade_date, ticker_id)`
+- exactly one current readable row per `(trade_date, ticker_id)`
 - deterministic canonical winner selection
+- mandatory non-null `publication_id` publication context on every live current row
 - readable-state linkage to run/publication context
 
 ### 2. Invalid bars
@@ -55,17 +44,19 @@ Must support:
 
 ### 3. Indicators
 Must support:
-- exactly one current row per `(trade_date, ticker_id)`
+- exactly one current readable row per `(trade_date, ticker_id)`
 - explicit validity state
 - invalid reason code
 - indicator-set version identity
+- mandatory non-null `publication_id` publication context on every live current row
 - readable-state linkage to run/publication context
 
 ### 4. Eligibility
 Must support:
-- exactly one current row per `(trade_date, ticker_id)`
+- exactly one current readable row per `(trade_date, ticker_id)`
 - explicit `eligible` state
 - explicit blocking reason code
+- mandatory non-null `publication_id` publication context on every live current row
 - readable-state linkage to run/publication context
 
 ### 5. Runs
@@ -106,12 +97,36 @@ When the hardened pointer model is adopted, schema must support:
 - publication-to-trade-date consistency
 - transactional alignment with publication switch flow
 
+## Live current tables vs history tables (LOCKED)
+The schema must keep a clean distinction between:
+
+### A. Live current readable tables
+- `eod_bars`
+- `eod_indicators`
+- `eod_eligibility`
+
+These store one current readable row per `(trade_date, ticker_id)`.
+In these live current tables:
+- `publication_id` is mandatory publication context
+- `publication_id` is not the live-table primary key
+- superseded publication row sets must not remain side-by-side with the current readable row set
+
+### B. Historical publication-bound row sets
+When retained, these belong in:
+- `eod_bars_history`
+- `eod_indicators_history`
+- `eod_eligibility_history`
+- or equivalent immutable publication-bound storage
+
+History tables may use `(publication_id, trade_date, ticker_id)` as the row identity.
+That is distinct from the live current-table identity.
+
 ## Required uniqueness and integrity constraints (LOCKED)
 
 ### Required uniqueness
-- `eod_bars`: exactly one current row per `(trade_date, ticker_id)`
-- `eod_indicators`: exactly one current row per `(trade_date, ticker_id)`
-- `eod_eligibility`: exactly one current row per `(trade_date, ticker_id)`
+- `eod_bars`: exactly one current readable row per `(trade_date, ticker_id)`
+- `eod_indicators`: exactly one current readable row per `(trade_date, ticker_id)`
+- `eod_eligibility`: exactly one current readable row per `(trade_date, ticker_id)`
 - `md_replay_reason_code_counts`: one row per `(replay_id, trade_date, reason_code)`
 - `eod_publications`: one row per `(trade_date, publication_version)`
 
@@ -119,6 +134,7 @@ When the hardened pointer model is adopted, schema must support:
 - one coherent publication context must back one readable state
 - one trade date must resolve to at most one current publication
 - where the hardened pointer model is used, current-publication resolution must prefer `eod_current_publication_pointer`
+- live current rows in `eod_bars`, `eod_indicators`, and `eod_eligibility` must carry non-null `publication_id`
 - prior superseded publication must remain auditable
 - invalid bars must never leak into canonical readable bars
 - run events must remain append-only
@@ -246,4 +262,8 @@ This schema contract must remain aligned with:
 For current-publication resolution behavior, the book-level pointer contract remains the sole behavioral owner. Schema notes and DDL may enforce that contract, but must not soften it.
 
 ## Anti-ambiguity rule (LOCKED)
-If a required audit artifact, invalid-row evidence, run-state dimension, or row-history strategy is described as mandatory in contracts but not represented or explicitly chosen in schema design, then the schema is incomplete and not contract-consistent.
+If a required audit artifact, invalid-row evidence, run-state dimension, publication-context rule, or row-history strategy is described as mandatory in contracts but not represented or explicitly chosen in schema design, then the schema is incomplete and not contract-consistent.
+
+
+**Publication-context integrity rule for live current tables.**
+For `eod_bars`, `eod_indicators`, and `eod_eligibility`, `publication_id` is a mandatory publication-context field used to bind the current readable rows to the resolved current publication. This field is required as an integrity anchor for downstream reads and operational verification. It must not be interpreted as permitting side-by-side storage of multiple publication versions in the live current tables for the same `(trade_date, ticker_id)` key. Live current tables retain a single current-state row per `(trade_date, ticker_id)`; publication-versioned history belongs in the publication trail and `*_history` tables.

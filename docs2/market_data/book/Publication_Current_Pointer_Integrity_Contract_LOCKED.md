@@ -10,6 +10,17 @@ Define the hardened rule for resolving the one current readable publication for 
 
 This contract strengthens current-publication integrity beyond a soft `is_current` flag pattern.
 
+## Production stance (LOCKED)
+This documentation set treats the hardened pointer model as the normative production target.
+
+That means:
+- current publication resolution is owned by `eod_current_publication_pointer`
+- `eod_publications.is_current` is mirror state only
+- `eod_runs.is_current_publication` is mirror state only
+- any legacy or compatibility procedure that updates only soft-current flags is subordinate to this contract
+
+A build that uses only soft-current flags may be acceptable as a temporary compatibility mode, but it is not the preferred production-grade implementation described by this documentation set.
+
 ## Core rule (LOCKED)
 For each trade date D, there must be exactly one authoritative current-publication pointer entry.
 
@@ -92,3 +103,7 @@ If the system claims one current readable publication per trade date but cannot 
 - how mismatches are handled safely
 
 then current-publication integrity is overstated.
+## Legacy-compatibility demotion rule (LOCKED)
+Any procedure, query, or helper that switches current state through `eod_publications.is_current` without treating the pointer table as the primary owner must be treated as legacy-compatibility material only.
+
+Such material may exist to help migration or local rollout, but it must not be presented to builders as the main publication-resolution path.

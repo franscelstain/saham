@@ -1,6 +1,7 @@
 -- LOCKED PROCEDURE PATTERN
 -- Purpose: switch the hardened current-publication pointer in the same protected flow
 -- that promotes a new sealed publication to current state.
+-- This is the preferred production switch path for new implementations.
 
 DELIMITER $$
 

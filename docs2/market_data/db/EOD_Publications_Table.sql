@@ -43,3 +43,7 @@ CREATE TABLE IF NOT EXISTS eod_publications (
 --      - set prior current publication to is_current = 0
 --      - set new publication to is_current = 1
 -- 4. Preserve prior publication row as audit history.
+-- LOCKED INTERPRETATION
+-- 1. `is_current` is supporting mirror state only when the hardened pointer model is used.
+-- 2. Current-publication ownership remains with `eod_current_publication_pointer`.
+-- 3. Builders must not implement current-publication resolution from this table alone when the pointer table is present.

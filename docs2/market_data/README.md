@@ -18,6 +18,10 @@ It does not define downstream scoring, ranking, picks, signals, portfolio constr
 ## Domain boundary
 Market Data Platform is an upstream data-production and publication-readiness module.
 
+It depends on shared-foundation master data outside this domain, especially the market calendar and ticker identity master.
+Those global dependencies may live under `docs/db/` or an equivalent shared-foundation owner.
+This domain consumes those dependencies, but it remains the authoritative owner for canonical EOD bars, EOD indicators, eligibility/readiness semantics, publication/read-model behavior, sealing, replay, correction handling, and upstream audit evidence.
+
 It may decide:
 - what data is canonical
 - what data is valid
@@ -45,9 +49,26 @@ Read in this order before going deeper into schema, ops, or proof packs:
 3. `book/INDEX.md`
 
 After that, continue according to the work being done:
-- implementation and publication flow → focus on the implementation-critical contracts referenced by `book/INDEX.md`, then continue to `db/`, `ops/`, and `indicators/` as needed
+- implementation and publication flow → read the implementation-critical contracts below first, then continue to `db/`, `ops/`, and `indicators/` as needed
 - compliance, replay, and correction proof → continue to `tests/`, `backtest/`, and the related proof contracts referenced by `book/INDEX.md`
 - example shape and executed evidence review → use `examples/` and `evidence/` only as companion material, not as a source of new behavior
+
+## Implementation-critical contracts for build
+A builder should not guess the runtime path from the whole tree. For the main upstream build path, read these files first and keep them aligned as one set:
+1. `book/Domain_Boundary_Invariants_LOCKED.md`
+2. `book/EOD_Bars_Contract.md`
+3. `book/EOD_Indicators_Contract.md`
+4. `book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
+5. `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
+6. `book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+7. `book/Dataset_Seal_and_Freeze_Contract_LOCKED.md`
+8. `book/Historical_Correction_and_Reseal_Contract_LOCKED.md`
+9. `db/EOD_Current_Publication_Pointer_Table.sql`
+10. `db/Publication_Current_Pointer_Switch_Procedure_LOCKED.sql`
+11. `ops/Daily_Pipeline_Execution_and_Sealing_Runbook_LOCKED.md`
+12. `ops/Audit_Query_Cookbook_LOCKED.md`
+
+A builder should treat the files above as the shortest path to a coherent implementation. Everything else expands or supports that path; it must not silently replace it.
 
 ## Reading rule
 Use this README for orientation only.

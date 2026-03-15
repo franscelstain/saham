@@ -6,6 +6,7 @@ Define the authoritative upstream indicator artifact for one trade date D.
 This contract governs:
 - indicator row identity
 - minimum fields
+- publication-context semantics
 - validity semantics
 - dependency semantics
 - null/invalid behavior
@@ -17,16 +18,20 @@ This document complements:
 - eligibility contracts
 
 ## Output identity
-For each `(trade_date, ticker_id)` there must be at most one indicator row.
+For the live current readable indicators table, there must be at most one indicator row per `(trade_date, ticker_id)`.
 
-Minimum row identity:
+Minimum logical row identity:
 - `trade_date`
 - `ticker_id`
+
+`publication_id` is mandatory publication context for the current readable row, but it is not a second competing live-table identity.
+Historical publication-bound snapshots belong in history tables or publication evidence, not as duplicate live current rows.
 
 ## Minimum fields
 Required minimum fields:
 - `trade_date`
 - `ticker_id`
+- `publication_id`
 - `is_valid`
 - `invalid_reason_code`
 - `indicator_set_version`
@@ -35,8 +40,16 @@ Required minimum fields:
 - `vol_ratio`
 - `roc20`
 - `hh20`
+- `run_id`
 
 Equivalent naming is allowed only if semantics remain identical.
+
+## Current-state publication-context rule (LOCKED)
+For the live readable table `eod_indicators`:
+- each row must belong to exactly one sealed publication context
+- `publication_id` must be non-null
+- the row must represent the current readable state for `(trade_date, ticker_id)`
+- superseded publication row sets must not remain side-by-side in the live current table
 
 ## Upstream-only rule (LOCKED)
 These indicators are upstream derived data.
@@ -56,8 +69,8 @@ When invalid:
 - blocked downstream readiness must be explainable without guessing
 
 ## One-row rule (LOCKED)
-The indicator artifact must emit at most one row per `(trade_date, ticker_id)`.
-Duplicate indicator rows for the same key are forbidden.
+The live current artifact must emit at most one row per `(trade_date, ticker_id)`.
+Duplicate live indicator rows for the same key are forbidden.
 
 ## Dependency summary table (LOCKED)
 
@@ -93,14 +106,15 @@ Preferred meanings:
 
 ## Row existence rule (LOCKED)
 If implementation chooses to materialize indicator rows even when invalid:
-- the row must remain uniquely keyed
+- the row must remain uniquely keyed by `(trade_date, ticker_id)` in the live current table
+- `publication_id` must still be populated
 - `is_valid = 0`
 - `invalid_reason_code` must explain why
 
 Implementation must not silently omit rows if downstream contracts expect explicit invalid-state rows.
 
 ## Determinism rule (LOCKED)
-Given identical canonical bars, calendar ordering, config semantics, and indicator-set version, the indicator row for `(trade_date, ticker_id)` must be identical across reruns.
+Given identical canonical bars, calendar ordering, config semantics, and indicator-set version, the indicator row for `(trade_date, ticker_id)` must be identical across reruns within the same publication outcome.
 
 ## Eligibility interaction
 Eligibility consumers must use this indicator artifact as published.
@@ -108,7 +122,8 @@ They must not recompute indicators ad hoc from bars at read time.
 
 ## Anti-ambiguity rule (LOCKED)
 The following are forbidden:
-- multiple indicator rows for the same `(trade_date, ticker_id)`
+- multiple live indicator rows for the same `(trade_date, ticker_id)`
 - invalid row with empty invalid reason
 - non-`NULL` output produced through guessed or missing dependencies
 - downstream read logic inferring validity from field non-nullness alone while ignoring `is_valid` and `invalid_reason_code`
+- live readable indicator rows with `publication_id IS NULL`

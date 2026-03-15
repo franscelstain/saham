@@ -1,9 +1,14 @@
--- LOCKED PROCEDURE PATTERN
--- Purpose: enforce deterministic publication switching so one trade_date has one current publication.
-
--- NOTE:
--- This is a reference locked procedure pattern.
--- Exact syntax may be adapted to local MariaDB deployment conventions.
+-- LOCKED COMPATIBILITY WRAPPER
+-- Purpose: preserve a legacy procedure name while delegating to the hardened
+-- pointer-based publication switch flow.
+--
+-- Normative build path:
+--   1. `eod_current_publication_pointer` is the primary current-publication owner.
+--   2. `sp_switch_current_publication_pointer` is the primary switch procedure.
+--   3. This wrapper exists only for compatibility with older callers that still
+--      invoke `sp_switch_current_publication`.
+--
+-- New implementations should call `sp_switch_current_publication_pointer` directly.
 
 DELIMITER $$
 
@@ -13,71 +18,19 @@ CREATE PROCEDURE sp_switch_current_publication (
     IN p_new_run_id BIGINT UNSIGNED
 )
 BEGIN
-    DECLARE v_current_publication_id BIGINT UNSIGNED DEFAULT NULL;
-    DECLARE v_new_seal_state VARCHAR(16);
-    DECLARE v_new_trade_date DATE;
-
-    START TRANSACTION;
-
-    SELECT publication_id
-      INTO v_current_publication_id
-      FROM eod_publications
-     WHERE trade_date = p_trade_date
-       AND is_current = 1
-     FOR UPDATE;
-
-    SELECT seal_state, trade_date
-      INTO v_new_seal_state, v_new_trade_date
-      FROM eod_publications
-     WHERE publication_id = p_new_publication_id
-       AND run_id = p_new_run_id
-     FOR UPDATE;
-
-    IF v_new_trade_date IS NULL THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'New publication not found for requested switch';
-    END IF;
-
-    IF v_new_trade_date <> p_trade_date THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Publication trade_date mismatch';
-    END IF;
-
-    IF v_new_seal_state <> 'SEALED' THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Unsealed publication cannot become current';
-    END IF;
-
-    UPDATE eod_publications
-       SET is_current = 0,
-           updated_at = NOW()
-     WHERE trade_date = p_trade_date
-       AND is_current = 1;
-
-    UPDATE eod_publications
-       SET is_current = 1,
-           updated_at = NOW()
-     WHERE publication_id = p_new_publication_id;
-
-    UPDATE eod_runs
-       SET is_current_publication = 0,
-           updated_at = NOW()
-     WHERE trade_date_effective = p_trade_date
-       AND is_current_publication = 1;
-
-    UPDATE eod_runs
-       SET is_current_publication = 1,
-           updated_at = NOW()
-     WHERE run_id = p_new_run_id;
-
-    COMMIT;
+    CALL sp_switch_current_publication_pointer(
+        p_trade_date,
+        p_new_publication_id,
+        p_new_run_id
+    );
 END$$
 
 DELIMITER ;
 
--- LOCKED SEMANTICS
--- 1. Only a SEALED publication may become current.
--- 2. Switching current publication is transactional.
--- 3. Old current publication is demoted before/with new promotion inside the same protected flow.
--- 4. eod_runs current-publication flags are kept aligned with eod_publications.
--- 5. This procedure pattern is the enforcement answer where MariaDB lacks a partial unique index for one-current-per-date.
+-- LOCKED COMPATIBILITY SEMANTICS
+-- 1. This wrapper must not introduce switching behavior different from
+--    `sp_switch_current_publication_pointer`.
+-- 2. Current-publication resolution still belongs to
+--    `eod_current_publication_pointer`, not to `eod_publications.is_current` alone.
+-- 3. If this wrapper is kept, it should be documented and presented as
+--    compatibility-only, not as the preferred production switch path.

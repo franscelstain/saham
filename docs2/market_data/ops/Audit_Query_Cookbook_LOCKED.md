@@ -10,8 +10,15 @@ The exact SQL may vary by implementation details, but the questions answered her
 Resolve the one current publication for D.
 
 ### Query intent
-- filter `eod_publications` by `trade_date = D`
-- resolve `is_current = 1`
+- resolve `eod_current_publication_pointer` by `trade_date = D`
+- join the pointed `publication_id` to `eod_publications`
+- validate `trade_date`, `seal_state`, and mirror current-state columns
+- use `eod_publications.is_current = 1` only as a supporting consistency check, not as the primary source of truth
+
+### Canonical audit join path
+1. `eod_current_publication_pointer.trade_date = D`
+2. `eod_current_publication_pointer.publication_id = eod_publications.publication_id`
+3. `eod_publications.run_id = eod_runs.run_id`
 
 ### Must answer
 - publication_id
@@ -25,8 +32,8 @@ Resolve the one current publication for D.
 List historical publications for D that are no longer current.
 
 ### Query intent
-- filter `eod_publications` by `trade_date = D`
-- resolve `is_current = 0`
+- resolve the current publication through `eod_current_publication_pointer`
+- list `eod_publications` for `trade_date = D` where the row is not the current pointed publication
 - sort by `publication_version`
 
 ### Must answer
@@ -107,7 +114,8 @@ Explain one correction event.
 Compare prior and corrected publication manifests.
 
 ### Query intent
-- resolve current and superseded publications for D
+- resolve the current publication through `eod_current_publication_pointer`
+- resolve superseded publications for D from `eod_publications`
 - compare bars/indicators/eligibility hashes
 
 ### Must answer
@@ -140,12 +148,13 @@ Inspect replay anomaly or blocking distribution.
 - reason code counts
 - whether mismatch is concentrated in one layer
 
-## Query 11 — Publication-bound row history (if history tables are implemented)
+## Query 11 — Publication-bound row history
 ### Goal
 Retrieve exact rows for a historical publication.
 
 ### Query intent
-- filter `*_history` tables by `publication_id`
+- resolve the target `publication_id` first
+- filter `*_history` tables by that `publication_id`
 
 ### Must answer
 - exact historical row set for that publication
@@ -155,7 +164,8 @@ Retrieve exact rows for a historical publication.
 Prove which config snapshot produced the current publication.
 
 ### Query intent
-- resolve current publication for D
+- resolve the current publication through `eod_current_publication_pointer`
+- validate the pointed publication row
 - join to `eod_runs`
 - read config identity fields
 
@@ -177,3 +187,6 @@ This cookbook must remain aligned with:
 
 ## Anti-ambiguity rule (LOCKED)
 If an operator cannot answer the audit questions above without inventing undocumented joins or inference logic, the audit usability layer is incomplete.
+## Build-safety rule (LOCKED)
+This cookbook must teach the same join path that the implementation actually uses.
+If a simpler-looking query bypasses the pointer owner, bypasses publication validation, or bypasses the one-publication context, that query must not be published here as a normal audit pattern.

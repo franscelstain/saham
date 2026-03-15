@@ -1,5 +1,9 @@
 # Indicator Computation Specification (EOD)
 
+## Role of this document
+This file is an implementation-facing companion specification.
+The normative owner for indicator semantics remains `../book/EOD_Indicators_Contract.md`, with formula authority in `EOD_Indicators_Formula_Spec.md`.
+
 ## Input source
 Input comes only from canonical `eod_bars` for valid trading days.
 Rows from `eod_invalid_bars` must never participate in indicator computation.
@@ -39,7 +43,7 @@ Requires current bar and previous canonical bar.
 Seed at the first date with 14 available TR values:
 `ATR14_seed = AVG(TR(x))` over the first 14 TR observations.
 Recursive form afterward:
-the locked Wilder recursion formula
+`ATR14(D) = ((ATR14(D[-1]) * 13) + TR(D)) / 14`
 Requires trading-day continuity per ticker.
 
 Warmup implication:
@@ -47,16 +51,16 @@ Warmup implication:
 - before that point, `ATR14` and `atr14_pct` are NULL
 
 ### 5) `atr14_pct`
-the locked percentage formula
+`atr14_pct(D) = ATR14(D) / P(D)`
 If `close(D) <= 0` the source bar is invalid and the indicator must not be computed.
 
 ### 6) `vol_ratio`
-the locked prior-20 volume-ratio formula over `window(D[-1], 20)`
+`vol_ratio(D) = volume(D) / AVG(volume(x))` over `window(D[-1], 20)`
 This uses the current day volume divided by the average volume of the **20 prior trading days excluding D**.
 Requires 21 canonical bars total: D plus D[-1]..D[-20].
 
 ### 7) `roc20`
-the locked ROC20 formula
+`roc20(D) = (P(D) / P(D[-20])) - 1`
 Requires both `P(D)` and `P(D[-20])`.
 This is a pure ratio, not a percentage-multiplied-by-100 field.
 

@@ -7,6 +7,11 @@ Lock what Market Data Platform requires from the global `tickers` master so:
 - downstream consumers receive stable `ticker_id`
 - historical replay can reconstruct universe membership as-of D without guessing from current ticker state
 
+## Ownership note
+Market Data Platform depends on a shared ticker-identity foundation.
+This contract defines required dependency semantics only.
+It does not make `market_data` the owner of the global ticker master, and it does not allow the shared foundation to reclaim ownership of canonical bars, indicators, eligibility, or publication behavior.
+
 ## Required fields
 - `ticker_id` (immutable PK)
 - `ticker_code` (display / exchange code)

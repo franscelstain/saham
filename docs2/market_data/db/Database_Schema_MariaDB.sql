@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS eod_bars (
   adj_close DECIMAL(20,4) NULL,
   source VARCHAR(32) NOT NULL,
   run_id BIGINT UNSIGNED NOT NULL,
-  publication_id BIGINT UNSIGNED NULL,
+  publication_id BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (trade_date, ticker_id),
   KEY idx_eod_bars_ticker_date (ticker_id, trade_date),
@@ -41,8 +41,10 @@ CREATE TABLE IF NOT EXISTS eod_bars (
 
 -- LOCKED NOTE
 -- eod_bars stores the current canonical readable row set for a given trade_date.
+-- publication_id is mandatory publication context on every live current row,
+-- but it is not part of the live-table primary key.
 -- Historical auditability across corrections is provided through publication trail,
--- hash trail, correction evidence, and optional immutable snapshot tables below.
+-- hash trail, correction evidence, and immutable snapshot tables below.
 
 -- =========================================================
 -- Invalid/rejected source-row evidence
@@ -90,7 +92,7 @@ CREATE TABLE IF NOT EXISTS eod_indicators (
   roc20 DECIMAL(20,10) NULL,
   hh20 DECIMAL(20,4) NULL,
   run_id BIGINT UNSIGNED NOT NULL,
-  publication_id BIGINT UNSIGNED NULL,
+  publication_id BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (trade_date, ticker_id),
   KEY idx_eod_indicators_ticker_date (ticker_id, trade_date),
@@ -98,6 +100,11 @@ CREATE TABLE IF NOT EXISTS eod_indicators (
   KEY idx_eod_indicators_invalid_reason (invalid_reason_code),
   KEY idx_eod_indicators_publication (publication_id)
 ) ENGINE=InnoDB;
+
+-- LOCKED NOTE
+-- eod_indicators stores the current readable indicator row set.
+-- publication_id is mandatory publication context on every live current row,
+-- but live-table identity remains (trade_date, ticker_id).
 
 -- =========================================================
 -- Eligibility artifact
@@ -109,7 +116,7 @@ CREATE TABLE IF NOT EXISTS eod_eligibility (
   eligible TINYINT(1) NOT NULL,
   reason_code VARCHAR(64) NULL,
   run_id BIGINT UNSIGNED NOT NULL,
-  publication_id BIGINT UNSIGNED NULL,
+  publication_id BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (trade_date, ticker_id),
   KEY idx_eod_eligibility_ticker_date (ticker_id, trade_date),
@@ -117,6 +124,11 @@ CREATE TABLE IF NOT EXISTS eod_eligibility (
   KEY idx_eod_eligibility_reason (reason_code),
   KEY idx_eod_eligibility_publication (publication_id)
 ) ENGINE=InnoDB;
+
+-- LOCKED NOTE
+-- eod_eligibility stores the current readable eligibility row set.
+-- publication_id is mandatory publication context on every live current row,
+-- but live-table identity remains (trade_date, ticker_id).
 
 -- =========================================================
 -- Runs with separated state model
