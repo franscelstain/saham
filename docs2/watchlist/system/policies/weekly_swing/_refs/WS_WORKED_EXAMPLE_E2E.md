@@ -14,7 +14,7 @@ Jika terdapat perbedaan antara worked example ini dan dokumen owner normatif, ma
 
 Owner normatif untuk contoh ini tetap berada pada:
 
-- `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+- `02_WS_CANONICAL_RUNTIME_FLOW.md`
 - `03_WS_DATA_MODEL_MARIADB.md`
 - `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`
 - `10_WS_CONFIRM_OVERLAY.md`

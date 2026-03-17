@@ -236,7 +236,7 @@ Dokumen ini tidak mengambil alih acceptance threshold OOS dan evaluation suffici
 4) Buat param_set baru (DRAFT):
    - parameter terkalibrasi => origin=BT, status=ACTIVE
    - parameter deterministik => origin=DET, status=ACTIVE
-5) Promote param_set BT menjadi ACTIVE (lihat [`02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)).
+5) Promote param_set BT menjadi ACTIVE (lihat [`02_WS_CANONICAL_RUNTIME_FLOW.md`](02_WS_CANONICAL_RUNTIME_FLOW.md)).
 
 ## Evaluation metrics sufficiency (LOCKED)
 Metrik pada `watchlist_bt_eval` wajib memenuhi spesifikasi:

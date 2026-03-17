@@ -19,7 +19,7 @@ Audit docs tidak boleh menjadi owner rule bisnis.
 - `system/policies/weekly_swing/README.md`
 
 ### Canonical / Runtime
-- `system/policies/weekly_swing/02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+- `system/policies/weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md` — owner canonical runtime flow Weekly Swing
 - `system/policies/weekly_swing/03_WS_DATA_MODEL_MARIADB.md`
 
 ### Plan / Parameter / Validation

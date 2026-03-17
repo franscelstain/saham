@@ -130,7 +130,7 @@ CONFIRM membaca item snapshot untuk binding kandidat, evaluasi freshness yang be
 | snapshot fresh? | header `captured_at` / `inserted_at` semantics | `10_WS_CONFIRM_OVERLAY.md` + dokumen ini |
 | item bound to ticker? | item `ticker_code` | `10_WS_CONFIRM_OVERLAY.md` + dokumen ini |
 | confirm positive/warning inputs | item fields normatif seperti `last_price` | `10_WS_CONFIRM_OVERLAY.md` |
-| plan mutation? | tidak boleh dari tabel snapshot | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` |
+| plan mutation? | tidak boleh dari tabel snapshot | `02_WS_CANONICAL_RUNTIME_FLOW.md` |
 
 ## What This Document Must Not Be Used For
 

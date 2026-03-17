@@ -64,7 +64,7 @@ RECOMMENDATION dapat kosong walaupun `TOP_PICKS` dan/atau `SECONDARY` pada PLAN 
 - `01_WS_OVERVIEW.md`
 
 ### Canonical Flow
-- `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+- `02_WS_CANONICAL_RUNTIME_FLOW.md` — owner untuk urutan canonical `PLAN -> RECOMMENDATION -> CONFIRM`
 
 ### Runtime / Data Model
 - `03_WS_DATA_MODEL_MARIADB.md`
@@ -90,7 +90,7 @@ RECOMMENDATION dapat kosong walaupun `TOP_PICKS` dan/atau `SECONDARY` pada PLAN 
 ## Core Reading Order
 
 1. `01_WS_OVERVIEW.md`
-2. `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+2. `02_WS_CANONICAL_RUNTIME_FLOW.md` — urutan canonical runtime flow
 3. `03_WS_DATA_MODEL_MARIADB.md`
 4. `08_WS_PLAN_ALGORITHM.md`
 5. `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`

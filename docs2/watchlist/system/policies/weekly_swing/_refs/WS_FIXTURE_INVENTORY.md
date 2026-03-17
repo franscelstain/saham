@@ -99,9 +99,9 @@ Kapan dipakai:
 | Fixture / category | Biasanya dipakai untuk | Pertanyaan yang dijawab | Dokumen normatif yang perlu dibuka |
 |---|---|---|---|
 | `paramset_valid.json` + validator fixtures | input/paramset validation | Apakah input salah ditolak dengan benar? | `04_WS_PARAMSET_JSON_CONTRACT.md`, `13_WS_CONTRACT_TEST_CHECKLIST.md` |
-| `PLAN_FIXTURE_A_TIES_V1.json` | PLAN determinism, plan levels, hash | Apakah run PLAN kaya tetap stabil? | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`, `07_WS_REASON_CODES_AND_HASH.md` |
+| `PLAN_FIXTURE_A_TIES_V1.json` | PLAN determinism, plan levels, hash | Apakah run PLAN kaya tetap stabil? | `02_WS_CANONICAL_RUNTIME_FLOW.md`, `07_WS_REASON_CODES_AND_HASH.md` |
 | `plan_items_artificial_ties.json` | tie-break diagnosis | Apakah ranking tetap deterministik saat skor sama? | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` |
-| `plan_items_guard_fail.json` | guard fail | Apakah kandidat gagal ditempatkan dengan reason yang benar? | `02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md` |
+| `plan_items_guard_fail.json` | guard fail | Apakah kandidat gagal ditempatkan dengan reason yang benar? | `02_WS_CANONICAL_RUNTIME_FLOW.md` |
 | `plan_items_forced_watch_only.json` | watch-only forcing | Apakah kandidat yang lewat guard tetap bisa diturunkan menjadi watch-only? | `09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md` |
 | `confirm_immutability_pair.json` | overlay / immutability | Apakah CONFIRM membaca PLAN tanpa menulis ulang? | `10_WS_CONFIRM_OVERLAY.md`, `13_WS_CONTRACT_TEST_CHECKLIST.md` |
 | `confirm_payload_with_unknown_top_level_field.json` | strictness / invalid schema drift | Apakah payload liar ditolak dengan benar? | `10_WS_CONFIRM_OVERLAY.md`, `13_WS_CONTRACT_TEST_CHECKLIST.md` |

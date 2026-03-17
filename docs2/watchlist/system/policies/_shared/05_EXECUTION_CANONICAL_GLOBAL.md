@@ -46,6 +46,6 @@ Database watchlist global ada di folder [`../../db/`](../../db/README.md):
 ## Policy-specific detail
 Detail implementasi per policy tetap di folder policy masing-masing.
 Contoh Weekly Swing:
-- [`../weekly_swing/02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`](../weekly_swing/02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md)
+- [`../weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md`](../weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md) — canonical runtime flow Weekly Swing
 - [`../weekly_swing/22_WS_RECOMMENDATION_OVERVIEW.md`](../weekly_swing/22_WS_RECOMMENDATION_OVERVIEW.md)
 - [`../weekly_swing/23_WS_RECOMMENDATION_INPUT_OUTPUT_CONTRACT.md`](../weekly_swing/23_WS_RECOMMENDATION_INPUT_OUTPUT_CONTRACT.md)

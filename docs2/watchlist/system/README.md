@@ -19,7 +19,7 @@ Policy aktif yang dibahas saat ini hanya:
 ## Read First
 
 1. `policies/weekly_swing/01_WS_OVERVIEW.md`
-2. `policies/weekly_swing/02_WS_EXECUTION_CANONICAL_PLAN_CONFIRM.md`
+2. `policies/weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md` — canonical runtime flow (`PLAN -> RECOMMENDATION -> CONFIRM`)
 3. `policies/weekly_swing/03_WS_DATA_MODEL_MARIADB.md`
 4. `policies/weekly_swing/08_WS_PLAN_ALGORITHM.md`
 5. `policies/weekly_swing/09_WS_DYNAMIC_SELECTION_DETERMINISTIC.md`

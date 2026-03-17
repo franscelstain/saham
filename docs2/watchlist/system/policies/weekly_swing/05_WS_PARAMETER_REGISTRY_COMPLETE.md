@@ -1,4 +1,4 @@
-# 05 — Parameter Registry (Complete) — WS_EOD_PLAN_CONFIRM
+# 05 — Parameter Registry (Complete) — Weekly Swing
 
 ## Purpose
 
