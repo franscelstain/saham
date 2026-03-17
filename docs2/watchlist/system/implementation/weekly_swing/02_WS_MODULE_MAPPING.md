@@ -65,7 +65,7 @@ Jika terjadi konflik:
 |---|---|---|---:|---:|---|
 | PLAN | `WsPlanInputProvider`, `WsPlanEngine`, `WsPlanAssembler`, `WsPlanSerializer`, `WsPlanPublisher` | recommendation, confirm, composite read | No | Yes | source artifact utama |
 | RECOMMENDATION | `WsRecommendationEngine`, `WsRecommendationAssembler`, `WsRecommendationSerializer`, `WsRecommendationPublisher` | composite read, API read | No | Yes | derived only from PLAN |
-| CONFIRM | `WsConfirmBinder`, `WsConfirmOverlayEngine`, `WsConfirmAssembler`, `WsConfirmSerializer`, `WsConfirmPublisher` | composite read, API read | No | Yes/Optional by implementation choice | must not alter recommendation |
+| CONFIRM | `WsConfirmBinder`, `WsConfirmOverlayEngine`, `WsConfirmAssembler`, `WsConfirmSerializer`, `WsConfirmPublisher` | composite read, API read | No | Yes | must not alter recommendation; persistence of CONFIRM is required for history, consumer reads, and audit alignment with persistence guidance |
 
 ## Per-Module Contract Boundary
 
@@ -149,6 +149,18 @@ Setiap module implementasi harus bisa ditelusuri balik ke owner doc yang relevan
 5. modul watchlist menulis holdings/portfolio state
 6. modul watchlist menulis order/execution/broker state
 7. confirm ditulis sebagai mutasi atas row recommendation sehingga recommendation terlihat berubah
+
+## Persistence Alignment Note (LOCKED)
+
+Status persistence untuk `CONFIRM` pada baseline ini adalah **Yes**.
+
+Artinya:
+- `CONFIRM` diperlakukan sebagai artifact yang dapat direplay
+- `CONFIRM` tersedia untuk consumer reads
+- `CONFIRM` tersedia untuk audit trail
+- implementasi transient-only untuk `CONFIRM` tidak dianggap setara tanpa audit dan perubahan guidance yang eksplisit
+
+Dokumen ini wajib sinkron dengan `05_WS_PERSISTENCE_GUIDANCE.md`.
 
 ## Final Rule
 
