@@ -20,7 +20,7 @@
 -- 0) Dictionary tables
 CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
   fail_code VARCHAR(64) NOT NULL,
-  scope ENUM('PLAN','CONFIRM','BOTH') NOT NULL,
+  scope ENUM('PLAN','RECOMMENDATION','CONFIRM','BOTH') NOT NULL,
   severity ENUM('INFO','WARN','ERROR') NOT NULL,
   description_id TEXT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
 CREATE TABLE IF NOT EXISTS watchlist_reason_codes (
   policy_code VARCHAR(16) NOT NULL,
   reason_code VARCHAR(64) NOT NULL,
-  scope ENUM('PLAN','CONFIRM','BT') NOT NULL,
+  scope ENUM('PLAN','RECOMMENDATION','CONFIRM','BT') NOT NULL,
   severity ENUM('INFO','WARN','BLOCK') NOT NULL,
   short_id VARCHAR(32) NOT NULL,
   description_id TEXT NOT NULL,
@@ -44,12 +44,16 @@ CREATE TABLE IF NOT EXISTS watchlist_param_sets (
   param_set_id BIGINT NOT NULL AUTO_INCREMENT,
   policy_code VARCHAR(16) NOT NULL,
   policy_version VARCHAR(64) NOT NULL,
+  schema_version VARCHAR(64) NOT NULL,
+  hash_contract LONGTEXT NOT NULL,
+  provenance_json LONGTEXT NOT NULL,
   status ENUM('DRAFT','ACTIVE','DEPRECATED') NOT NULL DEFAULT 'DRAFT',
   params_json LONGTEXT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (param_set_id),
-  KEY IDX_param_policy_status (policy_code, status, updated_at)
+  KEY IDX_param_policy_status (policy_code, status, updated_at),
+  KEY IDX_param_policy_version (policy_code, policy_version, schema_version)
 ) ENGINE=InnoDB;
 
 -- 2) watchlist_plan_runs

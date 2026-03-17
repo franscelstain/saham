@@ -57,3 +57,13 @@ BEGIN
   END IF;
 END//
 DELIMITER ;
+
+
+-- 4) Sinkronkan watchlist_param_sets dengan kontrak normatif paramset aktif
+ALTER TABLE watchlist_param_sets
+  ADD COLUMN schema_version VARCHAR(64) NOT NULL DEFAULT 'PARAMSET_JSON' AFTER policy_version,
+  ADD COLUMN hash_contract LONGTEXT NOT NULL AFTER schema_version,
+  ADD COLUMN provenance_json LONGTEXT NOT NULL AFTER hash_contract;
+
+ALTER TABLE watchlist_param_sets
+  ADD INDEX IDX_param_policy_version (policy_code, policy_version, schema_version);

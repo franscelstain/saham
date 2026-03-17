@@ -28,24 +28,29 @@ Dokumen ini bukan owner untuk:
 ### 1) watchlist_fail_codes
 Kode kegagalan run-level global.
 - fail_code (PK)
-- layer (`VALIDATOR` / `PLAN` / `RECOMMENDATION` / `CONFIRM`)
-- policy_code (nullable; `NULL` = global)
-- message
-- severity (`ERROR` / `WARN`)
-- is_active (`Yes`/`No`)
+- scope_layer (`PLAN` / `RECOMMENDATION` / `CONFIRM` / `BOTH`)
+- severity (`INFO` / `WARN` / `ERROR`)
+- description_id
+- created_at
 
 Catatan:
-- Sebuah policy boleh hanya memakai sebagian layer.
+- `BOTH` dipakai hanya untuk fail code global yang sah berlaku lintas lebih dari satu layer runtime watchlist.
 - Layer `RECOMMENDATION` dipakai hanya bila policy memang mempunyai layer runtime tersebut.
+- Dictionary fail code global ini adalah run-level/runtime-level; kebutuhan validator detail boleh memakai namespace fail code yang sama selama tetap tunduk pada dictionary resmi yang di-seed.
 
 ### 2) watchlist_reason_codes
 Dictionary reason codes lintas policy.
-- reason_code (PK)
-- policy_code (nullable jika truly global, biasanya policy-scoped)
-- applies_to_layer (`PLAN` / `RECOMMENDATION` / `CONFIRM`)
-- short_label
-- description
-- is_active (`Yes`/`No`)
+- policy_code + reason_code (PK komposit pada artifact SQL aktif)
+- scope_layer (`PLAN` / `RECOMMENDATION` / `CONFIRM` / `BT`)
+- severity (`INFO` / `WARN` / `BLOCK`)
+- short_id
+- description_id
+- description_en
+- created_at
+
+Catatan:
+- `BT` diizinkan untuk reason code evaluasi/backtest policy-scoped bila policy memang mempunyai discipline evaluasi resmi.
+- Layer runtime watchlist tetap memakai `PLAN` / `RECOMMENDATION` / `CONFIRM`; `BT` bukan runtime layer watchlist, tetapi tetap boleh hidup di dictionary reason code policy-scoped agar tidak perlu membuat tabel dictionary terpisah.
 
 ## B) Paramset
 
@@ -54,7 +59,8 @@ Paramset resmi untuk semua policy.
 - param_set_id (PK)
 - policy_code
 - policy_version
-- hash_contract
+- schema_version
+- hash_contract (LONGTEXT)
 - provenance_json (LONGTEXT)
 - status (DRAFT/ACTIVE/DEPRECATED)
 - params_json (LONGTEXT)
@@ -62,6 +68,11 @@ Paramset resmi untuk semua policy.
 
 Constraint:
 - per `policy_code`, maksimum 1 row `status='ACTIVE'` pada waktu tertentu (enforced by procedure + lock).
+
+Catatan parity (LOCKED):
+- `schema_version` adalah kolom identitas schema paramset yang wajib tersimpan eksplisit, bukan hanya diasumsikan ada di payload JSON.
+- `hash_contract` menyimpan canonical serialized hash-contract artifact yang diambil dari payload paramset tervalidasi.
+- `provenance_json` menyimpan projection canonical provenance untuk audit/query convenience; kolom ini bukan izin untuk memperkenalkan top-level `provenance` map baru di kontrak JSON.
 
 ## C) PLAN snapshot
 

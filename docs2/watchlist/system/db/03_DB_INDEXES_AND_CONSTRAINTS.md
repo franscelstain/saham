@@ -7,8 +7,9 @@ Mengunci constraint dan invariants agar snapshot deterministik, dapat diaudit, d
 02_DB_SCHEMA_MARIADB.md
 
 ## Inputs
-- Workload query PLAN/CONFIRM
-- Rule supersede PLAN aktif
+- Workload query watchlist global untuk `PLAN`, layer turunan resmi dari `PLAN` bila dipersist oleh policy, dan `CONFIRM`
+- Rule supersede `PLAN` aktif
+- Guard separation antar layer runtime watchlist
 
 ## Invariants (wajib)
 1) PLAN item rows append-only:
@@ -25,9 +26,10 @@ Mengunci constraint dan invariants agar snapshot deterministik, dapat diaudit, d
    - Untuk kombinasi yang sama hanya boleh ada satu `watchlist_plan_runs.is_active='Yes'`.
    - Supersede dilakukan dengan transaksi terkontrol: insert row baru aktif, lalu deaktifkan row aktif lama secara atomik.
 
-4) CONFIRM isolation:
-   - CONFIRM tables tidak boleh mengubah tabel PLAN.
-   - Foreign key dari confirm_check ke plan_run adalah relationship baca/audit, bukan izin mutasi.
+4) Runtime layer isolation:
+   - `CONFIRM` tables tidak boleh mengubah tabel `PLAN`.
+   - Jika policy memiliki persistence resmi untuk layer turunan dari `PLAN`, layer itu juga tidak boleh menulis ulang `PLAN`.
+   - Foreign key / reference antar layer runtime adalah relationship baca/audit, bukan izin mutasi.
 
 5) Paramset lifecycle:
    - Satu ACTIVE per `policy_code`.
@@ -63,8 +65,9 @@ Mengunci constraint dan invariants agar snapshot deterministik, dapat diaudit, d
 - Invariants yang menjadi acuan implementasi DDL, trigger, dan contract tests.
 
 ## Failure modes
-- Tanpa index, query dashboard/audit akan lambat.
-- Tanpa guard update yang ketat, supersede dapat merusak histori PLAN.
+- Tanpa index, query dashboard/audit untuk `PLAN`, layer turunan resmi, atau `CONFIRM` akan lambat.
+- Tanpa guard update yang ketat, supersede dapat merusak histori `PLAN`.
+- Tanpa isolasi layer yang jelas, persistence layer tambahan policy dapat salah dibaca sebagai izin mutasi ke `PLAN`.
 - Tanpa FK fail_code, abort reason bisa drift dari dictionary resmi.
 
 ## Next

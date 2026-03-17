@@ -8,6 +8,10 @@
 -- Catatan: struktur tabel global dibuat oleh 05_DB_DDL_MARIADB.sql; file ini hanya melakukan INSERT seed.
 
 -- A) FAIL CODES (global)
+-- Layer `RECOMMENDATION` diakui oleh dictionary global aktif, tetapi seed default
+-- tidak wajib mengisinya bila policy aktif menaruh fail/reason codes layer tersebut
+-- di seed policy-scoped resmi.
+
 INSERT INTO watchlist_fail_codes (fail_code, scope, severity, description_id) VALUES
 ('PLAN_ABORT_PARAMSET_INVALID','PLAN','ERROR','Param set tidak valid / tidak match policy_version.'),
 ('PLAN_ABORT_PARAMSET_NOT_FOUND','PLAN','ERROR','ACTIVE param_set tidak ditemukan untuk policy/rule yang dijalankan.'),

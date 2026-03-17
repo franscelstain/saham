@@ -7,7 +7,7 @@ Mengunci kontrak minimum paramset lintas policy agar semua policy punya bentuk, 
 - [`01_POLICY_FRAMEWORK_OVERVIEW.md`](01_POLICY_FRAMEWORK_OVERVIEW.md)
 
 ## Kontrak global paramset
-- Setiap run PLAN/CONFIRM harus mereferensikan **paramset aktif**.
+- Setiap layer runtime watchlist yang secara resmi dikontrakkan memakai paramset — minimal `PLAN`, dan bila policy memilikinya juga layer turunan dari `PLAN` seperti `RECOMMENDATION` serta `CONFIRM` — harus mereferensikan **paramset aktif**.
 - Identitas minimum paramset: `policy_code` + `policy_version` + status ACTIVE di DB.
 - `paramset_code` boleh dipakai untuk audit/operator convenience, tapi bukan pengganti identitas minimum.
 - Paramset menyimpan metadata, asal-usul parameter (BT/DET/MAN), dan `hash_contract`.
