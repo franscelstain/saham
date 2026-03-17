@@ -109,7 +109,9 @@ Wajib punya minimal:
 - `strategy_code`
 - `policy_code`
 - `policy_version`
+- `schema_version`
 - `trade_date`
+- `param_set_id`
 - `source_artifact_type = CONFIRM`
 - `source_plan_reference`
 - `ticker`
@@ -121,6 +123,7 @@ Wajib punya minimal:
 Aturan tambahan:
 - `confirm_status` adalah field canonical; jangan diganti dengan alias lain pada boundary API
 - `snapshot_reference` adalah field canonical untuk menunjuk basis input confirm yang sah
+- `schema_version` dan `param_set_id` wajib ikut pada response confirm agar runtime keys artifact-level tetap sinkron lintas artifact Weekly Swing
 - `reason_codes` wajib selalu ada dan bertipe array
 
 ### Composite Response Minimum — Canonical

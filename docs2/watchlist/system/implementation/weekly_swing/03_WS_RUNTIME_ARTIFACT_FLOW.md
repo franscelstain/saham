@@ -28,14 +28,22 @@ Composite view tidak boleh mengubah semantics artifact asal.
 
 ## Runtime Keys
 
-Kunci minimum yang harus konsisten di semua artifact:
+Kunci minimum artifact-level yang harus konsisten pada artifact runtime yang sah:
 - `strategy_code`
 - `trade_date`
 - `policy_code`
 - `param_set_id`
 - `policy_version`
 - `schema_version`
+
+Kunci minimum item-level yang harus konsisten bila artifact membawa scope ticker tunggal atau item candidate yang spesifik:
 - `ticker`
+
+Aturan interpretasi:
+- `PLAN` dan `RECOMMENDATION` wajib membawa runtime keys artifact-level pada header artifact/read model.
+- `CONFIRM` wajib membawa runtime keys artifact-level **dan** `ticker` karena artifact ini memang ticker-scoped.
+- Untuk `PLAN`, `ticker` boleh hidup pada item candidate, bukan wajib sebagai header artifact.
+- Untuk `RECOMMENDATION`, `ticker` boleh hidup pada `selected_items`, bukan wajib sebagai header artifact.
 
 ## Allowed States
 

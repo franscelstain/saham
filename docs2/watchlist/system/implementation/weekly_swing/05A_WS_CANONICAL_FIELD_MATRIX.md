@@ -53,7 +53,9 @@ Seluruh isi wajib tunduk pada owner docs Weekly Swing.
 | CONFIRM API | `strategy_code` | YES | string |  |
 | CONFIRM API | `policy_code` | YES | string |  |
 | CONFIRM API | `policy_version` | YES | string |  |
+| CONFIRM API | `schema_version` | YES | string | versi schema runtime |
 | CONFIRM API | `trade_date` | YES | date string |  |
+| CONFIRM API | `param_set_id` | YES | string/int | id paramset aktif runtime |
 | CONFIRM API | `source_artifact_type` | YES | `CONFIRM` | harus persis `CONFIRM` |
 | CONFIRM API | `source_plan_reference` | YES | string | canonical source ref |
 | CONFIRM API | `ticker` | YES | string | candidate PLAN |
@@ -85,6 +87,8 @@ Seluruh isi wajib tunduk pada owner docs Weekly Swing.
 | CONFIRM persistence | `trade_date` | YES | date string | logical field |
 | CONFIRM persistence | `policy_code` | YES | string | logical field |
 | CONFIRM persistence | `policy_version` | YES | string | logical field |
+| CONFIRM persistence | `schema_version` | YES | string | logical field |
+| CONFIRM persistence | `param_set_id` | YES | string/int | logical field |
 | CONFIRM persistence | `source_plan_reference` | YES | string | logical source ref |
 | CONFIRM persistence | `ticker` | YES | string | logical field |
 | CONFIRM persistence | `snapshot_reference` | YES | string | logical input ref |

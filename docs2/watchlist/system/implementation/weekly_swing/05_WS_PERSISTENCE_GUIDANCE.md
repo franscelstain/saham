@@ -82,6 +82,8 @@ Minimum metadata canonical:
 - `trade_date`
 - `policy_code`
 - `policy_version`
+- `schema_version`
+- `param_set_id`
 - `source_plan_reference`
 - `ticker`
 - `snapshot_reference`
@@ -91,6 +93,7 @@ Minimum metadata canonical:
 Aturan tambahan:
 - `snapshot_reference` adalah field canonical untuk basis input confirm yang sah
 - `confirm_status` adalah field canonical untuk hasil confirm
+- `schema_version` dan `param_set_id` wajib ikut di logical storage confirm agar runtime keys artifact-level tetap sinkron dengan contract runtime Weekly Swing
 - `created_at` adalah canonical audit timestamp minimum
 
 ### Optional Trace / Audit Storage
@@ -204,7 +207,7 @@ Watchlist bukan owner raw market-data provider.
 
 ## Anti-Ambiguity Guard
 
-- simpan `param_set_id` bila artifact perlu menunjuk instance paramset aktif yang dipakai saat generate runtime output
+- simpan `param_set_id` pada artifact runtime Weekly Swing untuk menunjuk instance paramset aktif yang dipakai saat generate output
 - simpan `policy_version` untuk menunjukkan versi rule/business contract
 - simpan `schema_version` untuk menunjukkan versi schema/contract yang dipakai
 - gunakan `created_at` sebagai canonical audit timestamp minimum
