@@ -33,3 +33,8 @@ Hal-hal berikut **tidak cukup** untuk mengaktifkan Layer C sendirian:
 - Jika Layer A dan B aktif, audit system docs dulu lalu implementation guidance.
 - Jika bukti Layer C belum ada, jangan melebar ke audit code/app nyata.
 - Jika Layer C ada, tetap mulai dari baseline A/B lebih dulu agar audit implementasi nyata punya owner map yang jelas.
+
+
+## Scoring Consequence
+- Jika Layer C tidak aktif, item audit yang khusus code/app/runtime nyata harus dinilai `N/A`, bukan `PARTIAL`.
+- Ketiadaan artefak Layer C pada ZIP dokumen A+B tidak boleh dianggap defect.

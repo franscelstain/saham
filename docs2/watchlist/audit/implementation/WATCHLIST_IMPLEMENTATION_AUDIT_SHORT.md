@@ -6,6 +6,11 @@ Gunakan status:
 - FAIL
 - N/A
 
+
+## Applicability Rule
+- Jika ZIP belum mengaktifkan Layer C, seluruh cek khusus code/app/runtime nyata diberi `N/A`, bukan `PARTIAL`.
+- `PARTIAL` untuk real-app evidence hanya boleh dipakai bila Layer C aktif tetapi buktinya belum lengkap.
+
 ## Ringkasan
 - ZIP / branch:
 - Tanggal audit:

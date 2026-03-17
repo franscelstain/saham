@@ -39,3 +39,9 @@ Jangan mengaudit sebagai portfolio atau execution system. Audit ini khusus imple
 
 
 Jika code/app nyata tersedia, audit harus memprioritaskan bukti nyata tersebut di atas contoh guidance. Jika code/app nyata belum tersedia, nyatakan keterbatasan itu dengan jujur dan audit sebagai implementation guidance baseline Layer B, bukan Layer C.
+
+
+Aturan scoring penting:
+- jika Layer C tidak aktif, seluruh item audit yang khusus code/app/runtime nyata harus diberi `N/A`, bukan `PARTIAL`;
+- jangan menurunkan nilai hanya karena service/controller/repository/payload runtime nyata memang belum ada pada ZIP guidance;
+- `PARTIAL` untuk real-app evidence hanya sah bila Layer C aktif tetapi buktinya belum lengkap atau belum sinkron.

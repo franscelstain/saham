@@ -42,3 +42,6 @@ Saat artefak code atau aplikasi nyata sudah tersedia, audit implementasi **SHOUL
 Aktivasi review code/app nyata **tidak otomatis** terjadi hanya karena ada examples, fixtures, SQL support, schema markdown, atau sample payload. Artefak seperti itu tetap dihitung sebagai support Layer A/B sampai ada bukti implementasi nyata yang cukup.
 
 Contoh pola review nyata tersedia di folder `_refs/`.
+
+
+Untuk aturan penilaian saat Layer C belum aktif, lihat [`WATCHLIST_LAYER_C_APPLICABILITY_RULE.md`](./WATCHLIST_LAYER_C_APPLICABILITY_RULE.md).

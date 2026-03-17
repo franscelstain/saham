@@ -70,4 +70,6 @@ Audit implementasi watchlist adalah guardrail terhadap implementasi aplikasi. Au
 
 Jika tersedia artefak code, API response, log runtime, atau screenshot hasil review aplikasi, audit implementasi **SHOULD** menilai bukti tersebut secara langsung dan tidak berhenti pada guidance dokumen saja.
 
-Jika bukti code/app belum tersedia, audit **MAY** memakai contoh pola review, tetapi status 10/10 absolut tetap ditahan sampai ada bukti implementasi nyata.
+Jika bukti code/app belum tersedia **dan Layer C memang tidak aktif**, audit **MUST** menandai item real-app evidence sebagai `N/A`, bukan `PARTIAL`. Lihat [`WATCHLIST_LAYER_C_APPLICABILITY_RULE.md`](./WATCHLIST_LAYER_C_APPLICABILITY_RULE.md).
+
+Jika bukti code/app belum tersedia **padahal Layer C aktif**, audit **MAY** memakai contoh pola review, tetapi status area Layer C dapat ditahan di `PARTIAL` sampai ada bukti implementasi nyata yang cukup.

@@ -96,7 +96,7 @@ Gunakan status:
 
 
 
-## I. Real-App Evidence
+## I. Real-App Evidence / Layer C Applicability
 
 | Item | Cek | Status | Catatan |
 |---|---|---|---|
@@ -104,7 +104,8 @@ Gunakan status:
 | I2 | Jika API nyata tersedia, payload nyata cocok dengan kontrak watchlist |  |  |
 | I3 | Jika persistence nyata tersedia, schema/runtime artifact nyata tetap memisahkan PLAN / RECOMMENDATION / CONFIRM |  |  |
 | I4 | Jika manual input nyata tersedia, validator path tetap terisolasi dan tidak menyelundupkan rule recommendation |  |  |
-| I5 | Jika bukti nyata belum ada, audit menandai keterbatasan ini secara eksplisit |  |  |
+| I5 | Jika Layer C tidak aktif, item I1-I4 diberi `N/A` dan tidak menurunkan nilai |  |  |
+| I6 | Jika Layer C aktif tetapi bukti nyata belum lengkap, audit menandai keterbatasan ini secara eksplisit sebagai `PARTIAL` |  |  |
 
 ## J. Final Verdict
 
