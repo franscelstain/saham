@@ -29,6 +29,13 @@ Watchlist bukan owner untuk:
 Watchlist hanya memakai data yang sudah tersedia dari domain `market-data` atau input manual yang sah.
 
 
+
+## Layer Reading Guard
+
+Folder ini bisa memuat system docs, audit docs, implementation guidance, examples, fixtures, SQL support, schema markdown, dan sample payload.
+Keberadaan artefak-artefak tersebut **tidak otomatis** berarti paket ini sudah masuk audit Layer C.
+Tanpa bukti code aplikasi nyata, runtime payload nyata dari aplikasi, atau persistence runtime nyata yang bisa ditelusuri, pembacaan audit **harus tetap A/B**, bukan C.
+
 ## Folder Layout
 
 - `system/` = source of truth watchlist

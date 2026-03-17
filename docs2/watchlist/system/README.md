@@ -34,3 +34,10 @@ Policy aktif yang dibahas saat ini hanya:
 ## Implementation Guidance
 
 Panduan implementasi watchlist tersedia di `docs/watchlist/system/implementation/`. Guidance ini tidak menggantikan owner docs policy dan harus tunduk pada baseline `weekly_swing` yang sudah difreeze.
+
+
+## Layer Guard
+
+Folder `system/` boleh direferensikan oleh implementation guidance, examples, fixtures, SQL support, schema docs, atau sample payload.
+Artefak-artefak itu membantu penerjemahan baseline, tetapi **tidak otomatis** mengubah paket dokumen menjadi audit Layer C.
+Layer C baru relevan bila ada bukti code/app/runtime nyata yang cukup dan bisa ditelusuri.

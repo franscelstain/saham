@@ -5,6 +5,8 @@ Mengunci alur runtime artifact global semua policy watchlist agar layer output w
 
 ## Naming Guard
 Nama file ini dipertahankan untuk kompatibilitas referensi lama.
+**Preferred normative term** untuk isi dokumen ini adalah **canonical runtime artifact flow watchlist global**.
+Kata `execution` pada nama file adalah **legacy filename only**, bukan istilah domain normatif.
 Secara normatif, dokumen ini harus dibaca sebagai **canonical runtime artifact flow watchlist global**, **bukan** broker execution, order execution, atau execution engine.
 Jika ada pembaca yang menangkap kata `execution` sebagai domain order placement, pembacaan itu salah dan harus diabaikan.
 

@@ -10,6 +10,13 @@ Tujuan folder ini:
 
 Folder ini **bukan** owner rule bisnis watchlist. Source of truth tetap berada di [`../../system/`](../../system/).
 
+
+## Reading Guard
+
+Kata `implementation` pada folder ini **default-nya bukan** berarti code audit.
+Secara default, kata itu harus dibaca sebagai **implementation guidance / translation layer review (Layer B)**.
+Reviewer tidak boleh mengaktifkan Layer C hanya karena melihat examples, fixtures, SQL support, schema docs, sample payload, atau artefak bantu lain yang tampak teknis.
+
 Dokumen inti:
 1. `WATCHLIST_IMPLEMENTATION_AUDIT_FOUNDATION.md`
 2. `WATCHLIST_IMPLEMENTATION_CHECKLIST_FINAL.md`
