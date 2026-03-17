@@ -20,6 +20,12 @@ Kontrak perilaku tetap dimiliki oleh dokumen policy owner; dokumen ini hanya men
 - [`../policy.md`](../policy.md)
 - [`../policies/_shared/05_EXECUTION_CANONICAL_GLOBAL.md`](../policies/_shared/05_EXECUTION_CANONICAL_GLOBAL.md)
 
+## Boundary Guard
+
+Dokumen DB global ini hanya mengatur persistence boundary watchlist yang audit-able.
+Dokumen ini **bukan** owner untuk execution system, portfolio state, atau market-data internals.
+Jika suatu policy memiliki persistence strategy-specific resmi, ownership semantics tetap berada pada dokumen policy owner; DB global hanya menjaga separation, parity, dan source map.
+
 ## Inputs
 
 - kebutuhan snapshot/watchlist runtime artifacts yang audit-able

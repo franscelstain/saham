@@ -1,6 +1,10 @@
-# 02 — WS Execution Canonical: PLAN, RECOMMENDATION, and CONFIRM
+# 02 — WS Canonical Runtime Flow: PLAN, RECOMMENDATION, and CONFIRM
 
-> Compatibility note: file ini adalah pengganti presentasi/navigasi untuk dokumen canonical flow Weekly Swing yang sebelumnya memakai nama file warisan model lama. Isi normatif tetap mengikuti baseline aktif `PLAN -> RECOMMENDATION -> CONFIRM`.
+> Compatibility note: nama file lama dipertahankan demi kestabilan referensi.
+>
+> Secara normatif, dokumen ini adalah **canonical runtime flow watchlist Weekly Swing**, bukan dokumen execution engine, bukan order placement, dan bukan domain broker execution.
+>
+> Isi normatif tetap mengikuti baseline aktif `PLAN -> RECOMMENDATION -> CONFIRM`.
 
 ## Purpose
 

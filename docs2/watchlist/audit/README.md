@@ -44,4 +44,6 @@ Folder audit ini diperlakukan sebagai audit baseline aktif untuk watchlist. Revi
 
 ## Additional Layer
 
-Folder `implementation/` berisi audit untuk implementation guidance watchlist. Layer ini terpisah dari audit system docs.
+Folder `implementation/` berisi audit untuk implementation guidance watchlist dan default-nya dibaca sebagai **Layer B**. Layer ini terpisah dari audit system docs.
+
+Layer C hanya aktif bila ada bukti code/app/runtime nyata yang cukup. Examples, fixtures, SQL support, dan schema docs tidak otomatis mengaktifkan Layer C.

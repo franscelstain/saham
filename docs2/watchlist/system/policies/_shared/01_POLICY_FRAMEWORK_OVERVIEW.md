@@ -88,5 +88,6 @@ Dokumen shared tidak boleh dipakai untuk menyimpulkan behavior detail strategy j
 
 ## Naming Guard
 
-Istilah `execution canonical` pada shared layer **bukan** berarti broker execution, order execution, atau domain execution engine.
-Istilah ini hanya berarti **canonical runtime artifact flow watchlist** yang harus tetap berada di domain watchlist.
+File shared yang masih memakai istilah `execution canonical` hanya memakai nama warisan referensi.
+Secara normatif, istilah itu **harus** dibaca sebagai **canonical runtime artifact flow watchlist**, bukan broker execution, order execution, atau execution engine.
+Audit dan implementasi **must not** memakai istilah tersebut untuk menarik scope ke domain execution.

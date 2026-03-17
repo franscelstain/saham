@@ -1,6 +1,6 @@
 # Watchlist Implementation Audit
 
-Folder ini berisi audit untuk **implementasi watchlist**. Audit ini terpisah dari audit `system/`.
+Folder ini berisi baseline audit untuk **implementation guidance watchlist (Layer B)** dan guardrail saat review implementasi nyata mulai tersedia. Audit ini terpisah dari audit `system/`.
 
 Tujuan folder ini:
 - menjaga implementasi tetap tunduk pada baseline [`../../system/`](../../system/);
@@ -22,12 +22,16 @@ Dokumen tambahan:
 
 Status saat ini:
 - folder ini adalah **implementation audit baseline**;
-- baseline ini dipakai untuk menilai implementation guidance, review code, dan audit app-facing artifacts watchlist;
+- baseline ini dipakai pertama-tama untuk menilai **implementation guidance**;
+- review code/app nyata baru menjadi audit Layer C bila ZIP memang memuat bukti implementasi nyata yang cukup;
+- tanpa code/app/runtime evidence nyata, audit **harus tetap dibaca sebagai Layer B**, bukan Layer C;
 - baseline ini tidak boleh mengubah freeze baseline bisnis `weekly_swing` pada [`../../system/`](../../system/).
 
 
 ## Code/App Real Review Notes
 
 Saat artefak code atau aplikasi nyata sudah tersedia, audit implementasi **SHOULD** menilai temuan terhadap service boundary, serializer/presenter boundary, validator manual input, persistence boundary, dan payload runtime yang benar-benar dihasilkan aplikasi.
+
+Aktivasi review code/app nyata **tidak otomatis** terjadi hanya karena ada examples, fixtures, SQL support, schema markdown, atau sample payload. Artefak seperti itu tetap dihitung sebagai support Layer A/B sampai ada bukti implementasi nyata yang cukup.
 
 Contoh pola review nyata tersedia di folder `_refs/`.

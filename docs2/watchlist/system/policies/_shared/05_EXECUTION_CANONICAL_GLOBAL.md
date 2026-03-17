@@ -1,11 +1,12 @@
-# 05 — Execution Canonical (Global)
+# 05 — Canonical Runtime Artifact Flow (Global)
 
 ## Purpose
 Mengunci alur runtime artifact global semua policy watchlist agar layer output watchlist tidak bercampur dan tidak saling menulis ulang diam-diam.
 
 ## Naming Guard
-Istilah `execution canonical` pada dokumen ini **bukan** berarti broker execution, order execution, atau domain execution engine.
-Istilah ini hanya berarti **canonical runtime artifact flow watchlist**.
+Nama file ini dipertahankan untuk kompatibilitas referensi lama.
+Secara normatif, dokumen ini harus dibaca sebagai **canonical runtime artifact flow watchlist global**, **bukan** broker execution, order execution, atau execution engine.
+Jika ada pembaca yang menangkap kata `execution` sebagai domain order placement, pembacaan itu salah dan harus diabaikan.
 
 ## Prerequisites
 - [`01_POLICY_FRAMEWORK_OVERVIEW.md`](01_POLICY_FRAMEWORK_OVERVIEW.md)
@@ -46,6 +47,6 @@ Database watchlist global ada di folder [`../../db/`](../../db/README.md):
 ## Policy-specific detail
 Detail implementasi per policy tetap di folder policy masing-masing.
 Contoh Weekly Swing:
-- [`../weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md`](../weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md) — canonical runtime flow Weekly Swing
+- [`../weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md`](../weekly_swing/02_WS_CANONICAL_RUNTIME_FLOW.md) — canonical runtime artifact flow Weekly Swing
 - [`../weekly_swing/22_WS_RECOMMENDATION_OVERVIEW.md`](../weekly_swing/22_WS_RECOMMENDATION_OVERVIEW.md)
 - [`../weekly_swing/23_WS_RECOMMENDATION_INPUT_OUTPUT_CONTRACT.md`](../weekly_swing/23_WS_RECOMMENDATION_INPUT_OUTPUT_CONTRACT.md)

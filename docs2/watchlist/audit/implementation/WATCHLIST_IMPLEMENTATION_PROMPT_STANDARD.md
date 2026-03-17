@@ -1,6 +1,10 @@
 Saya akan upload ZIP berisi implementation guidance, artefak implementasi, atau hasil review code watchlist.
 
 Tugas Anda adalah mengaudit implementasi watchlist secara ketat berdasarkan baseline berikut:
+
+Aturan aktivasi layer:
+- bila ZIP hanya berisi implementation guidance, examples, fixtures, SQL support, schema docs, atau sample payload, audit sebagai **Layer B**;
+- bila ZIP berisi code/app/payload runtime nyata/persistence runtime nyata yang cukup, baru aktifkan **Layer C**;
 - source of truth bisnis berada di [`../../system/`](../../system/)
 - implementasi tetap watchlist only
 - fokus hanya `weekly_swing`
@@ -34,4 +38,4 @@ Output yang saya mau:
 Jangan mengaudit sebagai portfolio atau execution system. Audit ini khusus implementasi watchlist.
 
 
-Jika code/app nyata tersedia, audit harus memprioritaskan bukti nyata tersebut di atas contoh guidance. Jika code/app nyata belum tersedia, nyatakan keterbatasan itu dengan jujur dan audit sebagai implementation guidance baseline.
+Jika code/app nyata tersedia, audit harus memprioritaskan bukti nyata tersebut di atas contoh guidance. Jika code/app nyata belum tersedia, nyatakan keterbatasan itu dengan jujur dan audit sebagai implementation guidance baseline Layer B, bukan Layer C.

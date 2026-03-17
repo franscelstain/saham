@@ -29,6 +29,12 @@ Audit implementasi watchlist tidak mencakup:
 3. Data input **MAY** berasal dari provider gratis atau input manual; implementasi **MUST** tetap stabil untuk constraint itu.
 4. Baseline system docs di [`../../system/`](../../system/) adalah source of truth untuk implementasi.
 
+## Layer Boundary Rule
+
+Default pembacaan folder implementation audit adalah **Layer B (implementation guidance)**.
+Layer C baru aktif bila ZIP memuat bukti implementasi nyata yang cukup, misalnya code aplikasi, payload runtime dari app nyata, API response nyata, persistence runtime nyata, atau hasil review app yang bisa ditelusuri.
+Examples, fixtures, schema docs, SQL support, dan sample JSON **tidak otomatis** mengaktifkan Layer C.
+
 ## Core Implementation Rules
 
 1. `PLAN` implementation **MUST** menjadi akar artefak watchlist.
