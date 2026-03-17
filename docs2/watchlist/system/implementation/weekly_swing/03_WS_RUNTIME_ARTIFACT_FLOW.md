@@ -41,7 +41,7 @@ Kunci minimum yang harus konsisten di semua artifact:
 
 - `PLAN only`
 - `PLAN + RECOMMENDATION`
-- `PLAN + CONFIRM`
+- `PLAN + CONFIRM (candidate still PLAN-rooted)`
 - `PLAN + RECOMMENDATION + CONFIRM`
 
 ## Invalid States

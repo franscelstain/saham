@@ -35,7 +35,7 @@ Contoh pada dokumen ini tidak boleh dipakai untuk menambah field, reason, label,
 | CONFIRM recommended candidate | `examples/WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json` |
 | CONFIRM non-recommended candidate | `examples/WS_CONFIRM_OUTPUT_NON_RECOMMENDED_CANDIDATE.json` |
 | PLAN + RECOMMENDATION pair | `examples/WS_PLAN_RECOMMENDATION_PAIR_EXAMPLE_A.json` |
-| PLAN + CONFIRM pair | `examples/WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json` |
+| PLAN + CONFIRM (candidate still PLAN-rooted) pair | `examples/WS_PLAN_CONFIRM_RUNTIME_PAIR_EXAMPLE_A.json` |
 | PLAN + RECOMMENDATION + CONFIRM triple | `examples/WS_PLAN_RECOMMENDATION_CONFIRM_TRIPLE_EXAMPLE_A.json` |
 | Composite consumer view | `examples/WS_PLAN_REC_CONFIRM_COMPOSITE_EXAMPLE.json` |
 

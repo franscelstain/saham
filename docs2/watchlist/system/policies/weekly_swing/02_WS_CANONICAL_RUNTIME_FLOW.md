@@ -78,7 +78,7 @@ Weekly Swing memiliki tiga output canonical yang berbeda:
 Consumer **MAY** menampilkan kombinasi state berikut:
 - PLAN only
 - PLAN + RECOMMENDATION
-- PLAN + CONFIRM
+- PLAN + CONFIRM (candidate still PLAN-rooted)
 - PLAN + RECOMMENDATION + CONFIRM
 
 Kombinasi berikut tidak valid:

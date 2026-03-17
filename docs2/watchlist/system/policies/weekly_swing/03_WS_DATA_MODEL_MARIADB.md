@@ -79,7 +79,7 @@ CONFIRM item boleh ada walaupun ticker tidak berada pada recommendation set.
 Kombinasi state berikut valid:
 - `PLAN only`
 - `PLAN + RECOMMENDATION`
-- `PLAN + CONFIRM`
+- `PLAN + CONFIRM (candidate still PLAN-rooted)`
 - `PLAN + RECOMMENDATION + CONFIRM`
 
 Kombinasi state berikut tidak valid:

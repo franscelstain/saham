@@ -127,7 +127,7 @@ Jika bug hanya muncul pada satu aspek, jangan langsung memakai fixture paling ka
 
 ### Pola 5 — Saat bug kompleks, susun fixture ladder
 Untuk bug yang melibatkan lebih dari satu lapisan, gunakan urutan berikut:
-1. mulai dari fixture validator atau fixture PLAN/CONFIRM kecil untuk memastikan perilaku dasar memang salah,
+1. mulai dari fixture validator atau fixture fixture runtime canonical kecil untuk memastikan perilaku dasar memang salah,
 2. naik ke fixture yang sedikit lebih kaya untuk melihat apakah interaksi antarfield atau antarlangkah mulai berpengaruh,
 3. pakai fixture kaya seperti `PLAN_FIXTURE_A_TIES_V1.json` atau pair example hanya setelah perilaku dasar sudah terisolasi.
 

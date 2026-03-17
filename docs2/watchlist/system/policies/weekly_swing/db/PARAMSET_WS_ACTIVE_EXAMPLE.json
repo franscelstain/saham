@@ -1,6 +1,6 @@
 {
   "policy_code": "WS",
-  "policy_version": "WS_EOD_PLAN_CONFIRM",
+  "policy_version": "WS_EOD_RUNTIME_V1",
   "schema_version": "PARAMSET_JSON",
   "paramset_code": "WS_ACTIVE_BOOTSTRAP_V1",
   "data_contract": {

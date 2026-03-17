@@ -13,7 +13,7 @@
 -- become the owner of reason-code meaning.
 
 -- REASON_CODES_SEED.sql
--- Policy: WS_EOD_PLAN_CONFIRM
+-- Policy: WS_EOD_RUNTIME_V1
 -- Table: watchlist_reason_codes(policy_code + reason_code composite PK, scope, severity, short_id, description_id, description_en)
 
 -- Tabel global watchlist_reason_codes didefinisikan oleh: ../../../db/05_DB_DDL_MARIADB.sql

@@ -2,7 +2,7 @@
   "trade_date": "2026-03-16",
   "policy_code": "WS",
   "param_set_id": 101,
-  "policy_version": "WS_EOD_PLAN_CONFIRM",
+  "policy_version": "WS_EOD_RUNTIME_V1",
   "schema_version": "PARAMSET_JSON",
   "plan_items": [
     {

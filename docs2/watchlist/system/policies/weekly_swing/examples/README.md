@@ -19,7 +19,7 @@ Jika terdapat perbedaan antara examples dan owner docs, maka owner docs selalu m
 | `WS_CONFIRM_RUNTIME_OUTPUT_EXAMPLE_A.json` | confirm untuk ticker recommended | CONFIRM |
 | `WS_CONFIRM_OUTPUT_NON_RECOMMENDED_CANDIDATE.json` | confirm untuk ticker non-recommended tetapi masih candidate PLAN | CONFIRM |
 | `WS_PLAN_RECOMMENDATION_PAIR_EXAMPLE_A.json` | pasangan PLAN + RECOMMENDATION | CROSS-LAYER |
-| `WS_PLAN_CONFIRM_PAIR_EXAMPLE_A.json` | pasangan PLAN + CONFIRM | CROSS-LAYER |
+| `WS_PLAN_CONFIRM_RUNTIME_PAIR_EXAMPLE_A.json` | pasangan PLAN + CONFIRM (candidate still PLAN-rooted) candidate | CROSS-LAYER |
 | `WS_PLAN_RECOMMENDATION_CONFIRM_TRIPLE_EXAMPLE_A.json` | triple artifact PLAN + RECOMMENDATION + CONFIRM | CROSS-LAYER |
 | `WS_PLAN_REC_CONFIRM_COMPOSITE_EXAMPLE.json` | composite consumer view | CONSUMER VIEW |
 
