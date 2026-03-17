@@ -56,6 +56,8 @@ Menilai apakah aplikasi nyata dibangun sesuai system docs.
 
 Untuk fase aktif saat ini, fokus utama adalah Layer A dan Layer B. Layer C akan dibangun setelah `weekly_swing` system docs dianggap matang.
 
+Support artifacts seperti `_refs`, `examples`, `fixtures`, `db/*.sql`, `db/*.md`, dan sample JSON **tidak otomatis mengaktifkan Layer C**. Artifact tersebut tetap dihitung sebagai bukti/support untuk Layer A/B sampai ada code aplikasi nyata, runtime payload nyata dari app, atau persistence runtime nyata.
+
 ## Mandatory Watchlist Rules
 
 Audit wajib memastikan seluruh system docs konsisten terhadap rule berikut:

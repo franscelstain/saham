@@ -75,7 +75,7 @@ Minimal wajib memverifikasi:
 - ticker di luar candidate PLAN ditolak untuk confirm
 - source PLAN missing ditolak
 - confirm input malformed ditolak
-- unsupported capital mode ditolak bila relevan
+- unsupported capital mode ditolak pada endpoint/flow yang memakai `capital_mode`
 
 ## Immutability Tests
 

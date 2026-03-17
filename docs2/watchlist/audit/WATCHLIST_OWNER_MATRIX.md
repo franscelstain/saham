@@ -88,6 +88,7 @@ Urutan authority yang wajib dipakai saat terjadi konflik:
 - `docs/watchlist/system/implementation/weekly_swing/03_WS_RUNTIME_ARTIFACT_FLOW.md`
 - `docs/watchlist/system/implementation/weekly_swing/04_WS_API_GUIDANCE.md`
 - `docs/watchlist/system/implementation/weekly_swing/05_WS_PERSISTENCE_GUIDANCE.md`
+- `docs/watchlist/system/implementation/weekly_swing/05A_WS_CANONICAL_FIELD_MATRIX.md`
 - `docs/watchlist/system/implementation/weekly_swing/06_WS_TEST_IMPLEMENTATION_GUIDANCE.md`
 - `docs/watchlist/system/implementation/weekly_swing/07_WS_DELIVERY_CHECKLIST.md`
 

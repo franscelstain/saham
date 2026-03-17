@@ -23,6 +23,8 @@ Semua shape API wajib tunduk pada baseline freeze dan owner docs Weekly Swing.
 4. endpoint watchlist tidak boleh expose holdings/PnL/portfolio semantics sebagai authority domain
 5. response `RECOMMENDATION` harus berasal dari PLAN
 6. response `CONFIRM` tidak boleh memutasi `RECOMMENDATION`
+7. nama field minimum pada dokumen ini adalah **canonical field set** untuk build layer B
+8. engineer **tidak boleh** mengganti nama field canonical dengan alias internal tanpa adapter yang eksplisit di boundary API
 
 ## Recommended Endpoints
 
@@ -56,9 +58,12 @@ Tujuan:
 Tujuan:
 - mengembalikan gabungan state watchlist untuk consumer tanpa mencampur source semantics
 
-## Minimum Response Contract
+## Canonical Response Contract
 
-### PLAN Response Minimum
+Bagian ini menutup ruang tafsir build layer B.  
+Nama field di bawah adalah **canonical API field set**. Bila service internal memakai nama berbeda, adapter boundary wajib mengubahnya menjadi nama canonical sebelum response keluar dari endpoint watchlist.
+
+### PLAN Response Minimum — Canonical
 Wajib punya minimal:
 - `strategy_code`
 - `policy_code`
@@ -69,10 +74,15 @@ Wajib punya minimal:
 - `source_artifact_type = PLAN`
 - `groups`
 - `candidates`
-- `no_trade` atau ekuivalen bila relevan
-- `reason_codes` bila relevan
+- `no_trade`
+- `reason_codes`
 
-### RECOMMENDATION Response Minimum
+Aturan tambahan:
+- `no_trade` wajib selalu ada dan bertipe boolean
+- `reason_codes` wajib selalu ada dan bertipe array; bila tidak ada alasan, isi `[]`
+- `groups` dan `candidates` tidak boleh diganti namanya pada boundary API
+
+### RECOMMENDATION Response Minimum — Canonical
 Wajib punya minimal:
 - `strategy_code`
 - `policy_code`
@@ -85,10 +95,16 @@ Wajib punya minimal:
 - `capital_mode`
 - `selected_items`
 - `reason_codes`
-- `is_empty` atau indikator empty-state yang ekuivalen
-- `empty_reason_codes` bila kosong
+- `is_empty`
+- `empty_reason_codes`
 
-### CONFIRM Response Minimum
+Aturan tambahan:
+- `source_plan_reference` adalah field canonical; jangan diganti menjadi alias lain pada boundary API
+- `is_empty` wajib selalu ada dan bertipe boolean
+- `empty_reason_codes` wajib selalu ada dan bertipe array; bila tidak kosong, isi `[]`
+- `selected_items` wajib selalu ada; recommendation kosong ditulis sebagai `[]`, bukan field hilang
+
+### CONFIRM Response Minimum — Canonical
 Wajib punya minimal:
 - `strategy_code`
 - `policy_code`
@@ -98,28 +114,47 @@ Wajib punya minimal:
 - `source_plan_reference`
 - `ticker`
 - `confirm_eligibility_basis`
-- `confirm_status` atau hasil ekuivalen
+- `confirm_status`
 - `reason_codes`
-- `snapshot_reference` atau timestamp input confirm yang sah
+- `snapshot_reference`
 
-### Composite Response Minimum
+Aturan tambahan:
+- `confirm_status` adalah field canonical; jangan diganti dengan alias lain pada boundary API
+- `snapshot_reference` adalah field canonical untuk menunjuk basis input confirm yang sah
+- `reason_codes` wajib selalu ada dan bertipe array
+
+### Composite Response Minimum — Canonical
 Wajib jelas memisahkan:
 - section `plan`
 - section `recommendation`
 - section `confirm`
 
-Composite view tidak boleh membuat seolah-olah confirm telah mengubah recommendation.
+Aturan tambahan:
+- nama section harus persis `plan`, `recommendation`, `confirm`
+- composite view tidak boleh membuat seolah-olah confirm telah mengubah recommendation
+- setiap section wajib mempertahankan source semantics artifact asalnya
 
-## Confirm Request Minimum
+## Confirm Request Minimum — Canonical
 
-`POST /watchlist/weekly-swing/confirm` minimal menerima field yang relevan untuk:
+`POST /watchlist/weekly-swing/confirm` minimal menerima field berikut:
 - `strategy_code`
 - `trade_date`
 - `ticker`
-- `source_plan_reference` atau kunci ekuivalen
-- manual/snapshot input yang sah sesuai baseline confirm
+- `source_plan_reference`
+- `snapshot_reference`
 
-Unknown top-level field harus ditolak bila policy contract menyatakannya demikian.
+Aturan tambahan:
+- `source_plan_reference` adalah field canonical request; jangan diganti dengan alias lain pada boundary API
+- `snapshot_reference` dapat menunjuk input manual atau snapshot sah sesuai baseline confirm
+- unknown top-level field harus ditolak
+- request tanpa salah satu field minimum di atas harus ditolak
+
+## Optional Fields Policy
+
+1. Field di luar canonical minimum hanya boleh ditambahkan bila **tidak** mengubah source semantics.
+2. Field tambahan tidak boleh menggantikan atau menamai ulang field canonical.
+3. Field tambahan execution-only, broker-only, order-only, holdings-only, atau PnL-only tetap dilarang.
+4. Bila response ingin membawa metadata tambahan, taruh sebagai metadata non-authority dan dokumentasikan eksplisit di app layer.
 
 ## Forbidden API Semantics (LOCKED)
 
@@ -129,6 +164,7 @@ Unknown top-level field harus ditolak bila policy contract menyatakannya demikia
 4. endpoint watchlist **must not** membawa field broker/order placement
 5. endpoint watchlist **must not** menjadi endpoint portfolio exposure/holding/PnL
 6. composite endpoint **must not** mencampur source semantics sehingga confirm terlihat sebagai source recommendation
+7. endpoint watchlist **must not** menghilangkan field canonical minimum hanya karena nilainya kosong; gunakan boolean/array kosong yang sah
 
 ## Error Contract Minimum
 
@@ -161,16 +197,19 @@ Contoh:
 3. non-recommended candidate tetap dapat di-confirm bila masih valid sebagai candidate PLAN
 4. response confirm harus gagal bila ticker bukan candidate PLAN
 5. response recommendation tidak boleh bergantung pada confirm
+6. response API harus mempertahankan field canonical minimum walau hasilnya kosong
 
 ## Example Cases That Must Exist In Implementation
 
 ### Valid
 - confirm request valid untuk candidate non-recommended
+- recommendation response valid dengan `selected_items = []`, `is_empty = true`, `empty_reason_codes` berisi alasan yang sah
 
 ### Invalid
 - confirm request invalid karena ticker bukan candidate PLAN
 - confirm request invalid karena unknown top-level field
-- recommendation response empty walau prioritized groups pada PLAN tidak kosong tetap harus dianggap valid
+- recommendation response invalid bila `selected_items` hilang
+- confirm response invalid bila `confirm_status` diganti nama field lain pada boundary API
 
 ## Manual Input Support
 
@@ -181,6 +220,7 @@ Aplikasi harus mendukung input manual untuk confirm sepanjang payload sesuai kon
 API watchlist Weekly Swing yang sah harus:
 - memisahkan PLAN / RECOMMENDATION / CONFIRM
 - menjaga source semantics tiap artifact
+- memakai canonical field minimum pada boundary API
 - menolak pelebaran ke execution/portfolio
 - menolak confirm atas ticker yang bukan candidate PLAN
 - tidak pernah memperlakukan CONFIRM sebagai source pembentuk RECOMMENDATION

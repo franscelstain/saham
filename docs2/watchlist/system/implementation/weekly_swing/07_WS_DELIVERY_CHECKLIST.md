@@ -45,7 +45,8 @@ Build harus ditolak bila hard-stop items gagal.
 - [ ] endpoint watchlist hanya bersifat read/suggestion
 - [ ] tidak ada endpoint buy/sell di domain ini
 - [ ] confirm input manual tervalidasi
-- [ ] unknown top-level field ditolak bila kontrak meminta demikian
+- [ ] unknown top-level field selalu ditolak pada confirm request boundary
+- [ ] field canonical minimum API dipakai persis seperti di `04_WS_API_GUIDANCE.md`
 - [ ] recommendation endpoint tidak memasukkan ticker di luar PLAN candidate set
 - [ ] composite endpoint memisahkan plan/recommendation/confirm secara eksplisit
 
@@ -56,6 +57,7 @@ Build harus ditolak bila hard-stop items gagal.
 - [ ] tidak ada persistence holdings/portfolio di domain ini
 - [ ] tidak ada persistence execution/order/broker di domain ini
 - [ ] tidak ada back-mutation business fields setelah publish
+- [ ] field canonical minimum persistence dipakai persis seperti di `05_WS_PERSISTENCE_GUIDANCE.md` / `05A_WS_CANONICAL_FIELD_MATRIX.md`
 
 ## Gate 4 — Audit Evidence Gate
 

@@ -13,8 +13,9 @@ Urutan baca:
 3. `weekly_swing/03_WS_RUNTIME_ARTIFACT_FLOW.md`
 4. `weekly_swing/04_WS_API_GUIDANCE.md`
 5. `weekly_swing/05_WS_PERSISTENCE_GUIDANCE.md`
-6. `weekly_swing/06_WS_TEST_IMPLEMENTATION_GUIDANCE.md`
-7. `weekly_swing/07_WS_DELIVERY_CHECKLIST.md`
+6. `weekly_swing/05A_WS_CANONICAL_FIELD_MATRIX.md`
+7. `weekly_swing/06_WS_TEST_IMPLEMENTATION_GUIDANCE.md`
+8. `weekly_swing/07_WS_DELIVERY_CHECKLIST.md`
 
 
 Audit implementasi watchlist berada di [`../../audit/implementation/`](../../audit/implementation/).
