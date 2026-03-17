@@ -1,0 +1,27 @@
+{
+  "plan_source": [
+    {
+      "ticker": "AAA",
+      "plan_rank": 1,
+      "group": "TOP_PICKS"
+    },
+    {
+      "ticker": "BBB",
+      "plan_rank": 2,
+      "group": "TOP_PICKS"
+    }
+  ],
+  "capital_free": {
+    "recommended_tickers": [
+      "AAA",
+      "BBB"
+    ]
+  },
+  "capital_aware": {
+    "input_capital": 200000,
+    "recommended_tickers": [
+      "AAA"
+    ]
+  },
+  "assertion": "difference is caused by capital mode, not confirm"
+}

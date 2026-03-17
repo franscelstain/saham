@@ -1,0 +1,16 @@
+{
+  "ticker": "AAA",
+  "recommended_flag": true,
+  "before": {
+    "recommendation_score": 0.92,
+    "recommendation_rank": 1
+  },
+  "confirm": {
+    "status": "CONFIRM_OK"
+  },
+  "after": {
+    "recommendation_score": 0.92,
+    "recommendation_rank": 1
+  },
+  "assertion": "strengthening signal only"
+}

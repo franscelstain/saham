@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "strategy_code": "WS",
+    "trade_date": "2026-03-16",
+    "capital_mode": "CAPITAL_FREE",
+    "generated_at": "2026-03-15T16:00:00Z"
+  },
+  "items": [
+    {
+      "ticker": "AAA",
+      "plan_rank": 1,
+      "plan_group_semantic": "TOP_PICKS",
+      "recommendation_score": 0.92,
+      "recommendation_rank": 1,
+      "recommendation_label": "RECOMMENDED",
+      "recommended_flag": true,
+      "reason_codes": [
+        "WS_REC_SELECTED"
+      ]
+    },
+    {
+      "ticker": "BBB",
+      "plan_rank": 2,
+      "plan_group_semantic": "TOP_PICKS",
+      "recommendation_score": 0.81,
+      "recommendation_rank": 2,
+      "recommendation_label": "RECOMMENDED",
+      "recommended_flag": true,
+      "reason_codes": [
+        "WS_REC_SELECTED"
+      ]
+    },
+    {
+      "ticker": "CCC",
+      "plan_rank": 3,
+      "plan_group_semantic": "SECONDARY",
+      "recommendation_score": 0.61,
+      "recommendation_rank": 3,
+      "recommendation_label": "NOT_SELECTED",
+      "recommended_flag": false,
+      "reason_codes": [
+        "WS_REC_RANK_OUTSIDE_DYNAMIC_TARGET",
+        "WS_REC_NOT_SELECTED"
+      ]
+    }
+  ],
+  "summary": {
+    "recommended_count": 2,
+    "capital_mode": "CAPITAL_FREE",
+    "empty_recommendation_flag": false,
+    "recommended_tickers": [
+      "AAA",
+      "BBB"
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+{"plan":{"meta":{"trade_date":"2026-03-16"},"items":[{"ticker":"AAA","group_semantic":"TOP_PICKS"},{"ticker":"CCC","group_semantic":"WATCH_ONLY"}]},"recommendation":{"items":[{"ticker":"AAA","recommended_flag":true}]},"confirm":{"items":[{"ticker":"AAA","confirm_status":"CONFIRMED"},{"ticker":"CCC","confirm_status":"CONFIRMED"}]}}

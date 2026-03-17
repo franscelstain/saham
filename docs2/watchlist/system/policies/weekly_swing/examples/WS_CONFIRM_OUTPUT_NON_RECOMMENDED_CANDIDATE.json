@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "strategy_code": "WS",
+    "trade_date": "2026-03-16",
+    "ticker": "CCC",
+    "bound_to_plan_candidate": true
+  },
+  "item": {
+    "ticker": "CCC",
+    "plan_group_semantic": "SECONDARY",
+    "recommended_flag": false,
+    "confirm_status": "CONFIRM_OK",
+    "confirm_label": "CANDIDATE_VALIDATION_ONLY",
+    "reason_codes": [
+      "WS_CONFIRM_OK"
+    ]
+  },
+  "summary": {
+    "interpretation": "valid confirm for non-recommended candidate; does not create recommendation"
+  }
+}

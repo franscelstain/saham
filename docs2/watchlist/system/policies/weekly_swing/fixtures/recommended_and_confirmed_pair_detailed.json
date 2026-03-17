@@ -1,0 +1,20 @@
+{
+  "before": {
+    "ticker": "AAA",
+    "recommended_flag": true,
+    "recommendation_score": 0.92,
+    "recommendation_rank": 1
+  },
+  "confirm": {
+    "ticker": "AAA",
+    "confirm_status": "CONFIRM_OK",
+    "semantic": "STRENGTHENING_SIGNAL_ONLY"
+  },
+  "after": {
+    "ticker": "AAA",
+    "recommended_flag": true,
+    "recommendation_score": 0.92,
+    "recommendation_rank": 1
+  },
+  "assertion": "confirm does not mutate recommendation payload"
+}

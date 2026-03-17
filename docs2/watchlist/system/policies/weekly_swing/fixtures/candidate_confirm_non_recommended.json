@@ -1,0 +1,8 @@
+{
+  "trade_date": "2026-03-16",
+  "ticker": "CCC",
+  "plan_candidate_membership": true,
+  "recommendation_membership": false,
+  "confirm_eligibility": true,
+  "expected_semantic": "candidate validation only"
+}

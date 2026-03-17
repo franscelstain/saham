@@ -1,0 +1,45 @@
+{
+  "meta": {
+    "strategy_code": "WS",
+    "trade_date": "2026-03-16",
+    "capital_mode": "CAPITAL_AWARE",
+    "input_capital": 150000,
+    "generated_at": "2026-03-15T16:00:00Z"
+  },
+  "items": [
+    {
+      "ticker": "DDD",
+      "plan_rank": 1,
+      "plan_group_semantic": "TOP_PICKS",
+      "recommendation_score": 0.58,
+      "recommendation_rank": 1,
+      "recommendation_label": "NOT_SELECTED",
+      "recommended_flag": false,
+      "reason_codes": [
+        "WS_REC_CAPITAL_INSUFFICIENT",
+        "WS_REC_NOT_SELECTED"
+      ]
+    },
+    {
+      "ticker": "EEE",
+      "plan_rank": 2,
+      "plan_group_semantic": "SECONDARY",
+      "recommendation_score": 0.55,
+      "recommendation_rank": 2,
+      "recommendation_label": "NOT_SELECTED",
+      "recommended_flag": false,
+      "reason_codes": [
+        "WS_REC_MIN_LOT_NOT_AFFORDABLE",
+        "WS_REC_NOT_SELECTED"
+      ]
+    }
+  ],
+  "summary": {
+    "recommended_count": 0,
+    "capital_mode": "CAPITAL_AWARE",
+    "input_capital": 150000,
+    "empty_recommendation_flag": true,
+    "recommended_tickers": [],
+    "selection_notes": "Source universe valid but no item passes final feasibility"
+  }
+}

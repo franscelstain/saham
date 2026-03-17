@@ -1,0 +1,20 @@
+{
+  "trade_date": "2026-03-16",
+  "policy_code": "WS",
+  "paramset_version": "1.0.0",
+  "plan_items": [
+    {
+      "ticker": "DDD",
+      "group": "TOP_PICKS"
+    },
+    {
+      "ticker": "EEE",
+      "group": "SECONDARY"
+    }
+  ],
+  "recommendation_summary": {
+    "recommended_count": 0,
+    "empty_recommendation_flag": true
+  },
+  "reason": "all prioritized items fail final recommendation feasibility"
+}

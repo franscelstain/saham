@@ -1,0 +1,37 @@
+{
+  "trade_date": "2026-03-16",
+  "consumer_view_only": true,
+  "items": [
+    {
+      "ticker": "AAA",
+      "plan_rank": 1,
+      "plan_group_semantic": "TOP_PICKS",
+      "recommendation_rank": 1,
+      "recommended_flag": true,
+      "confirm_status": "CONFIRM_OK",
+      "semantic": "RECOMMENDED_AND_CONFIRMED",
+      "interpretation": "confirm strengthens an already recommended ticker"
+    },
+    {
+      "ticker": "BBB",
+      "plan_rank": 2,
+      "plan_group_semantic": "TOP_PICKS",
+      "recommendation_rank": 2,
+      "recommended_flag": true,
+      "confirm_status": "PENDING",
+      "semantic": "RECOMMENDED_CONFIRM_PENDING",
+      "interpretation": "recommendation remains valid even without confirm result"
+    },
+    {
+      "ticker": "CCC",
+      "plan_rank": 3,
+      "plan_group_semantic": "SECONDARY",
+      "recommendation_rank": 3,
+      "recommended_flag": false,
+      "confirm_status": "CONFIRM_OK",
+      "semantic": "NON_RECOMMENDED_CANDIDATE_CONFIRMED",
+      "interpretation": "confirm is valid because ticker is still a PLAN candidate, but it does not create recommendation"
+    }
+  ],
+  "note": "This composite file is for consumer rendering only. Source semantics remain separated in PLAN, RECOMMENDATION, and CONFIRM artifacts."
+}
