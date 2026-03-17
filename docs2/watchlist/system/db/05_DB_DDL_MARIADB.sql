@@ -20,7 +20,7 @@
 -- 0) Dictionary tables
 CREATE TABLE IF NOT EXISTS watchlist_fail_codes (
   fail_code VARCHAR(64) NOT NULL,
-  scope ENUM('PLAN','RECOMMENDATION','CONFIRM','BOTH') NOT NULL,
+  scope ENUM('PLAN','RECOMMENDATION','CONFIRM','SHARED') NOT NULL,
   severity ENUM('INFO','WARN','ERROR') NOT NULL,
   description_id TEXT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

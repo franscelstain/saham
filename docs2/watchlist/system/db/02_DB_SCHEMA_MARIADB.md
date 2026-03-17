@@ -28,13 +28,13 @@ Dokumen ini bukan owner untuk:
 ### 1) watchlist_fail_codes
 Kode kegagalan run-level global.
 - fail_code (PK)
-- scope_layer (`PLAN` / `RECOMMENDATION` / `CONFIRM` / `BOTH`)
+- scope_layer (`PLAN` / `RECOMMENDATION` / `CONFIRM` / `SHARED`)
 - severity (`INFO` / `WARN` / `ERROR`)
 - description_id
 - created_at
 
 Catatan:
-- `BOTH` dipakai hanya untuk fail code global yang sah berlaku lintas lebih dari satu layer runtime watchlist.
+- `SHARED` dipakai hanya untuk fail code global yang sah berlaku lintas lebih dari satu layer runtime watchlist.
 - Layer `RECOMMENDATION` dipakai hanya bila policy memang mempunyai layer runtime tersebut.
 - Dictionary fail code global ini adalah run-level/runtime-level; kebutuhan validator detail boleh memakai namespace fail code yang sama selama tetap tunduk pada dictionary resmi yang di-seed.
 
