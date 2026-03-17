@@ -1,7 +1,9 @@
 {
-  "fixture_id": "WS_ARTIFACT_REFERENCE_GUARD_MINIMAL_V3",
+  "fixture_id": "WS_ARTIFACT_REFERENCE_GUARD_MINIMAL_V4",
   "policy_code": "WS",
-  "base_path_locked": "watchlist/policies/weekly_swing/fixtures/",
+  "owner_root_locked": "docs/watchlist/system/",
+  "policy_root_locked": "docs/watchlist/system/policies/weekly_swing/",
+  "base_path_locked": "docs/watchlist/system/policies/weekly_swing/fixtures/",
   "contract_reference_excerpt": [
     "Referensi artifact produksi wajib ada pada manifest resmi WS atau pada daftar fixture evidence yang eksplisit di file ini.",
     "Artifact name wajib sesuai allowlist dan scope policy.",
@@ -127,6 +129,6 @@
   ],
   "_fixture_expected": {
     "should_pass": true,
-    "notes": "V3: memisahkan artefak produksi resmi vs file fixture evidence agar tidak drift dengan manifest LOCKED."
+    "notes": "V4: root path dikunci ke docs/watchlist/system/policies/weekly_swing/fixtures/ dan dipisahkan jelas antara owner root, policy root, dan fixture base path."
   }
 }
