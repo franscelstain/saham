@@ -124,7 +124,7 @@ Minimum key/logical fields yang wajib bisa dilacak:
 - `policy_code`
 - `policy_version`
 - `schema_version`
-- `param_set_id` untuk PLAN dan RECOMMENDATION
+- `param_set_id` untuk PLAN, RECOMMENDATION, dan CONFIRM
 - `source_plan_reference` untuk RECOMMENDATION dan CONFIRM
 - `ticker` untuk item-level artifact
 - `created_at`
