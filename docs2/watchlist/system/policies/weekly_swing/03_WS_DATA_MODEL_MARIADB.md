@@ -31,7 +31,9 @@ RECOMMENDATION runtime output **MUST** terdiri dari `meta`, `items`, dan `summar
 - `strategy_code`
 - `trade_date`
 - `policy_code`
-- `paramset_version`
+- `param_set_id`
+- `policy_version`
+- `schema_version`
 - `capital_mode`
 - `input_capital` (nullable)
 - `generated_at`
@@ -95,3 +97,11 @@ Field recommendation **MUST NOT** dipakai untuk memutuskan eligibility candidate
 3. CONFIRM **MUST** berasal dari candidate PLAN yang sah.
 4. Ticker non-recommended **MAY** tetap memiliki CONFIRM selama masih valid sebagai candidate PLAN.
 5. Ticker recommended lalu confirmed **MAY** tampil dengan kedua state sekaligus.
+
+
+## Terminology Lock
+
+- `param_set_id` menunjuk row/instance paramset aktif yang dipakai untuk membentuk artifact.
+- `policy_version` menunjuk versi kontrak Weekly Swing yang sedang berlaku.
+- `schema_version` menunjuk versi schema paramset yang tervalidasi.
+- Nama `paramset_version` tidak lagi normatif dan tidak boleh dipakai sebagai field meta runtime karena berpotensi mencampur tiga makna di atas.

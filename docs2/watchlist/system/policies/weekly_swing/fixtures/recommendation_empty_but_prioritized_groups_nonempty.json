@@ -1,7 +1,9 @@
 {
   "trade_date": "2026-03-16",
   "policy_code": "WS",
-  "paramset_version": "1.0.0",
+  "param_set_id": 101,
+  "policy_version": "WS_EOD_PLAN_CONFIRM",
+  "schema_version": "PARAMSET_JSON",
   "plan_items": [
     {
       "ticker": "DDD",

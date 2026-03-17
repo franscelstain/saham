@@ -28,9 +28,19 @@ Persist jika dibutuhkan untuk history confirm dan consumer reads.
 - `trade_date`
 - `ticker` (untuk item-level)
 - `policy_code`
-- `paramset_version`
+- `param_set_id`
+- `policy_version`
+- `schema_version`
 - timestamps audit yang relevan
 
 ## Note on Source Data
 
 Penyimpanan watchlist tidak bertugas menyimpan raw market-data provider. Watchlist hanya menyimpan artifact hasil domain watchlist.
+
+
+## Anti-Ambiguity Guard
+
+- Simpan `param_set_id` bila artifact perlu menunjuk instance paramset aktif yang dipakai saat generate runtime output.
+- Simpan `policy_version` untuk menunjukkan versi rule/business contract.
+- Simpan `schema_version` untuk menunjukkan versi schema paramset yang divalidasi.
+- Jangan memakai `paramset_version` sebagai nama field persistence karena maknanya tidak tunggal.

@@ -8,7 +8,8 @@ Mengunci kontrak minimum paramset lintas policy agar semua policy punya bentuk, 
 
 ## Kontrak global paramset
 - Setiap layer runtime watchlist yang secara resmi dikontrakkan memakai paramset — minimal `PLAN`, dan bila policy memilikinya juga layer turunan dari `PLAN` seperti `RECOMMENDATION` serta `CONFIRM` — harus mereferensikan **paramset aktif**.
-- Identitas minimum paramset: `policy_code` + `policy_version` + status ACTIVE di DB.
+- Identitas minimum paramset di DB: `policy_code` + `policy_version` + `schema_version` + status ACTIVE.
+- `param_set_id` adalah identifier instance paramset aktif yang dipakai runtime/persistence ketika artefak perlu menunjuk row paramset tertentu.
 - `paramset_code` boleh dipakai untuk audit/operator convenience, tapi bukan pengganti identitas minimum.
 - Paramset menyimpan metadata, asal-usul parameter (BT/DET/MAN), dan `hash_contract`.
 - Paramset policy-spesifik boleh menambah field, tapi tidak boleh melanggar kontrak global ini.
@@ -43,3 +44,10 @@ Dokumen ini harus cukup untuk memastikan bahwa:
 - paramset bisa divalidasi tanpa menebak struktur
 - auditor bisa tahu asal setiap parameter
 - hash contract bisa dihitung dengan dasar yang jelas
+
+
+## Guard Terminologi (LOCKED)
+- `policy_version` = versi policy/rule contract.
+- `schema_version` = versi schema paramset yang divalidasi.
+- `param_set_id` = identifier instance paramset aktif di persistence.
+- Istilah `paramset_version` tidak boleh dipakai sebagai field normatif karena ambigu dan dapat dibaca sebagai salah satu dari tiga istilah di atas.

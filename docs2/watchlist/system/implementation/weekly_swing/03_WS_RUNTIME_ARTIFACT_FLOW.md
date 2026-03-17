@@ -32,7 +32,9 @@ Kunci minimum yang harus konsisten di semua artifact:
 - `strategy_code`
 - `trade_date`
 - `policy_code`
-- `paramset_version`
+- `param_set_id`
+- `policy_version`
+- `schema_version`
 - `ticker`
 
 ## Allowed States
@@ -46,3 +48,11 @@ Kunci minimum yang harus konsisten di semua artifact:
 
 - `RECOMMENDATION without PLAN`
 - `CONFIRM without PLAN candidate`
+
+
+## Terminology Guard
+
+- `param_set_id` = identifier instance paramset aktif yang benar-benar dipakai artifact runtime.
+- `policy_version` = versi policy Weekly Swing yang mengatur behavior artifact.
+- `schema_version` = versi kontrak schema paramset.
+- Istilah `paramset_version` tidak boleh dipakai lagi sebagai shorthand karena ambigu; ia dulu bisa dibaca sebagai versi instance paramset, versi policy, atau versi schema.
