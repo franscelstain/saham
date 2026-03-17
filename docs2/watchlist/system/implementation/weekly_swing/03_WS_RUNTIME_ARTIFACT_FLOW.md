@@ -64,3 +64,21 @@ Aturan interpretasi:
 - `policy_version` = versi policy Weekly Swing yang mengatur behavior artifact.
 - `schema_version` = versi kontrak schema paramset.
 - Istilah `paramset_version` tidak boleh dipakai lagi sebagai shorthand karena ambigu; ia dulu bisa dibaca sebagai versi instance paramset, versi policy, atau versi schema.
+
+
+## Minimum Implementation Outputs
+
+Implementasi yang sah minimal menghasilkan:
+- `PLAN` artifact
+- `RECOMMENDATION` artifact
+- `CONFIRM` artifact
+- source references antar artifact yang relevan
+- reason-code / hash integrity yang relevan
+- bukti test untuk core rules
+
+## Traceability Pointer
+
+Traceability detail implementasi dibaca bersama `02_WS_MODULE_MAPPING.md`, terutama untuk pemetaan:
+- owner policy doc -> module area
+- runtime artifact -> serializer / publisher / repository
+- contract acceptance -> implementation test suite

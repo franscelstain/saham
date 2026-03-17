@@ -48,7 +48,7 @@ Boundary utamanya adalah:
 - `24_WS_RECOMMENDATION_ALGORITHM.md`
 - `10_WS_CONFIRM_OVERLAY.md`
 - `13_WS_CONTRACT_TEST_CHECKLIST.md`
-- `21_WS_IMPLEMENTATION_BLUEPRINT.md`
+- `21_WS_IMPLEMENTATION_BLUEPRINT.md` — bridge note; detail translation implementasi tetap di `../../implementation/weekly_swing/`
 
 ## Recommended Reading Order
 
@@ -62,7 +62,7 @@ Boundary utamanya adalah:
 8. `24_WS_RECOMMENDATION_ALGORITHM.md`
 9. `10_WS_CONFIRM_OVERLAY.md`
 10. `13_WS_CONTRACT_TEST_CHECKLIST.md`
-11. `21_WS_IMPLEMENTATION_BLUEPRINT.md`
+11. `21_WS_IMPLEMENTATION_BLUEPRINT.md` — bridge note only; lanjutkan detail teknis ke `../../implementation/weekly_swing/`
 
 ## Implementation Note
 

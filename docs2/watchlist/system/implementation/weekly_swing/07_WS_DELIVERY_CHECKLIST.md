@@ -92,3 +92,19 @@ Checklist delivery dianggap lolos hanya bila:
 - contract tetap utuh
 - API/persistence separation tetap utuh
 - audit evidence minimum tersedia
+
+
+## Merge Readiness Focus
+
+- [ ] `PLAN` artifact sudah immutable sebelum `RECOMMENDATION` dibentuk
+- [ ] `RECOMMENDATION` hanya membaca `PLAN` immutable
+- [ ] `RECOMMENDATION` dapat tersedia tanpa `CONFIRM`
+- [ ] `RECOMMENDATION` dapat kosong
+- [ ] `CONFIRM` hanya berlaku untuk candidate `PLAN` yang sah
+- [ ] candidate non-recommended dapat di-confirm
+- [ ] recommendation kosong tidak memblokir `CONFIRM` pada candidate `PLAN`
+- [ ] `CONFIRM` tidak mengubah recommendation membership/rank/score/label
+- [ ] tidak ada code path yang membaca `CONFIRM` untuk membentuk `RECOMMENDATION`
+- [ ] tidak ada code path yang memakai recommendation sebagai syarat eligibility `CONFIRM` pada candidate `PLAN`
+- [ ] tidak ada leakage ke portfolio
+- [ ] tidak ada leakage ke execution

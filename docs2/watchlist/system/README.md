@@ -41,3 +41,8 @@ Panduan implementasi watchlist tersedia di `docs/watchlist/system/implementation
 Folder `system/` boleh direferensikan oleh implementation guidance, examples, fixtures, SQL support, schema docs, atau sample payload.
 Artefak-artefak itu membantu penerjemahan baseline, tetapi **tidak otomatis** mengubah paket dokumen menjadi audit Layer C.
 Layer C baru relevan bila ada bukti code/app/runtime nyata yang cukup dan bisa ditelusuri.
+
+
+## Layer Activation Reference
+
+Gunakan [`LAYER_ACTIVATION_RULE.md`](../LAYER_ACTIVATION_RULE.md) untuk menentukan apakah paket harus dibaca sebagai Layer A, B, atau C.

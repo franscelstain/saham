@@ -127,6 +127,42 @@ Jika terjadi konflik:
 | CONFIRM | confirm request or confirm read generation | candidate PLAN binding + valid confirm input | CONFIRM artifact/output | invalid candidate / invalid snapshot / contract fail |
 | Composite read | consumer read | PLAN and optionally RECOMMENDATION/CONFIRM | composite view | missing source artifact / inconsistent source refs |
 
+
+## Suggested Build Order (Translation Layer)
+
+### Phase 1 — Lock Core Contracts
+- baca `docs/watchlist/system/policy.md`
+- baca owner docs Weekly Swing yang relevan
+- kunci invariants `PLAN -> RECOMMENDATION -> CONFIRM`
+- kunci acceptance minimum dari `13_WS_CONTRACT_TEST_CHECKLIST.md`
+
+### Phase 2 — Build PLAN Foundation
+1. bind input yang sah untuk `PLAN`
+2. build candidate pool
+3. compute PLAN score
+4. resolve ranking dan group semantics
+5. assemble `PLAN` runtime output
+6. freeze `PLAN` sebagai immutable artifact
+
+### Phase 3 — Build RECOMMENDATION Layer
+1. bind immutable `PLAN` artifact
+2. form recommendation source universe from `PLAN` only
+3. compute recommendation logic
+4. resolve dynamic recommendation count
+5. resolve capital-free / capital-aware mode sesuai policy
+6. assemble `RECOMMENDATION` runtime output
+7. persist/publish `RECOMMENDATION` tanpa menunggu `CONFIRM`
+
+### Phase 4 — Build CONFIRM Overlay
+1. bind valid `PLAN` candidate
+2. validate confirm input / snapshot yang sah
+3. evaluate confirm per item
+4. assemble `CONFIRM` runtime output
+5. persist/publish `CONFIRM` tanpa memutasi `RECOMMENDATION`
+
+### Phase 5 — Build Composite Read Layer
+Gabungkan `PLAN`, `RECOMMENDATION`, dan `CONFIRM` hanya di read/view layer tanpa mencampur source semantics.
+
 ## Mapping to Source of Truth
 
 - `01_WS_OVERVIEW.md` = business orientation

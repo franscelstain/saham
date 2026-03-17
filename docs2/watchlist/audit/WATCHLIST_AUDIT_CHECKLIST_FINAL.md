@@ -26,7 +26,7 @@ Status yang dipakai:
 - [ ] `09` group semantics tidak disamakan dengan recommendation
 - [ ] `10` confirm overlay sinkron
 - [ ] `13` contract test checklist sinkron
-- [ ] `21` implementation blueprint sinkron
+- [ ] `21` implementation bridge note sinkron dan tidak mengambil alih owner rule
 - [ ] `22–25` recommendation docs lengkap dan sinkron
 
 ## C. Core Rules
@@ -47,12 +47,11 @@ Status yang dipakai:
 - [ ] `db` support tidak mengambil alih owner rule
 - [ ] `07` reason codes/hash sinkron dengan recommendation dan confirm
 
-## E. Build Translation
+## E. Layer Separation Guard
 
-- [ ] blueprint implementasi tetap di domain watchlist
-- [ ] tidak ada build guidance yang bocor ke portfolio/execution
-- [ ] tidak ada code path konseptual confirm -> recommendation
-- [ ] tidak ada syarat recommendation agar confirm bisa berjalan pada candidate PLAN
+- [ ] checklist ini dipakai hanya untuk audit Layer A (system docs)
+- [ ] penilaian build/module/API/persistence/test translation dipindahkan ke `implementation/WATCHLIST_IMPLEMENTATION_CHECKLIST_FINAL.md`
+- [ ] examples/fixtures/sql/schema docs tidak disalahbaca sebagai Layer C evidence
 
 ## F. Verdict Gate
 

@@ -44,3 +44,8 @@ Tanpa bukti code aplikasi nyata, runtime payload nyata dari aplikasi, atau persi
 
 
 Audit implementasi watchlist berada di `docs/watchlist/audit/implementation/`.
+
+
+## Layer Activation Reference
+
+Gunakan [`LAYER_ACTIVATION_RULE.md`](LAYER_ACTIVATION_RULE.md) untuk menentukan apakah paket harus dibaca sebagai Layer A, B, atau C.

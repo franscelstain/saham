@@ -19,3 +19,6 @@ Urutan baca:
 
 
 Audit implementasi watchlist berada di [`../../audit/implementation/`](../../audit/implementation/).
+
+
+Guidance di folder ini default-nya dibaca sebagai **Layer B**. Ia membantu translasi build, tetapi tidak mengubah owner rule pada folder policy.

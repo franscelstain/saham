@@ -14,6 +14,8 @@ Gunakan status:
 | A2 | Scope implementasi tetap watchlist only |  |  |
 | A3 | Fokus implementasi hanya `weekly_swing` |  |  |
 | A4 | Tidak ada leakage ke portfolio / execution / market-data internals |  |  |
+| A5 | Blueprint/build guidance tetap translation layer, bukan owner rule bisnis |  |  |
+| A6 | Examples/fixtures/sql/schema support tidak disalahbaca sebagai bukti Layer C |  |  |
 
 ## B. Module Mapping
 
@@ -28,6 +30,7 @@ Gunakan status:
 | B7 | Validator manual input terisolasi dari recommendation logic |  |  |
 | B8 | Serializer / presenter layer tidak mengambil alih business rule watchlist |  |  |
 | B9 | Repository / data-access layer tidak mengandung rule selection recommendation atau confirm overlay |  |  |
+| B10 | Tidak ada syarat recommendation agar confirm bisa berjalan pada candidate PLAN |  |  |
 
 ## C. Runtime Artifact Flow
 
@@ -38,6 +41,7 @@ Gunakan status:
 | C3 | Confirm berasal dari candidate PLAN |  |  |
 | C4 | Non-recommended candidate tetap bisa confirm |  |  |
 | C5 | Confirm tidak mengubah recommendation |  |  |
+| C6 | Tidak ada code path konseptual `CONFIRM -> RECOMMENDATION` |  |  |
 
 ## D. API / Consumer Layer
 
