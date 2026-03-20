@@ -1,50 +1,87 @@
 # Audit Method
 
+## Purpose
+Metode ini dibuat agar audit market-data konsisten, tidak generik, dan tetap mengikuti bentuk repo yang nyata.
+
 ## Standard audit flow
-1. intake package
-2. identify folder structure
+1. identify package boundary and claimed purpose
+2. read repo anchors and locked boundary docs first
 3. classify package layer
-4. determine normative vs companion materials
-5. verify domain boundary
-6. review cross-layer consistency
-7. assess evidence strength
-8. record findings
-9. produce remediation plan
+4. map normative core, normative support, companion, and illustrative areas
+5. verify domain boundary and out-of-scope contamination
+6. verify cross-folder authority and traceability
+7. assess implementation guidance quality
+8. assess evidence strength and Layer C claim viability
+9. record findings and remediation
 10. issue final verdict
 
-## Intake questions
-- Paket ini dominan layer apa?
-- Apa source-of-truth utamanya?
-- Apakah ada guidance yang menerjemahkan contract?
-- Apakah ada bukti runtime nyata?
-- Apakah ada domain drift?
+## Mandatory first-read anchors
+Audit tidak boleh dimulai dari summary generik. Audit harus mulai dari anchor resmi paket:
+1. `docs/market_data/README.md`
+2. `book/Terminology_and_Scope.md`
+3. `book/Domain_Boundary_Invariants_LOCKED.md`
+4. `book/INDEX.md`
 
-## Reading order
-1. `system/README.md`
-2. `system/SYSTEM_OVERVIEW.md`
-3. `system/SYSTEM_BOUNDARY.md`
-4. `audit/AUDIT_BASELINE.md`
-5. `audit/AUDIT_LAYER_CLASSIFICATION_RULES.md`
-6. `book/` core contracts
-7. `db/`
-8. `ops/`
-9. `tests/`
-10. `examples/` and `evidence/` as needed
+Setelah anchor ini dipahami, baru lanjut ke `system/` dan `audit/` untuk mempercepat navigasi.
+
+## Repo-shaped reading order
+### Core orientation
+1. `docs/market_data/README.md`
+2. `book/Terminology_and_Scope.md`
+3. `book/Domain_Boundary_Invariants_LOCKED.md`
+4. `book/INDEX.md`
+5. `system/README.md`
+6. `system/SYSTEM_BOUNDARY.md`
+7. `audit/AUDIT_BASELINE.md`
+
+### Contract and schema path
+8. `book/`
+9. `db/`
+10. `registry/`
+11. `indicators/`
+12. `session_snapshot/` if snapshot capability is in scope
+
+### Operational and proof path
+13. `ops/`
+14. `tests/`
+15. `backtest/` when replay/backtest material is used as proof support
+
+### Companion and proof archive path
+16. `examples/` for illustration only
+17. `evidence/` for actual archived proof if populated
+18. `audit/` templates/checklists/reports for evaluation output
+
+## Intake questions
+- Paket ini dominan Layer A, B, atau C?
+- Folder mana yang benar-benar owner behavior di paket ini?
+- Apakah `registry/`, `indicators/`, `session_snapshot/`, atau `backtest/` aktif sebagai bagian baseline?
+- Apakah evidence yang ada illustrative, admission-only, atau executed-and-traceable?
+- Apakah ada drift ke watchlist, strategy, execution, atau portfolio domain?
 
 ## Review dimensions
 - domain fit
 - authority clarity
+- cross-folder consistency
 - schema alignment
 - implementation readiness
+- proof readiness
 - evidence strength
 - traceability
-- cross-layer consistency
 
 ## Output requirement
 Audit output minimal harus memuat:
 - package classification
+- dominant layer
 - scope declaration
-- table PASS / PARTIAL / FAIL
-- findings
-- remediation
+- PASS / PARTIAL / FAIL table
+- major findings
+- remediation items
 - final verdict
+
+## Failure rule
+Audit harus memberi FAIL bila:
+- paket salah domain
+- source-of-truth tidak dapat diidentifikasi
+- summary mengalahkan contract
+- illustrative material diperlakukan sebagai owner behavior
+- Layer C diklaim tanpa bukti executed-and-traceable

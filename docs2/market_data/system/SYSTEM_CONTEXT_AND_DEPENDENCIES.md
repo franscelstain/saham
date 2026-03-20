@@ -1,23 +1,37 @@
 # System Context and Dependencies
 
-## Context
-Platform ini berjalan sebagai producer-side data platform yang menyediakan data terbitan untuk consumer downstream.
+## Purpose
+Dokumen ini merangkum konteks sistem dan dependensi utamanya. Detail normatif tetap hidup di owner folders.
 
-## Key dependencies
-- source/provider data feeds
-- symbol and identity dependencies
-- market calendar assumptions
-- indicator registry / formula specifications
-- persistence layer
-- scheduling / locking behavior
-- observability and evidence capture
+## External and shared-foundation dependencies
+Market-data bergantung pada sumber data dan shared foundation tertentu, terutama:
+- upstream market-data providers
+- market calendar requirements
+- ticker identity / symbol lifecycle dependencies
+- corporate action dependencies where relevant
 
-## Operational reality
-Saat ini model operasi masih dapat melibatkan sumber gratis/public dan sebagian langkah injeksi/manual handling. Fakta ini harus diperlakukan sebagai bagian dari operating model, bukan disembunyikan.
+Refer to owner contracts such as:
+- `book/Source_Data_Acquisition_Contract_LOCKED.md`
+- `book/Market_Calendar_Requirements_Contract.md`
+- `book/Tickers_and_Identity_Dependency_Contract_LOCKED.md`
+- `book/Symbol_Lifecycle_and_Mapping_Contract.md`
+- `book/Corporate_Action_and_Adjustment_Policy.md`
 
-## Main risk themes
-- provider variability
-- missing / partial data
-- correction and restatement needs
-- manual intervention risks
-- publication integrity drift
+## Platform-internal dependencies
+Platform behavior juga bergantung pada area berikut:
+- `registry/` for baseline config, indicator registry, normalization rules, and reason codes
+- `indicators/` for deterministic formulas and computation behavior
+- `session_snapshot/` for optional supplemental intraday/session snapshot capability
+- `db/` for publication tables, current pointers, optional failure tables, and switch procedures
+- `ops/` for scheduling, locking, release gates, run artifacts, and incident handling
+- `tests/` and `backtest/` for proof and replay validation
+
+## Operating model note
+Paket ini harus jujur terhadap operating model. Bila sumber data masih gratis/public atau ada langkah operator/manual injection tertentu, hal itu adalah bagian dari operating model dan harus dibaca melalui contract/runbook terkait, bukan disembunyikan.
+
+## Dependency reading pointers
+- acquisition and source behavior → `book/Source_Data_Acquisition_Contract_LOCKED.md`
+- publication pointer integrity → `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`, `db/EOD_Current_Publication_Pointer_Table.sql`, `db/Publication_Current_Pointer_Switch_Procedure_LOCKED.sql`
+- reproducibility and sealing → `book/Audit_Hash_and_Reproducibility_Contract_LOCKED.md`, `book/Dataset_Seal_and_Freeze_Contract_LOCKED.md`
+- run execution evidence → `ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md`, `ops/Archived_Actual_Execution_Evidence_Contract_LOCKED.md`
+- replay/backtest proof → `backtest/Historical_Replay_and_Data_Quality_Backtest.md`, `backtest/Backtest_Metrics_and_Acceptance_Criteria_LOCKED.md`
