@@ -41,3 +41,7 @@ Ia tidak menggantikan owner contracts di `book/`, `db/`, `registry/`, `indicator
 3. Read owner contracts before reading examples or archived evidence.
 4. Use `tests/` and `backtest/` to verify proof expectations.
 5. Use `evidence/` only after the expected contract and test IDs are already known.
+
+
+## Evidence reading note
+Archived evidence counts in audit only when it is genuinely traceable to actual execution, uses historically valid timestamps, and carries bundle admission metadata.

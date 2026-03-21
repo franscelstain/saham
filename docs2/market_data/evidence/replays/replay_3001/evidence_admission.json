@@ -1,0 +1,20 @@
+{
+  "bundle_type": "replay",
+  "bundle_id": "replay_3001",
+  "actuality_status": "actual",
+  "admission_status": "accepted",
+  "source_label": "Source: actual executed replay",
+  "replay_id": 3001,
+  "trade_date": "2025-12-10",
+  "replayed_at": "2026-03-07T09:00:00+07:00",
+  "traceability_ref": [
+    "replay_result.json",
+    "replay_reason_code_counts.json"
+  ],
+  "source_snapshot_ref": "historical snapshot for 2025-12-10",
+  "source_contract_refs": [
+    "../../backtest/Historical_Replay_and_Data_Quality_Backtest.md",
+    "../../tests/Executed_Proof_Admission_Criteria_LOCKED.md"
+  ],
+  "redaction_status": "none"
+}

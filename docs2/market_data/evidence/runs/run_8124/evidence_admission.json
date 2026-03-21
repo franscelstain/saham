@@ -1,0 +1,27 @@
+{
+  "bundle_type": "run",
+  "bundle_id": "run_8124",
+  "actuality_status": "actual",
+  "admission_status": "accepted",
+  "source_label": "Source: actual executed run",
+  "run_id": 8124,
+  "trade_date_requested": "2026-03-18",
+  "trade_date_effective": "2026-03-18",
+  "archived_at": "2026-03-18T17:45:00+07:00",
+  "execution_window": {
+    "started_at": "2026-03-18T17:31:00+07:00",
+    "finished_at": "2026-03-18T17:39:20+07:00"
+  },
+  "traceability_ref": [
+    "run_summary.json",
+    "run_event_summary.json",
+    "publication_manifest.json",
+    "eligibility_export.csv",
+    "anomaly_report.md"
+  ],
+  "source_contract_refs": [
+    "../../ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md",
+    "../../ops/Executed_Run_Admission_Criteria_LOCKED.md"
+  ],
+  "redaction_status": "none"
+}

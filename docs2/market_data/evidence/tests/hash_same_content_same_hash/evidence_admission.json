@@ -1,0 +1,19 @@
+{
+  "bundle_type": "test",
+  "bundle_id": "hash_same_content_same_hash",
+  "actuality_status": "actual",
+  "admission_status": "accepted",
+  "source_label": "Source: actual executed test",
+  "test_id": "hash_same_content_same_hash",
+  "fixture_ref": "fixture_hash_payload",
+  "executed_at": "2026-03-08T10:15:00+07:00",
+  "runner_identity": "phpunit contract suite",
+  "traceability_ref": [
+    "test_result.json"
+  ],
+  "source_contract_refs": [
+    "../../tests/Executed_Proof_Admission_Criteria_LOCKED.md",
+    "../../ops/Executed_Run_Admission_Criteria_LOCKED.md"
+  ],
+  "redaction_status": "none"
+}

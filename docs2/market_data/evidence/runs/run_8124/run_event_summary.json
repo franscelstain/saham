@@ -1,15 +1,15 @@
 {
   "run_id": 8124,
-  "trade_date_requested": "2026-04-21",
+  "trade_date_requested": "2026-03-18",
   "event_count": 17,
   "first_event": {
-    "event_time": "2026-04-21T17:31:00+07:00",
+    "event_time": "2026-03-18T17:31:00+07:00",
     "stage": "INGEST_BARS",
     "event_type": "RUN_CREATED",
     "severity": "INFO"
   },
   "last_event": {
-    "event_time": "2026-04-21T17:39:20+07:00",
+    "event_time": "2026-03-18T17:39:20+07:00",
     "stage": "FINALIZE",
     "event_type": "FINAL_STATUS_COMMITTED",
     "severity": "INFO"
