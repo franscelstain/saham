@@ -15,8 +15,25 @@ Paket didukung oleh bukti runtime nyata yang cukup kuat dan traceable.
 - implementation-ready: strong A+B
 - runtime-proven: actual Layer C evidence
 
+## Runtime-proven interpretation rule
+Claim `runtime-proven` harus selalu dibaca dalam konteks kekuatan evidence yang benar-benar ada.
+Audit wajib menyatakan apakah Layer C didukung oleh:
+- archived executed evidence only
+- runtime payload/log surface
+- real application code and runtime surface
+
+Bila paket hanya memiliki archived executed evidence bundles tanpa code aplikasi nyata atau runtime surface aplikasi yang lengkap, maka klaim yang benar adalah:
+- runtime-proven **for the documented execution artifacts that are present**, bukan
+- full real-implementation package.
+
 ## Overclaim rule
 Dokumen tidak boleh mengklaim runtime-proven bila yang ada baru contract, runbook, atau illustrative example.
+Dokumen juga tidak boleh menyamakan:
+- executed archived evidence
+- real application implementation completeness
 
 ## Downgrade rule
 Audit wajib menurunkan klaim bila evidence tidak cukup.
+Contoh downgrade yang wajib dilakukan:
+- dari `runtime-proven` menjadi `implementation-ready` bila evidence hanya template/contoh
+- dari `full real implementation` menjadi `runtime-proven via archived evidence` bila bukti nyata hanya berupa executed evidence bundles

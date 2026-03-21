@@ -54,4 +54,8 @@ Paket tidak boleh diklaim Layer C bila evidence yang ada hanya berupa:
 ## Important classification notes
 - Folder `examples/` tidak otomatis membuat paket menjadi Layer C.
 - Folder `evidence/` hanya mendukung Layer C bila isinya benar-benar archived actual execution evidence yang traceable.
+- Archived executed evidence dapat mengaktifkan Layer C walaupun paket tidak berisi code aplikasi nyata.
+- Namun audit wajib tetap membedakan antara:
+  - `Layer C via archived runtime evidence`, dan
+  - `Layer C via real implementation/app runtime surface`.
 - Package bisa dominan A walaupun mengandung sebagian B dan sebagian C.
