@@ -50,7 +50,7 @@ This file describes archived actual evidence organization, not example-only file
 
     evidence/
       tests/
-        hash_same_content_same_hash_v1/
+        hash_same_content_same_hash/
           test_result.json
           actual_hashes.json
           expected_hashes.json

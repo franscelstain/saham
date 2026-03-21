@@ -94,8 +94,8 @@ Every fixture family must carry enough expected outputs to support:
 
 ## Fixture naming rule
 Fixture family names must be stable semantic identifiers, for example:
-- `fixture_bars_atr_seed_v1`
-- `fixture_controlled_correction_v1`
+- `fixture_bars_atr_seed`
+- `fixture_controlled_correction`
 
 Do not use ad-hoc names based only on timestamps or local developer shorthand.
 

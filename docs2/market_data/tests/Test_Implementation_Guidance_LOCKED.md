@@ -112,8 +112,8 @@ If the semantic meaning of a fixture changes:
 - do not silently rewrite the old fixture and keep the same version name
 
 Examples:
-- `fixture_hash_payload_v1` -> `fixture_hash_payload_v2`
-- `fixture_controlled_correction_v1` -> `fixture_controlled_correction_v2`
+- `fixture_hash_payload` -> `fixture_hash_payload_v2`
+- `fixture_controlled_correction` -> `fixture_controlled_correction_v2`
 
 ## When to create a new fixture family
 Create a new fixture family when:

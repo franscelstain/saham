@@ -8,7 +8,7 @@ Storage format may vary, but semantic content must remain identical.
 
 ---
 
-## Example 1 — `fixture_hash_payload_v1`
+## Example 1 — `fixture_hash_payload`
 
 ### Bars serialized lines
 
@@ -17,7 +17,7 @@ Storage format may vary, but semantic content must remain identical.
 
 ### Indicators serialized lines
 
-    2026-03-03|101|1||baseline_v1|150000000.00|0.0238|1.2500|0.0500|109.0000
+    2026-03-03|101|1||baseline|150000000.00|0.0238|1.2500|0.0500|109.0000
 
 ### Eligibility serialized lines
 
@@ -33,7 +33,7 @@ Storage format may vary, but semantic content must remain identical.
 
 ---
 
-## Example 2 — `fixture_bars_atr_seed_v1`
+## Example 2 — `fixture_bars_atr_seed`
 
 ### Scenario
 15 consecutive trading-day bars exist for one ticker.
@@ -67,7 +67,7 @@ The fixture must prove:
 
 ---
 
-## Example 3 — `fixture_bars_short_history_v1`
+## Example 3 — `fixture_bars_short_history`
 
 ### Scenario
 Ticker has only 10 trading-day bars.
@@ -93,7 +93,7 @@ No forward-fill, zero-fill, or guessed history is allowed.
 
 ---
 
-## Example 4 — `fixture_missing_dependency_bar_v1`
+## Example 4 — `fixture_missing_dependency_bar`
 
 ### Scenario
 Target date D exists, but a required dependency bar inside the locked trading-day chain is missing unexpectedly.
@@ -108,7 +108,7 @@ A missing dependency inside a required locked window is not the same as ordinary
 
 ---
 
-## Example 5 — `fixture_effective_date_fallback_v1`
+## Example 5 — `fixture_effective_date_fallback`
 
 ### Scenario
 - requested date `2026-03-10`
@@ -129,7 +129,7 @@ Consumer readability is resolved by explicit effective-date logic, not by maximu
 
 ---
 
-## Example 6 — `fixture_controlled_correction_v1`
+## Example 6 — `fixture_controlled_correction`
 
 ### Scenario
 - original current sealed publication exists for `2026-03-05`
@@ -178,7 +178,7 @@ It is “new sealed publication + preserved prior trail + explicit supersession�
 
 ---
 
-## Example 7 — `fixture_unchanged_rerun_v1`
+## Example 7 — `fixture_unchanged_rerun`
 
 ### Scenario
 - prior current sealed publication exists for D
@@ -204,7 +204,7 @@ They summarize relationships across `eod_publications`, `eod_current_publication
 
 ---
 
-## Example 8 — `fixture_correction_reseal_fail_v1`
+## Example 8 — `fixture_correction_reseal_fail`
 
 ### Scenario
 - prior current publication exists
@@ -226,7 +226,7 @@ No ambiguous half-published correction state is allowed.
 
 ---
 
-## Example 9 — `fixture_replay_degraded_input_v1`
+## Example 9 — `fixture_replay_degraded_input`
 
 ### Scenario
 - replay injects degraded source coverage
@@ -272,7 +272,7 @@ It must also prove expected degraded outcomes.
       "indicators_batch_hash": null,
       "eligibility_batch_hash": null,
       "sealed_at": null,
-      "config_version": "cfg_2026_03_v1",
+      "config_version": "cfg_2026_03",
       "started_at": "2026-03-10T15:01:00+07:00",
       "finished_at": "2026-03-10T15:09:30+07:00"
     }

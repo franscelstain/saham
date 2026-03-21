@@ -6,8 +6,8 @@ Show what an executed proof-style test output looks like after a real test run.
 ## Example — Executed contract test output
 
     {
-      "test_id": "hash_same_content_same_hash_v1",
-      "fixture_family": "fixture_hash_payload_v1",
+      "test_id": "hash_same_content_same_hash",
+      "fixture_family": "fixture_hash_payload",
       "result": "PASS",
       "assertion_layers": [
         "row",
@@ -26,8 +26,8 @@ Show what an executed proof-style test output looks like after a real test run.
 ## Example — Executed negative test output
 
     {
-      "test_id": "correction_failed_reseal_no_switch_v1",
-      "fixture_family": "fixture_correction_reseal_fail_v1",
+      "test_id": "correction_failed_reseal_no_switch",
+      "fixture_family": "fixture_correction_reseal_fail",
       "result": "PASS",
       "assertion_layers": [
         "run",

@@ -7,8 +7,8 @@ Define how the documentation proves that critical contracts are actually covered
 
 | Contract | Covered by test IDs | Covered by fixture families | Closure state |
 |---|---|---|---|
-| hash determinism | `hash_same_content_same_hash_v1`, `hash_different_runid_same_hash_v1`, `hash_changed_content_diff_hash_v1` | `fixture_hash_payload_v1`, `fixture_controlled_correction_v1` | full |
-| correction publication integrity | `correction_preserves_prior_publication_v1`, `correction_publishes_new_current_v1`, `correction_unchanged_content_no_publish_v1` | `fixture_controlled_correction_v1`, `fixture_unchanged_rerun_v1` | full |
+| hash determinism | `hash_same_content_same_hash`, `hash_different_runid_same_hash`, `hash_changed_content_diff_hash` | `fixture_hash_payload`, `fixture_controlled_correction` | full |
+| correction publication integrity | `correction_preserves_prior_publication`, `correction_publishes_new_current`, `correction_unchanged_content_no_publish` | `fixture_controlled_correction`, `fixture_unchanged_rerun` | full |
 
 ## Allowed closure states
 - `full`

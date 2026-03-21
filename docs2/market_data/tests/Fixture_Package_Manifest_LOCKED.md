@@ -9,7 +9,7 @@ Define the manifest shape for one fixture package so every fixture family is exp
 ## Minimum manifest shape
 
     {
-      "fixture_family": "fixture_controlled_correction_v1",
+      "fixture_family": "fixture_controlled_correction",
       "version": "v1",
       "contract_areas": [
         "historical_correction_integrity",

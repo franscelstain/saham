@@ -27,7 +27,7 @@ A compliant implementation must materialize each required family as an executabl
 
 ## Fixture catalog
 
-### `fixture_calendar_v1`
+### `fixture_calendar`
 Purpose:
 - prove trading-day traversal independent of wall-clock date subtraction
 
@@ -53,7 +53,7 @@ Publication-aware:
 
 ---
 
-### `fixture_bars_valid_minimal_v1`
+### `fixture_bars_valid_minimal`
 Purpose:
 - prove valid canonical bars and basic indicator expectations
 
@@ -82,7 +82,7 @@ Publication-aware:
 
 ---
 
-### `fixture_bars_atr_seed_v1`
+### `fixture_bars_atr_seed`
 Purpose:
 - prove ATR14 Wilder seed and recursion
 
@@ -112,7 +112,7 @@ Publication-aware:
 
 ---
 
-### `fixture_bars_adj_close_fallback_v1`
+### `fixture_bars_adj_close_fallback`
 Purpose:
 - prove per-date `adj_close -> close` basis fallback
 
@@ -139,7 +139,7 @@ Publication-aware:
 
 ---
 
-### `fixture_invalid_provider_rows_v1`
+### `fixture_invalid_provider_rows`
 Purpose:
 - prove invalid row rejection and deterministic duplicate resolution
 
@@ -169,7 +169,7 @@ Publication-aware:
 
 ---
 
-### `fixture_bars_short_history_v1`
+### `fixture_bars_short_history`
 Purpose:
 - prove insufficient-history behavior
 
@@ -201,7 +201,7 @@ Publication-aware:
 
 ---
 
-### `fixture_missing_dependency_bar_v1`
+### `fixture_missing_dependency_bar`
 Purpose:
 - prove missing dependency bar invalidates dependent computations
 
@@ -230,7 +230,7 @@ Publication-aware:
 
 ---
 
-### `fixture_invalid_indicator_rows_v1`
+### `fixture_invalid_indicator_rows`
 Purpose:
 - prove eligibility behavior when indicator rows exist but are invalid
 
@@ -258,7 +258,7 @@ Publication-aware:
 
 ---
 
-### `fixture_eligibility_universe_v1`
+### `fixture_eligibility_universe`
 Purpose:
 - prove one-row-per-universe behavior
 
@@ -287,7 +287,7 @@ Publication-aware:
 
 ---
 
-### `fixture_effective_date_fallback_v1`
+### `fixture_effective_date_fallback`
 Purpose:
 - prove held requested date falls back to prior readable sealed date
 
@@ -315,7 +315,7 @@ Publication-aware:
 
 ---
 
-### `fixture_no_prior_readable_date_v1`
+### `fixture_no_prior_readable_date`
 Purpose:
 - prove no prior readable date leaves effective date unresolved
 
@@ -341,7 +341,7 @@ Publication-aware:
 
 ---
 
-### `fixture_hash_payload_v1`
+### `fixture_hash_payload`
 Purpose:
 - prove exact serialization and hash reproducibility
 
@@ -374,7 +374,7 @@ Publication-aware:
 
 ---
 
-### `fixture_finalize_without_seal_v1`
+### `fixture_finalize_without_seal`
 Purpose:
 - prove final readable success cannot happen without seal
 
@@ -400,7 +400,7 @@ Publication-aware:
 
 ---
 
-### `fixture_hash_precondition_fail_v1`
+### `fixture_hash_precondition_fail`
 Purpose:
 - prove seal cannot proceed without mandatory hashes
 
@@ -427,7 +427,7 @@ Publication-aware:
 
 ---
 
-### `fixture_controlled_correction_v1`
+### `fixture_controlled_correction`
 Purpose:
 - prove corrected publication lifecycle
 
@@ -464,7 +464,7 @@ Publication-aware:
 
 ---
 
-### `fixture_unchanged_rerun_v1`
+### `fixture_unchanged_rerun`
 Purpose:
 - prove unchanged rerun does not create fake correction publication
 
@@ -495,7 +495,7 @@ Publication-aware:
 
 ---
 
-### `fixture_correction_request_v1`
+### `fixture_correction_request`
 Purpose:
 - prove approval gate for correction flow
 
@@ -522,7 +522,7 @@ Publication-aware:
 
 ---
 
-### `fixture_correction_reseal_fail_v1`
+### `fixture_correction_reseal_fail`
 Purpose:
 - prove failed reseal blocks publication switch
 
@@ -551,7 +551,7 @@ Publication-aware:
 
 ---
 
-### `fixture_replay_unchanged_input_v1`
+### `fixture_replay_unchanged_input`
 Purpose:
 - prove unchanged replay reproducibility
 
@@ -583,7 +583,7 @@ Publication-aware:
 
 ---
 
-### `fixture_replay_degraded_input_v1`
+### `fixture_replay_degraded_input`
 Purpose:
 - prove replay of degraded data yields expected degraded behavior
 

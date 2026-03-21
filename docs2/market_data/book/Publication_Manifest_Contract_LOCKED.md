@@ -29,7 +29,7 @@ A conforming manifest must contain at minimum:
       "supersedes_publication_id": 1188,
       "seal_state": "SEALED",
       "sealed_at": "2026-03-06T10:15:00+07:00",
-      "config_identity": "cfg_2026_03_v1",
+      "config_identity": "cfg_2026_03",
       "bars_batch_hash": "H2B",
       "indicators_batch_hash": "H2I",
       "eligibility_batch_hash": "H2E",

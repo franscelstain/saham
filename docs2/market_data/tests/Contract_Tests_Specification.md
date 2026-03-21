@@ -33,9 +33,9 @@ Must prove:
 - duplicate resolution is auditable
 
 Minimum tests:
-- `bars_valid_accept_v1`
-- `bars_invalid_reject_v1`
-- `bars_duplicate_resolution_v1`
+- `bars_valid_accept`
+- `bars_invalid_reject`
+- `bars_duplicate_resolution`
 
 ### 2. Indicator correctness
 Must prove:
@@ -48,12 +48,12 @@ Must prove:
 - results do not depend on wall-clock date subtraction
 
 Minimum tests:
-- `atr14_seed_v1`
-- `atr14_recursive_v1`
-- `roc20_dminus20_v1`
-- `vol_ratio_prior20_excl_d_v1`
-- `hh20_inclusive_v1`
-- `price_basis_adj_close_fallback_v1`
+- `atr14_seed`
+- `atr14_recursive`
+- `roc20_dminus20`
+- `vol_ratio_prior20_excl_d`
+- `hh20_inclusive`
+- `price_basis_adj_close_fallback`
 
 ### 3. Null and warmup policy
 Must prove:
@@ -63,8 +63,8 @@ Must prove:
 - no forward-fill or zero-fill is used to fake readiness
 
 Minimum tests:
-- `indicator_insufficient_history_v1`
-- `missing_dependency_bar_v1`
+- `indicator_insufficient_history`
+- `missing_dependency_bar`
 
 ### 4. Eligibility determinism
 Must prove:
@@ -75,10 +75,10 @@ Must prove:
 - eligibility semantics do not depend on downstream ranking or selection logic
 
 Minimum tests:
-- `eligibility_one_row_per_universe_v1`
-- `eligibility_missing_bar_v1`
-- `eligibility_invalid_indicators_v1`
-- `eligibility_insufficient_history_v1`
+- `eligibility_one_row_per_universe`
+- `eligibility_missing_bar`
+- `eligibility_invalid_indicators`
+- `eligibility_insufficient_history`
 
 ### 5. Effective-date readiness and fallback
 Must prove:
@@ -88,9 +88,9 @@ Must prove:
 - readable state requires seal
 
 Minimum tests:
-- `effective_date_hold_fallback_v1`
-- `effective_date_no_prior_success_v1`
-- `success_requires_seal_v1`
+- `effective_date_hold_fallback`
+- `effective_date_no_prior_success`
+- `success_requires_seal`
 
 ### 6. Hash determinism and reproducibility
 Must prove:
@@ -103,11 +103,11 @@ Must prove:
 - hashing covers only the effective-date artifact content being sealed
 
 Minimum tests:
-- `hash_same_content_same_hash_v1`
-- `hash_different_runid_same_hash_v1`
-- `hash_changed_content_diff_hash_v1`
-- `hash_field_order_locked_v1`
-- `hash_formatting_locked_v1`
+- `hash_same_content_same_hash`
+- `hash_different_runid_same_hash`
+- `hash_changed_content_diff_hash`
+- `hash_field_order_locked`
+- `hash_formatting_locked`
 
 ### 7. Seal/finalize sequencing
 Must prove:
@@ -116,9 +116,9 @@ Must prove:
 - a readable publication maps to one coherent sealed run context
 
 Minimum tests:
-- `seal_requires_hashes_v1`
-- `success_requires_seal_v1`
-- `single_current_publication_v1`
+- `seal_requires_hashes`
+- `success_requires_seal`
+- `single_current_publication`
 
 ### 8. Historical correction integrity
 Must prove:
@@ -129,11 +129,11 @@ Must prove:
 - failed reseal does not switch current publication
 
 Minimum tests:
-- `correction_preserves_prior_publication_v1`
-- `correction_publishes_new_current_v1`
-- `correction_unchanged_content_no_publish_v1`
-- `correction_requires_approval_v1`
-- `correction_failed_reseal_no_switch_v1`
+- `correction_preserves_prior_publication`
+- `correction_publishes_new_current`
+- `correction_unchanged_content_no_publish`
+- `correction_requires_approval`
+- `correction_failed_reseal_no_switch`
 
 ### 9. Replay and data-quality proof
 Must prove:
@@ -142,9 +142,9 @@ Must prove:
 - runtime/locale differences do not change hash payload formatting
 
 Minimum tests:
-- `replay_same_input_same_output_v1`
-- `replay_degraded_expected_hold_v1`
-- `replay_runtime_format_stability_v1`
+- `replay_same_input_same_output`
+- `replay_degraded_expected_hold`
+- `replay_runtime_format_stability`
 
 ## Minimum assertion payload per implemented test (LOCKED)
 Every implemented test must assert all relevant layers below:
