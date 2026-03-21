@@ -58,4 +58,5 @@ Paket tidak boleh diklaim Layer C bila evidence yang ada hanya berupa:
 - Namun audit wajib tetap membedakan antara:
   - `Layer C via archived runtime evidence`, dan
   - `Layer C via real implementation/app runtime surface`.
+- Perbedaan dua bentuk Layer C ini adalah **batas klasifikasi**, bukan otomatis kelemahan. Selama paket jujur terhadap jenis buktinya, kondisi ini tidak boleh ditulis sebagai defect.
 - Package bisa dominan A walaupun mengandung sebagian B dan sebagian C.

@@ -1,6 +1,6 @@
 {
-  "test_id": "hash_same_content_same_hash_v1",
-  "fixture_family": "fixture_hash_payload_v1",
+  "test_id": "hash_same_content_same_hash",
+  "fixture_family": "fixture_hash_payload",
   "execution_time": "2026-04-22T10:15:00+07:00",
   "result": "PASS",
   "assertion_layers": [

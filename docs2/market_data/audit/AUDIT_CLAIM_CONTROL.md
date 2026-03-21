@@ -26,6 +26,10 @@ Bila paket hanya memiliki archived executed evidence bundles tanpa code aplikasi
 - runtime-proven **for the documented execution artifacts that are present**, bukan
 - full real-implementation package.
 
+Kondisi ini harus diperlakukan sebagai **claim boundary yang sah**, bukan defect, selama paket tetap jujur mengenai jenis evidence yang dimilikinya. Jadi perbedaan antara archived evidence dan full application/runtime surface adalah pembatas klasifikasi, bukan otomatis kelemahan kualitas.
+
+Kondisi ini harus diperlakukan sebagai **claim boundary yang sah**, bukan defect, selama paket tetap jujur mengenai jenis evidence yang dimilikinya. Jadi perbedaan antara archived evidence dan full application/runtime surface adalah pembatas klasifikasi, bukan otomatis kelemahan kualitas.
+
 ## Overclaim rule
 Dokumen tidak boleh mengklaim runtime-proven bila yang ada baru contract, runbook, atau illustrative example.
 Dokumen juga tidak boleh menyamakan:

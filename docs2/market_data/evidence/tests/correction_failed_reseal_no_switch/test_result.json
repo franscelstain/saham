@@ -1,6 +1,6 @@
 {
-  "test_id": "correction_failed_reseal_no_switch_v1",
-  "fixture_family": "fixture_correction_reseal_fail_v1",
+  "test_id": "correction_failed_reseal_no_switch",
+  "fixture_family": "fixture_correction_reseal_fail",
   "execution_time": "2026-04-22T10:40:00+07:00",
   "result": "PASS",
   "assertion_layers": [
