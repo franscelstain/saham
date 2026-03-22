@@ -1,8 +1,8 @@
-# Trade Axis Documentation Root
+# System Documentation Root
 
 ## 1. Purpose
 
-Folder `docs/` adalah **source of truth dokumentasi sistem** untuk Trade Axis.
+Folder `docs/` adalah **source of truth dokumentasi sistem** untuk sistem aktif.
 
 Dokumen di dalam folder ini dipakai sebagai panduan resmi untuk:
 - memahami batas domain sistem,
@@ -331,3 +331,38 @@ Jangan mulai dari asumsi, kebiasaan coding, atau pola lama yang belum tentu sesu
 Untuk hubungan lintas domain, terutama `market_data -> watchlist`, tidak boleh ada lebih dari satu makna jalur intake yang sama-sama dianggap sah.
 
 `watchlist` wajib membaca input upstream dari kontrak producer-facing yang jelas dari `market_data`. `api_architecture` hanya dipakai setelah jalur intake itu dikunci, bukan untuk membenarkan shortcut membaca internals producer.
+
+
+## System Assembly Baseline
+
+Dokumen pada repository ini tidak boleh dibaca sebagai kumpulan folder yang berdiri sendiri-sendiri. Paket aktif harus dipahami sebagai satu jalur assembly sistem dengan urutan authority yang jelas:
+
+1. `market_data` mengunci kontrak producer upstream.
+2. `watchlist` mengunci perilaku consumer setelah input upstream yang sah tersedia.
+3. `system_audit` mengunci readiness lintas-domain dan melarang shortcut interpretasi.
+4. `api_architecture` menerjemahkan kontrak domain yang sudah stabil ke implementasi kode.
+
+Artinya, implementer tidak boleh memulai build sistem penuh dari dokumen implementation atau architecture saja tanpa melewati kontrak domain yang menjadi owner meaning.
+
+## Global Build Order
+
+Urutan build minimum untuk sistem aktif adalah:
+
+1. kunci root ownership dan source-of-truth di folder `docs/`;
+2. kunci `market_data` sebagai producer contract dan publication-ready output;
+3. kunci baseline lintas-domain pada `docs/system_audit/`;
+4. kunci `watchlist` sebagai consumer behavior yang bergantung pada upstream producer-facing intake;
+5. masuk ke `watchlist/system/implementation/` hanya setelah policy dan intake baseline stabil;
+6. gunakan `api_architecture` sebagai translation guardrail untuk controller/service/repository/domain compute;
+7. implementasi kode tidak boleh menciptakan kontrak baru yang bersaing dengan owner docs.
+
+## Phase Transition: Domain Contract to Implementation Translation
+
+Perpindahan dari dokumen domain ke dokumen implementasi hanya boleh dilakukan bila syarat berikut sudah terpenuhi:
+
+- owner contract producer sudah jelas;
+- owner behavior consumer sudah jelas;
+- baseline input lintas-domain sudah jelas;
+- system assembly baseline sudah jelas.
+
+Setelah syarat di atas stabil, `docs/api_architecture/` menjadi wajib sebagai guardrail translation. Folder tersebut tidak boleh dipakai untuk mendefinisikan ulang business meaning dari producer contract maupun consumer policy.

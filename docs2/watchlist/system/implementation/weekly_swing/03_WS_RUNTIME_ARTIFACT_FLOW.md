@@ -8,6 +8,10 @@ Dokumen ini menjelaskan aliran artifact runtime yang harus dihasilkan aplikasi w
 
 ### Step 1 — Build PLAN
 Input upstream producer-facing yang sah dari `market-data` dibaca dan divalidasi. Intake ini harus publication-aware dan tunduk pada kontrak consumer-readable/downstream-readable milik producer.
+Anchor minimum untuk Step 1 adalah:
+- `docs/market_data/book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+- `docs/market_data/book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
+- `docs/market_data/book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
 Output `PLAN` dimaterialize sebagai artifact immutable untuk `trade_date`.
 
 ### Step 2 — Build RECOMMENDATION

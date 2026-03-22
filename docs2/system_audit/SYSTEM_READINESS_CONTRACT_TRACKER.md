@@ -47,8 +47,8 @@ Tracker ini hanya melacak kesiapan lintas area berikut:
 | Market-data upstream contract readiness | PASS | High | `docs/market_data/` | owner contracts market-data | kuat sebagai upstream producer baseline |
 | Watchlist downstream contract readiness | PASS | High | `docs/watchlist/` | owner docs watchlist | kuat sebagai consumer baseline |
 | API implementation guardrail readiness | PASS | High | `docs/api_architecture/` | architecture docs | cukup kuat sebagai pedoman implementasi |
-| Cross-domain contract readiness (`market_data -> watchlist`) | PARTIAL | Critical | lintas domain | market-data + watchlist | kontrak intake lintas domain belum cukup terkunci sebagai satu baseline integrasi |
-| System assembly readiness | PARTIAL | High | lintas domain | root + domain docs | belum ada peta assembly sistem yang cukup tegas |
+| Cross-domain contract readiness (`market_data -> watchlist`) | PASS | Medium | lintas domain | market-data + watchlist + system_audit | intake lintas domain sudah memiliki anchor producer-facing yang cukup tegas |
+| System assembly readiness | PARTIAL | High | lintas domain | root + domain docs + system_audit | assembly path sistem belum cukup eksplisit dan operasional |
 | Build-order readiness | PARTIAL | High | lintas domain | root README + domain README + api architecture | urutan global ada, tapi penerjemahan lintas domain belum cukup operasional |
 | Anti-drift readiness across owner docs and implementation guidance | PARTIAL | High | lintas domain | root + domain + architecture docs | masih ada ruang interpretasi ganda pada area integrasi |
 | Runtime-proof claim discipline | PASS | Medium | lintas domain | audit reading of docs | belum terlihat klaim runtime yang berlebihan pada area inti |
@@ -186,6 +186,84 @@ Sebelum dinilai sangat matang, sistem harus punya:
 - lalu audit ulang secara current-state.
 
 ---
+
+
+
+### GAP-002-A — No Explicit System Assembly Map
+- **Status:** `PARTIAL`
+- **Severity:** `High`
+
+#### Problem
+Belum ada satu baseline yang secara eksplisit merakit root ownership, producer contract, consumer behavior, dan architecture translation menjadi satu jalur assembly sistem.
+
+#### Expected target state
+Harus ada peta assembly yang menjelaskan phase, dependency direction, dan forbidden shortcuts lintas-domain.
+
+#### Main evidence
+- `docs/README.md`
+- `docs/system_audit/SYSTEM_ASSEMBLY_BASELINE.md`
+- `docs/watchlist/system/README.md`
+- `docs/api_architecture/README.md`
+
+#### Needed remediation
+- perkuat root README sebagai entry point assembly;
+- tambahkan baseline assembly khusus;
+- sinkronkan entry point watchlist dan architecture docs.
+
+### GAP-002-B — No Global Build Order Across Domains
+- **Status:** `PARTIAL`
+- **Severity:** `High`
+
+#### Problem
+Read order internal per domain sudah ada, tetapi urutan build global lintas-domain belum cukup operasional untuk implementer sistem utuh.
+
+#### Expected target state
+Harus ada global build order yang jelas dari producer contract sampai implementation translation.
+
+#### Main evidence
+- `docs/README.md`
+- `docs/system_audit/SYSTEM_ASSEMBLY_BASELINE.md`
+- `docs/watchlist/system/implementation/README.md`
+
+#### Needed remediation
+- tulis build order global di root dan baseline assembly;
+- gate implementation entry dengan prerequisites yang eksplisit.
+
+### GAP-002-C — Architecture Guidance Not Yet Positioned as Translation Phase
+- **Status:** `PARTIAL`
+- **Severity:** `High`
+
+#### Problem
+`docs/api_architecture/` sudah kuat sebagai guardrail, tetapi belum cukup diposisikan sebagai fase translation setelah kontrak domain stabil.
+
+#### Expected target state
+Harus jelas kapan architecture guidance mulai wajib dan apa yang boleh diterjemahkan tanpa mendefinisikan ulang policy domain.
+
+#### Main evidence
+- `docs/api_architecture/README.md`
+- `docs/api_architecture/panduan-adopsi-minimum.md`
+- `docs/api_architecture/contoh-implementasi-end-to-end.md`
+
+#### Needed remediation
+- tambahkan placement yang eksplisit;
+- tambahkan contoh sistem aktif yang menunjukkan producer -> consumer -> translation chain.
+
+### GAP-002-D — Implementation Entry Points Not Yet Gated by Assembly Prerequisites
+- **Status:** `PARTIAL`
+- **Severity:** `High`
+
+#### Problem
+Entry point implementation watchlist belum cukup dipaksa untuk tunduk pada prerequisites system assembly.
+
+#### Expected target state
+Implementation folder hanya boleh dimasuki setelah producer contract, consumer behavior, dan cross-domain baseline stabil.
+
+#### Main evidence
+- `docs/watchlist/system/README.md`
+- `docs/watchlist/system/implementation/README.md`
+
+#### Needed remediation
+- tambahkan preconditions dan phase transition yang eksplisit.
 
 ## Areas Already Strong
 

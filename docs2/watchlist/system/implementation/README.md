@@ -22,3 +22,33 @@ Audit implementasi watchlist berada di [`../../audit/implementation/`](../../aud
 
 
 Guidance di folder ini default-nya dibaca sebagai **Layer B**. Ia membantu translasi build, tetapi tidak mengubah owner rule pada folder policy.
+
+
+## When to Enter This Folder
+
+Folder ini baru boleh dipakai setelah pembaca menyelesaikan jalur berikut:
+
+- root ownership dan system assembly baseline;
+- producer-facing intake dari `market_data`;
+- consumer behavior owner docs pada `watchlist/system/policies/`;
+- baseline lintas-domain pada `docs/system_audit/`.
+
+Folder ini bukan entry point utama untuk memahami sistem aktif.
+
+## Preconditions for Implementation Translation
+
+Sebelum implementation translation dimulai, hal berikut harus sudah locked secara meaning:
+
+- input upstream yang sah;
+- posisi watchlist sebagai consumer, bukan producer;
+- forbidden shortcuts lintas-domain;
+- build order global dan phase transition ke architecture guidance.
+
+## What Must Already Be Locked Before Implementation Starts
+
+Implementer dilarang memulai coding dari folder ini bila masih ada ketidakjelasan pada:
+
+- producer contract;
+- consumer behavior contract;
+- system assembly order;
+- placement `api_architecture` sebagai translation guardrail.

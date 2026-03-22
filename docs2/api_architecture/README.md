@@ -213,3 +213,35 @@ Bila folder ini diterapkan dengan benar:
 - `panduan-adopsi-minimum.md`
   - panduan bertahap agar tim kecil atau proyek awal tetap bisa memakai dokumen ini tanpa terasa terlalu berat.
 
+
+
+## Placement in System Assembly
+
+Folder ini bukan titik awal memahami sistem aktif. `docs/api_architecture/` harus dipakai setelah kontrak domain pada producer dan consumer sudah cukup stabil dan jalur assembly lintas-domain sudah jelas.
+
+Pada sistem aktif, posisi folder ini adalah **translation phase**, yaitu menerjemahkan kontrak domain menjadi struktur implementasi seperti controller, application service, repository, domain compute, dan transport boundary.
+
+## When Architecture Guidance Becomes Mandatory
+
+Architecture guidance menjadi wajib setelah pembaca telah mengunci:
+
+- root ownership dan source-of-truth;
+- producer-facing contract pada `market_data`;
+- consumer behavior contract pada `watchlist`;
+- system assembly dan cross-domain readiness baseline.
+
+Setelah titik itu, implementasi kode tidak boleh dibuat tanpa guardrail arsitektur ini.
+
+## What This Folder May Translate and What It Must Not Redefine
+
+Folder ini boleh:
+
+- menerjemahkan kontrak domain ke struktur layer kode;
+- mengatur boundary controller/service/repository/domain compute;
+- mengatur determinisme, idempotensi, DTO, transport, dan handoff antar-layer.
+
+Folder ini tidak boleh:
+
+- mengubah arti kontrak producer;
+- mengubah perilaku owner consumer;
+- membuat policy bisnis baru yang bersaing dengan owner docs.

@@ -59,3 +59,26 @@ Layer C baru relevan bila ada bukti code/app/runtime nyata yang cukup dan bisa d
 ## Layer Activation Reference
 
 Gunakan [`LAYER_ACTIVATION_RULE.md`](../LAYER_ACTIVATION_RULE.md) untuk menentukan apakah paket harus dibaca sebagai Layer A, B, atau C.
+
+
+## Watchlist Position in System Assembly
+
+`watchlist/system/` bukan titik awal sistem. Folder ini harus dibaca sebagai node consumer dalam jalur assembly yang lebih besar:
+
+- `market_data` lebih dulu mengunci producer-facing upstream contract;
+- `system_audit` mengunci readiness lintas-domain dan forbidden shortcuts;
+- `watchlist` kemudian mengunci consumer behavior yang berjalan di atas intake upstream yang sah.
+
+Artinya, watchlist tidak boleh diperlakukan sebagai subsystem yang bebas menentukan urutan build sendiri.
+
+## Preconditions Before Building Watchlist
+
+Sebelum build watchlist dimulai, pembaca harus sudah memastikan:
+
+- producer-facing intake dari `market_data` sudah jelas;
+- current-state readiness lintas-domain sudah tidak membuka kontrak paralel;
+- behavior owner docs watchlist sudah dibaca lebih dulu daripada implementation guidance.
+
+## Transition to Implementation Guidance
+
+Masuk ke `watchlist/system/implementation/` hanya boleh dilakukan setelah policy dan intake baseline stabil. Folder implementation bukan pintu awal untuk menebak kontrak sistem, melainkan jalur translation setelah owner docs selesai dikunci.

@@ -62,6 +62,11 @@ Jika terjadi konflik:
 ## PLAN intake anchor for module translation
 `WsPlanInputProvider` tidak boleh bebas menentukan source upstream sendiri. Modul ini harus mengikat bacaannya ke intake producer-facing yang sah dari `market-data`, terutama kontrak consumer-readable / publication-aware yang sudah ditunjuk owner producer.
 
+Anchor minimum yang wajib dibaca dan dijadikan referensi implementasi adalah:
+- `docs/market_data/book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+- `docs/market_data/book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
+- `docs/market_data/book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
+
 Arti praktisnya:
 - adapter boleh berbeda secara teknis
 - tetapi meaning intake harus tunggal

@@ -11,6 +11,17 @@ Setiap produk data pada peta ini harus dibaca dalam salah satu kelas berikut:
 
 Kelas ini tidak menggantikan owner contract. Kelas ini hanya memperjelas apakah downstream consumer seperti `watchlist` boleh membaca artefak tersebut sebagai jalur intake.
 
+## Quick intake matrix
+
+| Product family | Owner area | Consumer-facing? | Publication-aware intake? | Internal-only? | Watchlist allowed as direct intake? |
+|---|---|---:|---:|---:|---:|
+| Canonical EOD bars | `market_data` | No, unless an owner contract explicitly exposes them | No | Yes | No |
+| Deterministic EOD indicators | `market_data` | No, unless an owner contract explicitly exposes them | No | Yes | No |
+| Eligibility and readability artifacts | `market_data` | Yes | Yes | No | Yes |
+| Publication and current-pointer semantics | `market_data` | Yes, only where owner contract defines consumer-readable publication semantics | Yes | No for semantics, but technical switch procedures remain implementation-support only | Yes, for semantics only |
+| Correction / replay / reseal artifacts | `market_data` | No | No | No | No |
+| Session snapshot artifacts | `market_data` | No, unless a downstream-facing contract later states otherwise | No | Yes | No |
+
 ## Main products
 ### Canonical EOD bars
 Classification: `internal-only` unless explicitly exposed through a downstream consumer-facing contract.

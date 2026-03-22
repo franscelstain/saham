@@ -117,3 +117,25 @@ Kalau ragu:
 - jaga placement query dulu
 - jaga response contract dulu
 - naikkan disiplin concern lain saat kompleksitas benar-benar mulai terasa
+
+
+## Minimum Adoption Path for the Active System
+
+Untuk sistem aktif, adopsi arsitektur minimum harus mengikuti urutan berikut:
+
+1. pastikan owner docs producer sudah stabil;
+2. pastikan owner docs consumer sudah stabil;
+3. pastikan baseline lintas-domain dan system assembly sudah jelas;
+4. baru terapkan boundary controller/service/repository/domain compute;
+5. baru refactor atau tulis implementasi dengan guardrail arsitektur ini.
+
+## Do Not Start Architecture Refactoring Before These Contracts Are Stable
+
+Refactor arsitektur tidak boleh dimulai bila salah satu hal berikut masih belum stabil:
+
+- producer-facing intake;
+- consumer behavior owner docs;
+- system assembly order;
+- placement architecture guidance sebagai translation phase.
+
+Bila kontrak-kontrak di atas belum stabil, refactor justru berisiko menciptakan kode yang rapi tetapi salah arah.
