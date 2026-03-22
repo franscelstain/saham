@@ -219,3 +219,39 @@ Module mapping yang sah adalah:
 - derive RECOMMENDATION hanya dari PLAN
 - derive CONFIRM dari candidate PLAN binding + confirm inputs yang sah
 - gabungkan hanya di layer read/view tanpa mengubah source semantics
+
+## Canonical Layer Mapping
+
+Dokumen ini harus dibaca bersama `docs/system_audit/SYSTEM_TRANSLATION_BASELINE.md` dan vocabulary di `docs/api_architecture/`.
+
+| Module | Canonical layer | Allowed input | Forbidden responsibility | Expected output form |
+|---|---|---|---|---|
+| `WsPlanInputProvider` | producer-facing read adapter / intake repository | publication-aware consumer-facing upstream output | scoring PLAN, recommendation logic, confirm logic, response shaping | upstream intake DTO / normalized result object |
+| `WsPlanEngine` | domain compute | clean PLAN input DTO | query upstream source langsung, persistence write, transport formatting | PLAN decision/result object |
+| `WsPlanAssembler` | application-side assembler / artifact shaper | PLAN result object + resolved runtime metadata | rule scoring baru, upstream query | PLAN artifact payload |
+| `WsRecommendationEngine` | domain compute | immutable PLAN-derived compute input | membaca CONFIRM, response shaping, persistence write | recommendation result object |
+| `WsRecommendationAssembler` | application-side assembler / artifact shaper | recommendation result object + metadata | mengubah source PLAN meaning | recommendation artifact payload |
+| `WsConfirmBinder` | application orchestration helper / binder | valid PLAN candidate binding + valid confirm input | rule confirm final, response transport final | confirm compute input object |
+| `WsConfirmOverlayEngine` | domain compute | clean confirm compute input | membaca upstream producer langsung, memutasi recommendation | confirm result object |
+| `WsConfirmAssembler` | application-side assembler / artifact shaper | confirm result object + metadata | rule confirm baru | confirm artifact payload |
+| `RuntimeArtifactRepository` | persistence adapter / repository | artifact payload yang sudah selesai diputuskan | eligibility/scoring/policy decision | persisted artifact / artifact read result |
+| `WsWatchlistReadService` | application service / orchestration | request intent yang sudah lolos boundary | query mentah di transport, policy baru | read/composite result object |
+| `WsWatchlistApiPresenter` | transport-facing presenter | read/composite result object | policy, upstream intake, persistence write | response DTO |
+
+## What Each Module May Read / Decide / Return
+
+### Read
+- `WsPlanInputProvider` hanya membaca source upstream producer-facing yang sah.
+- `RuntimeArtifactRepository` membaca/menulis artifact watchlist milik consumer.
+- `WsWatchlistReadService` boleh membaca artifact melalui adapter/repository yang sah, bukan langsung ke internals producer.
+
+### Decide
+- `WsPlanEngine`, `WsRecommendationEngine`, dan `WsConfirmOverlayEngine` adalah rumah keputusan internal weekly_swing.
+- Application service, binder, assembler, dan presenter tidak boleh menjadi rumah keputusan policy baru.
+
+### Return
+- read adapter mengembalikan intake DTO / normalized result object;
+- domain compute mengembalikan decision/result object;
+- assembler mengembalikan artifact payload;
+- presenter mengembalikan response DTO.
+

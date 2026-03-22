@@ -363,3 +363,42 @@ Contoh yang buruk:
 - Repository write tunggal diam-diam melakukan bulk update besar tanpa kontrak yang jelas.
 - Repository mencampur query, domain rule, response shaping, dan logging liar dalam satu method.
 - Repository yang sebenarnya hanya helper utilitas tanpa kontrak persistence yang jelas.
+
+## Active-System Repository Roles
+
+Pada sistem aktif saat ini, repository/read-adapter perlu dibedakan minimal menjadi tiga peran:
+
+1. **Producer-facing intake read adapter**
+   - membaca output upstream `market_data` yang consumer-facing dan publication-aware;
+   - mengembalikan intake DTO / normalized result object;
+   - tidak menjalankan policy watchlist.
+
+2. **Consumer artifact repository**
+   - menyimpan dan membaca artifact PLAN / RECOMMENDATION / CONFIRM milik watchlist;
+   - tidak mengubah meaning intake producer.
+
+3. **Response/read materialization adapter**
+   - membantu membentuk read model/composite read untuk consumer exposure;
+   - tetap tidak boleh menjadi rumah policy baru.
+
+## Intake Read vs Internal Persistence
+
+Repository untuk intake upstream **tidak sama** dengan repository untuk persistence artifact internal consumer.
+
+Perbedaan minimumnya:
+- intake read adapter tunduk pada kontrak producer-facing;
+- artifact repository tunduk pada persistence contract consumer;
+- keduanya tidak boleh digabung menjadi satu object serba bisa yang mencampur semantik intake dan semantik artifact write.
+
+## What a Consumer Read Adapter May Do
+
+Boleh:
+- membaca publication-aware consumer-facing output;
+- memetakan hasil baca ke intake DTO/result object yang stabil.
+
+Tidak boleh:
+- membaca raw internals producer sebagai shortcut;
+- menghitung ranking/scoring watchlist;
+- memutuskan validitas policy internal consumer;
+- langsung membentuk response transport final.
+

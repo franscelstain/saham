@@ -85,8 +85,52 @@ Harus cukup jelas:
 - `docs/api_architecture/transport-boundary.md`
 
 #### Needed remediation
-- buat mapping yang lebih eksplisit antara kontrak domain dan implementasi lintas layer;
-- atau tambah satu dokumen bridge yang memperjelas penerapan architecture guide pada domain aktif.
+- paku module mapping weekly_swing ke vocabulary layer arsitektur;
+- bedakan intake read adapter vs artifact persistence secara eksplisit;
+- pertegas kategori DTO/result object untuk flow aktif;
+- tambah baseline translation lintas layer dan contoh canonical aktif.
+
+### GAP-003-A — Active modules not yet pinned to architecture vocabulary
+- **Status:** `PARTIAL`
+- **Severity:** `High`
+
+#### Problem
+Komponen aktif weekly_swing seperti input provider, engine, assembler, dan presenter belum sepenuhnya dipaku ke vocabulary layer yang sama dengan `api_architecture`.
+
+#### Expected target state
+Setiap modul aktif punya canonical layer, allowed input, forbidden responsibility, dan expected output form yang tegas.
+
+### GAP-003-B — Intake read vs artifact persistence not yet clearly separated
+- **Status:** `PARTIAL`
+- **Severity:** `High`
+
+#### Problem
+Akses baca output producer-facing dan persistence artifact consumer masih terlalu mudah tercampur bila hanya mengandalkan guidance generik.
+
+#### Expected target state
+Read adapter upstream dan repository artifact consumer dibedakan eksplisit pada blueprint aktif.
+
+### GAP-003-C — DTO boundary for active flow not yet explicit
+- **Status:** `PARTIAL`
+- **Severity:** `Medium`
+
+#### Problem
+Kategori object boundary aktif untuk intake, compute, persistence, dan response belum cukup dipaku sehingga array liar masih berpotensi hidup lintas layer.
+
+#### Expected target state
+Kategori DTO/result object aktif dijelaskan eksplisit dan sinkron dengan module mapping serta runtime flow.
+
+### GAP-003-D — Active end-to-end translation example not yet canonical
+- **Status:** `PARTIAL`
+- **Severity:** `Medium`
+
+#### Problem
+Contoh end-to-end aktif belum cukup canonical untuk menjadi pegangan tunggal translasi lintas layer.
+
+#### Expected target state
+Harus ada contoh canonical aktif yang memetakan actor/layer, input, output, dan forbidden drift secara tegas.
+
+---
 
 ---
 

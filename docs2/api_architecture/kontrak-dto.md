@@ -356,3 +356,38 @@ DTO yang sehat umumnya:
 - tidak tahu dari mana data berasal;
 - tidak tahu ke mana data akan dipersist atau dipresentasikan;
 - mudah diuji dengan data statis.
+
+## Active-System DTO Categories
+
+Untuk sistem aktif, boundary object minimal harus dibedakan menjadi:
+
+1. **Upstream intake DTO / result object**
+   - berasal dari producer-facing intake read;
+   - dipakai sebelum domain compute berjalan.
+
+2. **Compute input DTO**
+   - bentuk bersih yang masuk ke PLAN / RECOMMENDATION / CONFIRM compute.
+
+3. **Artifact persistence payload**
+   - bentuk data yang siap disimpan sebagai artifact consumer.
+
+4. **Response DTO**
+   - bentuk keluaran untuk transport/API/read consumer.
+
+## Intake DTO vs Compute Input vs Response DTO
+
+| Object category | Source layer | Consumer layer | Allowed content | Forbidden content |
+|---|---|---|---|---|
+| Upstream intake DTO | intake read adapter | application service / domain compute preparation | publication-aware producer-facing data yang sudah dinormalisasi | request mentah, response formatting |
+| Compute input DTO | application preparation/binder | domain compute | input bersih untuk keputusan internal | row query mentah, ORM entity liar |
+| Artifact persistence payload | assembler/application | repository/persistence adapter | artifact yang sudah selesai diputuskan | response-only decoration, transport concern |
+| Response DTO | presenter/transport shaping | transport/API consumer | data exposure untuk consumer | rule bisnis baru, write concern |
+
+## What Must Never Stay as Untyped Arrays
+
+Yang tidak boleh dibiarkan sebagai array liar lintas layer:
+- hasil intake upstream aktif;
+- input compute PLAN / RECOMMENDATION / CONFIRM;
+- payload artifact yang dipersist;
+- response contract API utama.
+

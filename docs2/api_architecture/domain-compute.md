@@ -329,3 +329,31 @@ Contoh yang buruk:
 - Domain compute dipakai sebagai helper campur-aduk yang menampung semua logic non-query.
 - Kalkulasi domain tersebar di banyak file tanpa rumah resmi.
 - Policy domain diparameterisasi diam-diam tanpa dokumentasi atau versi yang jelas.
+
+## Active-System Domain Compute Shape
+
+Untuk sistem aktif, kandidat canonical domain compute minimal adalah:
+- PLAN engine/builder
+- RECOMMENDATION engine/builder
+- CONFIRM evaluator/overlay engine
+
+## Clean Inputs Required Before Domain Compute Runs
+
+Sebelum domain compute berjalan, input harus sudah:
+- berasal dari intake producer-facing yang sah atau artifact consumer yang sah;
+- bebas dari request transport mentah;
+- bebas dari row query mentah yang dijadikan kontrak aktif;
+- cukup stabil sebagai compute input DTO/result object.
+
+## Weekly Swing Example
+
+Pada weekly_swing:
+- `WsPlanEngine` menghitung keputusan PLAN dari input bersih;
+- `WsRecommendationEngine` menghitung recommendation hanya dari PLAN yang sah;
+- `WsConfirmOverlayEngine` mengevaluasi confirm dari binding PLAN candidate + confirm input yang sah.
+
+Domain compute tidak boleh:
+- query `market_data` langsung;
+- menulis persistence artifact langsung;
+- membentuk response DTO final.
+

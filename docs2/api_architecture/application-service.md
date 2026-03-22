@@ -283,3 +283,28 @@ Aturan:
 - Service memanggil banyak dependency tanpa batas yang jelas hingga menjadi god service.
 - Service memakai banyak flag untuk mengontrol banyak mode perilaku dalam satu method.
 - Service menjadi tempat shortcut teknis yang melanggar boundary “untuk sementara”, lalu permanen.
+
+## Active-System Orchestration Example
+
+Dalam flow aktif `market_data -> watchlist`, application service yang sehat melakukan hal berikut:
+- menerima intent/use-case dari boundary;
+- memanggil producer-facing intake reader yang sah;
+- meneruskan input bersih ke domain compute PLAN / RECOMMENDATION / CONFIRM;
+- memanggil persistence adapter bila artifact perlu disimpan;
+- menyusun response lewat presenter/response DTO.
+
+## What Orchestration May Coordinate
+
+Application service boleh:
+- mengatur urutan PLAN -> RECOMMENDATION -> CONFIRM;
+- mengikat candidate PLAN ke confirm input yang sah;
+- menggabungkan hasil artifact untuk kebutuhan consumer read.
+
+## What Orchestration Must Not Decide
+
+Application service tidak boleh:
+- menentukan arti eligibility/publication producer;
+- menentukan scoring/ranking/grouping owner watchlist;
+- menggantikan DTO boundary seenaknya;
+- melakukan query/persistence sebagai tempat policy tersembunyi.
+
