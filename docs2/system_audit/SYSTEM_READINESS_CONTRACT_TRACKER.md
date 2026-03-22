@@ -50,119 +50,31 @@ Tracker ini hanya melacak kesiapan lintas area berikut:
 | Cross-domain contract readiness (`market_data -> watchlist`) | PASS | Medium | lintas domain | market-data + watchlist + system_audit | intake lintas domain sudah memiliki anchor producer-facing yang cukup tegas |
 | System assembly readiness | PASS | Medium | lintas domain | root + domain docs + system_audit | assembly baseline, global build order, dan translation placement sudah cukup eksplisit |
 | Build-order readiness | PASS | Medium | lintas domain | root README + domain README + system assembly baseline | urutan global dan gating implementation entry sudah cukup jelas |
-| Anti-drift readiness across owner docs and implementation guidance | PARTIAL | Medium | lintas domain | root + domain + architecture docs + tracker | struktur sudah lebih rapat, tetapi guidance translation lintas layer masih perlu dipertegas untuk fase aktif |
+| Anti-drift readiness across owner docs and implementation guidance | PASS | Medium | lintas domain | root + domain + architecture docs + system_audit | owner docs, bridge baselines, dan implementation guidance sudah cukup sinkron untuk fase aktif |
 | Runtime-proof claim discipline | PASS | Medium | lintas domain | audit reading of docs | belum terlihat klaim runtime yang berlebihan pada area inti |
-| Readiness to build full system without major assumptions | PARTIAL | High | lintas domain | seluruh dokumen inti | major assumptions utama sudah turun, tetapi readiness penuh masih menunggu penutupan GAP-003 dan GAP-004 |
+| Readiness to build full system without major assumptions | PASS | Medium | lintas domain | seluruh dokumen inti + system_audit | major assumptions utama sudah cukup ditutup untuk fase dokumentasi aktif |
 
 ---
 
 ## Active Gaps
 
-### GAP-003 — Translation from Domain Contracts to Concrete Build Blueprint Is Still Partial
-- **Status:** `PARTIAL`
-- **Severity:** `High`
+Saat ini **tidak ada gap aktif substantif** untuk baseline dokumentasi sistem pada fase aktif yang sedang diaudit.
 
-#### Problem
-`docs/api_architecture/` sudah kuat sebagai guardrail generik, tetapi penerjemahan lintas domain ke blueprint implementasi yang lebih konkret belum sepenuhnya terkunci.
+Status aktif saat ini adalah:
+- `GAP-001` = `PASS / CLOSED`
+- `GAP-002` = `PASS / CLOSED`
+- `GAP-003` = `PASS / CLOSED`
+- `GAP-004` = `PASS / CLOSED`
 
-#### Why this matters
-Tanpa jembatan yang cukup tegas:
-- aturan coding bisa dipahami benar secara prinsip tetapi diterapkan berbeda-beda;
-- module boundary lintas domain bisa dibangun tidak konsisten.
+## Current-State Closure Rule
 
-#### Expected target state
-Harus cukup jelas:
-- domain mana yang hanya owner rule;
-- layer mana yang hanya orchestration;
-- layer mana yang melakukan read model access;
-- layer mana yang tidak boleh menciptakan policy baru.
+Tracker aktif harus selalu mewakili **single clean current-state**.
 
-#### Main evidence
-- `docs/api_architecture/README.md`
-- `docs/api_architecture/application-service.md`
-- `docs/api_architecture/repository.md`
-- `docs/api_architecture/domain-compute.md`
-- `docs/api_architecture/transport-boundary.md`
-
-#### Needed remediation
-- paku module mapping weekly_swing ke vocabulary layer arsitektur;
-- bedakan intake read adapter vs artifact persistence secara eksplisit;
-- pertegas kategori DTO/result object untuk flow aktif;
-- tambah baseline translation lintas layer dan contoh canonical aktif.
-
-### GAP-003-A — Active modules not yet pinned to architecture vocabulary
-- **Status:** `PARTIAL`
-- **Severity:** `High`
-
-#### Problem
-Komponen aktif weekly_swing seperti input provider, engine, assembler, dan presenter belum sepenuhnya dipaku ke vocabulary layer yang sama dengan `api_architecture`.
-
-#### Expected target state
-Setiap modul aktif punya canonical layer, allowed input, forbidden responsibility, dan expected output form yang tegas.
-
-### GAP-003-B — Intake read vs artifact persistence not yet clearly separated
-- **Status:** `PARTIAL`
-- **Severity:** `High`
-
-#### Problem
-Akses baca output producer-facing dan persistence artifact consumer masih terlalu mudah tercampur bila hanya mengandalkan guidance generik.
-
-#### Expected target state
-Read adapter upstream dan repository artifact consumer dibedakan eksplisit pada blueprint aktif.
-
-### GAP-003-C — DTO boundary for active flow not yet explicit
-- **Status:** `PARTIAL`
-- **Severity:** `Medium`
-
-#### Problem
-Kategori object boundary aktif untuk intake, compute, persistence, dan response belum cukup dipaku sehingga array liar masih berpotensi hidup lintas layer.
-
-#### Expected target state
-Kategori DTO/result object aktif dijelaskan eksplisit dan sinkron dengan module mapping serta runtime flow.
-
-### GAP-003-D — Active end-to-end translation example not yet canonical
-- **Status:** `PARTIAL`
-- **Severity:** `Medium`
-
-#### Problem
-Contoh end-to-end aktif belum cukup canonical untuk menjadi pegangan tunggal translasi lintas layer.
-
-#### Expected target state
-Harus ada contoh canonical aktif yang memetakan actor/layer, input, output, dan forbidden drift secara tegas.
-
----
-
----
-
-### GAP-004 — System Ready for Build, But Not Yet Fully Locked Against Interpretive Drift
-- **Status:** `PARTIAL`
-- **Severity:** `Critical`
-
-#### Problem
-Secara umum dokumen sudah cukup untuk mulai membangun, tetapi belum cukup terkunci untuk menghindari drift besar bila build dilakukan oleh pembaca yang berbeda atau dalam revisi berulang.
-
-#### Why this matters
-Ini adalah gap readiness paling penting.  
-Sistem bisa mulai dibangun, tetapi belum aman dari:
-- asumsi tambahan;
-- interpretasi berbeda;
-- kontrak integrasi paralel;
-- pergeseran owner secara diam-diam.
-
-#### Expected target state
-Sebelum dinilai sangat matang, sistem harus punya:
-- owner docs yang kuat;
-- bridge integrasi yang tegas;
-- build order yang eksplisit;
-- translation guidance yang cukup rapat.
-
-#### Main evidence
-- seluruh root/domain/architecture docs inti
-
-#### Needed remediation
-- pertahankan GAP-001 dan GAP-002 tetap tertutup;
-- tutup GAP-003;
-- lalu audit ulang secara current-state.
+Aturannya:
+- gap yang sudah tertutup tidak boleh dibiarkan tetap aktif hanya karena diagnosis lama belum dirapikan;
+- active state harus lebih diutamakan daripada histori diagnosis;
+- ketika owner docs, bridge baselines, dan implementation guidance sudah sinkron, tracker wajib dinaikkan ke state tertutup pada ronde yang sama atau ronde setelahnya;
+- gap hanya boleh dibuka kembali bila ada regresi nyata pada dokumen aktif, bukan karena histori audit lama masih tersisa.
 
 ---
 
@@ -221,6 +133,64 @@ Assembly baseline sistem untuk fase aktif sudah cukup eksplisit dan sinkron pada
 GAP ini dianggap tertutup untuk fase aktif saat ini. Buka kembali hanya jika root entry, assembly baseline, implementation entry, atau placement architecture guidance kembali membuka shortcut assembly yang melompati domain contract path.
 
 ---
+
+### GAP-003 — Translation Readiness Locked for the Current Active System
+- **Status:** `PASS / CLOSED`
+- **Severity:** `Closed`
+
+#### Current state
+Translation baseline, module mapping aktif, runtime step layer mapping, DTO boundary aktif, dan canonical example untuk sistem aktif sudah cukup rapat dan sinkron.
+
+#### What is now considered closed
+- modul weekly_swing aktif sudah dipaku ke vocabulary layer arsitektur;
+- producer-facing intake read dan artifact persistence sudah dibedakan eksplisit;
+- kategori DTO/result object aktif sudah dijelaskan dan sinkron lintas dokumen;
+- contoh canonical aktif sudah menjadi pegangan utama translation phase;
+- tracker tidak lagi perlu mempertahankan `GAP-003-A/B/C/D` sebagai gap aktif selama current-state tetap sinkron.
+
+#### Main evidence
+- `docs/system_audit/SYSTEM_TRANSLATION_BASELINE.md`
+- `docs/watchlist/system/implementation/weekly_swing/02_WS_MODULE_MAPPING.md`
+- `docs/watchlist/system/implementation/weekly_swing/03_WS_RUNTIME_ARTIFACT_FLOW.md`
+- `docs/api_architecture/repository.md`
+- `docs/api_architecture/application-service.md`
+- `docs/api_architecture/domain-compute.md`
+- `docs/api_architecture/kontrak-dto.md`
+- `docs/api_architecture/contoh-implementasi-end-to-end.md`
+
+#### Tracking rule
+GAP ini dianggap tertutup untuk fase aktif saat ini. Buka kembali hanya jika mapping layer aktif kembali longgar, boundary DTO/result object kembali kabur, atau contoh canonical aktif kehilangan statusnya sebagai pegangan translation utama.
+
+---
+
+### GAP-004 — Anti-Drift Current-State Control Locked for the Current Active System
+- **Status:** `PASS / CLOSED`
+- **Severity:** `Closed`
+
+#### Current state
+Owner docs, bridge baselines, implementation guidance, canonical examples, dan tracker aktif sudah cukup sinkron untuk menjaga single current-state yang bersih pada fase aktif ini.
+
+#### What is now considered closed
+- source-of-truth hierarchy, no-duplicate-contract rule, dan no-shortcut rules sudah aktif di root dan bridge baselines;
+- contoh aktif tidak lagi bersaing dengan contoh generik sebagai pseudo-contract;
+- tracker aktif sudah disinkronkan ke keadaan dokumen terbaru dan tidak lagi mempertahankan gap lama sebagai status aktif;
+- loop audit kembali tertutup: gap substantif yang sudah selesai sekarang tercermin juga pada current-state tracker.
+
+#### Main evidence
+- `docs/README.md`
+- `docs/system_audit/SYSTEM_READINESS_AUDIT_BASELINE.md`
+- `docs/system_audit/SYSTEM_CROSS_DOMAIN_INPUT_BASELINE.md`
+- `docs/system_audit/SYSTEM_ASSEMBLY_BASELINE.md`
+- `docs/system_audit/SYSTEM_TRANSLATION_BASELINE.md`
+- `docs/system_audit/SYSTEM_READINESS_CONTRACT_TRACKER.md`
+- `docs/api_architecture/contoh-implementasi-end-to-end.md`
+
+#### Tracking rule
+GAP ini dianggap tertutup untuk fase aktif saat ini. Buka kembali hanya jika tracker aktif tertinggal dari state dokumen nyata, jika contoh pelengkap kembali mengambil alih status kontrak, atau jika owner/bridge/implementation guidance kembali tidak sinkron.
+
+---
+
+
 ## Areas Already Strong
 
 ### STRENGTH-001 — Root Ownership Is Clear Enough
@@ -252,33 +222,10 @@ GAP ini dianggap tertutup untuk fase aktif saat ini. Buka kembali hanya jika roo
 ## Current Verdict Snapshot
 
 ### Overall readiness status
-`PARTIAL BUT STRUCTURED`
+`PASS / CLOSED FOR THE CURRENT ACTIVE PHASE`
 
 ### Practical meaning
 Dokumen saat ini:
-- **sudah layak dipakai untuk mulai build**, tetapi
-- **belum layak dianggap fully locked untuk build end-to-end tanpa gap interpretasi signifikan**.
-
-### Current practical verdict
-- `market_data` = kuat
-- `watchlist` = kuat
-- `api_architecture` = kuat
-- `system-level integration readiness` = intake lintas domain dan assembly sudah rapat; sisa gap utama ada pada translation blueprint dan anti-drift tingkat lanjut
-
----
-
-## Update Rule
-
-Tracker ini harus diperbarui bila:
-
-- ada gap yang ditutup;
-- ada gap baru yang ditemukan;
-- ada perubahan owner docs yang memengaruhi readiness lintas domain;
-- ada pergeseran scope audit aktif.
-
-Tracker ini tidak boleh diubah menjadi histori ronde audit.  
-Tracker harus tetap mewakili **status aktif saat ini**.
-
-## Final Rule
-
-Selama masih ada gap `Critical` pada kontrak lintas domain atau readiness sistem tingkat atas, audit tidak boleh menyatakan paket dokumentasi sudah matang penuh untuk membangun sistem utuh tanpa risiko drift besar.
+- **sudah layak dipakai untuk membangun sistem aktif berdasarkan baseline dokumentasi yang ada**;
+- **sudah cukup rapat untuk fase aktif tanpa major assumptions yang sebelumnya menjadi fokus audit system_readiness**;
+- tetap harus diaudit ulang bila nanti ada perluasan scope, domain baru, atau perubahan besar yang membuka kembali drift lintas domain.
