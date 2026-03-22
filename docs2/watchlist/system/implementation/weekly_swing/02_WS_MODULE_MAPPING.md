@@ -59,6 +59,14 @@ Jika terjadi konflik:
 - `WsWatchlistApiPresenter`
 - `WsWatchlistCompositeViewBuilder`
 
+## PLAN intake anchor for module translation
+`WsPlanInputProvider` tidak boleh bebas menentukan source upstream sendiri. Modul ini harus mengikat bacaannya ke intake producer-facing yang sah dari `market-data`, terutama kontrak consumer-readable / publication-aware yang sudah ditunjuk owner producer.
+
+Arti praktisnya:
+- adapter boleh berbeda secara teknis
+- tetapi meaning intake harus tunggal
+- dan tidak boleh diganti dengan raw internals, session snapshot internals, atau technical switch artifacts sebagai source of truth baru
+
 ## Artifact-to-Module Mapping
 
 | Artifact | Producer module(s) | Consumer module(s) | May mutate source artifact? | Persistence required? | Notes |
@@ -71,7 +79,8 @@ Jika terjadi konflik:
 
 ### PLAN Module
 - reads from:
-  - resolved input contract yang sah untuk PLAN
+  - producer-facing, publication-aware upstream intake contract dari `market-data`
+  - resolved PLAN intake adapter yang tunduk pada kontrak tersebut
 - writes to:
   - PLAN artifact
 - must not touch:

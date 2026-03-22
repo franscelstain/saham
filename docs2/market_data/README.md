@@ -42,6 +42,25 @@ Read the boundary layer first:
 - `book/Terminology_and_Scope.md`
 - `book/Domain_Boundary_Invariants_LOCKED.md`
 
+
+## Downstream consumer intake rule
+This domain is the owner of upstream market-data meaning for downstream consumers.
+
+For the active documentation set, any downstream consumer such as `watchlist` must bind its intake to producer-facing contracts from this domain, especially consumer-readable and publication-aware contracts.
+
+A downstream consumer must not:
+- define its own replacement meaning for upstream readability
+- read raw internal pipeline states as if they were consumer-facing output
+- treat intermediate technical artifacts as the authoritative intake path
+
+Use these as the primary intake anchors for downstream consumption:
+- `book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+- `book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
+- `book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
+- `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
+
+This README does not define downstream watchlist behavior. It only fixes the allowed upstream meaning that a downstream consumer may read.
+
 ## Start here
 This README is the orientation document itself. Before using it as the fourth read anchor referenced by `system/` and `audit/`, first read in this order:
 1. `book/Terminology_and_Scope.md`

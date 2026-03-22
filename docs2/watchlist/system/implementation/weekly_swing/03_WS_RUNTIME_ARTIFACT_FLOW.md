@@ -7,7 +7,7 @@ Dokumen ini menjelaskan aliran artifact runtime yang harus dihasilkan aplikasi w
 ## Canonical Flow
 
 ### Step 1 — Build PLAN
-Input EOD yang sah dibaca dan divalidasi.
+Input upstream producer-facing yang sah dari `market-data` dibaca dan divalidasi. Intake ini harus publication-aware dan tunduk pada kontrak consumer-readable/downstream-readable milik producer.
 Output `PLAN` dimaterialize sebagai artifact immutable untuk `trade_date`.
 
 ### Step 2 — Build RECOMMENDATION
@@ -82,3 +82,11 @@ Traceability detail implementasi dibaca bersama `02_WS_MODULE_MAPPING.md`, terut
 - owner policy doc -> module area
 - runtime artifact -> serializer / publisher / repository
 - contract acceptance -> implementation test suite
+
+
+## Invalid intake shortcuts
+Step 1 tidak boleh diimplementasikan sebagai salah satu shortcut berikut:
+- membaca raw bars atau raw indicators lalu menganggapnya otomatis setara dengan intake consumer-facing
+- membaca session snapshot internals sebagai source utama PLAN
+- membaca technical switching artifacts sebagai pengganti current publication semantics
+- membuat istilah baru `input EOD sah` tanpa anchor ke kontrak producer-facing `market-data`

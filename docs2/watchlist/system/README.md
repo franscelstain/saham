@@ -16,6 +16,19 @@ System docs watchlist:
 Policy aktif yang dibahas saat ini hanya:
 - `policies/weekly_swing/`
 
+
+## Upstream Intake Read First
+Sebelum membaca owner docs Weekly Swing, pembaca yang ingin membangun sistem watchlist harus lebih dulu mengikat intake upstream dari `market-data` ke kontrak producer-facing yang sah.
+
+Minimum anchor:
+1. `../../market_data/README.md`
+2. `../../market_data/book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+3. `../../market_data/book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
+4. `../../market_data/book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
+5. `../../market_data/book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
+
+Setelah jalur intake upstream ini jelas, baru lanjut ke owner docs Weekly Swing di bawah.
+
 ## Read First
 
 1. `policies/weekly_swing/01_WS_OVERVIEW.md`

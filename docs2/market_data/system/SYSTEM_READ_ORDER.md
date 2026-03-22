@@ -36,6 +36,21 @@ Setelah empat anchor ini dipahami, pembaca boleh memakai `system/` dan `audit/` 
 15. `evidence/` for actual archived proof if populated
 16. `audit/` checklists/templates/reports for evaluation output
 
+
+## Downstream consumer read path
+Jika pembaca datang dari domain consumer seperti `watchlist`, jalur baca minimum yang sah adalah:
+1. `book/Terminology_and_Scope.md`
+2. `book/Domain_Boundary_Invariants_LOCKED.md`
+3. `docs/market_data/README.md`
+4. `book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+5. `book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
+6. `book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
+7. `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
+
+Baru setelah itu pembaca boleh lanjut ke `docs/watchlist/README.md` dan `docs/api_architecture/README.md`.
+
+Jalur ini ada untuk mencegah downstream consumer membaca internals market-data secara bebas.
+
 ## Read path by audit layer
 ### For Layer A
 Use the mandatory outer read order first, then focus on:
@@ -59,3 +74,7 @@ Only after contracts and guidance are understood, inspect:
 
 ## Prohibited shortcut
 Jangan memulai audit hanya dari `system/` atau hanya dari `audit/`. Itu akan membuat pembaca terlalu jauh dari source-of-truth yang locked.
+
+
+## Prohibited downstream shortcut
+Downstream consumer tidak boleh memulai intake dari raw bars, raw indicators, session snapshot internals, atau technical switch procedures lalu menganggapnya setara dengan consumer-facing read model tanpa owner contract yang eksplisit.

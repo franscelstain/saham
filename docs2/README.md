@@ -37,6 +37,9 @@ Saat membangun, mengubah, atau meninjau sistem:
 
 7. **Jika ada konflik antar dokumen, ikuti hirarki source of truth yang dijelaskan di README ini dan README domain terkait.**
 
+8. **Consumer domain tidak boleh bebas memilih jalur baca upstream sendiri.**
+   Jika `watchlist` membaca `market_data`, maka intake harus mengikuti kontrak producer-facing milik `market_data`, bukan memilih raw internals atau artifact teknis lain hanya karena implementasi teknis memungkinkan.
+
 ---
 
 ## 3. Folder ownership
@@ -140,6 +143,20 @@ Mulai dari:
 Lalu ikuti jalur baca yang ditentukan di dalam folder `watchlist`.
 
 ---
+### Jika ingin memahami integrasi `market_data -> watchlist`
+Mulai dari:
+- `docs/market_data/README.md`
+- kontrak consumer-facing/downstream-facing yang dirujuk oleh `market_data`
+- `docs/watchlist/README.md`
+- `docs/watchlist/system/README.md`
+- `docs/api_architecture/README.md`
+
+Urutan ini wajib diikuti agar:
+- arti input tetap dimiliki producer,
+- perilaku watchlist tetap dimiliki consumer,
+- dan aturan implementasi tidak diam-diam menciptakan kontrak intake paralel.
+
+---
 
 ### Jika ingin memahami shared foundation
 Mulai dari:
@@ -164,8 +181,9 @@ Saat membuat sistem, urutannya harus seperti ini:
 1. pahami domain yang ingin dibangun,
 2. baca source of truth domain tersebut,
 3. pahami kontrak input/output dan batas perilaku,
-4. baru terapkan aturan implementasi dari `api_architecture`,
-5. baru menulis kode.
+4. jika build melibatkan lintas domain producer -> consumer, kunci dulu jalur intake upstream yang sah,
+5. baru terapkan aturan implementasi dari `api_architecture`,
+6. baru menulis kode.
 
 Urutan ini penting agar:
 - implementasi tidak mendahului kontrak,
@@ -307,3 +325,9 @@ Jika ada keraguan saat membangun sistem, kembali ke:
 3. aturan implementasi dari `api_architecture`.
 
 Jangan mulai dari asumsi, kebiasaan coding, atau pola lama yang belum tentu sesuai dengan spesifikasi sistem ini.
+---
+
+### F. Cross-domain input must not fork
+Untuk hubungan lintas domain, terutama `market_data -> watchlist`, tidak boleh ada lebih dari satu makna jalur intake yang sama-sama dianggap sah.
+
+`watchlist` wajib membaca input upstream dari kontrak producer-facing yang jelas dari `market_data`. `api_architecture` hanya dipakai setelah jalur intake itu dikunci, bukan untuk membenarkan shortcut membaca internals producer.

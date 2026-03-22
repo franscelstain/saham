@@ -35,3 +35,23 @@ Paket ini harus jujur terhadap operating model. Bila sumber data masih gratis/pu
 - reproducibility and sealing → `book/Audit_Hash_and_Reproducibility_Contract_LOCKED.md`, `book/Dataset_Seal_and_Freeze_Contract_LOCKED.md`
 - run execution evidence → `ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md`, `ops/Archived_Actual_Execution_Evidence_Contract_LOCKED.md`
 - replay/backtest proof → `backtest/Historical_Replay_and_Data_Quality_Backtest.md`, `backtest/Backtest_Metrics_and_Acceptance_Criteria_LOCKED.md`
+
+
+## Downstream consumer dependency direction
+Market-data is a producer domain. Downstream consumers may depend on its published, consumer-readable output, but they do not own the meaning of that output.
+
+For the active scope, `watchlist` is a downstream consumer of market-data. The dependency direction is:
+- shared foundation -> market-data
+- market-data producer contracts -> watchlist consumer intake
+- `api_architecture` -> implementation translation only
+
+That means `watchlist` must read producer-facing, publication-aware upstream output from market-data, not raw pipeline internals, temporary processing state, or implementation-only artifacts.
+
+## Downstream intake anchor pointers
+For downstream consumers, the minimum authoritative intake anchors are:
+- `book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
+- `book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
+- `book/Downstream_Data_Readiness_Guarantee_LOCKED.md`
+- `book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md`
+
+These anchors exist to keep downstream intake single in meaning.

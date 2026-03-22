@@ -28,6 +28,17 @@ Watchlist bukan owner untuk:
 
 Watchlist hanya memakai data yang sudah tersedia dari domain `market-data` atau input manual yang sah.
 
+### Allowed Upstream Intake
+Untuk scope aktif, intake upstream `watchlist` dari `market-data` harus mengikuti kontrak producer-facing yang jelas dari domain `market_data`, terutama kontrak consumer-readable dan publication-aware yang memang ditujukan untuk downstream consumption.
+
+`watchlist` tidak boleh menganggap hal berikut sebagai jalur intake yang setara tanpa kontrak producer yang eksplisit:
+- raw internal tables / raw bars / raw indicators
+- pipeline state antara
+- technical switching artifacts
+- implementation shortcut yang hanya nyaman untuk kode
+
+Aturan ini ada agar arti input upstream tetap dimiliki producer, sedangkan `watchlist` hanya memiliki perilaku setelah input itu diterima.
+
 
 
 ## Layer Reading Guard
