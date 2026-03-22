@@ -12,7 +12,7 @@ It is separate from `../examples/`, which may contain illustrative or representa
 - `tests/` for actual executed test evidence
 
 ## Admission rule
-Artifacts in this folder should satisfy:
+Artifacts in this folder must satisfy:
 - real execution identity
 - real produced values
 - traceable origin
@@ -31,7 +31,7 @@ The following are invalid under `evidence/`:
 If a bundle is illustrative, simulated, representative, or otherwise non-admissible as actual archived proof, it must live under `../examples/`, not under `evidence/`.
 
 ## Required bundle metadata
-Each bundle under `evidence/` should carry `evidence_admission.json` with at least:
+Each bundle under `evidence/` must carry `evidence_admission.json` with at least:
 - `bundle_type`
 - `bundle_id`
 - `actuality_status`

@@ -1,0 +1,18 @@
+{
+  "run_id": 8131,
+  "trade_date_requested": "2026-03-19",
+  "blocked_reason_code_counts": [
+    {
+      "reason_code": "RUN_FAIL_COVERAGE_BELOW_MINIMUM",
+      "count": 1
+    },
+    {
+      "reason_code": "RUN_FAIL_DATASET_UNREADABLE",
+      "count": 1
+    },
+    {
+      "reason_code": "ELIG_MISSING_BAR",
+      "count": 188
+    }
+  ]
+}

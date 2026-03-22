@@ -1,0 +1,25 @@
+{
+  "bundle_type": "correction",
+  "bundle_id": "correction_9001",
+  "actuality_status": "actual",
+  "admission_status": "accepted",
+  "source_label": "Source: actual executed correction publication",
+  "correction_id": 9001,
+  "run_id_prior": 5001,
+  "run_id_new": 5009,
+  "trade_date": "2026-03-05",
+  "archived_at": "2026-03-06T10:35:00+07:00",
+  "traceability_ref": [
+    "correction_request.json",
+    "prior_publication_manifest.json",
+    "new_publication_manifest.json",
+    "correction_diff.json",
+    "publication_switch_result.json"
+  ],
+  "source_contract_refs": [
+    "../../ops/Archived_Actual_Execution_Evidence_Contract_LOCKED.md",
+    "../../book/Historical_Correction_and_Reseal_Contract_LOCKED.md",
+    "../../book/Publication_Current_Pointer_Integrity_Contract_LOCKED.md"
+  ],
+  "redaction_status": "none"
+}

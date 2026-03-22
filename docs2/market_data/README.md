@@ -43,12 +43,12 @@ Read the boundary layer first:
 - `book/Domain_Boundary_Invariants_LOCKED.md`
 
 ## Start here
-Read in this order before going deeper into schema, ops, or proof packs:
+This README is the orientation document itself. Before using it as the fourth read anchor referenced by `system/` and `audit/`, first read in this order:
 1. `book/Terminology_and_Scope.md`
 2. `book/Domain_Boundary_Invariants_LOCKED.md`
 3. `book/INDEX.md`
 
-After that, continue according to the work being done:
+After those three anchors, return here and continue according to the work being done:
 - implementation and publication flow → read the implementation-critical contracts below first, then continue to `db/`, `ops/`, and `indicators/` as needed
 - compliance, replay, and correction proof → continue to `tests/`, `backtest/`, and the related proof contracts referenced by `book/INDEX.md`
 - example shape and executed evidence review → use `examples/` and `evidence/` only as companion material, not as a source of new behavior
@@ -121,7 +121,9 @@ This is reflected by:
 - `ops/Run_Execution_Evidence_Pack_Contract_LOCKED.md`
 - `ops/Executed_Run_Admission_Criteria_LOCKED.md`
 - `tests/Executed_Proof_Admission_Criteria_LOCKED.md`
-- files in `examples/`
+- executed bundles archived under `evidence/`
+
+Illustrative shapes may still appear under `examples/`, but they do not count as executed proof.
 
 ## Archived actual execution evidence
 Illustrative examples are not the same as archived actual execution evidence.

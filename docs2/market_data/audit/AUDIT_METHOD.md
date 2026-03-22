@@ -16,20 +16,20 @@ Metode ini dibuat agar audit market-data konsisten, tidak generik, dan tetap men
 10. issue final verdict
 
 ## Mandatory first-read anchors
-Audit tidak boleh dimulai dari summary generik. Audit harus mulai dari anchor resmi paket:
-1. `docs/market_data/README.md`
-2. `book/Terminology_and_Scope.md`
-3. `book/Domain_Boundary_Invariants_LOCKED.md`
-4. `book/INDEX.md`
+Audit tidak boleh dimulai dari summary generik. Audit harus mulai dari anchor resmi paket dan harus tetap sinkron dengan `audit/AUDIT_BASELINE.md`, `system/SYSTEM_READ_ORDER.md`, dan `docs/market_data/README.md`:
+1. `book/Terminology_and_Scope.md`
+2. `book/Domain_Boundary_Invariants_LOCKED.md`
+3. `book/INDEX.md`
+4. `docs/market_data/README.md`
 
-Setelah anchor ini dipahami, baru lanjut ke `system/` dan `audit/` untuk mempercepat navigasi.
+Setelah empat anchor ini dipahami, baru lanjut ke `system/` dan `audit/` untuk mempercepat navigasi. `README.md` di sini dipakai sebagai anchor ke-4, bukan sebagai titik mulai yang menggeser tiga anchor book di atasnya.
 
 ## Repo-shaped reading order
 ### Core orientation
-1. `docs/market_data/README.md`
-2. `book/Terminology_and_Scope.md`
-3. `book/Domain_Boundary_Invariants_LOCKED.md`
-4. `book/INDEX.md`
+1. `book/Terminology_and_Scope.md`
+2. `book/Domain_Boundary_Invariants_LOCKED.md`
+3. `book/INDEX.md`
+4. `docs/market_data/README.md`
 5. `system/README.md`
 6. `system/SYSTEM_BOUNDARY.md`
 7. `audit/AUDIT_BASELINE.md`
@@ -85,3 +85,13 @@ Audit harus memberi FAIL bila:
 - summary mengalahkan contract
 - illustrative material diperlakukan sebagai owner behavior
 - Layer C diklaim tanpa bukti executed-and-traceable
+
+
+## Audit report persistence rule
+Audit output untuk paket aktif harus disimpan sebagai **state saat ini**, bukan sebagai urutan revisi.
+
+Aturannya:
+- gunakan satu file kanonik: `audit/reports/AUDIT_FINAL_STATE.md`
+- jangan membuat final-state report baru dengan suffix `R1`, `R2`, `R3`, dst.
+- jangan menyimpan history audit lama di paket aktif bila history itu tidak dipakai untuk menilai state saat ini
+- remediation report hanya boleh ada selama isu masih terbuka; bila isu selesai, remediation report harus dihapus dari paket aktif

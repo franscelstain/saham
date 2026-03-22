@@ -69,8 +69,7 @@ The following folders are companion material for review and illustration. They d
 - `../evidence/`
 
 ## Freeze note
-This index maps the locked book-level contracts only.
-Normative companion folders contain schema, operations, testing, replay, and proof layers that complete the same source of truth. Companion review folders contain illustration and archived review material only.
+This index maps the primary book-level contracts and the companion normative folders that complete the same source of truth. It must not be read as a list of `LOCKED` files only, because some owned contracts in this book are intentionally non-LOCKED and several companion folders are authoritative support layers. Companion review folders contain illustration and archived review material only.
 
 ## Evidence note
 Archived actual execution evidence is part of the normative proof ecosystem, but is expected to live outside the book folder in an evidence archive area or equivalent official repository.

@@ -26,13 +26,24 @@ Setiap audit minimal harus menghasilkan:
 5. remediation items
 6. final verdict
 
+## Audit-output state rule
+Output audit pada paket aktif harus **state-based**, bukan **revision-based**.
+
+Artinya:
+- audit aktif harus berdiri pada state dokumen saat ini
+- audit aktif tidak boleh bergantung pada penamaan ronde seperti `R1`, `R2`, `R3`, dst.
+- audit aktif tidak boleh memakai history audit lama sebagai penopang agar verdict saat ini terlihat utuh
+- bila paket sudah bersih, output report aktif harus diringkas menjadi satu final-state report kanonik
+- remediation report hanya boleh hidup selama masalahnya masih terbuka
+
 ## How to use this folder
 Urutan minimum:
 1. baca `AUDIT_BASELINE.md`
 2. baca `AUDIT_LAYER_CLASSIFICATION_RULES.md`
 3. baca `AUDIT_DOMAIN_BOUNDARY.md`
 4. jalankan checklist yang sesuai
-5. pakai templates untuk intake, findings, remediation, dan final verdict
+5. baca `audit/reports/AUDIT_FINAL_STATE.md` untuk state audit aktif saat ini
+6. pakai templates bila perlu membuat findings, remediation, atau verdict baru
 
 ## Relationship to other folders
 - `system/` = peta besar sistem tingkat atas

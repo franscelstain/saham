@@ -4,12 +4,12 @@
 Read order untuk paket ini harus mengikuti source-of-truth yang sudah ada, bukan menggantinya dengan summary generik.
 
 ## Mandatory outer read order
-1. `docs/market_data/README.md`
-2. `book/Terminology_and_Scope.md`
-3. `book/Domain_Boundary_Invariants_LOCKED.md`
-4. `book/INDEX.md`
+1. `book/Terminology_and_Scope.md`
+2. `book/Domain_Boundary_Invariants_LOCKED.md`
+3. `book/INDEX.md`
+4. `docs/market_data/README.md`
 
-Setelah empat anchor ini dipahami, pembaca boleh memakai `system/` dan `audit/` untuk navigasi lebih cepat.
+Setelah empat anchor ini dipahami, pembaca boleh memakai `system/` dan `audit/` untuk navigasi lebih cepat. Urutan ini harus tetap sinkron dengan `audit/AUDIT_BASELINE.md` dan `docs/market_data/README.md`.
 
 ## Recommended repo-shaped read order
 ### Orientation

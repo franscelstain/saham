@@ -113,3 +113,14 @@ Sebelum memakai system summary atau audit summary, pembaca harus mengakui jalur 
 4. `docs/market_data/README.md`
 
 Audit docs boleh menambah orientasi, tetapi tidak boleh menggantikan anchor baca tersebut.
+
+
+## Active audit-report state rule
+Audit report dalam paket aktif harus mengikuti model **current-state only**.
+
+Aturannya:
+- report final-state aktif harus bernama tetap: `audit/reports/AUDIT_FINAL_STATE.md`
+- report final-state aktif tidak boleh memakai suffix revisi atau ronde audit
+- paket aktif tidak boleh bergantung pada folder history atau rangkaian report lama untuk memahami verdict saat ini
+- remediation report di paket aktif hanya boleh ada bila memang masih ada temuan PARTIAL / FAIL yang belum selesai
+- setelah temuan ditutup, remediation report aktif harus dihapus agar state audit kembali tunggal dan tidak mengawang

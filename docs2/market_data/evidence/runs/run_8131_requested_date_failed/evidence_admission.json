@@ -1,0 +1,27 @@
+{
+  "bundle_type": "run",
+  "bundle_id": "run_8131_requested_date_failed",
+  "actuality_status": "actual",
+  "admission_status": "accepted",
+  "source_label": "Source: actual executed requested-date failed run",
+  "run_id": 8131,
+  "trade_date_requested": "2026-03-19",
+  "trade_date_effective": "2026-03-19",
+  "archived_at": "2026-03-19T18:16:00+07:00",
+  "execution_window": {
+    "started_at": "2026-03-19T17:40:00+07:00",
+    "finished_at": "2026-03-19T17:52:11+07:00"
+  },
+  "traceability_ref": [
+    "run_summary.json",
+    "run_event_summary.json",
+    "failure_report.md",
+    "blocked_reason_code_counts.json"
+  ],
+  "source_contract_refs": [
+    "../../ops/Archived_Actual_Execution_Evidence_Contract_LOCKED.md",
+    "../../ops/Executed_Run_Admission_Criteria_LOCKED.md",
+    "../../ops/Error_Taxonomy_and_Run_Status_Decision_Table_LOCKED.md"
+  ],
+  "redaction_status": "none"
+}

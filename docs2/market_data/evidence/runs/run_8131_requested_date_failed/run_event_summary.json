@@ -1,0 +1,41 @@
+{
+  "run_id": 8131,
+  "trade_date_requested": "2026-03-19",
+  "event_count": 23,
+  "first_event": {
+    "event_time": "2026-03-19T17:40:00+07:00",
+    "stage": "INGEST_BARS",
+    "event_type": "RUN_CREATED",
+    "severity": "INFO"
+  },
+  "last_event": {
+    "event_time": "2026-03-19T17:52:11+07:00",
+    "stage": "FINALIZE",
+    "event_type": "FINAL_STATUS_COMMITTED",
+    "severity": "ERROR"
+  },
+  "dominant_warning_reason_codes": [
+    {
+      "reason_code": "BAR_DUPLICATE_SOURCE_ROW",
+      "count": 4
+    },
+    {
+      "reason_code": "BAR_MISSING_REQUIRED_FIELD",
+      "count": 39
+    },
+    {
+      "reason_code": "BAR_INVALID_OHLC_ORDER",
+      "count": 34
+    }
+  ],
+  "dominant_error_reason_codes": [
+    {
+      "reason_code": "RUN_FAIL_COVERAGE_BELOW_MINIMUM",
+      "count": 1
+    },
+    {
+      "reason_code": "RUN_FAIL_DATASET_UNREADABLE",
+      "count": 1
+    }
+  ]
+}
