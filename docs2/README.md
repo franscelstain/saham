@@ -167,10 +167,17 @@ Gunakan hanya untuk foundation yang memang bersifat global.
 ---
 
 ### Jika ingin mulai mengimplementasikan kode
-Mulai dari:
+Jangan mulai langsung dari:
 - `docs/api_architecture/`
 
-Gunakan folder ini untuk memahami struktur implementasi yang benar, setelah domain yang relevan sudah dipahami.
+Ikuti dulu jalur assembly berikut:
+1. `docs/README.md`
+2. domain owner yang relevan (`market_data` dan/atau `watchlist`)
+3. baseline lintas-domain yang relevan di `docs/system_audit/`
+4. entry point implementation domain yang relevan
+5. baru `docs/api_architecture/` sebagai **translation phase**
+
+`docs/api_architecture/` dipakai untuk menerjemahkan kontrak domain yang sudah terkunci ke struktur kode yang benar. Folder ini bukan titik awal memahami sistem dan bukan pengganti owner contract domain.
 
 ---
 

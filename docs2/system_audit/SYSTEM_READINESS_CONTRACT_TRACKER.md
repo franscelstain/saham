@@ -48,81 +48,15 @@ Tracker ini hanya melacak kesiapan lintas area berikut:
 | Watchlist downstream contract readiness | PASS | High | `docs/watchlist/` | owner docs watchlist | kuat sebagai consumer baseline |
 | API implementation guardrail readiness | PASS | High | `docs/api_architecture/` | architecture docs | cukup kuat sebagai pedoman implementasi |
 | Cross-domain contract readiness (`market_data -> watchlist`) | PASS | Medium | lintas domain | market-data + watchlist + system_audit | intake lintas domain sudah memiliki anchor producer-facing yang cukup tegas |
-| System assembly readiness | PARTIAL | High | lintas domain | root + domain docs + system_audit | assembly path sistem belum cukup eksplisit dan operasional |
-| Build-order readiness | PARTIAL | High | lintas domain | root README + domain README + api architecture | urutan global ada, tapi penerjemahan lintas domain belum cukup operasional |
-| Anti-drift readiness across owner docs and implementation guidance | PARTIAL | High | lintas domain | root + domain + architecture docs | masih ada ruang interpretasi ganda pada area integrasi |
+| System assembly readiness | PASS | Medium | lintas domain | root + domain docs + system_audit | assembly baseline, global build order, dan translation placement sudah cukup eksplisit |
+| Build-order readiness | PASS | Medium | lintas domain | root README + domain README + system assembly baseline | urutan global dan gating implementation entry sudah cukup jelas |
+| Anti-drift readiness across owner docs and implementation guidance | PARTIAL | Medium | lintas domain | root + domain + architecture docs + tracker | struktur sudah lebih rapat, tetapi guidance translation lintas layer masih perlu dipertegas untuk fase aktif |
 | Runtime-proof claim discipline | PASS | Medium | lintas domain | audit reading of docs | belum terlihat klaim runtime yang berlebihan pada area inti |
-| Readiness to build full system without major assumptions | PARTIAL | Critical | lintas domain | seluruh dokumen inti | masih butuh bridge docs lintas domain agar build tidak liar |
+| Readiness to build full system without major assumptions | PARTIAL | High | lintas domain | seluruh dokumen inti | major assumptions utama sudah turun, tetapi readiness penuh masih menunggu penutupan GAP-003 dan GAP-004 |
 
 ---
 
 ## Active Gaps
-
-### GAP-001 — Cross-Domain Input Contract Still Too Loose
-- **Status:** `PARTIAL`
-- **Severity:** `Critical`
-
-#### Problem
-Hubungan `market_data -> watchlist` sudah benar secara arah, tetapi belum cukup terkunci sebagai kontrak intake lintas domain yang eksplisit dan mudah diterjemahkan ke implementasi.
-
-#### Why this matters
-Tanpa kontrak intake yang cukup tegas:
-- engineer bisa membuat jalur baca upstream berbeda-beda;
-- DTO intake bisa berbeda antar implementasi;
-- boundary ownership bisa tetap terlihat benar di dokumen, tapi meleset saat build nyata.
-
-#### Expected target state
-Harus ada baseline yang tegas tentang:
-- apa input sah yang boleh dipakai watchlist dari upstream;
-- dokumen owner mana yang menjadi anchor intake;
-- apa yang tidak boleh dibaca langsung oleh watchlist;
-- bagaimana posisi publication-aware read model terhadap consumer watchlist.
-
-#### Main evidence
-- `docs/market_data/README.md`
-- `docs/market_data/book/Downstream_Consumer_Read_Model_Contract_LOCKED.md`
-- `docs/market_data/book/EOD_Eligibility_Snapshot_Contract_LOCKED.md`
-- `docs/watchlist/README.md`
-- dokumen owner watchlist yang menjelaskan PLAN / RECOMMENDATION / CONFIRM
-
-#### Needed remediation
-- buat atau rapatkan satu baseline integrasi lintas domain yang eksplisit;
-- kunci istilah intake agar tidak muncul kontrak paralel;
-- tegaskan jalur baca upstream yang sah untuk watchlist.
-
----
-
-### GAP-002 — System Assembly Baseline Not Yet Explicit Enough
-- **Status:** `PARTIAL`
-- **Severity:** `High`
-
-#### Problem
-Dokumen domain sudah kuat masing-masing, tetapi belum ada baseline assembly sistem yang cukup jelas untuk menunjukkan bagaimana domain-domain itu dirangkai menjadi satu build path.
-
-#### Why this matters
-Tanpa assembly baseline:
-- pembaca tahu owner per domain, tetapi belum tentu tahu urutan perakitan sistem;
-- implementasi bisa benar per folder, tapi salah sebagai sistem utuh.
-
-#### Expected target state
-Harus ada gambaran yang jelas tentang:
-- upstream producer position;
-- downstream consumer position;
-- posisi implementation guardrail;
-- dependency direction;
-- urutan baca dan urutan build yang tidak ambigu.
-
-#### Main evidence
-- `docs/README.md`
-- `docs/market_data/system/*`
-- `docs/watchlist/system/*`
-- `docs/api_architecture/*`
-
-#### Needed remediation
-- rapatkan satu dokumen assembly / readiness map tingkat sistem;
-- atau perkuat root-level ownership and build-order docs sampai cukup eksplisit.
-
----
 
 ### GAP-003 — Translation from Domain Contracts to Concrete Build Blueprint Is Still Partial
 - **Status:** `PARTIAL`
@@ -182,89 +116,67 @@ Sebelum dinilai sangat matang, sistem harus punya:
 - seluruh root/domain/architecture docs inti
 
 #### Needed remediation
-- tutup GAP-001, GAP-002, dan GAP-003;
+- pertahankan GAP-001 dan GAP-002 tetap tertutup;
+- tutup GAP-003;
 - lalu audit ulang secara current-state.
 
 ---
 
+## Closed Gaps
 
+### GAP-001 — Cross-Domain Input Contract Locked for Current Active Domains
+- **Status:** `PASS / CLOSED`
+- **Severity:** `Closed`
 
-### GAP-002-A — No Explicit System Assembly Map
-- **Status:** `PARTIAL`
-- **Severity:** `High`
+#### Current state
+Hubungan `market_data -> watchlist` untuk intake lintas domain pada fase aktif sudah memiliki anchor producer-facing yang cukup tegas.
 
-#### Problem
-Belum ada satu baseline yang secara eksplisit merakit root ownership, producer contract, consumer behavior, dan architecture translation menjadi satu jalur assembly sistem.
+#### What is now considered closed
+- jalur intake upstream sudah memiliki makna tunggal;
+- producer owner untuk intake meaning sudah jelas;
+- consumer tidak lagi bebas memilih raw internals sebagai shortcut;
+- blueprint implementation watchlist sudah merujuk ke kontrak producer-facing minimum.
 
-#### Expected target state
-Harus ada peta assembly yang menjelaskan phase, dependency direction, dan forbidden shortcuts lintas-domain.
+#### Main evidence
+- `docs/market_data/README.md`
+- `docs/market_data/system/SYSTEM_DATA_PRODUCT_MAP.md`
+- `docs/watchlist/README.md`
+- `docs/watchlist/system/implementation/weekly_swing/02_WS_MODULE_MAPPING.md`
+- `docs/watchlist/system/implementation/weekly_swing/03_WS_RUNTIME_ARTIFACT_FLOW.md`
+- `docs/system_audit/SYSTEM_CROSS_DOMAIN_INPUT_BASELINE.md`
+
+#### Tracking rule
+GAP ini dianggap tertutup untuk fase aktif saat ini. Buka kembali hanya jika ada perubahan yang melemahkan jalur intake producer-facing atau menciptakan kontrak intake paralel baru.
+
+---
+
+### GAP-002 — System Assembly Readiness Locked for the Current Active System
+- **Status:** `PASS / CLOSED`
+- **Severity:** `Closed`
+
+#### Current state
+Assembly baseline sistem untuk fase aktif sudah cukup eksplisit dan sinkron pada root entry, assembly bridge, watchlist implementation entry, dan placement `api_architecture` sebagai translation phase.
+
+#### What is now considered closed
+- peta assembly sistem eksplisit sudah tersedia;
+- global build order lintas domain sudah cukup operasional;
+- implementation entry watchlist sudah digate oleh prerequisites assembly;
+- `api_architecture` sudah diposisikan sebagai translation phase, bukan titik awal memahami sistem;
+- tracker aktif tidak lagi perlu memecah GAP-002 menjadi sub-gap terpisah selama current-state tetap sinkron.
 
 #### Main evidence
 - `docs/README.md`
 - `docs/system_audit/SYSTEM_ASSEMBLY_BASELINE.md`
 - `docs/watchlist/system/README.md`
-- `docs/api_architecture/README.md`
-
-#### Needed remediation
-- perkuat root README sebagai entry point assembly;
-- tambahkan baseline assembly khusus;
-- sinkronkan entry point watchlist dan architecture docs.
-
-### GAP-002-B — No Global Build Order Across Domains
-- **Status:** `PARTIAL`
-- **Severity:** `High`
-
-#### Problem
-Read order internal per domain sudah ada, tetapi urutan build global lintas-domain belum cukup operasional untuk implementer sistem utuh.
-
-#### Expected target state
-Harus ada global build order yang jelas dari producer contract sampai implementation translation.
-
-#### Main evidence
-- `docs/README.md`
-- `docs/system_audit/SYSTEM_ASSEMBLY_BASELINE.md`
 - `docs/watchlist/system/implementation/README.md`
-
-#### Needed remediation
-- tulis build order global di root dan baseline assembly;
-- gate implementation entry dengan prerequisites yang eksplisit.
-
-### GAP-002-C — Architecture Guidance Not Yet Positioned as Translation Phase
-- **Status:** `PARTIAL`
-- **Severity:** `High`
-
-#### Problem
-`docs/api_architecture/` sudah kuat sebagai guardrail, tetapi belum cukup diposisikan sebagai fase translation setelah kontrak domain stabil.
-
-#### Expected target state
-Harus jelas kapan architecture guidance mulai wajib dan apa yang boleh diterjemahkan tanpa mendefinisikan ulang policy domain.
-
-#### Main evidence
 - `docs/api_architecture/README.md`
-- `docs/api_architecture/panduan-adopsi-minimum.md`
 - `docs/api_architecture/contoh-implementasi-end-to-end.md`
+- `docs/api_architecture/panduan-adopsi-minimum.md`
 
-#### Needed remediation
-- tambahkan placement yang eksplisit;
-- tambahkan contoh sistem aktif yang menunjukkan producer -> consumer -> translation chain.
+#### Tracking rule
+GAP ini dianggap tertutup untuk fase aktif saat ini. Buka kembali hanya jika root entry, assembly baseline, implementation entry, atau placement architecture guidance kembali membuka shortcut assembly yang melompati domain contract path.
 
-### GAP-002-D — Implementation Entry Points Not Yet Gated by Assembly Prerequisites
-- **Status:** `PARTIAL`
-- **Severity:** `High`
-
-#### Problem
-Entry point implementation watchlist belum cukup dipaksa untuk tunduk pada prerequisites system assembly.
-
-#### Expected target state
-Implementation folder hanya boleh dimasuki setelah producer contract, consumer behavior, dan cross-domain baseline stabil.
-
-#### Main evidence
-- `docs/watchlist/system/README.md`
-- `docs/watchlist/system/implementation/README.md`
-
-#### Needed remediation
-- tambahkan preconditions dan phase transition yang eksplisit.
-
+---
 ## Areas Already Strong
 
 ### STRENGTH-001 — Root Ownership Is Clear Enough
@@ -296,7 +208,7 @@ Implementation folder hanya boleh dimasuki setelah producer contract, consumer b
 ## Current Verdict Snapshot
 
 ### Overall readiness status
-`PARTIAL BUT STRONG`
+`PARTIAL BUT STRUCTURED`
 
 ### Practical meaning
 Dokumen saat ini:
@@ -307,7 +219,7 @@ Dokumen saat ini:
 - `market_data` = kuat
 - `watchlist` = kuat
 - `api_architecture` = kuat
-- `system-level integration readiness` = belum rapat penuh
+- `system-level integration readiness` = intake lintas domain dan assembly sudah rapat; sisa gap utama ada pada translation blueprint dan anti-drift tingkat lanjut
 
 ---
 
